@@ -46,18 +46,25 @@ export default function Orders() {
     confidence: 'all'
   });
 
+  const [queryInfo, setQueryInfo] = useState({ filter: null, count: 0 });
+
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', tenantId, filters.dateRange],
     queryFn: async () => {
-      if (!tenantId) return [];
-      console.log('[Orders] Fetching orders for tenant:', tenantId);
+      if (!tenantId) {
+        console.log('[Orders] No tenantId, returning empty');
+        return [];
+      }
+      
+      const queryFilter = { tenant_id: tenantId };
+      console.log('[Orders] Fetching orders with filter:', JSON.stringify(queryFilter));
       
       // Fetch all orders for tenant, sorted by order_date desc
-      const allOrders = await base44.entities.Order.filter({ 
-        tenant_id: tenantId 
-      }, '-order_date', 1000);
+      const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
       
-      console.log('[Orders] Fetched', allOrders.length, 'orders');
+      console.log('[Orders] Fetched', allOrders.length, 'orders for tenant:', tenantId);
+      setQueryInfo({ filter: queryFilter, count: allOrders.length });
+      
       return allOrders;
     },
     enabled: !!tenantId && !tenantLoading
@@ -141,6 +148,8 @@ export default function Orders() {
         tenantId={tenantId} 
         ordersCount={orders.length}
         debug={debug}
+        queryFilter={queryInfo.filter}
+        dateRange={filters.dateRange}
       />
 
       {/* Header */}
