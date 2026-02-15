@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -31,11 +31,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
-import { useTenantResolver } from '../components/useTenantResolver';
 import DebugBanner from '../components/DebugBanner';
 
 export default function Orders() {
-  const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = useTenantResolver();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -46,24 +44,145 @@ export default function Orders() {
     confidence: 'all'
   });
 
-  const [queryInfo, setQueryInfo] = useState({ filter: null, count: 0 });
+  // Direct tenant resolution without hook - for debugging
+  const [tenantState, setTenantState] = useState({
+    tenant: null,
+    tenantId: null,
+    shopDomain: null,
+    loading: true,
+    debug: { env: 'prod', resolved_via: null, url_shop_param: null }
+  });
+  
+  const [queryInfo, setQueryInfo] = useState({ 
+    filter: null, 
+    count: 0, 
+    dateStart: null,
+    dateEnd: null,
+    dateField: 'order_date'
+  });
+
+  // Resolve tenant directly on mount
+  useEffect(() => {
+    async function resolveTenant() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let shopParam = urlParams.get('shop');
+      
+      const debug = {
+        env: 'prod',
+        url_shop_param: shopParam,
+        resolved_via: null,
+        pathname: window.location.pathname
+      };
+      
+      console.log('[Orders] URL:', window.location.href);
+      console.log('[Orders] shop param:', shopParam);
+      
+      let resolvedTenant = null;
+      let resolvedShopDomain = null;
+      
+      // Method 1: URL shop param
+      if (shopParam) {
+        resolvedShopDomain = shopParam.includes('.myshopify.com') 
+          ? shopParam.toLowerCase().trim()
+          : `${shopParam.toLowerCase().trim()}.myshopify.com`;
+        
+        debug.resolved_via = 'url_param';
+        console.log('[Orders] Looking up tenant by shop_domain:', resolvedShopDomain);
+        
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
+        console.log('[Orders] Found tenants:', tenants.length, tenants.map(t => ({ id: t.id, shop: t.shop_domain })));
+        
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+        }
+      }
+      
+      // Method 2: User's tenant_id
+      if (!resolvedTenant) {
+        try {
+          const user = await base44.auth.me();
+          console.log('[Orders] User:', user?.email, 'tenant_id:', user?.tenant_id);
+          
+          if (user?.tenant_id) {
+            debug.resolved_via = 'user_tenant';
+            const tenants = await base44.entities.Tenant.filter({ id: user.tenant_id });
+            if (tenants.length > 0) {
+              resolvedTenant = tenants[0];
+              resolvedShopDomain = resolvedTenant.shop_domain;
+            }
+          }
+        } catch (e) {
+          console.log('[Orders] No user auth');
+        }
+      }
+      
+      // Method 3: Fallback - first tenant
+      if (!resolvedTenant) {
+        debug.resolved_via = 'fallback_first';
+        const tenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
+        console.log('[Orders] Fallback tenants:', tenants.length);
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          resolvedShopDomain = resolvedTenant.shop_domain;
+        }
+      }
+      
+      debug.tenant_id = resolvedTenant?.id;
+      debug.shop_domain = resolvedShopDomain;
+      
+      console.log('[Orders] Final resolved tenant:', resolvedTenant?.id, 'shop:', resolvedShopDomain);
+      
+      setTenantState({
+        tenant: resolvedTenant,
+        tenantId: resolvedTenant?.id || null,
+        shopDomain: resolvedShopDomain,
+        loading: false,
+        debug
+      });
+    }
+    
+    resolveTenant();
+  }, []);
+
+  const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = tenantState;
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', tenantId, filters.dateRange],
+    queryKey: ['orders', tenantId],
     queryFn: async () => {
       if (!tenantId) {
         console.log('[Orders] No tenantId, returning empty');
+        setQueryInfo({ filter: null, count: 0, dateStart: null, dateEnd: null, dateField: 'order_date' });
         return [];
       }
       
+      // Simple query: just tenant_id, no date filtering at DB level
       const queryFilter = { tenant_id: tenantId };
-      console.log('[Orders] Fetching orders with filter:', JSON.stringify(queryFilter));
+      
+      console.log('[Orders] ====== QUERY START ======');
+      console.log('[Orders] Environment: PRODUCTION');
+      console.log('[Orders] tenant_id:', tenantId);
+      console.log('[Orders] Query filter:', JSON.stringify(queryFilter));
       
       // Fetch all orders for tenant, sorted by order_date desc
       const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
       
-      console.log('[Orders] Fetched', allOrders.length, 'orders for tenant:', tenantId);
-      setQueryInfo({ filter: queryFilter, count: allOrders.length });
+      console.log('[Orders] ====== QUERY RESULT ======');
+      console.log('[Orders] Returned count:', allOrders.length);
+      if (allOrders.length > 0) {
+        console.log('[Orders] First order:', allOrders[0].order_number, allOrders[0].order_date);
+        console.log('[Orders] Last order:', allOrders[allOrders.length-1].order_number, allOrders[allOrders.length-1].order_date);
+      }
+      
+      const now = new Date();
+      const dateStart = subDays(now, 30);
+      
+      setQueryInfo({ 
+        filter: queryFilter, 
+        count: allOrders.length,
+        dateStart: dateStart.toISOString(),
+        dateEnd: now.toISOString(),
+        dateField: 'order_date'
+      });
       
       return allOrders;
     },
@@ -150,6 +269,7 @@ export default function Orders() {
         debug={debug}
         queryFilter={queryInfo.filter}
         dateRange={filters.dateRange}
+        queryInfo={queryInfo}
       />
 
       {/* Header */}
