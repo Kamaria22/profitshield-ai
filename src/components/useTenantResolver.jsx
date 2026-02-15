@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 
 /**
  * Hook to resolve the current tenant from Shopify embedded app context.
- * Priority: URL param "shop" > session/user.tenant_id
+ * Priority: URL param "shop" > session/user.tenant_id > fallback first tenant
  * 
  * Returns: { tenant, tenantId, shopDomain, loading, error, debug }
  */
@@ -22,35 +22,58 @@ export function useTenantResolver() {
   }, []);
 
   const resolveTenant = async () => {
+    const debug = {
+      env: 'prod',
+      url_shop_param: null,
+      resolved_via: null,
+      query_filter: null
+    };
+
     try {
       // 1. Extract shop domain from URL params (Shopify embedded app)
       const urlParams = new URLSearchParams(window.location.search);
       let shopDomain = urlParams.get('shop');
+      debug.url_shop_param = shopDomain;
       
-      const debug = {
-        url_shop_param: shopDomain,
-        resolved_via: null,
-        env: 'prod'
-      };
+      console.log('[useTenantResolver] URL shop param:', shopDomain);
+      
+      let tenant = null;
       
       if (shopDomain) {
-        debug.resolved_via = 'url_param';
         // Normalize
         shopDomain = shopDomain.includes('.myshopify.com') 
           ? shopDomain.toLowerCase().trim()
           : `${shopDomain.toLowerCase().trim()}.myshopify.com`;
+        
+        debug.resolved_via = 'url_param';
+        debug.shop_domain = shopDomain;
+        
+        // Query tenant directly by shop_domain
+        debug.query_filter = { shop_domain: shopDomain };
+        console.log('[useTenantResolver] Querying Tenant by shop_domain:', shopDomain);
+        
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+        console.log('[useTenantResolver] Found tenants:', tenants.length);
+        
+        if (tenants.length > 0) {
+          tenant = tenants[0];
+        }
       }
       
-      // 2. If no shop param, try to get from user's tenant
-      if (!shopDomain) {
+      // 2. If no tenant from shop param, try user's tenant
+      if (!tenant) {
         try {
           const user = await base44.auth.me();
+          console.log('[useTenantResolver] User tenant_id:', user?.tenant_id);
+          
           if (user?.tenant_id) {
+            debug.query_filter = { id: user.tenant_id };
             const tenants = await base44.entities.Tenant.filter({ id: user.tenant_id });
             if (tenants.length > 0) {
-              shopDomain = tenants[0].shop_domain;
+              tenant = tenants[0];
+              shopDomain = tenant.shop_domain;
               debug.resolved_via = 'user_tenant';
-              debug.user_tenant_id = user.tenant_id;
+              debug.shop_domain = shopDomain;
             }
           }
         } catch (e) {
@@ -58,47 +81,38 @@ export function useTenantResolver() {
         }
       }
       
-      // 3. If still no shop domain, check for demo tenant
-      if (!shopDomain) {
-        const demoTenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
-        if (demoTenants.length > 0) {
-          shopDomain = demoTenants[0].shop_domain;
+      // 3. Fallback to first tenant (for demo)
+      if (!tenant) {
+        console.log('[useTenantResolver] Falling back to first tenant');
+        debug.query_filter = {};
+        const tenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
+        if (tenants.length > 0) {
+          tenant = tenants[0];
+          shopDomain = tenant.shop_domain;
           debug.resolved_via = 'fallback_first_tenant';
+          debug.shop_domain = shopDomain;
         }
       }
       
-      if (!shopDomain) {
+      if (!tenant) {
         setState({
           tenant: null,
           tenantId: null,
           shopDomain: null,
           loading: false,
-          error: 'No shop domain found. Please access from Shopify Admin.',
+          error: 'No tenant found. Please connect your Shopify store.',
           debug
         });
         return;
       }
       
-      debug.shop_domain = shopDomain;
-      
-      // 4. Call backend to resolve/create tenant
-      const response = await base44.functions.invoke('resolveTenant', { shop_domain: shopDomain });
-      const data = response.data;
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      debug.tenant_id = data.tenant_id;
-      
-      // 5. Fetch full tenant data
-      const tenants = await base44.entities.Tenant.filter({ id: data.tenant_id });
-      const tenant = tenants.length > 0 ? tenants[0] : null;
+      debug.tenant_id = tenant.id;
+      console.log('[useTenantResolver] Resolved tenant_id:', tenant.id, 'shop:', shopDomain);
       
       setState({
         tenant,
-        tenantId: data.tenant_id,
-        shopDomain: data.shop_domain,
+        tenantId: tenant.id,
+        shopDomain: shopDomain,
         loading: false,
         error: null,
         debug
