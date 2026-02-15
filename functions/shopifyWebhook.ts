@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     
     const url = new URL(req.url);
     const topic = req.headers.get('x-shopify-topic');
-    const shopDomain = req.headers.get('x-shopify-shop-domain');
+    let shopDomain = req.headers.get('x-shopify-shop-domain');
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256');
     const webhookId = req.headers.get('x-shopify-webhook-id');
     
@@ -176,15 +176,28 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required headers' }, { status: 400 });
     }
     
+    // Normalize shop domain
+    shopDomain = shopDomain.includes('.myshopify.com') 
+      ? shopDomain.toLowerCase().trim()
+      : `${shopDomain.toLowerCase().trim()}.myshopify.com`;
+    
+    console.log('[shopifyWebhook] Received webhook:', topic, 'for shop:', shopDomain);
+    
     const body = await req.text();
     
-    // Find tenant by shop domain
-    const tenants = await base44.asServiceRole.entities.Tenant.filter({ shop_domain: shopDomain });
+    // Resolve tenant by shop domain (single source of truth)
+    const tenants = await base44.asServiceRole.entities.Tenant.filter({ 
+      shop_domain: shopDomain,
+      platform: 'shopify'
+    });
+    
     if (tenants.length === 0) {
+      console.error('[shopifyWebhook] Unknown shop:', shopDomain);
       return Response.json({ error: 'Unknown shop' }, { status: 404 });
     }
     
     const tenant = tenants[0];
+    console.log('[shopifyWebhook] Resolved tenant_id:', tenant.id);
     
     // Verify HMAC if webhook secret is set
     if (tenant.webhook_secret && hmacHeader) {
@@ -222,10 +235,13 @@ Deno.serve(async (req) => {
     
     // Process based on topic
     if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
+      console.log('[shopifyWebhook] Processing order:', payload.id);
       await processOrder(base44, tenant, payload);
     } else if (topic === 'refunds/create') {
+      console.log('[shopifyWebhook] Processing refund:', payload.id);
       await processRefund(base44, tenant, payload);
     } else if (topic === 'app/uninstalled') {
+      console.log('[shopifyWebhook] Processing uninstall for tenant:', tenant.id);
       await handleUninstall(base44, tenant);
     }
     
@@ -235,7 +251,8 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString()
     });
     
-    return Response.json({ status: 'ok' });
+    console.log('[shopifyWebhook] Successfully processed:', topic);
+    return Response.json({ status: 'ok', tenant_id: tenant.id });
     
   } catch (error) {
     console.error('Webhook error:', error);

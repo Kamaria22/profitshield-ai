@@ -69,31 +69,54 @@ Deno.serve(async (req) => {
       // Get current user
       const user = await base44.auth.me();
       
-      // Check if tenant exists
+      // Resolve tenant (single source of truth)
+      console.log('[shopifyAuth] Resolving tenant for shop:', shopDomain);
+      
       let tenant;
       const existingTenants = await base44.asServiceRole.entities.Tenant.filter({ 
-        shop_domain: shopDomain 
+        shop_domain: shopDomain,
+        platform: 'shopify'
       });
       
       if (existingTenants.length > 0) {
         tenant = existingTenants[0];
         await base44.asServiceRole.entities.Tenant.update(tenant.id, {
-          status: 'pending_setup',
+          status: 'active',
           shop_name: shopData.name || shopDomain
         });
+        console.log('[shopifyAuth] Updated existing tenant:', tenant.id);
       } else {
         // Create new tenant
         tenant = await base44.asServiceRole.entities.Tenant.create({
           shop_domain: shopDomain,
           shop_name: shopData.name || shopDomain,
           platform: 'shopify',
-          status: 'pending_setup',
+          status: 'active',
           subscription_tier: 'trial',
           monthly_order_limit: 100,
           orders_this_month: 0,
+          onboarding_completed: true,
           trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           currency: shopData.currency || 'USD',
           webhook_secret: crypto.randomUUID()
+        });
+        console.log('[shopifyAuth] Created new tenant:', tenant.id);
+        
+        // Create default TenantSettings
+        await base44.asServiceRole.entities.TenantSettings.create({
+          tenant_id: tenant.id,
+          default_payment_fee_pct: 2.9,
+          default_payment_fee_fixed: 0.3,
+          default_platform_fee_pct: 0,
+          shipping_buffer_pct: 10,
+          high_risk_threshold: 70,
+          medium_risk_threshold: 40,
+          enable_discount_protection: false,
+          enable_shipping_alerts: true,
+          enable_risk_alerts: true,
+          weekly_report_enabled: true,
+          badge_public: false,
+          badge_style: 'light'
         });
       }
       
