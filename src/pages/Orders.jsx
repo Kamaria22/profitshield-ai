@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -31,10 +31,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
+import { useTenantResolver } from '../components/useTenantResolver';
+import DebugBanner from '../components/DebugBanner';
 
 export default function Orders() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
+  const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = useTenantResolver();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -45,51 +46,43 @@ export default function Orders() {
     confidence: 'all'
   });
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
-      }
-    } catch (e) {
-      console.log('Error loading user:', e);
-    }
-  };
-
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders', tenant?.id],
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders', tenantId, filters.dateRange],
     queryFn: async () => {
-      if (!tenant?.id) return [];
-      return base44.entities.Order.filter({ 
-        tenant_id: tenant.id 
+      if (!tenantId) return [];
+      console.log('[Orders] Fetching orders for tenant:', tenantId);
+      
+      // Fetch all orders for tenant, sorted by order_date desc
+      const allOrders = await base44.entities.Order.filter({ 
+        tenant_id: tenantId 
       }, '-order_date', 1000);
+      
+      console.log('[Orders] Fetched', allOrders.length, 'orders');
+      return allOrders;
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
   });
+
+  const isLoading = tenantLoading || ordersLoading;
 
   // Apply filters
   const filteredOrders = React.useMemo(() => {
     let result = [...orders];
 
-    // Date range filter
+    // Date range filter on order_date
     const days = parseInt(filters.dateRange);
     const startDate = subDays(new Date(), days);
     result = result.filter(o => o.order_date && new Date(o.order_date) >= startDate);
 
-    // Search
+    // Search: order_number, platform_order_id, customer_email, customer_name, notes
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(o => 
         o.order_number?.toLowerCase().includes(term) ||
+        o.platform_order_id?.toLowerCase().includes(term) ||
         o.customer_name?.toLowerCase().includes(term) ||
-        o.customer_email?.toLowerCase().includes(term)
+        o.customer_email?.toLowerCase().includes(term) ||
+        o.notes?.toLowerCase().includes(term)
       );
     }
 
@@ -142,6 +135,14 @@ export default function Orders() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Banner */}
+      <DebugBanner 
+        shopDomain={shopDomain} 
+        tenantId={tenantId} 
+        ordersCount={orders.length}
+        debug={debug}
+      />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Orders</h1>

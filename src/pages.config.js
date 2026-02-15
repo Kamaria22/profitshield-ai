@@ -47,24 +47,24 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import Alerts from './pages/Alerts';
 import Home from './pages/Home';
+import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
 import Products from './pages/Products';
-import Alerts from './pages/Alerts';
-import Shipping from './pages/Shipping';
 import Settings from './pages/Settings';
-import Onboarding from './pages/Onboarding';
+import Shipping from './pages/Shipping';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "Alerts": Alerts,
     "Home": Home,
+    "Onboarding": Onboarding,
     "Orders": Orders,
     "Products": Products,
-    "Alerts": Alerts,
-    "Shipping": Shipping,
     "Settings": Settings,
-    "Onboarding": Onboarding,
+    "Shipping": Shipping,
 }
 
 export const pagesConfig = {

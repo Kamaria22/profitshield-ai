@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
@@ -30,64 +30,49 @@ import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import MetricCard from '../components/dashboard/MetricCard';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import ProfitChart from '../components/dashboard/ProfitChart';
+import { useTenantResolver } from '../components/useTenantResolver';
+import DebugBanner from '../components/DebugBanner';
 
 export default function Home() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
+  const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug } = useTenantResolver();
   const [dateRange, setDateRange] = useState('30');
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
-      }
-    } catch (e) {
-      console.log('Error loading user:', e);
-    }
-  };
-
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', tenant?.id, dateRange],
+    queryKey: ['orders', tenantId, dateRange],
     queryFn: async () => {
-      if (!tenant?.id) return [];
-      const startDate = subDays(new Date(), parseInt(dateRange));
-      return base44.entities.Order.filter({ 
-        tenant_id: tenant.id 
+      if (!tenantId) return [];
+      console.log('[Home] Fetching orders for tenant:', tenantId);
+      const allOrders = await base44.entities.Order.filter({ 
+        tenant_id: tenantId 
       }, '-order_date', 500);
+      console.log('[Home] Fetched', allOrders.length, 'orders');
+      return allOrders;
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
   });
 
   const { data: profitLeaks = [], isLoading: leaksLoading } = useQuery({
-    queryKey: ['profitLeaks', tenant?.id],
+    queryKey: ['profitLeaks', tenantId],
     queryFn: async () => {
-      if (!tenant?.id) return [];
+      if (!tenantId) return [];
       return base44.entities.ProfitLeak.filter({ 
-        tenant_id: tenant.id,
+        tenant_id: tenantId,
         is_resolved: false 
       }, '-impact_amount', 10);
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
   });
 
   const { data: pendingAlerts = [] } = useQuery({
-    queryKey: ['pendingAlerts', tenant?.id],
+    queryKey: ['pendingAlerts', tenantId],
     queryFn: async () => {
-      if (!tenant?.id) return [];
+      if (!tenantId) return [];
       return base44.entities.Alert.filter({ 
-        tenant_id: tenant.id,
+        tenant_id: tenantId,
         status: 'pending' 
       }, '-created_date', 5);
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
   });
 
   // Calculate metrics
@@ -143,13 +128,27 @@ export default function Home() {
   const topLeaks = profitLeaks.slice(0, 3);
   const totalLeakImpact = profitLeaks.reduce((sum, l) => sum + (l.impact_amount || 0), 0);
 
-  if (!tenant) {
+  if (tenantLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-emerald-500 mx-auto mb-4 animate-spin" />
+          <p className="text-slate-500">Loading your store...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tenant && !tenantLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <Sparkles className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-900 mb-2">Welcome to ProfitShield AI</h2>
           <p className="text-slate-500 mb-4">Connect your Shopify store to get started</p>
+          {tenantError && (
+            <p className="text-red-500 text-sm mb-4">{tenantError}</p>
+          )}
           <Link to={createPageUrl('Onboarding')}>
             <Button className="bg-emerald-600 hover:bg-emerald-700">
               Connect Store
@@ -163,6 +162,14 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Banner */}
+      <DebugBanner 
+        shopDomain={shopDomain} 
+        tenantId={tenantId} 
+        ordersCount={orders.length}
+        debug={debug}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
