@@ -53,6 +53,7 @@ import Products from './pages/Products';
 import Alerts from './pages/Alerts';
 import Shipping from './pages/Shipping';
 import Settings from './pages/Settings';
+import Onboarding from './pages/Onboarding';
 import __Layout from './Layout.jsx';
 
 
@@ -63,6 +64,7 @@ export const PAGES = {
     "Alerts": Alerts,
     "Shipping": Shipping,
     "Settings": Settings,
+    "Onboarding": Onboarding,
 }
 
 export const pagesConfig = {
