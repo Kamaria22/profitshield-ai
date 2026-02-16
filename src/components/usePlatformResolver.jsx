@@ -26,7 +26,8 @@ import {
   persistContext,
   clearContext,
   normalizeStoreKey,
-  hasValidContext
+  hasValidContext,
+  isPersistedContextExpired
 } from '@/components/platformContext';
 
 /**
@@ -125,10 +126,11 @@ export function usePlatformResolver() {
     trace.steps.push(traceStep(TRACE_STEP.PARSE_URL, urlParams, true, null));
     
     // =====================
-    // STEP 2: Parse Persisted
+    // STEP 2: Parse Persisted (with TTL check)
     // =====================
-    const persisted = getPersistedContext();
-    trace.steps.push(traceStep(TRACE_STEP.PARSE_PERSISTED, persisted, true, null));
+    const persisted = getPersistedContext(); // TTL enforced internally
+    const isExpired = isPersistedContextExpired();
+    trace.steps.push(traceStep(TRACE_STEP.PARSE_PERSISTED, { ...persisted, isExpired }, !isExpired || !persisted.persistedAt, isExpired ? 'Context expired (TTL)' : null));
     
     // =====================
     // STEP 3: Authenticate User
@@ -152,9 +154,31 @@ export function usePlatformResolver() {
       storeKey = urlParams.storeKey;
       chosenBy = 'url';
       trace.steps.push(traceStep('priority_url', { platform, storeKey }, true, 'Using URL context'));
+      
+      // HARD VALIDATION: Shopify embedded requires host
+      if (platform === 'shopify' && urlParams.embedded === '1' && !urlParams.host) {
+        trace.steps.push(traceStep('embedded_validation', { embedded: urlParams.embedded, host: urlParams.host }, false, 'Missing host in embedded mode'));
+        trace.finishedAt = Date.now();
+        trace.chosenBy = 'url_invalid';
+        
+        setState({
+          status: RESOLVER_STATUS.ERROR,
+          tenantId: null,
+          tenant: null,
+          user,
+          platform,
+          storeKey,
+          integration: null,
+          integrationId: null,
+          availableStores: [],
+          reason: 'missing_host_in_embedded',
+          trace
+        });
+        return;
+      }
     }
-    // P2: Persisted context
-    else if (hasValidContext(persisted)) {
+    // P2: Persisted context (skip if expired - TTL already enforced in getPersistedContext)
+    else if (hasValidContext(persisted) && !isExpired) {
       platform = persisted.platform;
       storeKey = persisted.storeKey;
       tenantId = persisted.tenantId;
@@ -173,6 +197,29 @@ export function usePlatformResolver() {
           store_key: storeKey
         });
         
+        // HARD VALIDATION: Check for duplicate store_keys
+        if (integrations.length > 1) {
+          trace.steps.push(traceStep('duplicate_check', { count: integrations.length }, false, 'Multiple integrations for same store_key'));
+          // This is ambiguous - needs selection
+          trace.finishedAt = Date.now();
+          trace.chosenBy = 'duplicate_store_key';
+          
+          setState({
+            status: RESOLVER_STATUS.NEEDS_SELECTION,
+            tenantId: null,
+            tenant: null,
+            user,
+            platform,
+            storeKey,
+            integration: null,
+            integrationId: null,
+            availableStores: integrations,
+            reason: 'duplicate_store_key',
+            trace
+          });
+          return;
+        }
+        
         // Find connected one first, then any
         integration = integrations.find(i => i.status === 'connected') || integrations[0];
         
@@ -180,6 +227,35 @@ export function usePlatformResolver() {
           integrationId = integration.id;
           tenantId = integration.tenant_id;
           trace.steps.push(traceStep(TRACE_STEP.LOOKUP_INTEGRATION, { id: integration.id, status: integration.status }, true, null));
+          
+          // HARD VALIDATION: Verify tenant exists and matches
+          try {
+            const tenantCheck = await base44.entities.Tenant.filter({ id: integration.tenant_id });
+            if (!tenantCheck.length) {
+              trace.steps.push(traceStep('tenant_validation', { tenant_id: integration.tenant_id }, false, 'Integration points to missing tenant'));
+              clearContext();
+              trace.finishedAt = Date.now();
+              trace.chosenBy = 'invalid_tenant';
+              
+              setState({
+                status: RESOLVER_STATUS.ERROR,
+                tenantId: null,
+                tenant: null,
+                user,
+                platform,
+                storeKey,
+                integration: null,
+                integrationId: null,
+                availableStores: [],
+                reason: 'integration_tenant_mismatch',
+                trace
+              });
+              return;
+            }
+            tenant = tenantCheck[0];
+          } catch (tenantErr) {
+            trace.steps.push(traceStep('tenant_validation', { error: tenantErr.message }, false, 'Tenant lookup failed'));
+          }
           
           // Anti-stale: verify integration is still connected
           if (integration.status !== 'connected') {
@@ -192,8 +268,63 @@ export function usePlatformResolver() {
           }
         } else {
           trace.steps.push(traceStep(TRACE_STEP.LOOKUP_INTEGRATION, null, false, 'No integration found for platform/storeKey'));
-          // Persisted context is stale
-          if (chosenBy === 'persisted') {
+          
+          // AUTO-HEAL: Try to create PlatformIntegration from Tenant
+          if (platform === 'shopify' && storeKey && chosenBy === 'url') {
+            trace.steps.push(traceStep('auto_heal_attempt', { platform, storeKey }, true, 'Attempting auto-heal'));
+            
+            try {
+              // Look for tenant with matching shop_domain
+              const matchingTenants = await base44.entities.Tenant.filter({ shop_domain: storeKey });
+              
+              if (matchingTenants.length > 0) {
+                const matchedTenant = matchingTenants[0];
+                
+                // Create PlatformIntegration (idempotent - already checked it doesn't exist)
+                const newIntegration = await base44.entities.PlatformIntegration.create({
+                  tenant_id: matchedTenant.id,
+                  platform: 'shopify',
+                  store_key: storeKey,
+                  store_url: `https://${storeKey}`,
+                  store_name: matchedTenant.shop_name || storeKey,
+                  status: 'connected',
+                  is_primary: true,
+                  api_version: '2024-01',
+                  scopes: ['read_orders', 'read_products', 'read_customers'],
+                  sync_config: { auto_sync_enabled: true, sync_frequency_minutes: 15 }
+                });
+                
+                // Log to AuditLogs
+                try {
+                  await base44.entities.AuditLog.create({
+                    tenant_id: matchedTenant.id,
+                    event_type: 'resolver_autocreate_integration',
+                    action: 'create',
+                    entity_type: 'PlatformIntegration',
+                    entity_id: newIntegration.id,
+                    details: { platform, store_key: storeKey, auto_healed: true },
+                    user_email: user?.email || 'system'
+                  });
+                } catch (auditErr) {
+                  console.warn('[Resolver] Audit log failed:', auditErr.message);
+                }
+                
+                integration = newIntegration;
+                integrationId = newIntegration.id;
+                tenantId = matchedTenant.id;
+                tenant = matchedTenant;
+                
+                trace.steps.push(traceStep('auto_heal_success', { integration_id: newIntegration.id, tenant_id: matchedTenant.id }, true, 'Auto-created PlatformIntegration'));
+              } else {
+                trace.steps.push(traceStep('auto_heal_failed', null, false, 'No matching tenant found for auto-heal'));
+              }
+            } catch (healErr) {
+              trace.steps.push(traceStep('auto_heal_error', { error: healErr.message }, false, 'Auto-heal failed'));
+            }
+          }
+          
+          // If still no integration and was persisted, clear stale context
+          if (!integration && chosenBy === 'persisted') {
             clearContext();
             platform = null;
             storeKey = null;
@@ -251,7 +382,7 @@ export function usePlatformResolver() {
     if (isStale()) return;
     
     // =====================
-    // STEP 5: Lookup Tenant
+    // STEP 5: Lookup Tenant (if not already loaded)
     // =====================
     if (tenantId && !tenant) {
       try {
@@ -272,12 +403,12 @@ export function usePlatformResolver() {
         integration.platform === platform &&
         integration.store_key === storeKey;
       
-      trace.steps.push(traceStep(TRACE_STEP.VALIDATE_INVARIANTS, { ok: invariantsOk }, invariantsOk, null));
+      trace.steps.push(traceStep(TRACE_STEP.VALIDATE_INVARIANTS, { ok: invariantsOk }, invariantsOk, invariantsOk ? null : 'Invariant mismatch detected'));
       
-      // Shopify embedded requires host
-      if (platform === 'shopify' && urlParams.embedded === '1' && !urlParams.host) {
-        reason = 'missing_host_in_embedded';
-        trace.steps.push(traceStep('shopify_embedded_check', { host: urlParams.host }, false, 'Missing host in embedded mode'));
+      // If invariants fail, this is a critical error
+      if (!invariantsOk) {
+        clearContext();
+        reason = 'integration_tenant_mismatch';
       }
     }
     
