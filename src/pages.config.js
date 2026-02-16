@@ -56,13 +56,13 @@ import Home from './pages/Home';
 import Integrations from './pages/Integrations';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
+import PnLAnalytics from './pages/PnLAnalytics';
 import Products from './pages/Products';
+import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import PnLAnalytics from './pages/PnLAnalytics';
-import SelectStore from './pages/SelectStore';
 import __Layout from './Layout.jsx';
 
 
@@ -76,13 +76,13 @@ export const PAGES = {
     "Integrations": Integrations,
     "Onboarding": Onboarding,
     "Orders": Orders,
+    "PnLAnalytics": PnLAnalytics,
     "Products": Products,
+    "SelectStore": SelectStore,
     "Settings": Settings,
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "PnLAnalytics": PnLAnalytics,
-    "SelectStore": SelectStore,
 }
 
 export const pagesConfig = {
