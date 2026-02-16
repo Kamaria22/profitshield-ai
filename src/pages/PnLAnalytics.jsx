@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { useTenantResolver } from '@/components/useTenantResolver';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,9 @@ const DATE_PRESETS = [
 ];
 
 export default function PnLAnalytics() {
-  const { tenantId, loading: tenantLoading } = useTenantResolver();
+  const { tenantId, status } = usePlatformResolver();
   const { hasPermission } = usePermissions();
+  const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
   
   const [datePreset, setDatePreset] = useState('30d');
   const [dateRange, setDateRange] = useState(DATE_PRESETS[2].getDates());

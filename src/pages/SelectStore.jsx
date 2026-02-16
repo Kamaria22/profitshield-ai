@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/hooks/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
