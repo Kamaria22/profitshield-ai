@@ -51,12 +51,13 @@ function calculateOrderProfit(order, costMappings, settings) {
   };
 }
 
-// Calculate risk scores
-function calculateRiskScores(order, settings) {
+// Calculate risk scores with custom rules support
+function calculateRiskScores(order, settings, customRules = []) {
   let fraudScore = 0;
   let returnScore = 0;
   let chargebackScore = 0;
   const riskReasons = [];
+  let customRuleAction = null;
   
   const orderTotal = parseFloat(order.total_price || 0);
   const isFirstOrder = !order.customer || order.customer.orders_count <= 1;
@@ -89,10 +90,26 @@ function calculateRiskScores(order, settings) {
   }
   
   if (isFirstOrder) returnScore += 20;
+
+  // Apply custom risk rules
+  for (const rule of customRules) {
+    if (evaluateCustomRule(rule, order, orderTotal, isFirstOrder, discountCount)) {
+      const adjustment = rule.risk_adjustment || 0;
+      fraudScore += adjustment;
+      riskReasons.push(`Custom rule: ${rule.name}`);
+      
+      if (rule.action && rule.action !== 'none') {
+        const actionPriority = { cancel: 4, hold: 3, verify: 2, flag: 1 };
+        if (!customRuleAction || actionPriority[rule.action] > actionPriority[customRuleAction]) {
+          customRuleAction = rule.action;
+        }
+      }
+    }
+  }
   
-  fraudScore = Math.min(fraudScore, 100);
-  returnScore = Math.min(returnScore, 100);
-  chargebackScore = Math.min(chargebackScore, 100);
+  fraudScore = Math.min(100, Math.max(0, fraudScore));
+  returnScore = Math.min(100, Math.max(0, returnScore));
+  chargebackScore = Math.min(100, Math.max(0, chargebackScore));
   
   const maxScore = Math.max(fraudScore, chargebackScore);
   const highThreshold = settings?.high_risk_threshold || 70;
@@ -101,7 +118,14 @@ function calculateRiskScores(order, settings) {
   let riskLevel = 'low';
   let recommendedAction = 'none';
   
-  if (maxScore >= highThreshold) {
+  if (customRuleAction) {
+    recommendedAction = customRuleAction;
+    if (customRuleAction === 'cancel' || customRuleAction === 'hold') {
+      riskLevel = 'high';
+    } else {
+      riskLevel = 'medium';
+    }
+  } else if (maxScore >= highThreshold) {
     riskLevel = 'high';
     recommendedAction = 'hold';
   } else if (maxScore >= mediumThreshold) {
@@ -117,6 +141,78 @@ function calculateRiskScores(order, settings) {
     risk_reasons: riskReasons,
     recommended_action: recommendedAction
   };
+}
+
+// Evaluate custom rule against order data (simplified for sync)
+function evaluateCustomRule(rule, order, orderTotal, isFirstOrder, discountCount) {
+  const conditions = rule.conditions || [];
+  
+  for (const condition of conditions) {
+    const { field, operator, value } = condition;
+    let fieldValue;
+    
+    switch (field) {
+      case 'order_value':
+        fieldValue = orderTotal;
+        break;
+      case 'is_first_order':
+        fieldValue = isFirstOrder;
+        break;
+      case 'has_discount_code':
+        fieldValue = discountCount > 0;
+        break;
+      case 'discount_pct':
+        const discountTotal = order.discount_codes?.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0) || 0;
+        fieldValue = orderTotal > 0 ? (discountTotal / (orderTotal + discountTotal)) * 100 : 0;
+        break;
+      case 'shipping_country':
+        fieldValue = order.shipping_address?.country_code || order.shipping_address?.country || '';
+        break;
+      case 'item_count':
+        fieldValue = order.line_items?.length || 1;
+        break;
+      default:
+        continue;
+    }
+    
+    if (!evaluateCondition(fieldValue, operator, value, field)) {
+      return false;
+    }
+  }
+  
+  return conditions.length > 0;
+}
+
+function evaluateCondition(fieldValue, operator, compareValue, field) {
+  // Boolean fields
+  if (field === 'is_first_order' || field === 'has_discount_code') {
+    const boolValue = compareValue === 'true' || compareValue === true;
+    return operator === 'equals' ? fieldValue === boolValue : fieldValue !== boolValue;
+  }
+  
+  // Numeric fields
+  const numericFields = ['order_value', 'discount_pct', 'item_count'];
+  if (numericFields.includes(field)) {
+    const numField = parseFloat(fieldValue) || 0;
+    const numCompare = parseFloat(compareValue) || 0;
+    switch (operator) {
+      case 'greater_than': return numField > numCompare;
+      case 'less_than': return numField < numCompare;
+      case 'equals': return numField === numCompare;
+      case 'not_equals': return numField !== numCompare;
+    }
+  }
+  
+  // String fields
+  const strField = String(fieldValue).toLowerCase();
+  const strCompare = String(compareValue).toLowerCase();
+  switch (operator) {
+    case 'equals': return strField === strCompare;
+    case 'not_equals': return strField !== strCompare;
+    case 'contains': return strField.includes(strCompare);
+    case 'not_contains': return !strField.includes(strCompare);
+    default: return false;
+  }
 }
 
 function mapOrderStatus(order) {
@@ -218,10 +314,11 @@ Deno.serve(async (req) => {
     const { orders: shopifyOrders } = await shopifyRes.json();
     console.log('[syncShopifyOrders] Fetched orders from Shopify:', shopifyOrders.length);
     
-    // Get cost mappings and settings
-    const [costMappings, settingsData] = await Promise.all([
+    // Get cost mappings, settings, and custom risk rules
+    const [costMappings, settingsData, customRules] = await Promise.all([
       base44.asServiceRole.entities.CostMapping.filter({ tenant_id: tenant.id }),
-      base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id })
+      base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id }),
+      base44.asServiceRole.entities.RiskRule.filter({ tenant_id: tenant.id, is_active: true })
     ]);
     const settings = settingsData[0] || {};
     
@@ -230,7 +327,7 @@ Deno.serve(async (req) => {
     
     for (const orderData of shopifyOrders) {
       const profitData = calculateOrderProfit(orderData, costMappings, settings);
-      const riskData = calculateRiskScores(orderData, settings);
+      const riskData = calculateRiskScores(orderData, settings, customRules);
       
       const existingOrders = await base44.asServiceRole.entities.Order.filter({
         tenant_id: tenant.id,

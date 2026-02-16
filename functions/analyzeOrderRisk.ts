@@ -37,8 +37,14 @@ Deno.serve(async (req) => {
       medium_risk_threshold: 40
     };
 
-    // Perform comprehensive risk analysis
-    const riskAnalysis = analyzeRisk(order, customerOrders, tenantSettings);
+    // Fetch custom risk rules
+    const customRules = await base44.asServiceRole.entities.RiskRule.filter({ 
+      tenant_id, 
+      is_active: true 
+    });
+
+    // Perform comprehensive risk analysis with custom rules
+    const riskAnalysis = analyzeRisk(order, customerOrders, tenantSettings, customRules);
 
     // Update the order with risk analysis results
     await base44.asServiceRole.entities.Order.update(order_id, {
@@ -81,11 +87,12 @@ Deno.serve(async (req) => {
   }
 });
 
-function analyzeRisk(order, customerOrders, settings) {
+function analyzeRisk(order, customerOrders, settings, customRules = []) {
   const riskFactors = [];
   let fraudScore = 0;
   let returnScore = 0;
   let chargebackScore = 0;
+  let customRuleAction = null;
 
   // 1. New Customer Analysis
   const isFirstOrder = customerOrders.length <= 1;
@@ -192,6 +199,24 @@ function analyzeRisk(order, customerOrders, settings) {
     chargebackScore += 10;
   }
 
+  // 10. Apply Custom Risk Rules
+  for (const rule of customRules) {
+    const ruleMatches = evaluateCustomRule(rule, order, customerOrders);
+    if (ruleMatches) {
+      const adjustment = rule.risk_adjustment || 0;
+      fraudScore += adjustment;
+      riskFactors.push(`Custom rule: ${rule.name} (${adjustment > 0 ? '+' : ''}${adjustment})`);
+      
+      // Track rule action (most severe takes priority)
+      if (rule.action && rule.action !== 'none') {
+        const actionPriority = { cancel: 4, hold: 3, verify: 2, flag: 1 };
+        if (!customRuleAction || actionPriority[rule.action] > actionPriority[customRuleAction]) {
+          customRuleAction = rule.action;
+        }
+      }
+    }
+  }
+
   // Calculate combined risk score
   const combinedScore = Math.min(100, Math.round(
     (fraudScore * 0.5) + (returnScore * 0.25) + (chargebackScore * 0.25)
@@ -205,9 +230,11 @@ function analyzeRisk(order, customerOrders, settings) {
     riskLevel = 'medium';
   }
 
-  // Determine recommended action
+  // Determine recommended action (custom rules can override)
   let recommendedAction = 'none';
-  if (riskLevel === 'high') {
+  if (customRuleAction) {
+    recommendedAction = customRuleAction;
+  } else if (riskLevel === 'high') {
     if (fraudScore >= 60) {
       recommendedAction = 'cancel';
     } else if (fraudScore >= 40) {
@@ -235,9 +262,9 @@ function analyzeRisk(order, customerOrders, settings) {
   else if (confidenceScore < 80) confidence = 'medium';
 
   return {
-    fraud_score: Math.min(100, fraudScore),
-    return_score: Math.min(100, returnScore),
-    chargeback_score: Math.min(100, chargebackScore),
+    fraud_score: Math.min(100, Math.max(0, fraudScore)),
+    return_score: Math.min(100, Math.max(0, returnScore)),
+    chargeback_score: Math.min(100, Math.max(0, chargebackScore)),
     combined_score: combinedScore,
     risk_level: riskLevel,
     risk_reasons: riskFactors,
@@ -245,4 +272,81 @@ function analyzeRisk(order, customerOrders, settings) {
     confidence,
     confidence_score: confidenceScore
   };
+}
+
+// Evaluate a custom risk rule against an order
+function evaluateCustomRule(rule, order, customerOrders) {
+  const conditions = rule.conditions || [];
+  
+  // All conditions must match (AND logic)
+  for (const condition of conditions) {
+    const { field, operator, value } = condition;
+    let fieldValue = getFieldValue(field, order, customerOrders);
+    let compareValue = value;
+    
+    // Type coercion for numeric fields
+    const numericFields = ['order_value', 'discount_pct', 'customer_orders', 'item_count'];
+    if (numericFields.includes(field)) {
+      fieldValue = parseFloat(fieldValue) || 0;
+      compareValue = parseFloat(value) || 0;
+    }
+    
+    // Boolean fields
+    if (field === 'is_first_order' || field === 'has_discount_code') {
+      fieldValue = !!fieldValue;
+      compareValue = value === 'true' || value === true;
+    }
+    
+    const matches = evaluateCondition(fieldValue, operator, compareValue);
+    if (!matches) return false;
+  }
+  
+  return true;
+}
+
+function getFieldValue(field, order, customerOrders) {
+  switch (field) {
+    case 'order_value':
+      return order.total_revenue || 0;
+    case 'discount_pct':
+      const total = order.total_revenue || 0;
+      const discount = order.discount_total || 0;
+      return total > 0 ? (discount / (total + discount)) * 100 : 0;
+    case 'customer_orders':
+      return customerOrders.length;
+    case 'product_type':
+      // Would need line items with product type data
+      return order.platform_data?.line_items?.[0]?.product_type || '';
+    case 'shipping_country':
+      return order.shipping_address?.country || order.shipping_address?.country_code || '';
+    case 'payment_method':
+      return order.platform_data?.payment_gateway_names?.[0] || '';
+    case 'is_first_order':
+      return order.is_first_order || customerOrders.length <= 1;
+    case 'has_discount_code':
+      return (order.discount_codes || []).length > 0;
+    case 'item_count':
+      return order.platform_data?.line_items?.length || 1;
+    default:
+      return null;
+  }
+}
+
+function evaluateCondition(fieldValue, operator, compareValue) {
+  switch (operator) {
+    case 'equals':
+      return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+    case 'not_equals':
+      return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+    case 'greater_than':
+      return Number(fieldValue) > Number(compareValue);
+    case 'less_than':
+      return Number(fieldValue) < Number(compareValue);
+    case 'contains':
+      return String(fieldValue).toLowerCase().includes(String(compareValue).toLowerCase());
+    case 'not_contains':
+      return !String(fieldValue).toLowerCase().includes(String(compareValue).toLowerCase());
+    default:
+      return false;
+  }
 }
