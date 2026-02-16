@@ -280,6 +280,27 @@ function LayoutContent({ children, currentPageName }) {
   const status = resolver.status || RESOLVER_STATUS.RESOLVING;
   const user = resolver.user || null;
   const stores = Array.isArray(resolver.availableStores) ? resolver.availableStores : [];
+  
+  // Derived values needed for hooks
+  const activeUser = user || permUser;
+  const isAdmin = isUserAdmin(activeUser);
+
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  // Memoized nav items
+  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin);
+  
+  // Memoized handlers
+  const handleLogoutMemo = useCallback(() => {
+    try {
+      base44.auth.logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+      window.location.href = '/';
+    }
+  }, []);
+  
+  const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
+  const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
 
   // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
@@ -314,15 +335,8 @@ function LayoutContent({ children, currentPageName }) {
     }
   }, [status, currentPageName, navigate, location.search]);
 
-  const handleLogout = () => {
-    try {
-      base44.auth.logout();
-    } catch (e) {
-      console.error('Logout error:', e);
-      window.location.href = '/';
-    }
-  };
-
+  // ============= EARLY RETURNS AFTER ALL HOOKS =============
+  
   // Bypass layout for certain pages
   const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'];
   if (bypassLayoutPages.includes(currentPageName)) {
@@ -342,24 +356,6 @@ function LayoutContent({ children, currentPageName }) {
   }
 
   const showMissingContextBanner = status === RESOLVER_STATUS.ERROR;
-  const activeUser = user || permUser;
-  const isAdmin = isUserAdmin(activeUser);
-  
-  // Memoized nav items
-  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin);
-  
-  // Memoized handlers
-  const handleLogoutMemo = useCallback(() => {
-    try {
-      base44.auth.logout();
-    } catch (e) {
-      console.error('Logout error:', e);
-      window.location.href = '/';
-    }
-  }, []);
-  
-  const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
-  const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
   
   // Store info - only display when resolved
   const storeDisplayName = isResolved && resolver.integration?.store_name 
