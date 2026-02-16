@@ -42,6 +42,21 @@ export default function Home() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Check OAuth token status
+  const { data: tokenStatus } = useQuery({
+    queryKey: ['oauthToken', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return { hasToken: false };
+      const tokens = await base44.entities.OAuthToken.filter({ 
+        tenant_id: tenantId, 
+        platform: 'shopify',
+        is_valid: true 
+      });
+      return { hasToken: tokens.length > 0 };
+    },
+    enabled: !!tenantId && !tenantLoading
+  });
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       if (!tenantId) throw new Error('No store connected');
@@ -267,8 +282,9 @@ export default function Home() {
           <Button 
             variant="outline" 
             onClick={() => createTestOrderMutation.mutate()}
-            disabled={createTestOrderMutation.isPending || !tenantId}
+            disabled={createTestOrderMutation.isPending || !tenantId || !tokenStatus?.hasToken}
             className="gap-2"
+            title={!tokenStatus?.hasToken ? 'Connect Shopify first in Settings' : ''}
           >
             <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
             {createTestOrderMutation.isPending ? 'Creating...' : 'Create Test Order'}
@@ -276,7 +292,8 @@ export default function Home() {
           <Button 
             variant="outline" 
             onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || !tenantId}
+            disabled={syncMutation.isPending || !tenantId || !tokenStatus?.hasToken}
+            title={!tokenStatus?.hasToken ? 'Connect Shopify first in Settings' : ''}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
             {syncMutation.isPending ? 'Syncing...' : 'Sync Orders'}
@@ -340,6 +357,33 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Shopify Connection Warning */}
+      {tenantId && tokenStatus?.hasToken === false && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-red-800">Shopify Connection Required</p>
+                  <p className="text-sm text-red-600">
+                    Connect your Shopify store to sync orders and create test orders
+                  </p>
+                </div>
+              </div>
+              <Link to={`/settings${window.location.search}`}>
+                <Button className="bg-red-600 hover:bg-red-700 text-white">
+                  Connect Store
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alerts Banner */}
       {pendingAlerts.length > 0 && (
