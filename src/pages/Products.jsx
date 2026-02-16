@@ -23,7 +23,7 @@ import {
 
 import ProductsTable from '../components/products/ProductsTable';
 import ProductCostEditor from '../components/products/ProductCostEditor';
-import useTenantResolver from '../components/useTenantResolver';
+import { useTenantResolver } from '@/components/useTenantResolver';
 
 export default function Products() {
   const { tenant, tenantId, loading: tenantLoading } = useTenantResolver();
