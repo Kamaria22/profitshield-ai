@@ -76,6 +76,44 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Execute Shopify actions from matched custom rules
+    if (riskAnalysis.matched_shopify_actions?.length > 0 && order.platform_order_id) {
+      for (const shopifyAction of riskAnalysis.matched_shopify_actions) {
+        const requireConfirmation = shopifyAction.config?.require_confirmation !== false;
+
+        if (requireConfirmation || shopifyAction.type === 'cancel_order') {
+          // Create pending action for user confirmation
+          await base44.asServiceRole.entities.PendingShopifyAction.create({
+            tenant_id,
+            order_id: order.id,
+            platform_order_id: order.platform_order_id,
+            order_number: order.order_number,
+            action_type: shopifyAction.type,
+            action_config: shopifyAction.config,
+            source_type: 'risk_rule',
+            source_rule_id: shopifyAction.rule_id,
+            source_rule_name: shopifyAction.rule_name,
+            reason: `Risk rule triggered: ${shopifyAction.rule_name}`,
+            status: 'pending_confirmation'
+          });
+        } else {
+          // Execute immediately
+          try {
+            await base44.asServiceRole.functions.invoke('shopifyOrderActions', {
+              action: 'execute',
+              tenant_id,
+              order_id: order.id,
+              platform_order_id: order.platform_order_id,
+              action_type: shopifyAction.type,
+              action_config: shopifyAction.config
+            });
+          } catch (shopifyError) {
+            console.error('Shopify action failed:', shopifyError);
+          }
+        }
+      }
+    }
+
     return Response.json({ 
       success: true, 
       risk_analysis: riskAnalysis 
@@ -93,6 +131,7 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
   let returnScore = 0;
   let chargebackScore = 0;
   let customRuleAction = null;
+  const matchedShopifyActions = [];
 
   // 1. New Customer Analysis
   const isFirstOrder = customerOrders.length <= 1;
@@ -214,6 +253,16 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
           customRuleAction = rule.action;
         }
       }
+
+      // Track Shopify actions from matched rules
+      if (rule.shopify_action_type && rule.shopify_action_type !== 'none') {
+        matchedShopifyActions.push({
+          type: rule.shopify_action_type,
+          config: rule.shopify_action_config || {},
+          rule_id: rule.id,
+          rule_name: rule.name
+        });
+      }
     }
   }
 
@@ -270,7 +319,8 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     risk_reasons: riskFactors,
     recommended_action: recommendedAction,
     confidence,
-    confidence_score: confidenceScore
+    confidence_score: confidenceScore,
+    matched_shopify_actions: matchedShopifyActions
   };
 }
 

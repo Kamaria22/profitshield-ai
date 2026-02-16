@@ -285,4 +285,42 @@ View this order in ProfitShield to take action.
       console.error(`Failed to execute action ${action.type}:`, actionError);
     }
   }
+
+  // Handle Shopify actions
+  const shopifyActionType = rule.shopify_action_type;
+  if (shopifyActionType && shopifyActionType !== 'none' && order.platform_order_id) {
+    const shopifyConfig = rule.shopify_action_config || {};
+    const requireConfirmation = shopifyConfig.require_confirmation !== false;
+
+    if (requireConfirmation || shopifyActionType === 'cancel_order') {
+      // Create pending action for user confirmation
+      await base44.asServiceRole.entities.PendingShopifyAction.create({
+        tenant_id: tenantId,
+        order_id: order.id,
+        platform_order_id: order.platform_order_id,
+        order_number: order.order_number,
+        action_type: shopifyActionType,
+        action_config: shopifyConfig,
+        source_type: 'alert_rule',
+        source_rule_id: rule.id,
+        source_rule_name: rule.name,
+        reason: alertResult.message,
+        status: 'pending_confirmation'
+      });
+    } else {
+      // Execute immediately (non-destructive actions without confirmation)
+      try {
+        await base44.asServiceRole.functions.invoke('shopifyOrderActions', {
+          action: 'execute',
+          tenant_id: tenantId,
+          order_id: order.id,
+          platform_order_id: order.platform_order_id,
+          action_type: shopifyActionType,
+          action_config: shopifyConfig
+        });
+      } catch (shopifyError) {
+        console.error('Shopify action failed:', shopifyError);
+      }
+    }
+  }
 }

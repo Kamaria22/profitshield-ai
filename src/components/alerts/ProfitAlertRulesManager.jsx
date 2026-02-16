@@ -35,11 +35,13 @@ import {
   Mail,
   Flag,
   Pause,
-  ClipboardList
+  ClipboardList,
+  Store
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ShopifyActionsConfig from './ShopifyActionsConfig';
 
 const alertTypeConfig = {
   low_margin: {
@@ -95,7 +97,9 @@ const emptyRule = {
   comparison_period_days: 30,
   actions: [],
   notify_email: '',
-  severity: 'medium'
+  severity: 'medium',
+  shopify_action_type: 'none',
+  shopify_action_config: {}
 };
 
 export default function ProfitAlertRulesManager({ tenantId, userEmail }) {
@@ -153,7 +157,9 @@ export default function ProfitAlertRulesManager({ tenantId, userEmail }) {
         comparison_period_days: rule.comparison_period_days || 30,
         actions: rule.actions || [],
         notify_email: rule.notify_email || userEmail || '',
-        severity: rule.severity || 'medium'
+        severity: rule.severity || 'medium',
+        shopify_action_type: rule.shopify_action_type || 'none',
+        shopify_action_config: rule.shopify_action_config || {}
       });
     } else {
       setEditingRule(null);
@@ -348,6 +354,16 @@ export default function ProfitAlertRulesManager({ tenantId, userEmail }) {
                     />
                   </div>
                 )}
+
+                <Separator />
+
+                <ShopifyActionsConfig
+                  value={{ 
+                    shopify_action_type: formData.shopify_action_type, 
+                    shopify_action_config: formData.shopify_action_config 
+                  }}
+                  onChange={(v) => setFormData({ ...formData, ...v })}
+                />
               </div>
 
               <DialogFooter>
@@ -415,13 +431,21 @@ export default function ProfitAlertRulesManager({ tenantId, userEmail }) {
                           </Badge>
                         </div>
                         <p className="text-sm text-slate-500 mt-0.5">{config?.description}</p>
-                        {rule.actions?.length > 0 && (
-                          <div className="flex gap-1 mt-2">
-                            {rule.actions.map((action, i) => (
+                        {(rule.actions?.length > 0 || rule.shopify_action_type !== 'none') && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {rule.actions?.map((action, i) => (
                               <Badge key={i} variant="outline" className="text-xs">
                                 {actionTypes.find(a => a.value === action.type)?.label}
                               </Badge>
                             ))}
+                            {rule.shopify_action_type && rule.shopify_action_type !== 'none' && (
+                              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                <Store className="w-3 h-3 mr-1" />
+                                {rule.shopify_action_type === 'add_tag' ? `Tag: ${rule.shopify_action_config?.tag_name || 'Custom'}` :
+                                 rule.shopify_action_type === 'hold_fulfillment' ? 'Hold Fulfillment' :
+                                 rule.shopify_action_type === 'cancel_order' ? 'Cancel Order' : rule.shopify_action_type}
+                              </Badge>
+                            )}
                           </div>
                         )}
                         {rule.triggered_count > 0 && (

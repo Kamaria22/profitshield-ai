@@ -30,11 +30,13 @@ import {
   Shield,
   Zap,
   GripVertical,
-  Pencil
+  Pencil,
+  Store
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ShopifyActionsConfig from '../alerts/ShopifyActionsConfig';
 
 const fieldOptions = [
   { value: 'order_value', label: 'Order Value ($)' },
@@ -73,7 +75,9 @@ const emptyRule = {
   conditions: [{ field: 'order_value', operator: 'greater_than', value: '' }],
   risk_adjustment: 10,
   action: 'flag',
-  notification: true
+  notification: true,
+  shopify_action_type: 'none',
+  shopify_action_config: {}
 };
 
 export default function CustomRiskRulesManager({ tenantId }) {
@@ -130,7 +134,9 @@ export default function CustomRiskRulesManager({ tenantId }) {
         conditions: rule.conditions || [{ field: 'order_value', operator: 'greater_than', value: '' }],
         risk_adjustment: rule.risk_adjustment || 10,
         action: rule.action || 'flag',
-        notification: rule.notification !== false
+        notification: rule.notification !== false,
+        shopify_action_type: rule.shopify_action_type || 'none',
+        shopify_action_config: rule.shopify_action_config || {}
       });
     } else {
       setEditingRule(null);
@@ -335,6 +341,16 @@ export default function CustomRiskRulesManager({ tenantId }) {
                     <Label className="font-normal">Send notification when triggered</Label>
                   </div>
                 </div>
+
+                <Separator />
+
+                <ShopifyActionsConfig
+                  value={{ 
+                    shopify_action_type: formData.shopify_action_type, 
+                    shopify_action_config: formData.shopify_action_config 
+                  }}
+                  onChange={(v) => setFormData({ ...formData, ...v })}
+                />
               </div>
 
               <DialogFooter>
@@ -384,6 +400,12 @@ export default function CustomRiskRulesManager({ tenantId }) {
                         {rule.action !== 'none' && (
                           <Badge className="bg-slate-100 text-slate-600 text-xs">
                             {actionOptions.find(a => a.value === rule.action)?.label}
+                          </Badge>
+                        )}
+                        {rule.shopify_action_type && rule.shopify_action_type !== 'none' && (
+                          <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <Store className="w-3 h-3 mr-1" />
+                            Shopify
                           </Badge>
                         )}
                       </div>
