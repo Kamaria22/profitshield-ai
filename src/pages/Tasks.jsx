@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -56,12 +57,14 @@ export default function Tasks() {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: tasksQueryKey,
     queryFn: () => base44.entities.Task.filter({ tenant_id: queryFilter.tenant_id }, '-created_date'),
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.standard
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
     queryFn: () => base44.entities.User.list(),
+    ...queryDefaults.config // Users list rarely changes
   });
 
   const updateTaskMutation = useMutation({
@@ -88,16 +91,16 @@ export default function Tasks() {
     overdue: tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < new Date()).length
   };
 
-  const handleTaskSelect = (task) => {
+  const handleTaskSelect = useCallback((task) => {
     setSelectedTask(task);
-  };
+  }, []);
 
-  const handleTaskUpdate = (id, data) => {
+  const handleTaskUpdate = useCallback((id, data) => {
     updateTaskMutation.mutate({ id, data });
     if (selectedTask?.id === id) {
       setSelectedTask({ ...selectedTask, ...data });
     }
-  };
+  }, [updateTaskMutation, selectedTask]);
 
   return (
     <div className="space-y-6">

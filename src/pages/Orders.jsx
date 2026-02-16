@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { subDays } from 'date-fns';
 import { toast } from 'sonner';
+import { invariant } from '@/components/utils/invariant';
 import { 
   Search, 
   Download,
@@ -77,16 +79,14 @@ export default function Orders() {
   const ordersQueryKey = buildQueryKey('orders', resolverCheck);
   const settingsQueryKey = buildQueryKey('tenantSettings', resolverCheck);
   
-  // Log invariant violation
-  if (hasInvariantViolation) {
-    console.error('[Orders] INVARIANT VIOLATION: resolved_missing_tenantId', {
-      status: resolverCheck.status,
-      platform: resolverCheck.platform,
-      storeKey: resolverCheck.storeKey,
-      integrationId: resolverCheck.integrationId,
-      tenantId: resolverCheck.tenantId
-    });
-  }
+  // Enterprise invariant check
+  invariant(!hasInvariantViolation, 'resolved_missing_tenantId', {
+    status: resolverCheck.status,
+    platform: resolverCheck.platform,
+    storeKey: resolverCheck.storeKey,
+    integrationId: resolverCheck.integrationId,
+    route: 'Orders'
+  });
 
   // =====================================================
   // DATA QUERIES - Hooks MUST be called unconditionally (React rules)
@@ -254,8 +254,8 @@ export default function Orders() {
     unscored: filteredOrders.filter(o => o.fraud_score === undefined || o.fraud_score === null).length
   }), [filteredOrders]);
 
-  // Bulk analyze risk for unscored orders
-  const analyzeUnscoredOrders = async () => {
+  // Memoized handlers
+  const analyzeUnscoredOrders = useCallback(async () => {
     const unscoredOrders = filteredOrders.filter(o => o.fraud_score === undefined || o.fraud_score === null);
     if (unscoredOrders.length === 0) {
       toast.info('All orders already have risk scores');
@@ -269,24 +269,26 @@ export default function Orders() {
     for (const order of unscoredOrders.slice(0, 50)) { // Limit to 50 at a time
       try {
         await base44.functions.invoke('analyzeOrderRisk', {
-        order_id: order.id,
-        tenant_id: resolverCheck.tenantId
+          order_id: order.id,
+          tenant_id: resolverCheck.tenantId
         });
         analyzed++;
       } catch (e) {
         failed++;
-        console.error('Risk analysis failed for order:', order.id, e);
       }
     }
 
     setAnalyzingRisk(false);
     queryClient.invalidateQueries({ queryKey: ordersQueryKey });
     toast.success(`Analyzed ${analyzed} orders${failed > 0 ? `, ${failed} failed` : ''}`);
-  };
+  }, [filteredOrders, resolverCheck.tenantId, queryClient, ordersQueryKey]);
 
-  const activeFiltersCount = Object.values(filters).filter(v => v !== 'all' && v !== '30' && v !== '').length;
+  const activeFiltersCount = useMemo(() => 
+    Object.values(filters).filter(v => v !== 'all' && v !== '30' && v !== '').length,
+    [filters]
+  );
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({
       dateRange: '30',
       status: 'all',
@@ -297,7 +299,7 @@ export default function Orders() {
       confidence: 'all'
     });
     setSearchTerm('');
-  };
+  }, []);
 
   // Loading state
   if (isLoading) {

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,18 +48,20 @@ export default function Customers() {
   const segmentsQueryKey = buildQueryKey('segments', resolverCheck);
   const customersQueryKey = buildQueryKey('customers', resolverCheck);
 
-  // Fetch segments
+  // Fetch segments (standard)
   const { data: segments = [], isLoading: segmentsLoading } = useQuery({
     queryKey: segmentsQueryKey,
     queryFn: () => base44.entities.CustomerSegment.filter({ tenant_id: queryFilter.tenant_id }),
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.standard
   });
 
-  // Fetch all customers
+  // Fetch all customers (heavy list)
   const { data: allCustomers = [], isLoading: customersLoading } = useQuery({
     queryKey: customersQueryKey,
     queryFn: () => base44.entities.Customer.filter({ tenant_id: queryFilter.tenant_id }),
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.heavyList
   });
 
   // Create segment mutation

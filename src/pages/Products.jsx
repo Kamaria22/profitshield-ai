@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { 
   Search, 
   Download,
@@ -44,6 +45,7 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [costEditorOpen, setCostEditorOpen] = useState(false);
 
+  // Heavy list queries with keepPreviousData
   const { data: products = [], isLoading } = useQuery({
     queryKey: productsQueryKey,
     queryFn: async () => {
@@ -52,7 +54,8 @@ export default function Products() {
         tenant_id: queryFilter.tenant_id 
       }, '-total_revenue', 500);
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.heavyList
   });
 
   const { data: variants = [] } = useQuery({
@@ -64,7 +67,8 @@ export default function Products() {
         product_id: selectedProduct.platform_product_id
       });
     },
-    enabled: canQuery && !!selectedProduct?.platform_product_id
+    enabled: canQuery && !!selectedProduct?.platform_product_id,
+    ...queryDefaults.standard
   });
 
   const { data: costMappings = [] } = useQuery({
@@ -73,7 +77,8 @@ export default function Products() {
       if (!queryFilter?.tenant_id) return [];
       return base44.entities.CostMapping.filter({ tenant_id: queryFilter.tenant_id });
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.config // Cost mappings rarely change
   });
 
   // Filter and sort products
@@ -140,10 +145,10 @@ export default function Products() {
     return result;
   }, [products, searchTerm, sortBy, profitFilter]);
 
-  const handleEditCost = (product) => {
+  const handleEditCost = useCallback((product) => {
     setSelectedProduct(product);
     setCostEditorOpen(true);
-  };
+  }, []);
 
   // Calculate stats
   const stats = React.useMemo(() => {

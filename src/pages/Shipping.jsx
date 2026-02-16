@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { format, subDays } from 'date-fns';
 import { 
   Truck, 
@@ -59,7 +60,8 @@ export default function Shipping() {
         tenant_id: queryFilter.tenant_id 
       }, '-order_date', 500);
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.standard
   });
   
   // Loading state

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -30,12 +31,14 @@ export default function SystemHealth() {
   const { data: eventLogs = [] } = useQuery({
     queryKey: eventLogsQueryKey,
     queryFn: () => base44.entities.EventLog.filter({ tenant_id: queryFilter.tenant_id }, '-created_date', 100),
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.realtime // System health should refresh often
   });
 
   const { data: healthMetrics = [] } = useQuery({
     queryKey: ['systemHealth'],
-    queryFn: () => base44.entities.SystemHealth.filter({}, '-period', 1)
+    queryFn: () => base44.entities.SystemHealth.filter({}, '-period', 1),
+    ...queryDefaults.standard
   });
 
   // Calculate live metrics from event logs

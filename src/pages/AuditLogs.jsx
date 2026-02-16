@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,17 +85,26 @@ export default function AuditLogs() {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: auditLogsQueryKey,
     queryFn: () => base44.entities.AuditLog.filter({ tenant_id: queryFilter.tenant_id }, '-created_date', 200),
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.standard
   });
 
-  const filteredLogs = logs.filter(log => {
-    if (filters.action_type !== 'all' && log.action_type !== filters.action_type) return false;
-    if (filters.search && !log.user_email?.toLowerCase().includes(filters.search.toLowerCase()) &&
-        !log.entity_type?.toLowerCase().includes(filters.search.toLowerCase())) return false;
-    return true;
-  });
+  // Memoized filtering
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      if (filters.action_type !== 'all' && log.action_type !== filters.action_type) return false;
+      if (filters.search && !log.user_email?.toLowerCase().includes(filters.search.toLowerCase()) &&
+          !log.entity_type?.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      return true;
+    });
+  }, [logs, filters.action_type, filters.search]);
 
-  const uniqueActionTypes = [...new Set(logs.map(l => l.action_type))];
+  const uniqueActionTypes = useMemo(() => 
+    [...new Set(logs.map(l => l.action_type))],
+    [logs]
+  );
+  
+  const handleLogClick = useCallback((log) => setSelectedLog(log), []);
 
   return (
     <div className="space-y-6">
@@ -194,7 +204,7 @@ export default function AuditLogs() {
                         {log.reason || (log.new_state ? 'State changed' : '-')}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedLog(log)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleLogClick(log)} aria-label="View audit log details">
                           <Eye className="w-4 h-4" />
                         </Button>
                       </TableCell>
