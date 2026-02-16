@@ -25,7 +25,6 @@ import {
   getPersistedContext,
   persistContext,
   clearContext,
-  normalizeStoreKey,
   hasValidContext,
   isPersistedContextExpired
 } from '@/components/platformContext';
@@ -625,7 +624,7 @@ export function usePlatformResolver() {
  * Helper to check if resolver is ready for data queries
  * GUARANTEED to return stable shape - never throws, never returns undefined fields
  * @param {object} resolver - Resolver state
- * @returns {{ ok: boolean, tenantId: string|null, integrationId: string|null, status: string, reason: string|null }}
+ * @returns {{ ok: boolean, tenantId: string|null, integrationId: string|null, status: string, reason: string|null, platform: string|null, storeKey: string|null }}
  */
 export function requireResolved(resolver) {
   // Defensive: handle null/undefined/invalid resolver
@@ -635,7 +634,9 @@ export function requireResolved(resolver) {
       tenantId: null, 
       integrationId: null, 
       status: RESOLVER_STATUS.ERROR, 
-      reason: 'resolver_undefined' 
+      reason: 'resolver_undefined',
+      platform: null,
+      storeKey: null
     };
   }
   
@@ -643,6 +644,8 @@ export function requireResolved(resolver) {
   const tenantId = resolver.tenantId || null;
   const integrationId = resolver.integrationId || null;
   const reason = resolver.reason || null;
+  const platform = resolver.platform || null;
+  const storeKey = resolver.storeKey || null;
   
   // Only ok if RESOLVED AND has tenantId
   if (status === RESOLVER_STATUS.RESOLVED && tenantId) {
@@ -651,7 +654,9 @@ export function requireResolved(resolver) {
       tenantId, 
       integrationId,
       status,
-      reason: null
+      reason: null,
+      platform,
+      storeKey
     };
   }
   
@@ -660,8 +665,45 @@ export function requireResolved(resolver) {
     tenantId, 
     integrationId,
     status,
-    reason: reason || 'not_resolved'
+    reason: reason || 'not_resolved',
+    platform,
+    storeKey
   };
+}
+
+/**
+ * Check if we can safely query tenant data
+ * @param {object} resolverCheck - Result from requireResolved()
+ * @returns {boolean}
+ */
+export function canQueryTenant(resolverCheck) {
+  return resolverCheck?.ok === true && !!resolverCheck?.tenantId;
+}
+
+/**
+ * Get a tenant filter object for queries, or null if not ready
+ * @param {object} resolverCheck - Result from requireResolved()
+ * @returns {{ tenant_id: string } | null}
+ */
+export function getTenantFilter(resolverCheck) {
+  if (!canQueryTenant(resolverCheck)) return null;
+  return { tenant_id: resolverCheck.tenantId };
+}
+
+/**
+ * Build a deterministic query key that includes store identity (prevents cross-store cache bleed)
+ * @param {string} base - Base query key name (e.g., 'orders', 'alerts')
+ * @param {object} resolverCheck - Result from requireResolved()
+ * @returns {Array} Query key array
+ */
+export function buildQueryKey(base, resolverCheck) {
+  return [
+    base,
+    resolverCheck?.platform || null,
+    resolverCheck?.storeKey || null,
+    resolverCheck?.integrationId || null,
+    resolverCheck?.tenantId || null
+  ];
 }
 
 export default usePlatformResolver;

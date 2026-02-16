@@ -65,6 +65,8 @@ function isUserAdmin(user) {
 
 // Debug Panel with full trace visibility - 100% null-safe
 function DebugPanel({ resolver, userEmail, search }) {
+  const [visible, setVisible] = React.useState(true);
+  
   // Safe URL param parsing
   let urlParams = {};
   try {
@@ -82,7 +84,7 @@ function DebugPanel({ resolver, userEmail, search }) {
   }
   
   const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
-  if (!showDebug) return null;
+  if (!showDebug || !visible) return null;
   
   // Fully defensive resolver access
   const safeResolver = resolver || {};
@@ -116,6 +118,13 @@ function DebugPanel({ resolver, userEmail, search }) {
         <Bug className="w-4 h-4 text-amber-400" />
         <span className="font-bold">Resolver Debug</span>
         <span className="ml-auto text-slate-500">{duration}</span>
+        <button 
+          onClick={() => setVisible(false)}
+          className="ml-2 text-slate-400 hover:text-white"
+          title="Close debug panel"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
       
       <div className="space-y-1 mb-3">
