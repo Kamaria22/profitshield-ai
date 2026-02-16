@@ -21,8 +21,17 @@ import {
   Target,
   Loader2,
   ChevronRight,
-  Lightbulb
+  Lightbulb,
+  Bell,
+  Link as LinkIcon
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export default function FounderDashboard() {
@@ -47,10 +56,38 @@ export default function FounderDashboard() {
   const generateBriefMutation = useMutation({
     mutationFn: () => base44.functions.invoke('founderAI', { action: 'generate_weekly_brief' }),
     onSuccess: (result) => {
-      toast.success('Weekly brief generated');
+      const created = result.data?.milestones_created || 0;
+      toast.success(`Weekly brief generated${created > 0 ? ` + ${created} milestone(s) created` : ''}`);
       queryClient.invalidateQueries({ queryKey: ['founderInsights'] });
+      queryClient.invalidateQueries({ queryKey: ['milestones'] });
     },
     onError: () => toast.error('Failed to generate brief')
+  });
+
+  const sendNotificationsMutation = useMutation({
+    mutationFn: (email) => base44.functions.invoke('founderAI', { action: 'send_critical_notifications', founder_email: email }),
+    onSuccess: (result) => {
+      const count = result.data?.notifications_sent || 0;
+      if (count > 0) {
+        toast.success(`${count} notification(s) sent`);
+        queryClient.invalidateQueries({ queryKey: ['founderInsights'] });
+      } else {
+        toast.info('No critical insights to notify');
+      }
+    },
+    onError: () => toast.error('Failed to send notifications')
+  });
+
+  const linkToMilestoneMutation = useMutation({
+    mutationFn: ({ insight_id, milestone_id }) => base44.functions.invoke('founderAI', { 
+      action: 'link_insight_to_milestone', 
+      insight_id, 
+      milestone_id 
+    }),
+    onSuccess: () => {
+      toast.success('Insight linked to milestone');
+      queryClient.invalidateQueries({ queryKey: ['founderInsights'] });
+    }
   });
 
   const askMutation = useMutation({
@@ -82,18 +119,35 @@ export default function FounderDashboard() {
           </h1>
           <p className="text-slate-500">Strategic intelligence for ProfitShield</p>
         </div>
-        <Button 
-          onClick={() => generateBriefMutation.mutate()}
-          disabled={generateBriefMutation.isPending}
-          className="bg-purple-600 hover:bg-purple-700"
-        >
-          {generateBriefMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Sparkles className="w-4 h-4 mr-2" />
-          )}
-          Generate Weekly Brief
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              const email = prompt('Enter email for notifications:');
+              if (email) sendNotificationsMutation.mutate(email);
+            }}
+            disabled={sendNotificationsMutation.isPending}
+          >
+            {sendNotificationsMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Bell className="w-4 h-4 mr-2" />
+            )}
+            Send Alerts
+          </Button>
+          <Button 
+            onClick={() => generateBriefMutation.mutate()}
+            disabled={generateBriefMutation.isPending}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            {generateBriefMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4 mr-2" />
+            )}
+            Generate Weekly Brief
+          </Button>
+        </div>
       </div>
 
       {/* Ask FounderAI */}
@@ -208,6 +262,47 @@ export default function FounderDashboard() {
                         ))}
                       </div>
                     )}
+
+                    {/* Link to Milestone */}
+                    <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        {insight.linked_milestone_id ? (
+                          <>
+                            <LinkIcon className="w-3 h-3" />
+                            <span>Linked to milestone</span>
+                          </>
+                        ) : insight.auto_created_milestone_id ? (
+                          <>
+                            <Target className="w-3 h-3 text-purple-500" />
+                            <span className="text-purple-600">Auto-created milestone</span>
+                          </>
+                        ) : null}
+                        {insight.notification_sent && (
+                          <Badge variant="outline" className="text-xs ml-2">
+                            <Bell className="w-3 h-3 mr-1" /> Notified
+                          </Badge>
+                        )}
+                      </div>
+                      {!insight.linked_milestone_id && !insight.auto_created_milestone_id && milestones.length > 0 && (
+                        <Select
+                          onValueChange={(milestoneId) => linkToMilestoneMutation.mutate({ 
+                            insight_id: insight.id, 
+                            milestone_id: milestoneId 
+                          })}
+                        >
+                          <SelectTrigger className="w-[160px] h-7 text-xs">
+                            <SelectValue placeholder="Link to milestone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {milestones.map(m => (
+                              <SelectItem key={m.id} value={m.id} className="text-xs">
+                                {m.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
