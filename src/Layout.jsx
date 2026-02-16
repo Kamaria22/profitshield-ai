@@ -90,6 +90,7 @@ const navItems = [
   { name: 'Shipping', page: 'Shipping', icon: Truck },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle },
+  { name: 'Integrations', page: 'Integrations', icon: TrendingUp },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, adminOnly: true },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings },
