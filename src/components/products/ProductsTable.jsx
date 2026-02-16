@@ -9,10 +9,16 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle, Package } from 'lucide-react';
+import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle, Package, Edit2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
-export default function ProductsTable({ products, loading, onProductClick }) {
+export default function ProductsTable({ products, loading, onProductClick, onEditCost }) {
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-slate-200">
@@ -49,6 +55,7 @@ export default function ProductsTable({ products, loading, onProductClick }) {
           <TableRow className="bg-slate-50">
             <TableHead className="font-semibold">Product</TableHead>
             <TableHead className="font-semibold text-right">Revenue</TableHead>
+            <TableHead className="font-semibold text-right">COGS</TableHead>
             <TableHead className="font-semibold text-right">Profit</TableHead>
             <TableHead className="font-semibold text-right">Margin</TableHead>
             <TableHead className="font-semibold text-right">Units Sold</TableHead>
@@ -93,6 +100,29 @@ export default function ProductsTable({ products, loading, onProductClick }) {
                 <TableCell className="text-right font-medium">
                   ${product.total_revenue?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
                 </TableCell>
+                <TableCell className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditCost?.(product);
+                          }}
+                        >
+                          <span className="font-medium">
+                            ${(product.total_cogs || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </span>
+                          <Edit2 className="w-3 h-3 text-slate-400" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Click to edit COGS</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableCell>
                 <TableCell className={`text-right font-semibold ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
                   {isProfitable ? '+' : ''}${product.total_profit?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
                 </TableCell>
@@ -123,7 +153,15 @@ export default function ProductsTable({ products, loading, onProductClick }) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditCost?.(product);
+                    }}
+                  >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </TableCell>
