@@ -68,28 +68,41 @@ export default function Orders() {
   const reason = resolver?.reason || null;
   const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // Load tenant settings - ONLY when resolved
+  // SINGLE queryFilter object - used for ALL Order queries and debug display
+  // INVARIANT: If isResolved but no authTenantId, this is an error state
+  const queryFilter = isResolved && authTenantId ? { tenant_id: authTenantId } : null;
+  
+  // Hard invariant check
+  if (isResolved && !authTenantId) {
+    console.warn('[Orders] INVARIANT VIOLATION: resolved=true but tenantId is null/undefined');
+  }
+
+  // Load tenant settings - ONLY when queryFilter is valid
   const { data: tenantSettings } = useQuery({
     queryKey: ['tenantSettings', authTenantId],
     queryFn: async () => {
-      if (!authTenantId) return null;
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: authTenantId });
+      if (!queryFilter) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
-    enabled: isResolved && !!authTenantId
+    enabled: !!queryFilter
   });
 
-  // Fetch orders - ONLY when resolved with valid tenantId
+  // Fetch orders - ONLY when queryFilter is valid (never null)
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', authTenantId],
+    queryKey: ['orders', queryFilter?.tenant_id],
     queryFn: async () => {
-      if (!authTenantId) return [];
-      console.log('[Orders] Fetching orders for tenant:', authTenantId);
-      const allOrders = await base44.entities.Order.filter({ tenant_id: authTenantId }, '-order_date', 1000);
+      // HARD GATE: Never query without valid filter
+      if (!queryFilter || !queryFilter.tenant_id) {
+        console.warn('[Orders] Skipping query - no valid queryFilter');
+        return [];
+      }
+      console.log('[Orders] Fetching orders with filter:', JSON.stringify(queryFilter));
+      const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
       console.log('[Orders] Returned count:', allOrders.length);
       return allOrders;
     },
-    enabled: isResolved && !!authTenantId
+    enabled: !!queryFilter && !!queryFilter.tenant_id
   });
 
   const isLoading = resolverLoading || ordersLoading || status === RESOLVER_STATUS.RESOLVING;
@@ -231,6 +244,8 @@ export default function Orders() {
         tenantId={authTenantId} 
         ordersCount={orders.length}
         debug={{ platform, reason, resolved: isResolved }}
+        queryFilter={queryFilter}
+        dateRange={filters.dateRange}
         userEmail={user?.email}
       />
 
