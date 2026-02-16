@@ -38,6 +38,11 @@ class GlobalErrorBoundary extends React.Component {
     const { error, errorInfo } = this.state;
     const { resolverContext = {} } = this.props;
     
+    // Build trace steps safely
+    const traceSteps = Array.isArray(resolverContext.trace?.steps) 
+      ? resolverContext.trace.steps.map(s => ({ step: s?.step, ok: s?.ok, note: s?.note }))
+      : [];
+    
     return {
       timestamp: new Date().toISOString(),
       error: {
@@ -54,7 +59,9 @@ class GlobalErrorBoundary extends React.Component {
         storeKey: resolverContext.storeKey ? maskDomain(resolverContext.storeKey) : 'unknown',
         tenantId: resolverContext.tenantId ? `${resolverContext.tenantId.slice(0, 8)}...` : 'unknown',
         integrationId: resolverContext.integrationId ? `${resolverContext.integrationId.slice(0, 8)}...` : 'unknown',
-        resolverStatus: resolverContext.status || 'unknown'
+        resolverStatus: resolverContext.status || 'unknown',
+        resolverChosenBy: resolverContext.trace?.chosenBy || 'unknown',
+        resolverTraceSteps: traceSteps
       },
       browser: typeof navigator !== 'undefined' ? {
         userAgent: navigator.userAgent,

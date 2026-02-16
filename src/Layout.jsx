@@ -8,6 +8,7 @@ import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
+import ResolverSelfTest from '@/components/ResolverSelfTest';
 import { maskEmail } from '@/components/utils/safeLog';
 import {
   LayoutDashboard,
@@ -230,6 +231,11 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
           </div>
         </div>
       )}
+      
+      {/* Self-test section */}
+      <div className="border-t border-slate-700 pt-2 mt-2">
+        <ResolverSelfTest />
+      </div>
     </div>
   );
 });
@@ -612,17 +618,37 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function Layout({ children, currentPageName }) {
-  // Get resolver context for error boundary
-  const resolverContext = useMemo(() => ({}), []); // Will be populated by LayoutContent
+// Wrapper that captures resolver context for error boundary
+function LayoutWithErrorBoundary({ children, currentPageName }) {
+  // Get resolver to pass to error boundary
+  const resolver = usePlatformResolver() || {};
+  
+  // Build context for error boundary
+  const resolverContext = useMemo(() => ({
+    status: resolver.status,
+    platform: resolver.platform,
+    storeKey: resolver.storeKey,
+    tenantId: resolver.tenantId,
+    integrationId: resolver.integrationId,
+    userEmail: resolver.user?.email,
+    trace: resolver.trace
+  }), [resolver.status, resolver.platform, resolver.storeKey, resolver.tenantId, resolver.integrationId, resolver.user?.email, resolver.trace]);
   
   return (
     <GlobalErrorBoundary resolverContext={resolverContext}>
-      <PermissionsProvider>
-        <LayoutContent currentPageName={currentPageName}>
-          {children}
-        </LayoutContent>
-      </PermissionsProvider>
+      <LayoutContent currentPageName={currentPageName}>
+        {children}
+      </LayoutContent>
     </GlobalErrorBoundary>
+  );
+}
+
+export default function Layout({ children, currentPageName }) {
+  return (
+    <PermissionsProvider>
+      <LayoutWithErrorBoundary currentPageName={currentPageName}>
+        {children}
+      </LayoutWithErrorBoundary>
+    </PermissionsProvider>
   );
 }
