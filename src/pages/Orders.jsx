@@ -101,23 +101,20 @@ export default function Orders() {
       const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.config
   });
 
   // Fetch orders with deterministic cache key - only enabled when canQuery
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ordersQueryKey,
     queryFn: async () => {
-      if (!queryFilter?.tenant_id) {
-        console.warn('[Orders] queryFn called but no valid filter - returning empty');
-        return [];
-      }
-      console.log('[Orders] Fetching with filter:', JSON.stringify(queryFilter), 'key:', ordersQueryKey);
+      if (!queryFilter?.tenant_id) return [];
       const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
-      console.log('[Orders] Returned count:', allOrders.length);
       return allOrders;
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.heavyList
   });
 
   // Cache isolation: invalidate queries when store identity changes
@@ -256,11 +253,49 @@ export default function Orders() {
     setSearchTerm('');
   }, []);
 
+  // =====================================================
+  // EARLY RETURNS - AFTER all hooks
+  // =====================================================
+  
   // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  // No valid context - show Connect Store banner
+  if (!canQuery || hasInvariantViolation || status === RESOLVER_STATUS.ERROR) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-amber-100 rounded-full mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">No Store Connected</h2>
+              <p className="text-slate-600 mb-4 max-w-md">
+                {hasInvariantViolation 
+                  ? 'Store resolved but tenant data is missing. Please reconnect your store.'
+                  : 'Connect your store to view and analyze orders.'}
+              </p>
+              <Link to={createPageUrl('Integrations', location.search)}>
+                <Button className="gap-2">
+                  <Store className="w-4 h-4" />
+                  Connect Store
+                </Button>
+              </Link>
+              {hasInvariantViolation && (
+                <p className="text-xs text-red-600 mt-4 font-mono">
+                  Error: resolved_missing_tenantId
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
