@@ -186,10 +186,12 @@ Deno.serve(async (req) => {
     const body = await req.text();
     
     // Resolve tenant by shop domain (single source of truth)
+    console.log('[shopifyWebhook] Looking up tenant by shop_domain:', shopDomain);
     const tenants = await base44.asServiceRole.entities.Tenant.filter({ 
-      shop_domain: shopDomain,
-      platform: 'shopify'
+      shop_domain: shopDomain
     });
+    
+    console.log('[shopifyWebhook] Found tenants:', tenants.length);
     
     if (tenants.length === 0) {
       console.error('[shopifyWebhook] Unknown shop:', shopDomain);
@@ -197,7 +199,7 @@ Deno.serve(async (req) => {
     }
     
     const tenant = tenants[0];
-    console.log('[shopifyWebhook] Resolved tenant_id:', tenant.id);
+    console.log('[shopifyWebhook] Resolved tenant_id:', tenant.id, 'shop_name:', tenant.shop_name);
     
     // Verify HMAC if webhook secret is set
     if (tenant.webhook_secret && hmacHeader) {
@@ -261,12 +263,15 @@ Deno.serve(async (req) => {
 });
 
 async function processOrder(base44, tenant, orderData) {
+  console.log('[processOrder] Starting for order:', orderData.id, 'tenant:', tenant.id);
+  
   // Get cost mappings and settings
   const [costMappings, settingsData] = await Promise.all([
     base44.asServiceRole.entities.CostMapping.filter({ tenant_id: tenant.id }),
     base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id })
   ]);
   
+  console.log('[processOrder] Cost mappings:', costMappings.length, 'Settings found:', settingsData.length);
   const settings = settingsData[0] || {};
   
   // Calculate profit
@@ -302,9 +307,12 @@ async function processOrder(base44, tenant, orderData) {
   };
   
   if (existingOrders.length > 0) {
+    console.log('[processOrder] Updating existing order:', existingOrders[0].id);
     await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
   } else {
-    await base44.asServiceRole.entities.Order.create(orderRecord);
+    console.log('[processOrder] Creating new order:', orderRecord.order_number);
+    const createdOrder = await base44.asServiceRole.entities.Order.create(orderRecord);
+    console.log('[processOrder] Created order with id:', createdOrder.id);
     
     // Create alert if high risk
     if (riskData.risk_level === 'high') {
