@@ -580,3 +580,12 @@ export function clearStaleContext(validIntegrationIds) {
 export function getContextTTL() {
   return CONTEXT_TTL_MS;
 }
+
+/**
+ * Get store-specific storage key (exported for testing)
+ * @param {string} storeKey
+ * @returns {string|null}
+ */
+export function getStoreKeyForStorage(storeKey) {
+  return getStoreStorageKey(storeKey);
+}
