@@ -43,6 +43,9 @@ import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
 import SyncHealthCard from '../components/dashboard/SyncHealthCard';
+import OnboardingProgressBar from '../components/growth/OnboardingProgressBar';
+import ReviewRequestModal from '../components/growth/ReviewRequestModal';
+import { useReviewPrompt } from '../components/growth/useReviewPrompt';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -98,6 +101,13 @@ export default function Home() {
   const [dateRange, setDateRange] = useState('30');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Review prompt hook
+  const { 
+    showReviewModal, 
+    reviewRequest, 
+    closeReviewModal 
+  } = useReviewPrompt(authTenantId, platform);
 
   // Check OAuth token status and tenant settings - ONLY when canQuery
   // Using config defaults for rarely-changing data
@@ -422,6 +432,16 @@ export default function Home() {
       animate="animate"
       variants={staggerContainer}
     >
+      {/* Review Request Modal */}
+      <ReviewRequestModal
+        isOpen={showReviewModal}
+        onClose={closeReviewModal}
+        tenantId={authTenantId}
+        platform={platform}
+        condition={reviewRequest?.condition}
+        requestId={reviewRequest?.id}
+      />
+
       {/* Debug Banner */}
       <DebugBanner 
         shopDomain={storeKey} 
@@ -430,6 +450,13 @@ export default function Home() {
         debug={{ platform, reason, resolved: canQuery }}
         userEmail={user?.email}
       />
+
+      {/* Onboarding Progress */}
+      {tenant && (
+        <motion.div variants={fadeInUp}>
+          <OnboardingProgressBar tenantId={authTenantId} compact />
+        </motion.div>
+      )}
 
       {/* Header with glassmorphism */}
       <motion.div 
