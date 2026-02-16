@@ -52,8 +52,19 @@ export default function SelectStore() {
   const handleSelectStore = async (integration) => {
     await selectStore(integration);
     
-    // Build URL with context and navigate
-    const url = createPageUrl(returnTo, `?platform=${integration.platform}&store=${integration.store_key}`);
+    // Build proper query string based on platform
+    let queryStr = '';
+    if (integration.platform === 'shopify') {
+      queryStr = `?shop=${integration.store_key}`;
+    } else if (integration.platform === 'woocommerce') {
+      queryStr = `?platform=woocommerce&site=${integration.store_key}`;
+    } else if (integration.platform === 'bigcommerce') {
+      queryStr = `?platform=bigcommerce&store_hash=${integration.store_key}`;
+    } else {
+      queryStr = `?platform=${integration.platform}&store=${integration.store_key}`;
+    }
+    
+    const url = createPageUrl(returnTo, queryStr);
     navigate(url);
   };
 

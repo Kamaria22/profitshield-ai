@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl, parseQuery, getPersistedContext, persistContext } from '@/components/platformContext';
+import { createPageUrl, parseQuery, getPersistedContext } from '@/components/platformContext';
 import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -23,9 +24,9 @@ import {
   ClipboardList,
   Link2,
   Loader2,
-  Brain
+  Brain,
+  Bug
 } from 'lucide-react';
-import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -53,14 +54,57 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
+// Helper to check if user is admin
+function isUserAdmin(user) {
+  const role = user?.app_role?.toLowerCase();
+  return role === 'owner' || role === 'admin';
+}
+
+// Debug Panel Component
+function DebugPanel({ resolver, userEmail }) {
+  const urlParams = parseQuery(window.location.search);
+  const persisted = getPersistedContext();
+  const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
+  
+  if (!showDebug) return null;
+  
+  return (
+    <div className="fixed bottom-4 left-4 z-50 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-lg max-w-sm">
+      <div className="flex items-center gap-2 mb-2 border-b border-slate-700 pb-2">
+        <Bug className="w-4 h-4 text-amber-400" />
+        <span className="font-bold">Debug Panel</span>
+      </div>
+      <div className="space-y-1">
+        <p><span className="text-slate-400">Status:</span> <span className={
+          resolver.status === RESOLVER_STATUS.RESOLVED ? 'text-green-400' :
+          resolver.status === RESOLVER_STATUS.ERROR ? 'text-red-400' :
+          'text-yellow-400'
+        }>{resolver.status}</span></p>
+        <p><span className="text-slate-400">Tenant:</span> {resolver.tenantId || 'null'}</p>
+        <p><span className="text-slate-400">Platform:</span> {resolver.platform || 'null'}</p>
+        <p><span className="text-slate-400">StoreKey:</span> {resolver.storeKey || 'null'}</p>
+        <p><span className="text-slate-400">Integration:</span> {resolver.integration?.id || 'null'}</p>
+        <p><span className="text-slate-400">Reason:</span> {resolver.reason || 'null'}</p>
+        <p><span className="text-slate-400">Stores:</span> {resolver.availableStores?.length || 0}</p>
+        <div className="border-t border-slate-700 mt-2 pt-2">
+          <p className="text-slate-400 mb-1">Persisted:</p>
+          <p className="truncate"><span className="text-slate-500">platform:</span> {persisted.platform || 'null'}</p>
+          <p className="truncate"><span className="text-slate-500">storeKey:</span> {persisted.storeKey || 'null'}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LayoutContent({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission, role } = usePermissions();
+  const { hasPermission, role, user: permUser } = usePermissions();
   
   // Use unified platform resolver
+  const resolver = usePlatformResolver();
   const { 
     status, 
     tenantId, 
@@ -71,12 +115,14 @@ function LayoutContent({ children, currentPageName }) {
     integration,
     availableStores,
     reason
-  } = usePlatformResolver();
+  } = resolver;
 
   // Load alerts when tenant is resolved
   useEffect(() => {
     if (status === RESOLVER_STATUS.RESOLVED && tenantId) {
       loadAlerts();
+    } else {
+      setPendingAlerts(0);
     }
   }, [status, tenantId]);
 
@@ -89,13 +135,15 @@ function LayoutContent({ children, currentPageName }) {
       setPendingAlerts(alerts.length);
     } catch (e) {
       console.log('Error loading alerts:', e.message);
+      setPendingAlerts(0);
     }
   };
 
   // Redirect to SelectStore if needed
   useEffect(() => {
     if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore') {
-      navigate(createPageUrl('SelectStore', location.search) + `&return=${currentPageName}`);
+      const returnPath = encodeURIComponent(currentPageName);
+      navigate(createPageUrl('SelectStore', location.search) + `&return=${returnPath}`);
     }
   }, [status, currentPageName, navigate, location.search]);
 
@@ -120,9 +168,9 @@ function LayoutContent({ children, currentPageName }) {
     );
   }
 
-  const urlParams = parseQuery(location.search);
-  const persisted = getPersistedContext();
   const showMissingContextBanner = status === RESOLVER_STATUS.ERROR;
+  const activeUser = user || permUser;
+  const isAdmin = isUserAdmin(activeUser);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -165,7 +213,7 @@ function LayoutContent({ children, currentPageName }) {
               <p className="text-sm font-medium text-slate-900 truncate">
                 {integration?.store_name || tenant.shop_name || storeKey}
               </p>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="outline" className="text-xs capitalize">
                   {platform}
                 </Badge>
@@ -185,7 +233,10 @@ function LayoutContent({ children, currentPageName }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
+              // Check permission
               if (item.permission && !hasPermission(item.permission)) return false;
+              // Check adminOnly
+              if (item.adminOnly && !isAdmin) return false;
               return true;
             }).map((item) => {
               const isActive = currentPageName === item.page;
@@ -217,24 +268,24 @@ function LayoutContent({ children, currentPageName }) {
           </nav>
 
           {/* User Menu */}
-          {user && (
+          {activeUser && (
             <div className="p-4 border-t border-slate-200">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors">
                     <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-slate-600">
-                        {user.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                        {activeUser.full_name?.charAt(0) || activeUser.email?.charAt(0) || 'U'}
                       </span>
                     </div>
-                    <div className="flex-1 text-left">
+                    <div className="flex-1 text-left min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">
-                        {user.full_name || 'User'}
+                        {activeUser.full_name || 'User'}
                       </p>
-                      <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                      <p className="text-xs text-slate-500 truncate">{activeUser.email}</p>
                       {role && <p className="text-xs text-emerald-600 capitalize">{role}</p>}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -304,17 +355,42 @@ function LayoutContent({ children, currentPageName }) {
           {children}
         </main>
 
-        {/* MerchantAI Chat */}
-        {tenantId && (
-          <MerchantAIChat 
-            tenantId={tenantId} 
-            currentPage={currentPageName}
-          />
+        {/* MerchantAI Chat - with error boundary */}
+        {tenantId && activeUser && (
+          <ErrorBoundary fallback={null}>
+            <MerchantAIChat 
+              tenantId={tenantId} 
+              currentPage={currentPageName}
+            />
+          </ErrorBoundary>
         )}
-        </div>
-        </div>
-        );
-        }
+      </div>
+
+      {/* Debug Panel */}
+      <DebugPanel resolver={resolver} userEmail={activeUser?.email} />
+    </div>
+  );
+}
+
+// Simple error boundary for chat
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('MerchantAI Chat error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 export default function Layout({ children, currentPageName }) {
   return (

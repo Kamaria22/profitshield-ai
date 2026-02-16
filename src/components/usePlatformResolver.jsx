@@ -111,7 +111,14 @@ export function usePlatformResolver() {
           tenantId,
           host: urlParams.host || persisted.host,
           embedded: urlParams.embedded || persisted.embedded,
-          debug: urlParams.debug || persisted.debug
+          debug: urlParams.debug || persisted.debug,
+          integrationId: integration.id
+        });
+        
+        // Load all available stores for this tenant
+        const allStores = await base44.entities.PlatformIntegration.filter({
+          tenant_id: tenantId,
+          status: 'connected'
         });
         
         console.log('[Resolver] Found integration:', integration.id, 'tenant:', tenantId);
@@ -125,7 +132,7 @@ export function usePlatformResolver() {
           tenant,
           user,
           reason,
-          availableStores: []
+          availableStores: allStores
         });
         return;
       } else {
@@ -163,7 +170,8 @@ export function usePlatformResolver() {
           tenantId,
           host: urlParams.host || persisted.host,
           embedded: urlParams.embedded || persisted.embedded,
-          debug: urlParams.debug || persisted.debug
+          debug: urlParams.debug || persisted.debug,
+          integrationId: integration.id
         });
         
         console.log('[Resolver] Auto-selected single store:', platform, storeKey);
@@ -252,20 +260,27 @@ export function usePlatformResolver() {
   }, [resolve]);
 
   // Function to manually select a store
-  const selectStore = useCallback(async (integration) => {
-    const platform = integration.platform;
-    const storeKey = integration.store_key;
-    const tenantId = integration.tenant_id;
+  const selectStore = useCallback(async (selectedIntegration) => {
+    const platform = selectedIntegration.platform;
+    const storeKey = selectedIntegration.store_key;
+    const tenantId = selectedIntegration.tenant_id;
     
     // Load tenant
     const tenants = await base44.entities.Tenant.filter({ id: tenantId });
     const tenant = tenants[0] || null;
     
+    // Load all stores for this tenant
+    const allStores = await base44.entities.PlatformIntegration.filter({
+      tenant_id: tenantId,
+      status: 'connected'
+    });
+    
     // Persist
     persistContext({
       platform,
       storeKey,
-      tenantId
+      tenantId,
+      integrationId: selectedIntegration.id
     });
     
     setState(prev => ({
@@ -274,9 +289,10 @@ export function usePlatformResolver() {
       tenantId,
       platform,
       storeKey,
-      integration,
+      integration: selectedIntegration,
       tenant,
-      reason: 'manual_selection'
+      reason: 'manual_selection',
+      availableStores: allStores
     }));
   }, []);
 

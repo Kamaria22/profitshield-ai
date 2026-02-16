@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   TENANT_ID: 'ctx_tenant_id',
   HOST: 'ctx_host',
   EMBEDDED: 'ctx_embedded',
-  DEBUG: 'ctx_debug'
+  DEBUG: 'ctx_debug',
+  INTEGRATION_ID: 'ctx_integration_id'
 };
 
 /**
@@ -133,7 +134,8 @@ export function getPersistedContext() {
       tenantId: null,
       host: null,
       embedded: null,
-      debug: null
+      debug: null,
+      integrationId: null
     };
   }
   
@@ -143,7 +145,8 @@ export function getPersistedContext() {
     tenantId: localStorage.getItem(STORAGE_KEYS.TENANT_ID),
     host: localStorage.getItem(STORAGE_KEYS.HOST),
     embedded: localStorage.getItem(STORAGE_KEYS.EMBEDDED),
-    debug: localStorage.getItem(STORAGE_KEYS.DEBUG)
+    debug: localStorage.getItem(STORAGE_KEYS.DEBUG),
+    integrationId: localStorage.getItem(STORAGE_KEYS.INTEGRATION_ID)
   };
 }
 
@@ -152,7 +155,7 @@ export function getPersistedContext() {
  * Only overwrites if value is truthy
  * @param {Object} context
  */
-export function persistContext({ platform, storeKey, tenantId, host, embedded, debug }) {
+export function persistContext({ platform, storeKey, tenantId, host, embedded, debug, integrationId }) {
   if (typeof localStorage === 'undefined') return;
   
   if (platform) localStorage.setItem(STORAGE_KEYS.PLATFORM, platform);
@@ -165,6 +168,7 @@ export function persistContext({ platform, storeKey, tenantId, host, embedded, d
   if (debug !== undefined && debug !== null) {
     localStorage.setItem(STORAGE_KEYS.DEBUG, debug);
   }
+  if (integrationId) localStorage.setItem(STORAGE_KEYS.INTEGRATION_ID, integrationId);
 }
 
 /**

@@ -52,11 +52,21 @@ export default function StoreSwitcher() {
     
     await selectStore(store);
     
-    // Reload current page with new context
-    const url = createPageUrl(
-      location.pathname.replace('/', '') || 'Home',
-      `?platform=${store.platform}&store=${store.store_key}`
-    );
+    // Build proper query string based on platform
+    let queryStr = '';
+    if (store.platform === 'shopify') {
+      queryStr = `?shop=${store.store_key}`;
+    } else if (store.platform === 'woocommerce') {
+      queryStr = `?platform=woocommerce&site=${store.store_key}`;
+    } else if (store.platform === 'bigcommerce') {
+      queryStr = `?platform=bigcommerce&store_hash=${store.store_key}`;
+    } else {
+      queryStr = `?platform=${store.platform}&store=${store.store_key}`;
+    }
+    
+    // Get current page name
+    const pageName = location.pathname.replace('/', '') || 'Home';
+    const url = createPageUrl(pageName, queryStr);
     navigate(url);
     window.location.reload(); // Force reload to reset all queries
   };
