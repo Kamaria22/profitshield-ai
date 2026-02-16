@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-// Custom createPageUrl that preserves query string (especially ?shop=)
-const createPageUrl = (pageName) => {
-  const base = `/${pageName.toLowerCase()}`;
-  const qs = window.location.search || "";
-  return `${base}${qs}`;
-};
+import { createPageUrl, persistShopifyContext, getPersistedShopifyContext } from './utils/createPageUrl';
 import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard,
@@ -65,8 +60,9 @@ export default function Layout({ children, currentPageName }) {
       
       // Tenant resolution order: A) URL param > B) localStorage > C) user.tenant_id
       // NO fallback to first tenant
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = new URLSearchParams(location.search);
       let shopParam = urlParams.get('shop');
+      let hostParam = urlParams.get('host');
       let resolvedTenant = null;
       
       // PRIORITY A: URL shop param (Shopify embedded app context)
@@ -80,25 +76,27 @@ export default function Layout({ children, currentPageName }) {
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
           console.log('[Layout] Found tenant:', resolvedTenant.id);
-          // Persist for navigation fallback
-          localStorage.setItem('resolved_shop_domain', shopDomain);
-          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+          // Persist for navigation fallback (including host)
+          persistShopifyContext({
+            shopDomain,
+            tenantId: resolvedTenant.id,
+            host: hostParam
+          });
         }
       }
 
       // PRIORITY B: localStorage fallback
       if (!resolvedTenant) {
-        const storedShopDomain = localStorage.getItem('resolved_shop_domain');
-        const storedTenantId = localStorage.getItem('resolved_tenant_id');
-        console.log('[Layout] Trying localStorage fallback:', storedShopDomain, storedTenantId);
+        const persisted = getPersistedShopifyContext();
+        console.log('[Layout] Trying localStorage fallback:', persisted.shopDomain, persisted.tenantId);
 
-        if (storedShopDomain) {
-          const tenants = await base44.entities.Tenant.filter({ shop_domain: storedShopDomain });
+        if (persisted.shopDomain) {
+          const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
           if (tenants.length > 0) {
             resolvedTenant = tenants[0];
           }
-        } else if (storedTenantId) {
-          const tenants = await base44.entities.Tenant.filter({ id: storedTenantId });
+        } else if (persisted.tenantId) {
+          const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
           if (tenants.length > 0) {
             resolvedTenant = tenants[0];
           }
@@ -112,8 +110,10 @@ export default function Layout({ children, currentPageName }) {
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
           // Persist for navigation
-          localStorage.setItem('resolved_shop_domain', resolvedTenant.shop_domain);
-          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+          persistShopifyContext({
+            shopDomain: resolvedTenant.shop_domain,
+            tenantId: resolvedTenant.id
+          });
         }
       }
 
@@ -168,7 +168,7 @@ export default function Layout({ children, currentPageName }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200">
-            <Link to={createPageUrl('Home')} className="flex items-center gap-2">
+            <Link to={createPageUrl('Home', location.search)} className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
@@ -203,13 +203,17 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.filter(item => !item.adminOnly || user?.role === 'admin').map((item) => {
+            {navItems.filter(item => {
+              if (!item.adminOnly) return true;
+              const isAdmin = user?.app_role === 'owner' || user?.app_role === 'admin';
+              return isAdmin;
+            }).map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
               return (
                 <Link
                   key={item.page}
-                  to={createPageUrl(item.page)}
+                  to={createPageUrl(item.page, location.search)}
                   onClick={() => setSidebarOpen(false)}
                   className={`
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
@@ -257,7 +261,7 @@ export default function Layout({ children, currentPageName }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem asChild>
-                    <Link to={createPageUrl('Settings')}>
+                    <Link to={createPageUrl('Settings', location.search)}>
                       <Settings className="w-4 h-4 mr-2" />
                       Settings
                     </Link>
@@ -288,7 +292,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex-1 lg:flex-none" />
 
           <div className="flex items-center gap-3">
-            <Link to={createPageUrl('Alerts')}>
+            <Link to={createPageUrl('Alerts', location.search)}>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="w-5 h-5" />
                 {pendingAlerts > 0 && (
@@ -303,10 +307,10 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
-          {!tenant && !localStorage.getItem('resolved_tenant_id') && (
+          {!tenant && !getPersistedShopifyContext().tenantId && !new URLSearchParams(location.search).get('shop') && (
             <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
               No store resolved. Open the app with a shop param like:
-              <span className="ml-2 font-mono">/orders?shop=profitshield-dev.myshopify.com</span>
+              <span className="ml-2 font-mono">/orders?shop=profitshield-dev.myshopify.com&host=HOST_VALUE</span>
             </div>
           )}
           {children}
