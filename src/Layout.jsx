@@ -1,7 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { createPageUrl, persistShopifyContext, getPersistedShopifyContext } from '@/components/shopifyContext';
 import { base44 } from '@/api/base44Client';
+
+// Shopify context utilities - inlined to avoid path resolution issues
+function createPageUrl(pageName, locationSearch) {
+  const searchString = locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
+  const currentParams = new URLSearchParams(searchString);
+  const preservedParams = new URLSearchParams();
+
+  let shop = currentParams.get('shop');
+  if (!shop && typeof localStorage !== 'undefined') {
+    shop = localStorage.getItem('resolved_shop_domain');
+  }
+  if (shop) {
+    const normalizedShop = shop.includes('.myshopify.com') 
+      ? shop.toLowerCase().trim()
+      : `${shop.toLowerCase().trim()}.myshopify.com`;
+    preservedParams.set('shop', normalizedShop);
+  }
+
+  let host = currentParams.get('host');
+  if (!host && typeof localStorage !== 'undefined') {
+    host = localStorage.getItem('resolved_host');
+  }
+  if (host) {
+    preservedParams.set('host', host);
+  }
+
+  const embedded = currentParams.get('embedded');
+  if (embedded) preservedParams.set('embedded', embedded);
+
+  const debug = currentParams.get('debug');
+  if (debug) preservedParams.set('debug', debug);
+
+  const queryString = preservedParams.toString();
+  const basePath = `/${pageName.toLowerCase()}`;
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
+function persistShopifyContext({ shopDomain, tenantId, host }) {
+  if (typeof localStorage === 'undefined') return;
+  if (shopDomain) localStorage.setItem('resolved_shop_domain', shopDomain);
+  if (tenantId) localStorage.setItem('resolved_tenant_id', tenantId);
+  if (host) localStorage.setItem('resolved_host', host);
+}
+
+function getPersistedShopifyContext() {
+  if (typeof localStorage === 'undefined') {
+    return { shopDomain: null, tenantId: null, host: null };
+  }
+  return {
+    shopDomain: localStorage.getItem('resolved_shop_domain'),
+    tenantId: localStorage.getItem('resolved_tenant_id'),
+    host: localStorage.getItem('resolved_host')
+  };
+}
 import {
   LayoutDashboard,
   ShoppingCart,
