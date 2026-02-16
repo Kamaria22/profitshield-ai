@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import { 
   Search, 
@@ -34,6 +34,7 @@ import OrderDetailPanel from '../components/orders/OrderDetailPanel';
 import DebugBanner from '../components/DebugBanner';
 
 export default function Orders() {
+  const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -496,6 +497,13 @@ export default function Orders() {
           <OrderDetailPanel 
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
+            onOrderUpdated={() => {
+              queryClient.invalidateQueries({ queryKey: ['orders', tenantId] });
+              // Refresh selected order data
+              base44.entities.Order.filter({ id: selectedOrder.id }).then(orders => {
+                if (orders.length > 0) setSelectedOrder(orders[0]);
+              });
+            }}
           />
         </>
       )}
