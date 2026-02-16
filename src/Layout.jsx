@@ -270,7 +270,7 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
-          {!tenant && (
+          {!tenant && !localStorage.getItem('resolved_tenant_id') && (
             <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
               No store resolved. Open the app with a shop param like:
               <span className="ml-2 font-mono">/orders?shop=profitshield-dev.myshopify.com</span>
