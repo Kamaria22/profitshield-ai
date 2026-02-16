@@ -45,25 +45,62 @@ export default function Layout({ children, currentPageName }) {
 
   useEffect(() => {
     loadUserAndTenant();
-  }, []);
+  }, [location.search]); // Re-run when URL params change
 
   const loadUserAndTenant = async () => {
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
+      // PRIORITY 1: Resolve tenant from URL shop param (Shopify embedded app context)
+      const urlParams = new URLSearchParams(window.location.search);
+      let shopParam = urlParams.get('shop');
+      let resolvedTenant = null;
+      
+      if (shopParam) {
+        // Normalize shop domain
+        const shopDomain = shopParam.includes('.myshopify.com') 
+          ? shopParam.toLowerCase().trim()
+          : `${shopParam.toLowerCase().trim()}.myshopify.com`;
         
+        console.log('[Layout] Resolving tenant from shop param:', shopDomain);
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          console.log('[Layout] Found tenant:', resolvedTenant.id);
+        }
+      }
+      
+      // PRIORITY 2: Fall back to user's tenant_id only if no shop param
+      if (!resolvedTenant && currentUser?.tenant_id) {
+        console.log('[Layout] Falling back to user tenant_id:', currentUser.tenant_id);
+        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+        }
+      }
+      
+      // PRIORITY 3: Fall back to first tenant (demo mode)
+      if (!resolvedTenant) {
+        console.log('[Layout] Falling back to first tenant');
+        const tenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+        }
+      }
+      
+      if (resolvedTenant) {
+        setTenant(resolvedTenant);
+        
+        // Load alerts for the resolved tenant
         const alerts = await base44.entities.Alert.filter({ 
-          tenant_id: currentUser.tenant_id, 
+          tenant_id: resolvedTenant.id, 
           status: 'pending' 
         });
         setPendingAlerts(alerts.length);
       }
     } catch (e) {
-      console.log('User not logged in or no tenant');
+      console.log('User not logged in or no tenant:', e.message);
     }
   };
 
