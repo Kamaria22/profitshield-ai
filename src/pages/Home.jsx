@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +14,9 @@ import {
   Package,
   ArrowRight,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Plus,
+  ExternalLink
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +40,7 @@ export default function Home() {
   const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
   const [dateRange, setDateRange] = useState('30');
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -45,11 +48,41 @@ export default function Home() {
       return response.data;
     },
     onSuccess: (data) => {
-      toast.success(`Synced ${data.total} orders (${data.created} new, ${data.updated} updated)`);
+      const msg = `Synced: ${data.createdCount || data.created} new, ${data.updatedCount || data.updated} updated${data.newestOrderNumber ? ` (newest #${data.newestOrderNumber})` : ''}`;
+      toast.success(msg, {
+        action: {
+          label: 'View Orders',
+          onClick: () => {
+            const qs = window.location.search || '';
+            navigate(`/orders${qs}`);
+          }
+        }
+      });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Failed to sync orders');
+    }
+  });
+
+  const createTestOrderMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('createShopifyTestOrder', { tenant_id: tenantId });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Created Shopify order ${data.order_number} ($${data.total_price})`, {
+        description: `Product: ${data.product_title}`,
+        action: {
+          label: 'View in Shopify',
+          onClick: () => {
+            window.open(`https://${shopDomain}/admin/orders/${data.order_id}`, '_blank');
+          }
+        }
+      });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to create test order');
     }
   });
 
@@ -204,6 +237,15 @@ export default function Home() {
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
+          <Button 
+            variant="outline" 
+            onClick={() => createTestOrderMutation.mutate()}
+            disabled={createTestOrderMutation.isPending || !tenantId}
+            className="gap-2"
+          >
+            <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
+            {createTestOrderMutation.isPending ? 'Creating...' : 'Create Test Order'}
+          </Button>
           <Button 
             variant="outline" 
             onClick={() => syncMutation.mutate()}
