@@ -7,7 +7,8 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  AlertTriangle
+  AlertTriangle,
+  Filter
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,40 +22,47 @@ import {
 } from '@/components/ui/select';
 
 import ProductsTable from '../components/products/ProductsTable';
+import ProductCostEditor from '../components/products/ProductCostEditor';
+import useTenantResolver from '../components/useTenantResolver';
 
 export default function Products() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
+  const { tenant, tenantId, loading: tenantLoading } = useTenantResolver();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('profit_desc');
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
-      }
-    } catch (e) {
-      console.log('Error loading user:', e);
-    }
-  };
+  const [profitFilter, setProfitFilter] = useState('all');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [costEditorOpen, setCostEditorOpen] = useState(false);
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products', tenant?.id],
+    queryKey: ['products', tenantId],
     queryFn: async () => {
-      if (!tenant?.id) return [];
+      if (!tenantId) return [];
       return base44.entities.Product.filter({ 
-        tenant_id: tenant.id 
+        tenant_id: tenantId 
       }, '-total_revenue', 500);
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
+  });
+
+  const { data: variants = [] } = useQuery({
+    queryKey: ['variants', tenantId, selectedProduct?.id],
+    queryFn: async () => {
+      if (!tenantId || !selectedProduct?.platform_product_id) return [];
+      return base44.entities.ProductVariant.filter({ 
+        tenant_id: tenantId,
+        product_id: selectedProduct.platform_product_id
+      });
+    },
+    enabled: !!tenantId && !!selectedProduct?.platform_product_id
+  });
+
+  const { data: costMappings = [] } = useQuery({
+    queryKey: ['costMappings', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      return base44.entities.CostMapping.filter({ tenant_id: tenantId });
+    },
+    enabled: !!tenantId && !tenantLoading
   });
 
   // Filter and sort products
@@ -70,6 +78,27 @@ export default function Products() {
       );
     }
 
+    // Profit filter
+    switch (profitFilter) {
+      case 'profitable':
+        result = result.filter(p => (p.total_profit || 0) > 0);
+        break;
+      case 'unprofitable':
+        result = result.filter(p => (p.total_profit || 0) <= 0);
+        break;
+      case 'high_margin':
+        result = result.filter(p => (p.avg_margin_pct || 0) >= 30);
+        break;
+      case 'low_margin':
+        result = result.filter(p => (p.avg_margin_pct || 0) < 20 && (p.avg_margin_pct || 0) >= 0);
+        break;
+      case 'negative_margin':
+        result = result.filter(p => (p.avg_margin_pct || 0) < 0);
+        break;
+      default:
+        break;
+    }
+
     // Sort
     switch (sortBy) {
       case 'profit_desc':
@@ -80,6 +109,9 @@ export default function Products() {
         break;
       case 'revenue_desc':
         result.sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0));
+        break;
+      case 'cogs_desc':
+        result.sort((a, b) => (b.total_cogs || 0) - (a.total_cogs || 0));
         break;
       case 'margin_desc':
         result.sort((a, b) => (b.avg_margin_pct || 0) - (a.avg_margin_pct || 0));
@@ -95,17 +127,23 @@ export default function Products() {
     }
 
     return result;
-  }, [products, searchTerm, sortBy]);
+  }, [products, searchTerm, sortBy, profitFilter]);
+
+  const handleEditCost = (product) => {
+    setSelectedProduct(product);
+    setCostEditorOpen(true);
+  };
 
   // Calculate stats
   const stats = React.useMemo(() => {
     const totalRevenue = products.reduce((sum, p) => sum + (p.total_revenue || 0), 0);
+    const totalCogs = products.reduce((sum, p) => sum + (p.total_cogs || 0), 0);
     const totalProfit = products.reduce((sum, p) => sum + (p.total_profit || 0), 0);
     const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const unprofitableCount = products.filter(p => (p.avg_margin_pct || 0) < 0).length;
     const highReturnCount = products.filter(p => (p.return_rate || 0) > 10).length;
     
-    return { totalRevenue, totalProfit, avgMargin, unprofitableCount, highReturnCount };
+    return { totalRevenue, totalCogs, totalProfit, avgMargin, unprofitableCount, highReturnCount };
   }, [products]);
 
   return (
@@ -199,6 +237,21 @@ export default function Products() {
           />
         </div>
 
+        <Select value={profitFilter} onValueChange={setProfitFilter}>
+          <SelectTrigger className="w-44">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Filter" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Products</SelectItem>
+            <SelectItem value="profitable">Profitable</SelectItem>
+            <SelectItem value="unprofitable">Unprofitable</SelectItem>
+            <SelectItem value="high_margin">High Margin (30%+)</SelectItem>
+            <SelectItem value="low_margin">Low Margin (&lt;20%)</SelectItem>
+            <SelectItem value="negative_margin">Negative Margin</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Sort by" />
@@ -207,6 +260,7 @@ export default function Products() {
             <SelectItem value="profit_desc">Highest Profit</SelectItem>
             <SelectItem value="profit_asc">Lowest Profit</SelectItem>
             <SelectItem value="revenue_desc">Highest Revenue</SelectItem>
+            <SelectItem value="cogs_desc">Highest COGS</SelectItem>
             <SelectItem value="margin_desc">Highest Margin</SelectItem>
             <SelectItem value="margin_asc">Lowest Margin</SelectItem>
             <SelectItem value="return_rate">Highest Return Rate</SelectItem>
@@ -222,7 +276,18 @@ export default function Products() {
       {/* Products Table */}
       <ProductsTable 
         products={filteredProducts} 
-        loading={isLoading}
+        loading={isLoading || tenantLoading}
+        onEditCost={handleEditCost}
+      />
+
+      {/* Cost Editor Sheet */}
+      <ProductCostEditor
+        product={selectedProduct}
+        variants={variants}
+        costMappings={costMappings}
+        tenantId={tenantId}
+        open={costEditorOpen}
+        onOpenChange={setCostEditorOpen}
       />
     </div>
   );
