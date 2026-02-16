@@ -3,11 +3,15 @@
  * Enterprise-grade context persistence for multi-platform commerce apps.
  * Supports: Shopify (embedded + standalone), WooCommerce, BigCommerce, future platforms
  * 
- * STORAGE KEY: profitshield_ctx_v1
- * This is the ONLY localStorage key used for platform context.
+ * STORAGE STRATEGY (v2 - store-partitioned):
+ * - profitshield_ctx_active = pointer to last active storeKey
+ * - profitshield_ctx::<storeKey> = per-store context
+ * This prevents WooCommerce context from overwriting Shopify context in multi-store setups.
  */
 
-const STORAGE_KEY = 'profitshield_ctx_v1';
+const STORAGE_KEY_PREFIX = 'profitshield_ctx::';
+const ACTIVE_STORE_KEY = 'profitshield_ctx_active';
+const LEGACY_KEY = 'profitshield_ctx_v1'; // For migration
 
 /**
  * Context TTL in milliseconds (7 days)
@@ -172,33 +176,87 @@ export function buildQuery(params) {
 }
 
 /**
+ * Gets the storage key for a specific store
+ * @param {string} storeKey
+ * @returns {string}
+ */
+function getStoreStorageKey(storeKey) {
+  if (!storeKey) return null;
+  // Normalize to safe key
+  const safeKey = String(storeKey).toLowerCase().replace(/[^a-z0-9.-]/g, '_');
+  return `${STORAGE_KEY_PREFIX}${safeKey}`;
+}
+
+/**
+ * Migrate legacy v1 context to new store-partitioned format
+ */
+function migrateLegacyContext() {
+  if (!hasLocalStorage()) return;
+  
+  try {
+    const legacyRaw = window.localStorage.getItem(LEGACY_KEY);
+    if (!legacyRaw) return;
+    
+    const legacy = JSON.parse(legacyRaw);
+    if (legacy && legacy.storeKey) {
+      // Migrate to new format
+      const newKey = getStoreStorageKey(legacy.storeKey);
+      if (newKey) {
+        window.localStorage.setItem(newKey, legacyRaw);
+        window.localStorage.setItem(ACTIVE_STORE_KEY, legacy.storeKey);
+      }
+    }
+    // Remove legacy key after migration
+    window.localStorage.removeItem(LEGACY_KEY);
+    console.log('[platformContext] Migrated legacy context to store-partitioned format');
+  } catch (e) {
+    console.warn('[platformContext] Legacy migration failed:', e.message);
+  }
+}
+
+/**
  * Retrieves persisted platform context from localStorage
  * SAFE: Always returns a fully-shaped object, never throws
  * Auto-resets if JSON is corrupted OR TTL expired
  * @param {boolean} [ignoreTTL=false] - If true, returns context even if expired
+ * @param {string} [forStoreKey] - Specific store to retrieve (defaults to active store)
  * @returns {PlatformContext}
  */
-export function getPersistedContext(ignoreTTL = false) {
+export function getPersistedContext(ignoreTTL = false, forStoreKey = null) {
   const ctx = getEmptyContext();
   
   if (!hasLocalStorage()) return ctx;
   
+  // One-time migration check
+  migrateLegacyContext();
+  
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    // Determine which store to load
+    let storeKey = forStoreKey;
+    if (!storeKey) {
+      storeKey = window.localStorage.getItem(ACTIVE_STORE_KEY);
+    }
+    
+    if (!storeKey) return ctx;
+    
+    const storageKey = getStoreStorageKey(storeKey);
+    if (!storageKey) return ctx;
+    
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return ctx;
     
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') {
       // Corrupted - clear it
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
       return ctx;
     }
     
     // TTL check - if expired, clear and return empty
     const persistedAt = typeof parsed.persistedAt === 'number' ? parsed.persistedAt : null;
     if (!ignoreTTL && persistedAt && (Date.now() - persistedAt > CONTEXT_TTL_MS)) {
-      console.log('[platformContext] Persisted context expired (TTL), clearing');
-      window.localStorage.removeItem(STORAGE_KEY);
+      console.log('[platformContext] Persisted context expired (TTL), clearing for store:', storeKey);
+      window.localStorage.removeItem(storageKey);
       return ctx;
     }
     
@@ -218,10 +276,7 @@ export function getPersistedContext(ignoreTTL = false) {
     
   } catch (e) {
     // JSON parse error - clear corrupted data
-    console.warn('[platformContext] Corrupted persisted context, clearing:', e.message);
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch (_) {}
+    console.warn('[platformContext] Corrupted persisted context:', e.message);
     return ctx;
   }
 }
@@ -237,7 +292,7 @@ export function isPersistedContextExpired() {
 }
 
 /**
- * Persists platform context to localStorage
+ * Persists platform context to localStorage (store-partitioned)
  * SAFE: Merges with existing, never throws
  * @param {Partial<PlatformContext>} partial - Fields to persist (merged with existing)
  */
@@ -245,7 +300,15 @@ export function persistContext(partial) {
   if (!hasLocalStorage() || !partial) return;
   
   try {
-    const existing = getPersistedContext();
+    // Determine store key - prefer new value, fall back to existing
+    const targetStoreKey = partial.storeKey || getPersistedContext(true).storeKey;
+    if (!targetStoreKey) {
+      console.warn('[platformContext] Cannot persist without storeKey');
+      return;
+    }
+    
+    // Get existing context for this specific store
+    const existing = getPersistedContext(true, targetStoreKey);
     
     // Merge: only overwrite if new value is truthy (except for explicit null clearing)
     const merged = { ...existing };
@@ -263,7 +326,13 @@ export function persistContext(partial) {
     // Always update timestamp
     merged.persistedAt = Date.now();
     
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    // Save to store-specific key
+    const storageKey = getStoreStorageKey(targetStoreKey);
+    if (storageKey) {
+      window.localStorage.setItem(storageKey, JSON.stringify(merged));
+      // Update active store pointer
+      window.localStorage.setItem(ACTIVE_STORE_KEY, targetStoreKey);
+    }
     
   } catch (e) {
     console.warn('[platformContext] persistContext error:', e.message);
@@ -271,16 +340,118 @@ export function persistContext(partial) {
 }
 
 /**
- * Clears persisted context
+ * Clears persisted context for current active store
  * SAFE: Never throws
+ * @param {string} [storeKey] - Specific store to clear (defaults to active)
  */
-export function clearContext() {
+export function clearContext(storeKey = null) {
   if (!hasLocalStorage()) return;
   
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    const targetStoreKey = storeKey || window.localStorage.getItem(ACTIVE_STORE_KEY);
+    
+    if (targetStoreKey) {
+      const storageKey = getStoreStorageKey(targetStoreKey);
+      if (storageKey) {
+        window.localStorage.removeItem(storageKey);
+      }
+    }
+    
+    // Also clear active pointer if clearing active store
+    if (!storeKey || storeKey === window.localStorage.getItem(ACTIVE_STORE_KEY)) {
+      window.localStorage.removeItem(ACTIVE_STORE_KEY);
+    }
   } catch (e) {
     console.warn('[platformContext] clearContext error:', e.message);
+  }
+}
+
+/**
+ * Hard reset - clears ALL store contexts and query caches
+ * DEBUG ONLY - use with caution
+ * @returns {{ cleared: number }}
+ */
+export function hardResetAllContexts() {
+  if (!hasLocalStorage()) return { cleared: 0 };
+  
+  let cleared = 0;
+  try {
+    // Find and remove all store-partitioned keys
+    const keys = Object.keys(window.localStorage);
+    for (const key of keys) {
+      if (key.startsWith(STORAGE_KEY_PREFIX) || key === ACTIVE_STORE_KEY || key === LEGACY_KEY) {
+        window.localStorage.removeItem(key);
+        cleared++;
+      }
+    }
+    console.log('[platformContext] Hard reset cleared', cleared, 'keys');
+  } catch (e) {
+    console.warn('[platformContext] hardResetAllContexts error:', e.message);
+  }
+  
+  return { cleared };
+}
+
+/**
+ * List all persisted store contexts
+ * DEBUG ONLY
+ * @returns {Array<{ storeKey: string, persistedAt: number }>}
+ */
+export function listPersistedStores() {
+  if (!hasLocalStorage()) return [];
+  
+  const stores = [];
+  try {
+    const keys = Object.keys(window.localStorage);
+    for (const key of keys) {
+      if (key.startsWith(STORAGE_KEY_PREFIX)) {
+        const storeKey = key.replace(STORAGE_KEY_PREFIX, '');
+        const ctx = getPersistedContext(true, storeKey);
+        if (ctx.storeKey) {
+          stores.push({
+            storeKey: ctx.storeKey,
+            platform: ctx.platform,
+            tenantId: ctx.tenantId,
+            persistedAt: ctx.persistedAt
+          });
+        }
+      }
+    }
+  } catch (e) {}
+  
+  return stores;
+}
+
+/**
+ * Get active store key
+ * @returns {string|null}
+ */
+export function getActiveStoreKey() {
+  if (!hasLocalStorage()) return null;
+  try {
+    return window.localStorage.getItem(ACTIVE_STORE_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Switch active store (without clearing others)
+ * @param {string} storeKey
+ * @returns {boolean}
+ */
+export function switchActiveStore(storeKey) {
+  if (!hasLocalStorage() || !storeKey) return false;
+  
+  try {
+    // Verify this store has context
+    const ctx = getPersistedContext(true, storeKey);
+    if (!ctx.storeKey) return false;
+    
+    window.localStorage.setItem(ACTIVE_STORE_KEY, storeKey);
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 
