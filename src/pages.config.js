@@ -64,6 +64,7 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
+import ResolverTestHarness from './pages/ResolverTestHarness';
 import __Layout from './Layout.jsx';
 
 
@@ -85,6 +86,7 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
+    "ResolverTestHarness": ResolverTestHarness,
 }
 
 export const pagesConfig = {
