@@ -21,26 +21,30 @@ export function normalizeShopDomain(shopParam) {
  */
 export function parseQuery(search) {
   const params = new URLSearchParams(search || '');
+  const embedded = params.get('embedded');
+  const debug = params.get('debug');
   return {
     shop: params.get('shop'),
     host: params.get('host'),
-    embedded: params.get('embedded'),
-    debug: params.get('debug')
+    embedded: (embedded === '1' || embedded === 'true') ? '1' : embedded,
+    debug: (debug === '1' || debug === 'true') ? '1' : debug
   };
 }
 
 /**
  * Retrieves persisted Shopify context from localStorage
- * @returns {Object} {shopDomain, tenantId, host}
+ * @returns {Object} {shopDomain, tenantId, host, embedded, debug}
  */
 export function getPersistedShopifyContext() {
   if (typeof localStorage === 'undefined') {
-    return { shopDomain: null, tenantId: null, host: null };
+    return { shopDomain: null, tenantId: null, host: null, embedded: null, debug: null };
   }
   return {
     shopDomain: localStorage.getItem('resolved_shop_domain'),
     tenantId: localStorage.getItem('resolved_tenant_id'),
-    host: localStorage.getItem('resolved_host')
+    host: localStorage.getItem('resolved_host'),
+    embedded: localStorage.getItem('resolved_embedded'),
+    debug: localStorage.getItem('resolved_debug')
   };
 }
 
@@ -50,12 +54,29 @@ export function getPersistedShopifyContext() {
  * @param {string} [context.shop] - Shop domain
  * @param {string} [context.host] - Shopify host param
  * @param {string} [context.tenantId] - Tenant ID
+ * @param {string} [context.embedded] - Embedded flag
+ * @param {string} [context.debug] - Debug flag
  */
-export function persistShopifyContext({ shop, host, tenantId }) {
+export function persistShopifyContext({ shop, host, tenantId, embedded, debug }) {
   if (typeof localStorage === 'undefined') return;
-  if (shop) localStorage.setItem('resolved_shop_domain', shop);
-  if (host) localStorage.setItem('resolved_host', host);
-  if (tenantId) localStorage.setItem('resolved_tenant_id', tenantId);
+  
+  // Always normalize shop before storing
+  if (shop) {
+    localStorage.setItem('resolved_shop_domain', normalizeShopDomain(shop));
+  }
+  if (host) {
+    localStorage.setItem('resolved_host', host);
+  }
+  if (tenantId) {
+    localStorage.setItem('resolved_tenant_id', tenantId);
+  }
+  // For embedded and debug, only update if provided (preserve existing otherwise)
+  if (embedded !== undefined && embedded !== null) {
+    localStorage.setItem('resolved_embedded', embedded);
+  }
+  if (debug !== undefined && debug !== null) {
+    localStorage.setItem('resolved_debug', debug);
+  }
 }
 
 /**
@@ -75,7 +96,8 @@ export function buildQuery({ shop, host, embedded, debug }) {
 
 /**
  * Creates a page URL that preserves Shopify embedded app context
- * Priority: A) URL params, B) localStorage, C) nothing
+ * Merges query params with priority: A) URL params, B) localStorage
+ * ALWAYS includes shop/host/embedded/debug if known from either source
  * @param {string} pageName - Page name to navigate to
  * @param {string} [locationSearch] - Current URL search string
  * @returns {string} Full URL path with preserved query params
@@ -87,12 +109,12 @@ export function createPageUrl(pageName, locationSearch) {
   // Get persisted context (Priority B fallback)
   const persisted = getPersistedShopifyContext();
   
-  // Merge with URL taking priority
+  // Merge with URL taking priority, but fall back to persisted for all params
   const merged = {
     shop: urlParams.shop || persisted.shopDomain,
     host: urlParams.host || persisted.host,
-    embedded: urlParams.embedded,
-    debug: urlParams.debug
+    embedded: urlParams.embedded || persisted.embedded,
+    debug: urlParams.debug || persisted.debug
   };
   
   const queryString = buildQuery(merged);

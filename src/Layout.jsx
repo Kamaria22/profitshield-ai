@@ -125,11 +125,13 @@ export default function Layout({ children, currentPageName }) {
         return;
       }
       
-      // Persist resolved context for navigation
+      // Persist resolved context for navigation (including embedded/debug flags)
       persistShopifyContext({
         shop: resolvedShopDomain,
         host: resolvedHost,
-        tenantId: resolvedTenant.id
+        tenantId: resolvedTenant.id,
+        embedded: urlParams.embedded ?? persisted.embedded,
+        debug: urlParams.debug ?? persisted.debug
       });
       
       setTenant(resolvedTenant);
