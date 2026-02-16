@@ -102,6 +102,7 @@ export default function Customers() {
 
   // Get customers for selected segment or all
   const displayedCustomers = useMemo(() => {
+    if (!canQuery) return [];
     let customers = selectedSegment ? getSegmentCustomers(selectedSegment) : allCustomers;
     
     if (searchTerm) {
@@ -113,7 +114,7 @@ export default function Customers() {
     }
     
     return customers;
-  }, [selectedSegment, allCustomers, searchTerm]);
+  }, [selectedSegment, allCustomers, searchTerm, canQuery]);
 
   // Calculate segment stats
   const segmentsWithStats = useMemo(() => {
