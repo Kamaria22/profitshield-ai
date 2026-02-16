@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { 
   DollarSign, 
@@ -36,6 +37,21 @@ import DebugBanner from '../components/DebugBanner';
 export default function Home() {
   const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
   const [dateRange, setDateRange] = useState('30');
+  const queryClient = useQueryClient();
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('syncShopifyOrders', { tenant_id: tenantId });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Synced ${data.total} orders (${data.created} new, ${data.updated} updated)`);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to sync orders');
+    }
+  });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', tenantId, dateRange],
@@ -188,8 +204,13 @@ export default function Home() {
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon">
-            <RefreshCw className="w-4 h-4" />
+          <Button 
+            variant="outline" 
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || !tenantId}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? 'Syncing...' : 'Sync Orders'}
           </Button>
         </div>
       </div>
