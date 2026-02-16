@@ -63,6 +63,7 @@ export default function Orders() {
   });
   
   const [currentUser, setCurrentUser] = useState(null);
+  const [tenantSettings, setTenantSettings] = useState(null);
 
   // Resolve tenant directly on mount
   // Priority: A) URL param ?shop= > B) localStorage > C) user.tenant_id
@@ -169,6 +170,15 @@ export default function Orders() {
       
       console.log('[Orders] Final resolved tenant:', resolvedTenant?.id, 'shop:', resolvedShopDomain);
       
+      // Load tenant settings for demo_mode
+      if (resolvedTenant?.id) {
+        const settingsData = await base44.entities.TenantSettings.filter({ tenant_id: resolvedTenant.id });
+        if (settingsData.length > 0) {
+          setTenantSettings(settingsData[0]);
+          console.log('[Orders] Tenant settings loaded, demo_mode:', settingsData[0].demo_mode);
+        }
+      }
+      
       setTenantState({
         tenant: resolvedTenant,
         tenantId: resolvedTenant?.id || null,
@@ -232,6 +242,13 @@ export default function Orders() {
   // Apply filters
   const filteredOrders = React.useMemo(() => {
     let result = [...orders];
+
+    // Demo mode filter: when demo_mode is false, only show real Shopify orders
+    const demoMode = tenantSettings?.demo_mode !== false; // default true
+    if (!demoMode) {
+      // Only show orders with platform_order_id (real Shopify orders) and is_demo !== true
+      result = result.filter(o => o.platform_order_id && o.is_demo !== true);
+    }
 
     // Date range filter on order_date
     const days = parseInt(filters.dateRange);
