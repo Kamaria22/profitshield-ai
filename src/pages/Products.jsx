@@ -23,10 +23,11 @@ import {
 
 import ProductsTable from '../components/products/ProductsTable';
 import ProductCostEditor from '../components/products/ProductCostEditor';
-import { useTenantResolver } from '@/components/useTenantResolver';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 
 export default function Products() {
-  const { tenant, tenantId, loading: tenantLoading } = useTenantResolver();
+  const { tenantId, status } = usePlatformResolver();
+  const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('profit_desc');
   const [profitFilter, setProfitFilter] = useState('all');

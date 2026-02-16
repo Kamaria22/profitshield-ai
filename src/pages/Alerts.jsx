@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -24,92 +24,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  normalizeShopDomain,
-  parseQuery,
-  getPersistedShopifyContext,
-  persistShopifyContext
-} from '@/components/shopifyContext';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 
 import AlertCard from '../components/alerts/AlertCard';
 
 export default function Alerts() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
   const [typeFilter, setTypeFilter] = useState('all');
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      // Use shared tenant resolution
-      const urlParams = parseQuery(window.location.search);
-      const persisted = getPersistedShopifyContext();
-      
-      let resolvedTenant = null;
-      
-      // PRIORITY A: URL shop param
-      if (urlParams.shop) {
-        const shopDomain = normalizeShopDomain(urlParams.shop);
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          persistShopifyContext({ shop: shopDomain, host: urlParams.host, tenantId: resolvedTenant.id });
-        }
-      }
-      
-      // PRIORITY B: localStorage
-      if (!resolvedTenant && persisted.shopDomain) {
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
-        if (tenants.length > 0) resolvedTenant = tenants[0];
-      } else if (!resolvedTenant && persisted.tenantId) {
-        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
-        if (tenants.length > 0) resolvedTenant = tenants[0];
-      }
-      
-      // PRIORITY C: user.tenant_id
-      if (!resolvedTenant && currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          persistShopifyContext({ shop: resolvedTenant.shop_domain, tenantId: resolvedTenant.id });
-        }
-      }
-      
-      if (resolvedTenant) setTenant(resolvedTenant);
-    } catch (e) {
-      console.log('Error loading user:', e);
-    }
-  };
+  
+  const { tenantId, user, status } = usePlatformResolver();
 
   const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ['alerts', tenant?.id],
+    queryKey: ['alerts', tenantId],
     queryFn: async () => {
-      if (!tenant?.id) return [];
+      if (!tenantId) return [];
       return base44.entities.Alert.filter({ 
-        tenant_id: tenant.id 
+        tenant_id: tenantId 
       }, '-created_date', 500);
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
   });
 
   const updateAlertMutation = useMutation({
-    mutationFn: async ({ id, status }) => {
+    mutationFn: async ({ id, status: newStatus }) => {
       await base44.entities.Alert.update(id, { 
-        status,
+        status: newStatus,
         reviewed_by: user?.email,
         reviewed_at: new Date().toISOString()
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['alerts', tenant?.id]);
+      queryClient.invalidateQueries(['alerts', tenantId]);
     }
   });
 
