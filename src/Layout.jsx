@@ -59,13 +59,14 @@ export default function Layout({ children, currentPageName }) {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // PRIORITY 1: Resolve tenant from URL shop param (Shopify embedded app context)
+      // Tenant resolution order: A) URL param > B) localStorage > C) user.tenant_id
+      // NO fallback to first tenant
       const urlParams = new URLSearchParams(window.location.search);
       let shopParam = urlParams.get('shop');
       let resolvedTenant = null;
       
+      // PRIORITY A: URL shop param (Shopify embedded app context)
       if (shopParam) {
-        // Normalize shop domain
         const shopDomain = shopParam.includes('.myshopify.com') 
           ? shopParam.toLowerCase().trim()
           : `${shopParam.toLowerCase().trim()}.myshopify.com`;
@@ -75,19 +76,13 @@ export default function Layout({ children, currentPageName }) {
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
           console.log('[Layout] Found tenant:', resolvedTenant.id);
-        }
-      }
-      
-      // PRIORITY 2: If shop param missing, resolve by matching current user's tenant to a real shop tenant
-      if (!resolvedTenant && currentUser?.tenant_id) {
-        console.log('[Layout] Using currentUser.tenant_id fallback');
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
+          // Persist for navigation fallback
+          localStorage.setItem('resolved_shop_domain', shopDomain);
+          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
         }
       }
 
-      // PRIORITY 3: localStorage fallback
+      // PRIORITY B: localStorage fallback
       if (!resolvedTenant) {
         const storedShopDomain = localStorage.getItem('resolved_shop_domain');
         const storedTenantId = localStorage.getItem('resolved_tenant_id');
@@ -105,31 +100,36 @@ export default function Layout({ children, currentPageName }) {
           }
         }
       }
+      
+      // PRIORITY C: user.tenant_id fallback
+      if (!resolvedTenant && currentUser?.tenant_id) {
+        console.log('[Layout] Using currentUser.tenant_id fallback');
+        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          // Persist for navigation
+          localStorage.setItem('resolved_shop_domain', resolvedTenant.shop_domain);
+          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+        }
+      }
 
-      // No fallback - require explicit tenant resolution
+      // NO FALLBACK - require explicit tenant resolution
       if (!resolvedTenant) {
-        console.warn('[Layout] No tenant could be resolved. shop param missing and user has no tenant.');
+        console.warn('[Layout] No tenant could be resolved. shop param missing and no fallback.');
         setTenant(null);
         setPendingAlerts(0);
         return;
       }
       
-      if (resolvedTenant) {
-        setTenant(resolvedTenant);
-        
-        // Persist for other pages
-        localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
-        localStorage.setItem('resolved_shop_domain', resolvedTenant.shop_domain);
-        
-        console.log('[Layout] Persisted tenant:', resolvedTenant.id);
-        
-        // Load alerts for the resolved tenant
-        const alerts = await base44.entities.Alert.filter({ 
-          tenant_id: resolvedTenant.id, 
-          status: 'pending' 
-        });
-        setPendingAlerts(alerts.length);
-      }
+      setTenant(resolvedTenant);
+      console.log('[Layout] Persisted tenant:', resolvedTenant.id);
+      
+      // Load alerts for the resolved tenant
+      const alerts = await base44.entities.Alert.filter({ 
+        tenant_id: resolvedTenant.id, 
+        status: 'pending' 
+      });
+      setPendingAlerts(alerts.length);
     } catch (e) {
       console.log('User not logged in or no tenant:', e.message);
     }
