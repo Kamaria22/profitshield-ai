@@ -23,6 +23,7 @@ import PnLTrendsChart from '@/components/analytics/PnLTrendsChart';
 import PnLBreakdownChart from '@/components/analytics/PnLBreakdownChart';
 import PnLSegmentTable from '@/components/analytics/PnLSegmentTable';
 import OrderDrilldownPanel from '@/components/analytics/OrderDrilldownPanel';
+import AIOrderAnalysis from '@/components/analytics/AIOrderAnalysis';
 
 const DATE_PRESETS = [
   { label: 'Today', value: 'today', getDates: () => ({ from: new Date(), to: new Date() }) },
@@ -340,6 +341,9 @@ export default function PnLAnalytics() {
               />
             </CardContent>
           </Card>
+
+          {/* AI Order Analysis */}
+          <AIOrderAnalysis orders={orders} metrics={metrics} />
 
           {/* Drilldown Panel */}
           {drilldownOrders && (

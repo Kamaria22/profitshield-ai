@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import AIOrderInsightsBadge from './AIOrderInsightsBadge';
 
 const riskBadgeConfig = {
   low: { variant: 'outline', className: 'border-emerald-200 text-emerald-700 bg-emerald-50' },
@@ -88,6 +89,7 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
             <TableHead className="font-semibold text-right">Margin</TableHead>
             <TableHead className="font-semibold">Risk</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
+            <TableHead className="font-semibold">AI</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -155,6 +157,9 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                   <Badge className={statusBadgeConfig[order.status] || statusBadgeConfig.pending}>
                     {order.status?.replace('_', ' ')}
                   </Badge>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <AIOrderInsightsBadge order={order} />
                 </TableCell>
                 <TableCell>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
