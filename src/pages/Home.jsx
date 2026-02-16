@@ -42,6 +42,7 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, 
 import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
+import SyncHealthCard from '../components/dashboard/SyncHealthCard';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -81,6 +82,7 @@ export default function Home() {
   const tokenQueryKey = buildQueryKey('oauthToken', resolverCheck);
   const leaksQueryKey = buildQueryKey('profitLeaks', resolverCheck);
   const alertsQueryKey = buildQueryKey('pendingAlerts', resolverCheck);
+  const syncJobsQueryKey = buildQueryKey('syncJobs', resolverCheck);
   
   // Raw values for display
   const tenant = resolver?.tenant || null;
@@ -274,6 +276,26 @@ export default function Home() {
     },
     enabled: canQuery,
     ...queryDefaults.realtime // Alerts should refresh more often
+  });
+
+  // Sync jobs for health card
+  const { data: syncJobs = [] } = useQuery({
+    queryKey: syncJobsQueryKey,
+    queryFn: async () => {
+      if (!resolver?.integrationId) return [];
+      try {
+        const result = await base44.functions.invoke('syncEngine', {
+          action: 'list_sync_jobs',
+          integration_id: resolver.integrationId,
+          limit: 20
+        });
+        return result.data?.jobs || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: canQuery && !!resolver?.integrationId,
+    ...queryDefaults.activity
   });
 
   // Calculate metrics
@@ -684,8 +706,14 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Benchmark Comparison */}
-      <motion.div variants={fadeInUp}>
+      {/* Sync Health + Benchmark */}
+      <motion.div variants={fadeInUp} className="grid lg:grid-cols-2 gap-6">
+        <SyncHealthCard 
+          integration={resolver?.integration}
+          syncJobs={syncJobs}
+          onSync={(integrationId) => syncMutation.mutate()}
+          syncing={syncMutation.isPending}
+        />
         <BenchmarkComparison tenantId={authTenantId} />
       </motion.div>
 
