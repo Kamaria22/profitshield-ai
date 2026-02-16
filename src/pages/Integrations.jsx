@@ -639,6 +639,7 @@ export default function Integrations() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats Cards */}
