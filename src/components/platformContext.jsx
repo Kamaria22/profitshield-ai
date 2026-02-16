@@ -10,6 +10,11 @@
 const STORAGE_KEY = 'profitshield_ctx_v1';
 
 /**
+ * Context TTL in milliseconds (7 days)
+ */
+const CONTEXT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Context Shape - always returned with all keys defined
  * @typedef {Object} PlatformContext
  * @property {string|null} platform - 'shopify'|'woocommerce'|'bigcommerce'|null
@@ -169,10 +174,11 @@ export function buildQuery(params) {
 /**
  * Retrieves persisted platform context from localStorage
  * SAFE: Always returns a fully-shaped object, never throws
- * Auto-resets if JSON is corrupted
+ * Auto-resets if JSON is corrupted OR TTL expired
+ * @param {boolean} [ignoreTTL=false] - If true, returns context even if expired
  * @returns {PlatformContext}
  */
-export function getPersistedContext() {
+export function getPersistedContext(ignoreTTL = false) {
   const ctx = getEmptyContext();
   
   if (!hasLocalStorage()) return ctx;
@@ -188,6 +194,14 @@ export function getPersistedContext() {
       return ctx;
     }
     
+    // TTL check - if expired, clear and return empty
+    const persistedAt = typeof parsed.persistedAt === 'number' ? parsed.persistedAt : null;
+    if (!ignoreTTL && persistedAt && (Date.now() - persistedAt > CONTEXT_TTL_MS)) {
+      console.log('[platformContext] Persisted context expired (TTL), clearing');
+      window.localStorage.removeItem(STORAGE_KEY);
+      return ctx;
+    }
+    
     // Merge parsed values into context (only known keys)
     return {
       platform: parsed.platform || null,
@@ -199,7 +213,7 @@ export function getPersistedContext() {
       embedded: parsed.embedded === '1' ? '1' : null,
       debug: parsed.debug === '1' ? '1' : null,
       userHintEmail: parsed.userHintEmail || null,
-      persistedAt: typeof parsed.persistedAt === 'number' ? parsed.persistedAt : null
+      persistedAt
     };
     
   } catch (e) {
@@ -210,6 +224,16 @@ export function getPersistedContext() {
     } catch (_) {}
     return ctx;
   }
+}
+
+/**
+ * Checks if persisted context is expired
+ * @returns {boolean}
+ */
+export function isPersistedContextExpired() {
+  const ctx = getPersistedContext(true); // Get without TTL check
+  if (!ctx.persistedAt) return false;
+  return Date.now() - ctx.persistedAt > CONTEXT_TTL_MS;
 }
 
 /**
@@ -371,9 +395,17 @@ export { parseQuery as parseQueryParams };
 export function clearStaleContext(validIntegrationIds) {
   if (!Array.isArray(validIntegrationIds)) return;
   
-  const persisted = getPersistedContext();
+  const persisted = getPersistedContext(true); // Ignore TTL for this check
   if (persisted.integrationId && !validIntegrationIds.includes(persisted.integrationId)) {
     console.log('[platformContext] Clearing stale context for integration:', persisted.integrationId);
     clearContext();
   }
+}
+
+/**
+ * Gets the context TTL in milliseconds
+ * @returns {number}
+ */
+export function getContextTTL() {
+  return CONTEXT_TTL_MS;
 }
