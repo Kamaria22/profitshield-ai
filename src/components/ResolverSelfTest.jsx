@@ -6,7 +6,9 @@ import {
   getPersistedContext, 
   persistContext, 
   clearContext,
-  hasValidContext 
+  hasValidContext,
+  hardResetAllContexts,
+  listPersistedStores
 } from '@/components/platformContext';
 
 /**
@@ -134,6 +136,138 @@ const TEST_CASES = [
         pass, 
         detail: pass ? 'Keys isolated by store' : `Keys identical: ${JSON.stringify(key1)}`
       };
+    }
+  },
+  {
+    id: 'data_isolation_null_filter',
+    name: 'Null tenant filter blocked',
+    description: 'Query with null tenant_id should be rejected',
+    run: async () => {
+      const { canQueryTenant, getTenantFilter } = await import('@/components/usePlatformResolver');
+      
+      // Simulate unresolved state
+      const unresolvedCheck = { ok: false, tenantId: null };
+      
+      const canQuery = canQueryTenant(unresolvedCheck);
+      const filter = getTenantFilter(unresolvedCheck);
+      
+      const pass = canQuery === false && filter === null;
+      
+      return { 
+        pass, 
+        detail: pass ? 'Null filter correctly blocked' : `canQuery=${canQuery}, filter=${JSON.stringify(filter)}`
+      };
+    }
+  },
+  {
+    id: 'store_partitioned_persistence',
+    name: 'Store-partitioned localStorage',
+    description: 'Multiple stores should persist independently',
+    run: async () => {
+      // Save current context
+      const original = getPersistedContext(true);
+      const originalStores = listPersistedStores();
+      
+      try {
+        // Persist two different stores
+        const store1 = { platform: 'shopify', storeKey: 'test-store1.myshopify.com', tenantId: 'tenant-1' };
+        const store2 = { platform: 'woocommerce', storeKey: 'test-store2.example.com', tenantId: 'tenant-2' };
+        
+        persistContext(store1);
+        persistContext(store2);
+        
+        // Retrieve each store's context
+        const ctx1 = getPersistedContext(true, store1.storeKey);
+        const ctx2 = getPersistedContext(true, store2.storeKey);
+        
+        // Verify they're separate
+        const pass = ctx1.platform === 'shopify' && 
+                     ctx2.platform === 'woocommerce' &&
+                     ctx1.tenantId === 'tenant-1' &&
+                     ctx2.tenantId === 'tenant-2';
+        
+        // Cleanup test stores
+        clearContext(store1.storeKey);
+        clearContext(store2.storeKey);
+        
+        // Restore original if any
+        if (original.storeKey) {
+          persistContext(original);
+        }
+        
+        return { 
+          pass, 
+          detail: pass ? 'Stores persisted independently' : `ctx1=${JSON.stringify(ctx1)}, ctx2=${JSON.stringify(ctx2)}`
+        };
+      } catch (e) {
+        return { pass: false, detail: e.message };
+      }
+    }
+  },
+  {
+    id: 'cache_isolation_switch',
+    name: 'Cache isolation on store switch',
+    description: 'Query keys change when switching stores',
+    run: async () => {
+      const { buildQueryKey } = await import('@/components/usePlatformResolver');
+      
+      const store1Check = { ok: true, tenantId: 'tenant-1', platform: 'shopify', storeKey: 'store-a.myshopify.com', integrationId: 'int-a' };
+      const store2Check = { ok: true, tenantId: 'tenant-1', platform: 'shopify', storeKey: 'store-b.myshopify.com', integrationId: 'int-b' };
+      
+      // Build keys for multiple query types
+      const ordersKey1 = buildQueryKey('orders', store1Check);
+      const ordersKey2 = buildQueryKey('orders', store2Check);
+      const alertsKey1 = buildQueryKey('alerts', store1Check);
+      const alertsKey2 = buildQueryKey('alerts', store2Check);
+      
+      const ordersIsolated = JSON.stringify(ordersKey1) !== JSON.stringify(ordersKey2);
+      const alertsIsolated = JSON.stringify(alertsKey1) !== JSON.stringify(alertsKey2);
+      
+      const pass = ordersIsolated && alertsIsolated;
+      
+      return { 
+        pass, 
+        detail: pass ? 'All query types isolated' : `orders=${ordersIsolated}, alerts=${alertsIsolated}`
+      };
+    }
+  },
+  {
+    id: 'hard_reset_clears_all',
+    name: 'Hard reset clears all stores',
+    description: 'hardResetAllContexts removes all persisted data',
+    run: async () => {
+      // Save current state
+      const originalStores = listPersistedStores();
+      const originalActive = getPersistedContext(true);
+      
+      try {
+        // Add test stores
+        persistContext({ platform: 'shopify', storeKey: 'reset-test-1.myshopify.com', tenantId: 't1' });
+        persistContext({ platform: 'shopify', storeKey: 'reset-test-2.myshopify.com', tenantId: 't2' });
+        
+        // Hard reset
+        const result = hardResetAllContexts();
+        
+        // Check all cleared
+        const afterStores = listPersistedStores();
+        const pass = result.cleared >= 2 && afterStores.length === 0;
+        
+        // Restore original stores
+        for (const store of originalStores) {
+          persistContext({ 
+            platform: store.platform, 
+            storeKey: store.storeKey, 
+            tenantId: store.tenantId 
+          });
+        }
+        
+        return { 
+          pass, 
+          detail: pass ? `Cleared ${result.cleared} keys` : `After reset: ${afterStores.length} stores remain`
+        };
+      } catch (e) {
+        return { pass: false, detail: e.message };
+      }
     }
   }
 ];
