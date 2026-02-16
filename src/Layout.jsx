@@ -71,9 +71,9 @@ export default function Layout({ children, currentPageName }) {
         }
       }
       
-      // PRIORITY 2: Fall back to user's tenant_id only if no shop param
+      // PRIORITY 2: If shop param missing, resolve by matching current user's tenant to a real shop tenant
       if (!resolvedTenant && currentUser?.tenant_id) {
-        console.log('[Layout] Falling back to user tenant_id:', currentUser.tenant_id);
+        console.log('[Layout] Using currentUser.tenant_id fallback');
         const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
@@ -94,6 +94,8 @@ export default function Layout({ children, currentPageName }) {
         // Persist for other pages
         localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
         localStorage.setItem('resolved_shop_domain', resolvedTenant.shop_domain);
+        
+        console.log('[Layout] Persisted tenant:', resolvedTenant.id);
         
         // Load alerts for the resolved tenant
         const alerts = await base44.entities.Alert.filter({ 
