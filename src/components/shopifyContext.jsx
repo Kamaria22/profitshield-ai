@@ -1,90 +1,112 @@
 /**
- * Creates a page URL that preserves Shopify embedded app context params.
- * 
- * @param {string} pageName - The page name to navigate to
- * @param {string} [locationSearch] - Optional query string (defaults to window.location.search)
- * @returns {string} The full URL path with preserved query params
+ * Shopify Context Utilities - Single Source of Truth
+ * All Shopify embedded app context handling should use these functions.
  */
-export function createPageUrl(pageName, locationSearch) {
-  const searchString = locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
-  const currentParams = new URLSearchParams(searchString);
-  const preservedParams = new URLSearchParams();
 
-  // 1. Shop param: from URL or localStorage
-  let shop = currentParams.get('shop');
-  if (!shop && typeof localStorage !== 'undefined') {
-    shop = localStorage.getItem('resolved_shop_domain');
-  }
-  if (shop) {
-    // Normalize shop domain
-    const normalizedShop = shop.includes('.myshopify.com') 
-      ? shop.toLowerCase().trim()
-      : `${shop.toLowerCase().trim()}.myshopify.com`;
-    preservedParams.set('shop', normalizedShop);
-  }
-
-  // 2. Host param: from URL or localStorage
-  let host = currentParams.get('host');
-  if (!host && typeof localStorage !== 'undefined') {
-    host = localStorage.getItem('resolved_host');
-  }
-  if (host) {
-    preservedParams.set('host', host);
-  }
-
-  // 3. Embedded param: keep if present
-  const embedded = currentParams.get('embedded');
-  if (embedded) {
-    preservedParams.set('embedded', embedded);
-  }
-
-  // 4. Debug param: keep if present
-  const debug = currentParams.get('debug');
-  if (debug) {
-    preservedParams.set('debug', debug);
-  }
-
-  const queryString = preservedParams.toString();
-  const basePath = `/${pageName.toLowerCase()}`;
-  
-  return queryString ? `${basePath}?${queryString}` : basePath;
+/**
+ * Normalizes a shop domain to the standard format
+ * @param {string} shopParam - Shop param (e.g., "mystore" or "mystore.myshopify.com")
+ * @returns {string} Normalized shop domain (e.g., "mystore.myshopify.com")
+ */
+export function normalizeShopDomain(shopParam) {
+  if (!shopParam) return '';
+  const trimmed = shopParam.toLowerCase().trim();
+  return trimmed.includes('.myshopify.com') ? trimmed : `${trimmed}.myshopify.com`;
 }
 
 /**
- * Persists Shopify context to localStorage for navigation fallback.
- * 
- * @param {Object} context - The context to persist
- * @param {string} [context.shopDomain] - The shop domain
- * @param {string} [context.tenantId] - The tenant ID
- * @param {string} [context.host] - The Shopify host param
+ * Parses URL search string for Shopify context params
+ * @param {string} search - URL search string (e.g., "?shop=mystore&host=xxx")
+ * @returns {Object} Parsed params {shop, host, embedded, debug}
  */
-export function persistShopifyContext({ shopDomain, tenantId, host }) {
-  if (typeof localStorage === 'undefined') return;
-  
-  if (shopDomain) {
-    localStorage.setItem('resolved_shop_domain', shopDomain);
-  }
-  if (tenantId) {
-    localStorage.setItem('resolved_tenant_id', tenantId);
-  }
-  if (host) {
-    localStorage.setItem('resolved_host', host);
-  }
+export function parseQuery(search) {
+  const params = new URLSearchParams(search || '');
+  return {
+    shop: params.get('shop'),
+    host: params.get('host'),
+    embedded: params.get('embedded'),
+    debug: params.get('debug')
+  };
 }
 
 /**
- * Retrieves persisted Shopify context from localStorage.
- * 
- * @returns {Object} The persisted context
+ * Retrieves persisted Shopify context from localStorage
+ * @returns {Object} {shopDomain, tenantId, host}
  */
 export function getPersistedShopifyContext() {
   if (typeof localStorage === 'undefined') {
     return { shopDomain: null, tenantId: null, host: null };
   }
-  
   return {
     shopDomain: localStorage.getItem('resolved_shop_domain'),
     tenantId: localStorage.getItem('resolved_tenant_id'),
     host: localStorage.getItem('resolved_host')
   };
+}
+
+/**
+ * Persists Shopify context to localStorage
+ * @param {Object} context - Context to persist
+ * @param {string} [context.shop] - Shop domain
+ * @param {string} [context.host] - Shopify host param
+ * @param {string} [context.tenantId] - Tenant ID
+ */
+export function persistShopifyContext({ shop, host, tenantId }) {
+  if (typeof localStorage === 'undefined') return;
+  if (shop) localStorage.setItem('resolved_shop_domain', shop);
+  if (host) localStorage.setItem('resolved_host', host);
+  if (tenantId) localStorage.setItem('resolved_tenant_id', tenantId);
+}
+
+/**
+ * Builds a query string from context params (only includes non-null values)
+ * @param {Object} params - Query params {shop, host, embedded, debug}
+ * @returns {string} Query string (e.g., "?shop=...&host=...")
+ */
+export function buildQuery({ shop, host, embedded, debug }) {
+  const queryParams = new URLSearchParams();
+  if (shop) queryParams.set('shop', normalizeShopDomain(shop));
+  if (host) queryParams.set('host', host);
+  if (embedded) queryParams.set('embedded', embedded);
+  if (debug) queryParams.set('debug', debug);
+  const str = queryParams.toString();
+  return str ? `?${str}` : '';
+}
+
+/**
+ * Creates a page URL that preserves Shopify embedded app context
+ * Priority: A) URL params, B) localStorage, C) nothing
+ * @param {string} pageName - Page name to navigate to
+ * @param {string} [locationSearch] - Current URL search string
+ * @returns {string} Full URL path with preserved query params
+ */
+export function createPageUrl(pageName, locationSearch) {
+  // Parse current URL params (Priority A)
+  const urlParams = parseQuery(locationSearch);
+  
+  // Get persisted context (Priority B fallback)
+  const persisted = getPersistedShopifyContext();
+  
+  // Merge with URL taking priority
+  const merged = {
+    shop: urlParams.shop || persisted.shopDomain,
+    host: urlParams.host || persisted.host,
+    embedded: urlParams.embedded,
+    debug: urlParams.debug
+  };
+  
+  const queryString = buildQuery(merged);
+  const basePath = `/${pageName.toLowerCase()}`;
+  
+  return `${basePath}${queryString}`;
+}
+
+/**
+ * Checks if user has admin access based on app_role
+ * @param {Object} user - User object
+ * @returns {boolean} True if user is admin or owner
+ */
+export function isUserAdmin(user) {
+  if (!user) return false;
+  return user.app_role === 'owner' || user.app_role === 'admin';
 }
