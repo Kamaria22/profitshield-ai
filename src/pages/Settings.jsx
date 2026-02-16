@@ -45,10 +45,10 @@ import {
 import { toast } from 'sonner';
 
 import CostMappingTable from '../components/settings/CostMappingTable';
+import { useTenantResolver } from '../components/useTenantResolver';
 
 export default function Settings() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
+  const { tenant, tenantId, user, loading: tenantLoading } = useTenantResolver();
   const [settings, setSettings] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
   const [newCostDialog, setNewCostDialog] = useState(false);
@@ -56,33 +56,27 @@ export default function Settings() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    loadUserData();
-  }, []);
+    if (tenantId) {
+      loadSettings();
+    }
+  }, [tenantId]);
 
-  const loadUserData = async () => {
+  const loadSettings = async () => {
     try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
-        
-        const settingsData = await base44.entities.TenantSettings.filter({ tenant_id: currentUser.tenant_id });
-        if (settingsData.length > 0) setSettings(settingsData[0]);
-      }
+      const settingsData = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+      if (settingsData.length > 0) setSettings(settingsData[0]);
     } catch (e) {
-      console.log('Error loading user:', e);
+      console.log('Error loading settings:', e);
     }
   };
 
   const { data: costMappings = [], isLoading: costsLoading } = useQuery({
-    queryKey: ['costMappings', tenant?.id],
+    queryKey: ['costMappings', tenantId],
     queryFn: async () => {
-      if (!tenant?.id) return [];
-      return base44.entities.CostMapping.filter({ tenant_id: tenant.id }, 'sku', 1000);
+      if (!tenantId) return [];
+      return base44.entities.CostMapping.filter({ tenant_id: tenantId }, 'sku', 1000);
     },
-    enabled: !!tenant?.id
+    enabled: !!tenantId && !tenantLoading
   });
 
   const updateSettingsMutation = useMutation({
@@ -90,19 +84,19 @@ export default function Settings() {
       if (settings?.id) {
         await base44.entities.TenantSettings.update(settings.id, data);
       } else {
-        await base44.entities.TenantSettings.create({ tenant_id: tenant.id, ...data });
+        await base44.entities.TenantSettings.create({ tenant_id: tenantId, ...data });
       }
     },
     onSuccess: () => {
       toast.success('Settings saved');
-      loadUserData();
+      loadSettings();
     }
   });
 
   const createCostMutation = useMutation({
     mutationFn: async (data) => {
       await base44.entities.CostMapping.create({
-        tenant_id: tenant.id,
+        tenant_id: tenantId,
         ...data,
         source: 'manual',
         last_updated_by: user?.email
@@ -110,7 +104,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       toast.success('Cost mapping added');
-      queryClient.invalidateQueries(['costMappings', tenant?.id]);
+      queryClient.invalidateQueries(['costMappings', tenantId]);
       setNewCostDialog(false);
       setNewCost({ sku: '', product_title: '', cost_per_unit: '' });
     }
@@ -122,7 +116,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       toast.success('Cost updated');
-      queryClient.invalidateQueries(['costMappings', tenant?.id]);
+      queryClient.invalidateQueries(['costMappings', tenantId]);
     }
   });
 
@@ -132,7 +126,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       toast.success('Cost mapping deleted');
-      queryClient.invalidateQueries(['costMappings', tenant?.id]);
+      queryClient.invalidateQueries(['costMappings', tenantId]);
     }
   });
 
