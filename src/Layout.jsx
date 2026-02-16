@@ -1,60 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-
-// Shopify context utilities - inlined to avoid path resolution issues
-function createPageUrl(pageName, locationSearch) {
-  const searchString = locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
-  const currentParams = new URLSearchParams(searchString);
-  const preservedParams = new URLSearchParams();
-
-  let shop = currentParams.get('shop');
-  if (!shop && typeof localStorage !== 'undefined') {
-    shop = localStorage.getItem('resolved_shop_domain');
-  }
-  if (shop) {
-    const normalizedShop = shop.includes('.myshopify.com') 
-      ? shop.toLowerCase().trim()
-      : `${shop.toLowerCase().trim()}.myshopify.com`;
-    preservedParams.set('shop', normalizedShop);
-  }
-
-  let host = currentParams.get('host');
-  if (!host && typeof localStorage !== 'undefined') {
-    host = localStorage.getItem('resolved_host');
-  }
-  if (host) {
-    preservedParams.set('host', host);
-  }
-
-  const embedded = currentParams.get('embedded');
-  if (embedded) preservedParams.set('embedded', embedded);
-
-  const debug = currentParams.get('debug');
-  if (debug) preservedParams.set('debug', debug);
-
-  const queryString = preservedParams.toString();
-  const basePath = `/${pageName.toLowerCase()}`;
-  return queryString ? `${basePath}?${queryString}` : basePath;
-}
-
-function persistShopifyContext({ shopDomain, tenantId, host }) {
-  if (typeof localStorage === 'undefined') return;
-  if (shopDomain) localStorage.setItem('resolved_shop_domain', shopDomain);
-  if (tenantId) localStorage.setItem('resolved_tenant_id', tenantId);
-  if (host) localStorage.setItem('resolved_host', host);
-}
-
-function getPersistedShopifyContext() {
-  if (typeof localStorage === 'undefined') {
-    return { shopDomain: null, tenantId: null, host: null };
-  }
-  return {
-    shopDomain: localStorage.getItem('resolved_shop_domain'),
-    tenantId: localStorage.getItem('resolved_tenant_id'),
-    host: localStorage.getItem('resolved_host')
-  };
-}
+import {
+  createPageUrl,
+  normalizeShopDomain,
+  parseQuery,
+  getPersistedShopifyContext,
+  persistShopifyContext,
+  isUserAdmin
+} from '@/components/shopifyContext';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -70,7 +24,8 @@ import {
   Bell,
   TrendingUp,
   Users,
-  ClipboardList
+  ClipboardList,
+  Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,7 +45,7 @@ const navItems = [
   { name: 'Shipping', page: 'Shipping', icon: Truck },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle },
-  { name: 'Integrations', page: 'Integrations', icon: TrendingUp },
+  { name: 'Integrations', page: 'Integrations', icon: Link2 },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, adminOnly: true },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings },
@@ -105,82 +60,80 @@ export default function Layout({ children, currentPageName }) {
 
   useEffect(() => {
     loadUserAndTenant();
-  }, [location.search]); // Re-run when URL params change
+  }, [location.search]);
 
   const loadUserAndTenant = async () => {
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      // Tenant resolution order: A) URL param > B) localStorage > C) user.tenant_id
-      // NO fallback to first tenant
-      const urlParams = new URLSearchParams(location.search);
-      let shopParam = urlParams.get('shop');
-      let hostParam = urlParams.get('host');
-      let resolvedTenant = null;
+      // Parse URL params
+      const urlParams = parseQuery(location.search);
+      const persisted = getPersistedShopifyContext();
       
-      // PRIORITY A: URL shop param (Shopify embedded app context)
-      if (shopParam) {
-        const shopDomain = shopParam.includes('.myshopify.com') 
-          ? shopParam.toLowerCase().trim()
-          : `${shopParam.toLowerCase().trim()}.myshopify.com`;
+      let resolvedTenant = null;
+      let resolvedShopDomain = null;
+      let resolvedHost = urlParams.host || persisted.host;
+      
+      // PRIORITY A: URL shop param
+      if (urlParams.shop) {
+        resolvedShopDomain = normalizeShopDomain(urlParams.shop);
+        console.log('[Layout] Resolving tenant from shop param:', resolvedShopDomain);
         
-        console.log('[Layout] Resolving tenant from shop param:', shopDomain);
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
           console.log('[Layout] Found tenant:', resolvedTenant.id);
-          // Persist for navigation fallback (including host)
-          persistShopifyContext({
-            shopDomain,
-            tenantId: resolvedTenant.id,
-            host: hostParam
-          });
         }
       }
 
       // PRIORITY B: localStorage fallback
-      if (!resolvedTenant) {
-        const persisted = getPersistedShopifyContext();
-        console.log('[Layout] Trying localStorage fallback:', persisted.shopDomain, persisted.tenantId);
-
-        if (persisted.shopDomain) {
-          const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
-          if (tenants.length > 0) {
-            resolvedTenant = tenants[0];
-          }
-        } else if (persisted.tenantId) {
-          const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
-          if (tenants.length > 0) {
-            resolvedTenant = tenants[0];
-          }
+      if (!resolvedTenant && persisted.shopDomain) {
+        console.log('[Layout] Trying localStorage fallback:', persisted.shopDomain);
+        resolvedShopDomain = persisted.shopDomain;
+        
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+        }
+      } else if (!resolvedTenant && persisted.tenantId) {
+        console.log('[Layout] Trying localStorage tenant_id fallback:', persisted.tenantId);
+        
+        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          resolvedShopDomain = resolvedTenant.shop_domain;
         }
       }
       
       // PRIORITY C: user.tenant_id fallback
       if (!resolvedTenant && currentUser?.tenant_id) {
-        console.log('[Layout] Using currentUser.tenant_id fallback');
+        console.log('[Layout] Using user.tenant_id fallback:', currentUser.tenant_id);
+        
         const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
-          // Persist for navigation
-          persistShopifyContext({
-            shopDomain: resolvedTenant.shop_domain,
-            tenantId: resolvedTenant.id
-          });
+          resolvedShopDomain = resolvedTenant.shop_domain;
         }
       }
 
-      // NO FALLBACK - require explicit tenant resolution
+      // NO FALLBACK to first tenant - require explicit resolution
       if (!resolvedTenant) {
-        console.warn('[Layout] No tenant could be resolved. shop param missing and no fallback.');
+        console.warn('[Layout] No tenant resolved. Missing shop param and no valid fallback.');
         setTenant(null);
         setPendingAlerts(0);
         return;
       }
       
+      // Persist resolved context for navigation
+      persistShopifyContext({
+        shop: resolvedShopDomain,
+        host: resolvedHost,
+        tenantId: resolvedTenant.id
+      });
+      
       setTenant(resolvedTenant);
-      console.log('[Layout] Persisted tenant:', resolvedTenant.id);
+      console.log('[Layout] Resolved tenant:', resolvedTenant.id, 'shop:', resolvedShopDomain);
       
       // Load alerts for the resolved tenant
       const alerts = await base44.entities.Alert.filter({ 
@@ -189,7 +142,7 @@ export default function Layout({ children, currentPageName }) {
       });
       setPendingAlerts(alerts.length);
     } catch (e) {
-      console.log('User not logged in or no tenant:', e.message);
+      console.log('User not logged in or error:', e.message);
     }
   };
 
@@ -201,6 +154,11 @@ export default function Layout({ children, currentPageName }) {
   if (['Onboarding', 'ShopifyAuth', 'ShopifyCallback'].includes(currentPageName)) {
     return <>{children}</>;
   }
+
+  const isAdmin = isUserAdmin(user);
+  const urlParams = parseQuery(location.search);
+  const persisted = getPersistedShopifyContext();
+  const showMissingContextBanner = !tenant && !persisted.tenantId && !urlParams.shop;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -259,7 +217,6 @@ export default function Layout({ children, currentPageName }) {
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
               if (!item.adminOnly) return true;
-              const isAdmin = user?.app_role === 'owner' || user?.app_role === 'admin';
               return isAdmin;
             }).map((item) => {
               const isActive = currentPageName === item.page;
@@ -361,10 +318,13 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
-          {!tenant && !getPersistedShopifyContext().tenantId && !new URLSearchParams(location.search).get('shop') && (
-            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-              No store resolved. Open the app with a shop param like:
-              <span className="ml-2 font-mono">/orders?shop=profitshield-dev.myshopify.com&host=HOST_VALUE</span>
+          {showMissingContextBanner && (
+            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+              <p className="font-medium mb-1">Embedded Context Missing</p>
+              <p>No store resolved. Open the app with a shop param:</p>
+              <code className="block mt-2 p-2 bg-yellow-100 rounded text-xs">
+                /orders?shop=yourstore.myshopify.com&host=YOUR_HOST_VALUE&embedded=1
+              </code>
             </div>
           )}
           {children}

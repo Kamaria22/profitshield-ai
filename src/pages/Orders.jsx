@@ -28,6 +28,12 @@ import {
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  normalizeShopDomain,
+  parseQuery,
+  getPersistedShopifyContext,
+  persistShopifyContext
+} from '@/components/shopifyContext';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
@@ -65,29 +71,29 @@ export default function Orders() {
   const [currentUser, setCurrentUser] = useState(null);
   const [tenantSettings, setTenantSettings] = useState(null);
 
-  // Resolve tenant directly on mount
+  // Resolve tenant directly on mount using shared utilities
   // Priority: A) URL param ?shop= > B) localStorage > C) user.tenant_id
   // NO fallback to first tenant
   useEffect(() => {
     async function resolveTenant() {
-      const urlParams = new URLSearchParams(window.location.search);
-      let shopParam = urlParams.get('shop');
+      const urlParams = parseQuery(window.location.search);
+      const persisted = getPersistedShopifyContext();
       
       const debug = {
         env: 'prod',
-        url_shop_param: shopParam,
+        url_shop_param: urlParams.shop,
         resolved_via: null,
         pathname: window.location.pathname
       };
       
       console.log('[Orders] URL:', window.location.href);
-      console.log('[Orders] shop param:', shopParam);
+      console.log('[Orders] shop param:', urlParams.shop);
       
       let resolvedTenant = null;
       let resolvedShopDomain = null;
       let user = null;
       
-      // Get current user for debug panel gating
+      // Get current user
       try {
         user = await base44.auth.me();
         setCurrentUser(user);
@@ -97,45 +103,42 @@ export default function Orders() {
       }
       
       // PRIORITY A: URL shop param
-      if (shopParam) {
-        resolvedShopDomain = shopParam.includes('.myshopify.com') 
-          ? shopParam.toLowerCase().trim()
-          : `${shopParam.toLowerCase().trim()}.myshopify.com`;
-        
+      if (urlParams.shop) {
+        resolvedShopDomain = normalizeShopDomain(urlParams.shop);
         debug.resolved_via = 'url_param';
         console.log('[Orders] Looking up tenant by shop_domain:', resolvedShopDomain);
         
         const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
-        console.log('[Orders] Found tenants:', tenants.length, tenants.map(t => ({ id: t.id, shop: t.shop_domain })));
+        console.log('[Orders] Found tenants:', tenants.length);
         
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
-          // Persist for navigation fallback
-          localStorage.setItem('resolved_shop_domain', resolvedShopDomain);
-          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+          persistShopifyContext({
+            shop: resolvedShopDomain,
+            host: urlParams.host,
+            tenantId: resolvedTenant.id
+          });
         }
       }
       
       // PRIORITY B: localStorage fallback
-      if (!resolvedTenant) {
-        const storedShopDomain = localStorage.getItem('resolved_shop_domain');
-        const storedTenantId = localStorage.getItem('resolved_tenant_id');
-        console.log('[Orders] Trying localStorage fallback:', storedShopDomain, storedTenantId);
+      if (!resolvedTenant && persisted.shopDomain) {
+        debug.resolved_via = 'localStorage_shop';
+        console.log('[Orders] Trying localStorage fallback:', persisted.shopDomain);
         
-        if (storedShopDomain) {
-          debug.resolved_via = 'localStorage_shop';
-          const tenants = await base44.entities.Tenant.filter({ shop_domain: storedShopDomain });
-          if (tenants.length > 0) {
-            resolvedTenant = tenants[0];
-            resolvedShopDomain = storedShopDomain;
-          }
-        } else if (storedTenantId) {
-          debug.resolved_via = 'localStorage_tenant';
-          const tenants = await base44.entities.Tenant.filter({ id: storedTenantId });
-          if (tenants.length > 0) {
-            resolvedTenant = tenants[0];
-            resolvedShopDomain = resolvedTenant.shop_domain;
-          }
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          resolvedShopDomain = persisted.shopDomain;
+        }
+      } else if (!resolvedTenant && persisted.tenantId) {
+        debug.resolved_via = 'localStorage_tenant';
+        console.log('[Orders] Trying localStorage tenant_id:', persisted.tenantId);
+        
+        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          resolvedShopDomain = resolvedTenant.shop_domain;
         }
       }
       
@@ -146,15 +149,16 @@ export default function Orders() {
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
           resolvedShopDomain = resolvedTenant.shop_domain;
-          // Persist for navigation
-          localStorage.setItem('resolved_shop_domain', resolvedShopDomain);
-          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+          persistShopifyContext({
+            shop: resolvedShopDomain,
+            tenantId: resolvedTenant.id
+          });
         }
       }
       
-      // NO FALLBACK - require explicit tenant resolution
+      // NO FALLBACK
       if (!resolvedTenant) {
-        console.warn('[Orders] No tenant resolved. shop param missing and no fallback.');
+        console.warn('[Orders] No tenant resolved.');
         setTenantState({
           tenant: null,
           tenantId: null,
@@ -165,23 +169,22 @@ export default function Orders() {
         return;
       }
       
-      debug.tenant_id = resolvedTenant?.id;
+      debug.tenant_id = resolvedTenant.id;
       debug.shop_domain = resolvedShopDomain;
       
-      console.log('[Orders] Final resolved tenant:', resolvedTenant?.id, 'shop:', resolvedShopDomain);
+      console.log('[Orders] Final resolved tenant:', resolvedTenant.id);
       
       // Load tenant settings for demo_mode
-      if (resolvedTenant?.id) {
+      if (resolvedTenant.id) {
         const settingsData = await base44.entities.TenantSettings.filter({ tenant_id: resolvedTenant.id });
         if (settingsData.length > 0) {
           setTenantSettings(settingsData[0]);
-          console.log('[Orders] Tenant settings loaded, demo_mode:', settingsData[0].demo_mode);
         }
       }
       
       setTenantState({
         tenant: resolvedTenant,
-        tenantId: resolvedTenant?.id || null,
+        tenantId: resolvedTenant.id,
         shopDomain: resolvedShopDomain,
         loading: false,
         debug
@@ -193,15 +196,15 @@ export default function Orders() {
 
   const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = tenantState;
 
-  // Build the query filter object once - reuse for query and debug display
-  const queryFilter = tenantId ? { tenant_id: tenantId } : null;
+  // Build the query filter object - never null in display, always show actual filter
+  const queryFilter = tenantId ? { tenant_id: tenantId } : {};
   
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', tenantId],
     queryFn: async () => {
-      if (!queryFilter) {
+      if (!tenantId) {
         console.log('[Orders] No tenantId, returning empty');
-        setQueryInfo({ filter: null, count: 0, dateStart: null, dateEnd: null, dateField: 'order_date' });
+        setQueryInfo({ filter: {}, count: 0, dateStart: null, dateEnd: null, dateField: 'order_date' });
         return [];
       }
       

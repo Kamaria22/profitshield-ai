@@ -48,37 +48,37 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import Alerts from './pages/Alerts';
+import AuditLogs from './pages/AuditLogs';
 import Customers from './pages/Customers';
+import DataCompliance from './pages/DataCompliance';
+import FounderDashboard from './pages/FounderDashboard';
 import Home from './pages/Home';
+import Integrations from './pages/Integrations';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
 import Products from './pages/Products';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
-import Tasks from './pages/Tasks';
-import AuditLogs from './pages/AuditLogs';
 import SystemHealth from './pages/SystemHealth';
-import FounderDashboard from './pages/FounderDashboard';
-import DataCompliance from './pages/DataCompliance';
-import Integrations from './pages/Integrations';
+import Tasks from './pages/Tasks';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "Alerts": Alerts,
+    "AuditLogs": AuditLogs,
     "Customers": Customers,
+    "DataCompliance": DataCompliance,
+    "FounderDashboard": FounderDashboard,
     "Home": Home,
+    "Integrations": Integrations,
     "Onboarding": Onboarding,
     "Orders": Orders,
     "Products": Products,
     "Settings": Settings,
     "Shipping": Shipping,
-    "Tasks": Tasks,
-    "AuditLogs": AuditLogs,
     "SystemHealth": SystemHealth,
-    "FounderDashboard": FounderDashboard,
-    "DataCompliance": DataCompliance,
-    "Integrations": Integrations,
+    "Tasks": Tasks,
 }
 
 export const pagesConfig = {
