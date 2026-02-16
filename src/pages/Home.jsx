@@ -44,30 +44,44 @@ export default function Home() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
+      if (!tenantId) throw new Error('No store connected');
       const response = await base44.functions.invoke('syncShopifyOrders', { tenant_id: tenantId });
+      if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
     onSuccess: (data) => {
-      const msg = `Synced: ${data.createdCount || data.created} new, ${data.updatedCount || data.updated} updated${data.newestOrderNumber ? ` (newest #${data.newestOrderNumber})` : ''}`;
+      const created = data.createdCount ?? data.created ?? 0;
+      const updated = data.updatedCount ?? data.updated ?? 0;
+      const msg = `Synced: ${created} new, ${updated} updated${data.newestOrderNumber ? ` (newest #${data.newestOrderNumber})` : ''}`;
       toast.success(msg, {
         action: {
           label: 'View Orders',
-          onClick: () => {
-            const qs = window.location.search || '';
-            navigate(`/orders${qs}`);
-          }
+          onClick: () => navigate(`/orders${window.location.search}`)
         }
       });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || 'Failed to sync orders');
+      const msg = error.message || error.response?.data?.error || 'Failed to sync orders';
+      if (msg.includes('token') || msg.includes('reconnect')) {
+        toast.error('Shopify connection expired', {
+          description: 'Please reconnect your store in Settings',
+          action: {
+            label: 'Go to Settings',
+            onClick: () => navigate(`/settings${window.location.search}`)
+          }
+        });
+      } else {
+        toast.error(msg);
+      }
     }
   });
 
   const createTestOrderMutation = useMutation({
     mutationFn: async () => {
+      if (!tenantId) throw new Error('No store connected');
       const response = await base44.functions.invoke('createShopifyTestOrder', { tenant_id: tenantId });
+      if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
     onSuccess: (data) => {
@@ -80,9 +94,22 @@ export default function Home() {
           }
         }
       });
+      // Auto-sync after creating test order
+      setTimeout(() => syncMutation.mutate(), 2000);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || 'Failed to create test order');
+      const msg = error.message || error.response?.data?.error || 'Failed to create test order';
+      if (msg.includes('token') || msg.includes('reconnect')) {
+        toast.error('Shopify connection expired', {
+          description: 'Please reconnect your store in Settings',
+          action: {
+            label: 'Go to Settings',
+            onClick: () => navigate(`/settings${window.location.search}`)
+          }
+        });
+      } else {
+        toast.error(msg);
+      }
     }
   });
 
