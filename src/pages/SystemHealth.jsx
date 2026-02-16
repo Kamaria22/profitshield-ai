@@ -16,15 +16,21 @@ import {
   Zap,
   Database
 } from 'lucide-react';
-import { useTenantResolver } from '../components/useTenantResolver';
+import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 
 export default function SystemHealth() {
-  const { tenantId } = useTenantResolver();
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const eventLogsQueryKey = buildQueryKey('eventLogs', resolverCheck);
 
   const { data: eventLogs = [] } = useQuery({
-    queryKey: ['eventLogs', tenantId],
-    queryFn: () => base44.entities.EventLog.filter({ tenant_id: tenantId }, '-created_date', 100),
-    enabled: !!tenantId
+    queryKey: eventLogsQueryKey,
+    queryFn: () => base44.entities.EventLog.filter({ tenant_id: queryFilter.tenant_id }, '-created_date', 100),
+    enabled: canQuery
   });
 
   const { data: healthMetrics = [] } = useQuery({

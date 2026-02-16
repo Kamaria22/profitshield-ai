@@ -23,13 +23,20 @@ import {
   XCircle,
   Loader2
 } from 'lucide-react';
-import { useTenantResolver } from '../components/useTenantResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import TasksTable from '../components/tasks/TasksTable';
 import TaskDetailPanel from '../components/tasks/TaskDetailPanel';
 import CreateTaskDialog from '../components/tasks/CreateTaskDialog';
 
 export default function Tasks() {
-  const { tenantId } = useTenantResolver();
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const tasksQueryKey = buildQueryKey('tasks', resolverCheck);
+  
   const [user, setUser] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -47,9 +54,9 @@ export default function Tasks() {
   }, []);
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['tasks', tenantId],
-    queryFn: () => base44.entities.Task.filter({ tenant_id: tenantId }, '-created_date'),
-    enabled: !!tenantId
+    queryKey: tasksQueryKey,
+    queryFn: () => base44.entities.Task.filter({ tenant_id: queryFilter.tenant_id }, '-created_date'),
+    enabled: canQuery
   });
 
   const { data: users = [] } = useQuery({
@@ -60,7 +67,7 @@ export default function Tasks() {
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Task.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: tasksQueryKey });
     }
   });
 
@@ -234,7 +241,7 @@ export default function Tasks() {
 
       {/* Create Task Dialog */}
       <CreateTaskDialog
-        tenantId={tenantId}
+        tenantId={resolverCheck.tenantId}
         users={users}
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}

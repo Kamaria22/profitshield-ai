@@ -38,24 +38,28 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 
 export default function Shipping() {
   const [dateRange, setDateRange] = useState('30');
   
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
-  const tenantId = resolverCheck.tenantId;
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const shippingQueryKey = [...buildQueryKey('orders-shipping', resolverCheck), dateRange];
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders-shipping', tenantId, dateRange],
+    queryKey: shippingQueryKey,
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!queryFilter?.tenant_id) return [];
       return base44.entities.Order.filter({ 
-        tenant_id: tenantId 
+        tenant_id: queryFilter.tenant_id 
       }, '-order_date', 500);
     },
-    enabled: resolverCheck.ok
+    enabled: canQuery
   });
   
   // Loading state

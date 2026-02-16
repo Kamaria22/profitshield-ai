@@ -39,7 +39,7 @@ import {
   Download
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useTenantResolver } from '../components/useTenantResolver';
+import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 
 const actionTypeConfig = {
   rule_created: { label: 'Rule Created', color: 'bg-green-100 text-green-700', icon: Settings },
@@ -67,7 +67,14 @@ const actionTypeConfig = {
 };
 
 export default function AuditLogs() {
-  const { tenantId } = useTenantResolver();
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const auditLogsQueryKey = buildQueryKey('auditLogs', resolverCheck);
+  
   const [selectedLog, setSelectedLog] = useState(null);
   const [filters, setFilters] = useState({
     action_type: 'all',
@@ -75,9 +82,9 @@ export default function AuditLogs() {
   });
 
   const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['auditLogs', tenantId],
-    queryFn: () => base44.entities.AuditLog.filter({ tenant_id: tenantId }, '-created_date', 200),
-    enabled: !!tenantId
+    queryKey: auditLogsQueryKey,
+    queryFn: () => base44.entities.AuditLog.filter({ tenant_id: queryFilter.tenant_id }, '-created_date', 200),
+    enabled: canQuery
   });
 
   const filteredLogs = logs.filter(log => {

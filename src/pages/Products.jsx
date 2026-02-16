@@ -23,11 +23,21 @@ import {
 
 import ProductsTable from '../components/products/ProductsTable';
 import ProductCostEditor from '../components/products/ProductCostEditor';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 
 export default function Products() {
-  const { tenantId, status } = usePlatformResolver();
-  const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const productsQueryKey = buildQueryKey('products', resolverCheck);
+  const costMappingsQueryKey = buildQueryKey('costMappings', resolverCheck);
+  
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
+  const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('profit_desc');
   const [profitFilter, setProfitFilter] = useState('all');
@@ -35,35 +45,35 @@ export default function Products() {
   const [costEditorOpen, setCostEditorOpen] = useState(false);
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products', tenantId],
+    queryKey: productsQueryKey,
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!queryFilter?.tenant_id) return [];
       return base44.entities.Product.filter({ 
-        tenant_id: tenantId 
+        tenant_id: queryFilter.tenant_id 
       }, '-total_revenue', 500);
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: canQuery
   });
 
   const { data: variants = [] } = useQuery({
-    queryKey: ['variants', tenantId, selectedProduct?.id],
+    queryKey: [...buildQueryKey('variants', resolverCheck), selectedProduct?.id],
     queryFn: async () => {
-      if (!tenantId || !selectedProduct?.platform_product_id) return [];
+      if (!queryFilter?.tenant_id || !selectedProduct?.platform_product_id) return [];
       return base44.entities.ProductVariant.filter({ 
-        tenant_id: tenantId,
+        tenant_id: queryFilter.tenant_id,
         product_id: selectedProduct.platform_product_id
       });
     },
-    enabled: !!tenantId && !!selectedProduct?.platform_product_id
+    enabled: canQuery && !!selectedProduct?.platform_product_id
   });
 
   const { data: costMappings = [] } = useQuery({
-    queryKey: ['costMappings', tenantId],
+    queryKey: costMappingsQueryKey,
     queryFn: async () => {
-      if (!tenantId) return [];
-      return base44.entities.CostMapping.filter({ tenant_id: tenantId });
+      if (!queryFilter?.tenant_id) return [];
+      return base44.entities.CostMapping.filter({ tenant_id: queryFilter.tenant_id });
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: canQuery
   });
 
   // Filter and sort products
@@ -277,7 +287,7 @@ export default function Products() {
       {/* Products Table */}
       <ProductsTable 
         products={filteredProducts} 
-        loading={isLoading || tenantLoading}
+        loading={isLoading || resolverLoading}
         onEditCost={handleEditCost}
       />
 
@@ -286,7 +296,7 @@ export default function Products() {
         product={selectedProduct}
         variants={variants}
         costMappings={costMappings}
-        tenantId={tenantId}
+        tenantId={resolverCheck.tenantId}
         open={costEditorOpen}
         onOpenChange={setCostEditorOpen}
       />

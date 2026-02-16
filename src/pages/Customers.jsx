@@ -26,7 +26,7 @@ import CustomerTable from '@/components/customers/CustomerTable';
 import CreateSegmentDialog from '@/components/customers/CreateSegmentDialog';
 import SegmentInsightsCard from '@/components/customers/SegmentInsightsCard';
 import AIInsightsPanel from '@/components/customers/AIInsightsPanel';
-import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 
 export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,29 +37,35 @@ export default function Customers() {
   const [actionDialog, setActionDialog] = useState(null);
   
   const queryClient = useQueryClient();
+  
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
-  const tenantId = resolverCheck.tenantId;
+  
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const segmentsQueryKey = buildQueryKey('segments', resolverCheck);
+  const customersQueryKey = buildQueryKey('customers', resolverCheck);
 
   // Fetch segments
   const { data: segments = [], isLoading: segmentsLoading } = useQuery({
-    queryKey: ['segments', tenantId],
-    queryFn: () => base44.entities.CustomerSegment.filter({ tenant_id: tenantId }),
-    enabled: !!tenantId
+    queryKey: segmentsQueryKey,
+    queryFn: () => base44.entities.CustomerSegment.filter({ tenant_id: queryFilter.tenant_id }),
+    enabled: canQuery
   });
 
   // Fetch all customers
   const { data: allCustomers = [], isLoading: customersLoading } = useQuery({
-    queryKey: ['customers', tenantId],
-    queryFn: () => base44.entities.Customer.filter({ tenant_id: tenantId }),
-    enabled: !!tenantId
+    queryKey: customersQueryKey,
+    queryFn: () => base44.entities.Customer.filter({ tenant_id: queryFilter.tenant_id }),
+    enabled: canQuery
   });
 
   // Create segment mutation
   const createSegmentMutation = useMutation({
-    mutationFn: (data) => base44.entities.CustomerSegment.create({ ...data, tenant_id: tenantId }),
+    mutationFn: (data) => base44.entities.CustomerSegment.create({ ...data, tenant_id: resolverCheck.tenantId }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['segments']);
+      queryClient.invalidateQueries({ queryKey: segmentsQueryKey });
       setCreateDialogOpen(false);
     }
   });
@@ -68,7 +74,7 @@ export default function Customers() {
   const deleteSegmentMutation = useMutation({
     mutationFn: (id) => base44.entities.CustomerSegment.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries(['segments']);
+      queryClient.invalidateQueries({ queryKey: segmentsQueryKey });
       setDeleteSegment(null);
     }
   });
@@ -147,7 +153,7 @@ export default function Customers() {
     );
   }
 
-  if (!resolverCheck.ok) {
+  if (!canQuery) {
     return (
       <div className="p-6 text-center text-slate-500">
         No store connected. Please connect your store first.
