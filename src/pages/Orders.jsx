@@ -117,15 +117,17 @@ export default function Orders() {
         }
       }
       
-      // Method 3: Fallback - first tenant
+      // No fallback - require explicit tenant resolution
       if (!resolvedTenant) {
-        debug.resolved_via = 'fallback_first';
-        const tenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
-        console.log('[Orders] Fallback tenants:', tenants.length);
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = resolvedTenant.shop_domain;
-        }
+        console.warn('[Orders] No tenant resolved. shop param missing and no user tenant.');
+        setTenantState({
+          tenant: null,
+          tenantId: null,
+          shopDomain: null,
+          loading: false,
+          debug
+        });
+        return;
       }
       
       debug.tenant_id = resolvedTenant?.id;
