@@ -266,10 +266,27 @@ Deno.serve(async (req) => {
       }
     }
     
-    console.log('[syncShopifyOrders] Sync complete. Created:', created, 'Updated:', updated);
+    // Find newest order number
+    let newestOrderNumber = null;
+    if (shopifyOrders.length > 0) {
+      const sorted = [...shopifyOrders].sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+      newestOrderNumber = sorted[0]?.order_number?.toString() || sorted[0]?.name;
+    }
+    
+    console.log('[syncShopifyOrders] Sync complete. Created:', created, 'Updated:', updated, 'Newest:', newestOrderNumber);
     
     return Response.json({ 
-      success: true, 
+      success: true,
+      shopDomain: tenant.shop_domain,
+      tenantId: tenant.id,
+      fetchedCount: shopifyOrders.length,
+      createdCount: created,
+      updatedCount: updated,
+      newestOrderNumber,
+      anyErrors: [],
+      // Legacy fields for backward compatibility
       created, 
       updated, 
       total: shopifyOrders.length 
