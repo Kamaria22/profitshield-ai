@@ -24,12 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  normalizeShopDomain,
-  parseQuery,
-  getPersistedShopifyContext,
-  persistShopifyContext
-} from '@/components/shopifyContext';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -65,7 +60,7 @@ const SYNC_FREQUENCIES = [
 ];
 
 export default function Integrations() {
-  const [tenantId, setTenantId] = useState(null);
+  const { tenantId, status } = usePlatformResolver();
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [webhooksDialogOpen, setWebhooksDialogOpen] = useState(false);
@@ -89,45 +84,6 @@ export default function Integrations() {
   });
 
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    loadTenant();
-  }, []);
-
-  const loadTenant = async () => {
-    try {
-      const user = await base44.auth.me();
-      const urlParams = parseQuery(window.location.search);
-      const persisted = getPersistedShopifyContext();
-      
-      let resolvedTenantId = null;
-      
-      if (urlParams.shop) {
-        const shopDomain = normalizeShopDomain(urlParams.shop);
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
-        if (tenants.length) {
-          resolvedTenantId = tenants[0].id;
-          persistShopifyContext({ shop: shopDomain, host: urlParams.host, tenantId: resolvedTenantId });
-        }
-      }
-      
-      if (!resolvedTenantId && persisted.shopDomain) {
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
-        if (tenants.length) resolvedTenantId = tenants[0].id;
-      } else if (!resolvedTenantId && persisted.tenantId) {
-        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
-        if (tenants.length) resolvedTenantId = tenants[0].id;
-      }
-      
-      if (!resolvedTenantId && user?.tenant_id) {
-        resolvedTenantId = user.tenant_id;
-      }
-      
-      if (resolvedTenantId) setTenantId(resolvedTenantId);
-    } catch (e) {
-      console.error('Error loading tenant:', e);
-    }
-  };
 
   const { data: integrations = [], isLoading: integrationsLoading, refetch: refetchIntegrations } = useQuery({
     queryKey: ['integrations', tenantId],
@@ -378,13 +334,26 @@ export default function Integrations() {
     return <Clock className="w-4 h-4 text-gray-600" />;
   };
 
-  if (!tenantId) {
+  if (status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-400 mb-4" />
+            <p className="text-slate-600">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!tenantId && status !== RESOLVER_STATUS.RESOLVING) {
     return (
       <div className="space-y-6">
         <Card>
           <CardContent className="pt-6 text-center">
             <AlertTriangle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
-            <p className="text-slate-600">No store connected. Please connect via Shopify first.</p>
+            <p className="text-slate-600">No store connected. Please connect a platform first.</p>
           </CardContent>
         </Card>
       </div>
