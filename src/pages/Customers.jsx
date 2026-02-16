@@ -25,6 +25,7 @@ import SegmentCard from '@/components/customers/SegmentCard';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CreateSegmentDialog from '@/components/customers/CreateSegmentDialog';
 import SegmentInsightsCard from '@/components/customers/SegmentInsightsCard';
+import AIInsightsPanel from '@/components/customers/AIInsightsPanel';
 
 export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -260,7 +261,8 @@ export default function Customers() {
               </CardContent>
             </Card>
           </div>
-          <div>
+          <div className="space-y-4">
+            <AIInsightsPanel segment={selectedSegment} customers={displayedCustomers} />
             <SegmentInsightsCard segment={selectedSegment} customers={displayedCustomers} />
           </div>
         </div>
