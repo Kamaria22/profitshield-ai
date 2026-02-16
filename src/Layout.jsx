@@ -15,7 +15,8 @@ import {
   LogOut,
   ChevronDown,
   Bell,
-  TrendingUp
+  TrendingUp,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +32,7 @@ const navItems = [
   { name: 'Dashboard', page: 'Home', icon: LayoutDashboard },
   { name: 'Orders', page: 'Orders', icon: ShoppingCart },
   { name: 'Products', page: 'Products', icon: Package },
+  { name: 'Customers', page: 'Customers', icon: Users },
   { name: 'Shipping', page: 'Shipping', icon: Truck },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle },
   { name: 'Settings', page: 'Settings', icon: Settings },
