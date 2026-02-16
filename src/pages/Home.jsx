@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryDefaults } from '@/components/utils/queryDefaults';
 import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -97,6 +98,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   // Check OAuth token status and tenant settings - ONLY when canQuery
+  // Using config defaults for rarely-changing data
   const { data: tenantSettings } = useQuery({
     queryKey: settingsQueryKey,
     queryFn: async () => {
@@ -104,7 +106,8 @@ export default function Home() {
       const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.config
   });
 
   const { data: tokenStatus } = useQuery({
@@ -118,7 +121,9 @@ export default function Home() {
       });
       return { hasToken: tokens.length > 0 };
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.config,
+    select: (data) => data // Identity selector to minimize rerenders
   });
 
   // In demo mode, we don't require Shopify connection
@@ -231,21 +236,21 @@ export default function Home() {
     }
   });
 
+  // Heavy list query with keepPreviousData for no flicker
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: [...ordersQueryKey, dateRange],
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
-      console.log('[Home] Fetching orders for tenant:', queryFilter.tenant_id);
       const allOrders = await base44.entities.Order.filter({ 
         tenant_id: queryFilter.tenant_id 
       }, '-order_date', 500);
-      console.log('[Home] Fetched', allOrders.length, 'orders');
       return allOrders;
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.heavyList
   });
 
-  const { data: profitLeaks = [], isLoading: leaksLoading } = useQuery({
+  const { data: profitLeaks = [] } = useQuery({
     queryKey: leaksQueryKey,
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
@@ -254,7 +259,8 @@ export default function Home() {
         is_resolved: false 
       }, '-impact_amount', 10);
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.standard
   });
 
   const { data: pendingAlerts = [] } = useQuery({
@@ -266,7 +272,8 @@ export default function Home() {
         status: 'pending' 
       }, '-created_date', 5);
     },
-    enabled: canQuery
+    enabled: canQuery,
+    ...queryDefaults.realtime // Alerts should refresh more often
   });
 
   // Calculate metrics
@@ -319,8 +326,16 @@ export default function Home() {
     return data;
   }, [orders, dateRange]);
 
-  const topLeaks = profitLeaks.slice(0, 3);
-  const totalLeakImpact = profitLeaks.reduce((sum, l) => sum + (l.impact_amount || 0), 0);
+  // Memoized derived values
+  const topLeaks = useMemo(() => profitLeaks.slice(0, 3), [profitLeaks]);
+  const totalLeakImpact = useMemo(() => 
+    profitLeaks.reduce((sum, l) => sum + (l.impact_amount || 0), 0), 
+    [profitLeaks]
+  );
+  
+  // Memoized mutation handlers
+  const handleSync = useCallback(() => syncMutation.mutate(), [syncMutation]);
+  const handleCreateTestOrder = useCallback(() => createTestOrderMutation.mutate(), [createTestOrderMutation]);
 
   if (tenantLoading) {
     return (
@@ -423,20 +438,22 @@ export default function Home() {
           </Select>
           <Button 
             variant="outline" 
-            onClick={() => createTestOrderMutation.mutate()}
+            onClick={handleCreateTestOrder}
             disabled={createTestOrderMutation.isPending || !authTenantId}
-            className="gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.02]"
+            className="gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+            aria-label={isDemoMode && !tokenStatus?.hasToken ? 'Create demo order' : 'Create test order'}
           >
-            <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
+            <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
             {createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Demo Order' : 'Test Order'}
           </Button>
           <Button 
-            onClick={() => syncMutation.mutate()}
+            onClick={handleSync}
             disabled={syncMutation.isPending || !authTenantId || !tokenStatus?.hasToken}
             title={!tokenStatus?.hasToken ? 'Connect Shopify to sync real orders' : ''}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all hover:scale-[1.02]"
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-emerald-600"
+            aria-label="Sync orders from Shopify"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
             {syncMutation.isPending ? 'Syncing...' : 'Sync'}
           </Button>
         </div>

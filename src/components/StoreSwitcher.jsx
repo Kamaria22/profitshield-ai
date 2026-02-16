@@ -26,7 +26,8 @@ const PLATFORM_COLORS = {
   bigcommerce: 'text-blue-600'
 };
 
-export default function StoreSwitcher() {
+// Memoized StoreSwitcher component
+const StoreSwitcher = React.memo(function StoreSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
   const resolver = usePlatformResolver();
@@ -38,19 +39,17 @@ export default function StoreSwitcher() {
   const storeKey = resolver?.storeKey || null;
   const selectStore = resolver?.selectStore;
   
-  // SAFE: Always treat availableStores as array
-  const availableStores = Array.isArray(resolver?.availableStores) ? resolver.availableStores : [];
-  const connectedStores = availableStores.filter(s => s?.status === 'connected');
-
-  // Only show if resolved and there are multiple stores
-  if (status !== RESOLVER_STATUS.RESOLVED || connectedStores.length <= 1) {
-    return null;
-  }
+  // SAFE: Always treat availableStores as array - memoized
+  const connectedStores = useMemo(() => {
+    const availableStores = Array.isArray(resolver?.availableStores) ? resolver.availableStores : [];
+    return availableStores.filter(s => s?.status === 'connected');
+  }, [resolver?.availableStores]);
 
   const currentStore = integration;
-  const CurrentIcon = PLATFORM_ICONS[platform] || Store;
+  const CurrentIcon = useMemo(() => PLATFORM_ICONS[platform] || Store, [platform]);
 
-  const handleSwitchStore = async (store) => {
+  // Memoized switch handler
+  const handleSwitchStore = useCallback(async (store) => {
     if (!store || store.id === currentStore?.id) return;
     
     // Call resolver's selectStore
@@ -72,7 +71,17 @@ export default function StoreSwitcher() {
     
     // Force reload to reset all queries with new context
     window.location.reload();
-  };
+  }, [currentStore?.id, selectStore, location.pathname, location.search, navigate]);
+
+  // Memoized navigate to integrations
+  const handleAddStore = useCallback(() => {
+    navigate(createPageUrl('Integrations', location.search));
+  }, [navigate, location.search]);
+
+  // Only show if resolved and there are multiple stores
+  if (status !== RESOLVER_STATUS.RESOLVED || connectedStores.length <= 1) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -114,7 +123,7 @@ export default function StoreSwitcher() {
         })}
         <DropdownMenuSeparator />
         <DropdownMenuItem 
-          onClick={() => navigate(createPageUrl('Integrations', location.search))}
+          onClick={handleAddStore}
           className="cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -123,4 +132,6 @@ export default function StoreSwitcher() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+export default StoreSwitcher;
