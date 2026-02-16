@@ -34,6 +34,12 @@ const riskBadgeConfig = {
   high: { variant: 'outline', className: 'border-red-200 text-red-700 bg-red-50' },
 };
 
+const getRiskScoreColor = (score) => {
+  if (score >= 70) return 'text-red-600 bg-red-50';
+  if (score >= 40) return 'text-yellow-600 bg-yellow-50';
+  return 'text-emerald-600 bg-emerald-50';
+};
+
 const confidenceIcon = {
   high: { icon: CheckCircle, color: 'text-emerald-500' },
   medium: { icon: AlertCircle, color: 'text-yellow-500' },
@@ -144,14 +150,50 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                   {order.margin_pct?.toFixed(1) || '0.0'}%
                 </TableCell>
                 <TableCell>
-                  {order.risk_level && (
-                    <Badge 
-                      variant={riskBadgeConfig[order.risk_level]?.variant}
-                      className={riskBadgeConfig[order.risk_level]?.className}
-                    >
-                      {order.risk_level}
-                    </Badge>
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          {order.fraud_score !== undefined && order.fraud_score !== null ? (
+                            <span className={`inline-flex items-center justify-center w-10 h-6 rounded text-xs font-bold ${getRiskScoreColor(order.fraud_score)}`}>
+                              {order.fraud_score}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-10 h-6 rounded text-xs text-slate-400 bg-slate-100">
+                              --
+                            </span>
+                          )}
+                          {order.risk_level && (
+                            <Badge 
+                              variant={riskBadgeConfig[order.risk_level]?.variant}
+                              className={`${riskBadgeConfig[order.risk_level]?.className} text-xs px-1.5`}
+                            >
+                              {order.risk_level}
+                            </Badge>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        {order.risk_reasons?.length > 0 ? (
+                          <div className="space-y-1">
+                            <p className="font-medium">Risk Factors:</p>
+                            <ul className="text-xs space-y-0.5">
+                              {order.risk_reasons.slice(0, 5).map((reason, i) => (
+                                <li key={i}>• {reason}</li>
+                              ))}
+                              {order.risk_reasons.length > 5 && (
+                                <li className="text-slate-400">+{order.risk_reasons.length - 5} more</li>
+                              )}
+                            </ul>
+                          </div>
+                        ) : order.fraud_score !== undefined ? (
+                          <p>Risk score: {order.fraud_score}/100</p>
+                        ) : (
+                          <p>Not analyzed yet</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
                 <TableCell>
                   <Badge className={statusBadgeConfig[order.status] || statusBadgeConfig.pending}>
