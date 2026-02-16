@@ -54,7 +54,8 @@ import CostMappingTable from '../components/settings/CostMappingTable';
 import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
 import RiskModelConfig from '../components/settings/RiskModelConfig';
-import { useTenantResolver } from '../components/useTenantResolver';
+import { useTenantResolver } from '@/components/useTenantResolver';
+import { createPageUrl } from '@/components/shopifyContext';
 
 export default function Settings() {
   const { tenant, tenantId, shopDomain, user, loading: tenantLoading } = useTenantResolver();
@@ -653,7 +654,7 @@ export default function Settings() {
               <p className="text-slate-600">
                 Access full data export capabilities, GDPR deletion tools, and compliance documentation.
               </p>
-              <Button variant="outline" onClick={() => window.location.href = '/datacompliance' + window.location.search}>
+              <Button variant="outline" onClick={() => window.location.href = createPageUrl('DataCompliance', window.location.search)}>
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Open Compliance Dashboard
               </Button>
