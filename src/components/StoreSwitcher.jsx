@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
