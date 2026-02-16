@@ -16,7 +16,8 @@ import {
   RefreshCw,
   ExternalLink,
   CheckCircle,
-  XCircle
+  XCircle,
+  Shield
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ import {
 import { toast } from 'sonner';
 
 import CostMappingTable from '../components/settings/CostMappingTable';
+import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import { useTenantResolver } from '../components/useTenantResolver';
 
 export default function Settings() {
@@ -225,6 +227,10 @@ export default function Settings() {
           <TabsTrigger value="alerts" className="gap-2">
             <Bell className="w-4 h-4" />
             Alerts
+          </TabsTrigger>
+          <TabsTrigger value="risk-rules" className="gap-2">
+            <Shield className="w-4 h-4" />
+            Risk Rules
           </TabsTrigger>
           <TabsTrigger value="viral" className="gap-2">
             <Share2 className="w-4 h-4" />
@@ -577,6 +583,11 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Risk Rules Tab */}
+        <TabsContent value="risk-rules" className="mt-6 space-y-6">
+          <CustomRiskRulesManager tenantId={tenantId} />
         </TabsContent>
 
         {/* Viral Tab */}

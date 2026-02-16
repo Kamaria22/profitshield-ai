@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { base44 } from '@/api/base44Client';
 import RiskAnalysisCard from './RiskAnalysisCard';
+import RiskBreakdownCard from '../risk/RiskBreakdownCard';
+import RiskMitigationPanel from '../risk/RiskMitigationPanel';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -206,7 +209,7 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
               </div>
             )}
 
-            {/* Risk Analysis Card */}
+            {/* Risk Analysis Tabs */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-slate-900">Risk Analysis</h3>
@@ -224,7 +227,25 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
                   {analyzing ? 'Analyzing...' : 'Re-analyze'}
                 </Button>
               </div>
-              <RiskAnalysisCard order={order} />
+              
+              <Tabs defaultValue="breakdown" className="w-full">
+                <TabsList className="w-full grid grid-cols-2 mb-3">
+                  <TabsTrigger value="breakdown">Risk Breakdown</TabsTrigger>
+                  <TabsTrigger value="mitigation">Mitigation</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="breakdown" className="mt-0">
+                  <RiskBreakdownCard order={order} />
+                </TabsContent>
+                
+                <TabsContent value="mitigation" className="mt-0">
+                  <RiskMitigationPanel 
+                    order={order} 
+                    tenantId={order.tenant_id}
+                    onActionTaken={() => onOrderUpdated?.()}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Action Buttons */}
