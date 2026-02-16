@@ -1,14 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 import { 
   Search, 
   Filter, 
   Download,
   SlidersHorizontal,
   X,
-  Loader2
+  Loader2,
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -42,9 +45,12 @@ export default function Orders() {
     dateRange: '30',
     status: 'all',
     riskLevel: 'all',
+    riskScoreMin: '',
+    riskScoreMax: '',
     profitability: 'all',
     confidence: 'all'
   });
+  const [analyzingRisk, setAnalyzingRisk] = useState(false);
 
   // Use unified platform resolver
   const { 
@@ -119,6 +125,16 @@ export default function Orders() {
       result = result.filter(o => o.risk_level === filters.riskLevel);
     }
 
+    // Risk score range filter
+    if (filters.riskScoreMin !== '') {
+      const minScore = parseInt(filters.riskScoreMin);
+      result = result.filter(o => (o.fraud_score || 0) >= minScore);
+    }
+    if (filters.riskScoreMax !== '') {
+      const maxScore = parseInt(filters.riskScoreMax);
+      result = result.filter(o => (o.fraud_score || 0) <= maxScore);
+    }
+
     // Profitability filter
     if (filters.profitability === 'profitable') {
       result = result.filter(o => (o.net_profit || 0) >= 0);
@@ -140,16 +156,52 @@ export default function Orders() {
     totalRevenue: filteredOrders.reduce((sum, o) => sum + (o.total_revenue || 0), 0),
     totalProfit: filteredOrders.reduce((sum, o) => sum + (o.net_profit || 0), 0),
     highRisk: filteredOrders.filter(o => o.risk_level === 'high').length,
-    unprofitable: filteredOrders.filter(o => (o.net_profit || 0) < 0).length
+    unprofitable: filteredOrders.filter(o => (o.net_profit || 0) < 0).length,
+    avgRiskScore: filteredOrders.length > 0 
+      ? Math.round(filteredOrders.reduce((sum, o) => sum + (o.fraud_score || 0), 0) / filteredOrders.length)
+      : 0,
+    unscored: filteredOrders.filter(o => o.fraud_score === undefined || o.fraud_score === null).length
   }), [filteredOrders]);
 
-  const activeFiltersCount = Object.values(filters).filter(v => v !== 'all' && v !== '30').length;
+  // Bulk analyze risk for unscored orders
+  const analyzeUnscoredOrders = async () => {
+    const unscoredOrders = filteredOrders.filter(o => o.fraud_score === undefined || o.fraud_score === null);
+    if (unscoredOrders.length === 0) {
+      toast.info('All orders already have risk scores');
+      return;
+    }
+
+    setAnalyzingRisk(true);
+    let analyzed = 0;
+    let failed = 0;
+
+    for (const order of unscoredOrders.slice(0, 50)) { // Limit to 50 at a time
+      try {
+        await base44.functions.invoke('analyzeOrderRisk', {
+          order_id: order.id,
+          tenant_id: tenantId
+        });
+        analyzed++;
+      } catch (e) {
+        failed++;
+        console.error('Risk analysis failed for order:', order.id, e);
+      }
+    }
+
+    setAnalyzingRisk(false);
+    queryClient.invalidateQueries({ queryKey: ['orders', tenantId] });
+    toast.success(`Analyzed ${analyzed} orders${failed > 0 ? `, ${failed} failed` : ''}`);
+  };
+
+  const activeFiltersCount = Object.values(filters).filter(v => v !== 'all' && v !== '30' && v !== '').length;
 
   const clearFilters = () => {
     setFilters({
       dateRange: '30',
       status: 'all',
       riskLevel: 'all',
+      riskScoreMin: '',
+      riskScoreMax: '',
       profitability: 'all',
       confidence: 'all'
     });
@@ -210,10 +262,39 @@ export default function Orders() {
           <p className={`text-2xl font-bold ${stats.highRisk > 0 ? 'text-red-600' : 'text-slate-900'}`}>{stats.highRisk}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">Unprofitable</p>
-          <p className={`text-2xl font-bold ${stats.unprofitable > 0 ? 'text-red-600' : 'text-slate-900'}`}>{stats.unprofitable}</p>
+          <p className="text-sm text-slate-500">Avg Risk Score</p>
+          <div className="flex items-center gap-2">
+            <p className={`text-2xl font-bold ${stats.avgRiskScore >= 70 ? 'text-red-600' : stats.avgRiskScore >= 40 ? 'text-yellow-600' : 'text-emerald-600'}`}>
+              {stats.avgRiskScore}
+            </p>
+            <span className="text-xs text-slate-400">/100</span>
+          </div>
         </div>
       </div>
+
+      {/* Risk Analysis Banner */}
+      {stats.unscored > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-900">{stats.unscored} orders without risk scores</p>
+              <p className="text-sm text-amber-700">Run AI analysis to detect fraud patterns and assign risk scores</p>
+            </div>
+          </div>
+          <Button 
+            onClick={analyzeUnscoredOrders}
+            disabled={analyzingRisk}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            {analyzingRisk ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</>
+            ) : (
+              <><Sparkles className="w-4 h-4 mr-2" /> Analyze Risk</>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -298,6 +379,32 @@ export default function Orders() {
               </div>
 
               <div>
+                <Label className="text-sm font-medium">Risk Score Range</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="Min"
+                    value={filters.riskScoreMin}
+                    onChange={(e) => setFilters({ ...filters, riskScoreMin: e.target.value })}
+                    className="w-20"
+                  />
+                  <span className="text-slate-400">-</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="Max"
+                    value={filters.riskScoreMax}
+                    onChange={(e) => setFilters({ ...filters, riskScoreMax: e.target.value })}
+                    className="w-20"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">0-39 Low, 40-69 Medium, 70+ High</p>
+              </div>
+
+              <div>
                 <Label className="text-sm font-medium">Profitability</Label>
                 <Select 
                   value={filters.profitability} 
@@ -375,6 +482,15 @@ export default function Orders() {
               <X 
                 className="w-3 h-3 cursor-pointer" 
                 onClick={() => setFilters({ ...filters, riskLevel: 'all' })}
+              />
+            </Badge>
+          )}
+          {(filters.riskScoreMin !== '' || filters.riskScoreMax !== '') && (
+            <Badge variant="secondary" className="gap-1">
+              Score: {filters.riskScoreMin || '0'}-{filters.riskScoreMax || '100'}
+              <X 
+                className="w-3 h-3 cursor-pointer" 
+                onClick={() => setFilters({ ...filters, riskScoreMin: '', riskScoreMax: '' })}
               />
             </Badge>
           )}
