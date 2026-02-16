@@ -65,6 +65,7 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
+import Referrals from './pages/Referrals';
 import __Layout from './Layout.jsx';
 
 
@@ -87,6 +88,7 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
+    "Referrals": Referrals,
 }
 
 export const pagesConfig = {

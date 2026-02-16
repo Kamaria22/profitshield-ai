@@ -29,7 +29,11 @@ import {
   Activity,
   CheckCircle2,
   XCircle,
-  Percent
+  Percent,
+  Star,
+  Gift,
+  Rocket,
+  FlaskConical
 } from 'lucide-react';
 import {
   Select,
@@ -75,6 +79,18 @@ export default function FounderDashboard() {
   const { data: globalWeights = [] } = useQuery({
     queryKey: ['globalRiskWeights'],
     queryFn: () => base44.entities.RiskFeatureWeight.filter({ scope: 'global' })
+  });
+
+  // Growth metrics
+  const { data: growthMetrics = [] } = useQuery({
+    queryKey: ['growthMetrics'],
+    queryFn: () => base44.entities.GrowthMetric.filter({}, '-created_date', 12)
+  });
+
+  // Revenue experiments
+  const { data: experiments = [] } = useQuery({
+    queryKey: ['revenueExperiments'],
+    queryFn: () => base44.entities.RevenueExperiment.filter({})
   });
 
   const generateBriefMutation = useMutation({
@@ -278,8 +294,9 @@ export default function FounderDashboard() {
       )}
 
       <Tabs defaultValue="insights">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="growth">Growth</TabsTrigger>
           <TabsTrigger value="risk-roi">Risk ROI</TabsTrigger>
           <TabsTrigger value="global-intel">Global Intelligence</TabsTrigger>
           <TabsTrigger value="moat">Moat Strength</TabsTrigger>
@@ -397,6 +414,189 @@ export default function FounderDashboard() {
                 </Card>
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        {/* Growth Tab */}
+        <TabsContent value="growth" className="mt-4 space-y-4">
+          {growthMetrics.length > 0 ? (
+            <>
+              {/* Growth Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-purple-700">Install Velocity</span>
+                      <Rocket className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {growthMetrics[0]?.installs?.total || 0}
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">This period</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-amber-700">Review Velocity</span>
+                      <Star className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-amber-700">
+                      {growthMetrics[0]?.reviews?.reviews_submitted || 0}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Avg: {(growthMetrics[0]?.reviews?.avg_rating || 0).toFixed(1)}⭐
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-pink-50 to-white border-pink-100">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-pink-700">Referral Rate</span>
+                      <Gift className="w-5 h-5 text-pink-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-pink-700">
+                      {((growthMetrics[0]?.referrals?.referral_rate || 0) * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-pink-600 mt-1">
+                      {growthMetrics[0]?.referrals?.installs || 0} referred installs
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-emerald-700">Activation Rate</span>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-700">
+                      {((growthMetrics[0]?.activations?.activation_rate || 0) * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      {growthMetrics[0]?.activations?.total || 0} activated
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Conversion Funnel */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                    Conversion Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-slate-50 rounded-lg">
+                      <p className="text-2xl font-bold text-slate-700">
+                        {growthMetrics[0]?.conversions?.trial_starts || 0}
+                      </p>
+                      <p className="text-xs text-slate-500">Trial Starts</p>
+                    </div>
+                    <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                      <p className="text-2xl font-bold text-emerald-700">
+                        {growthMetrics[0]?.conversions?.trial_to_paid || 0}
+                      </p>
+                      <p className="text-xs text-emerald-600">Converted to Paid</p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-2xl font-bold text-blue-700">
+                        {((growthMetrics[0]?.conversions?.trial_to_paid_rate || 0) * 100).toFixed(0)}%
+                      </p>
+                      <p className="text-xs text-blue-600">Conversion Rate</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 rounded-lg">
+                      <p className="text-2xl font-bold text-red-700">
+                        {growthMetrics[0]?.conversions?.churns || 0}
+                      </p>
+                      <p className="text-xs text-red-600">Churned</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Review Boost Score */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-500" />
+                    Review Boost Score
+                  </CardTitle>
+                  <CardDescription>Potential for generating positive reviews</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <Progress value={growthMetrics[0]?.review_boost_score || 0} className="flex-1 h-4" />
+                    <span className="text-2xl font-bold text-amber-600">
+                      {Math.round(growthMetrics[0]?.review_boost_score || 0)}/100
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-slate-700">
+                        {growthMetrics[0]?.reviews?.requests_sent || 0}
+                      </p>
+                      <p className="text-xs text-slate-500">Requests Sent</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-emerald-600">
+                        {growthMetrics[0]?.reviews?.five_star_count || 0}
+                      </p>
+                      <p className="text-xs text-slate-500">5-Star Reviews</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-amber-600">
+                        {(growthMetrics[0]?.reviews?.avg_rating || 0).toFixed(1)}
+                      </p>
+                      <p className="text-xs text-slate-500">Avg Rating</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Rocket className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">No growth metrics yet. Run the growth metrics calculator.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Experiments */}
+          {experiments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5 text-purple-600" />
+                  Active Experiments
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {experiments.map((exp) => (
+                    <div key={exp.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">{exp.experiment_name}</p>
+                        <p className="text-xs text-slate-500">{exp.hypothesis}</p>
+                      </div>
+                      <Badge className={
+                        exp.status === 'running' ? 'bg-green-100 text-green-700' :
+                        exp.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-700'
+                      }>
+                        {exp.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
