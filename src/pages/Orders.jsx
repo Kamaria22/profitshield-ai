@@ -31,7 +31,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
@@ -52,38 +52,44 @@ export default function Orders() {
   });
   const [analyzingRisk, setAnalyzingRisk] = useState(false);
 
-  // Use unified platform resolver
-  const { 
-    status, 
-    tenantId, 
-    tenant, 
-    platform, 
-    storeKey, 
-    user, 
-    reason,
-    loading: resolverLoading 
-  } = usePlatformResolver();
+  // Use unified platform resolver with requireResolved gating
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  // SINGLE SOURCE OF TRUTH: Only use resolverCheck for gated operations
+  const isResolved = resolverCheck.ok;
+  const authTenantId = resolverCheck.tenantId;
+  
+  // Raw values for display only
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
+  const platform = resolver?.platform || null;
+  const storeKey = resolver?.storeKey || null;
+  const user = resolver?.user || null;
+  const reason = resolver?.reason || null;
+  const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // Load tenant settings
+  // Load tenant settings - ONLY when resolved
   const { data: tenantSettings } = useQuery({
-    queryKey: ['tenantSettings', tenantId],
+    queryKey: ['tenantSettings', authTenantId],
     queryFn: async () => {
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+      if (!authTenantId) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: authTenantId });
       return settings[0] || null;
     },
-    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
+    enabled: isResolved && !!authTenantId
   });
 
-  // Fetch orders
+  // Fetch orders - ONLY when resolved with valid tenantId
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', tenantId],
+    queryKey: ['orders', authTenantId],
     queryFn: async () => {
-      console.log('[Orders] Fetching orders for tenant:', tenantId);
-      const allOrders = await base44.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 1000);
+      if (!authTenantId) return [];
+      console.log('[Orders] Fetching orders for tenant:', authTenantId);
+      const allOrders = await base44.entities.Order.filter({ tenant_id: authTenantId }, '-order_date', 1000);
       console.log('[Orders] Returned count:', allOrders.length);
       return allOrders;
     },
-    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
+    enabled: isResolved && !!authTenantId
   });
 
   const isLoading = resolverLoading || ordersLoading || status === RESOLVER_STATUS.RESOLVING;
@@ -179,7 +185,7 @@ export default function Orders() {
       try {
         await base44.functions.invoke('analyzeOrderRisk', {
           order_id: order.id,
-          tenant_id: tenantId
+          tenant_id: authTenantId
         });
         analyzed++;
       } catch (e) {
@@ -189,7 +195,7 @@ export default function Orders() {
     }
 
     setAnalyzingRisk(false);
-    queryClient.invalidateQueries({ queryKey: ['orders', tenantId] });
+    queryClient.invalidateQueries({ queryKey: ['orders', authTenantId] });
     toast.success(`Analyzed ${analyzed} orders${failed > 0 ? `, ${failed} failed` : ''}`);
   };
 
@@ -222,9 +228,9 @@ export default function Orders() {
       {/* Debug Banner */}
       <DebugBanner 
         shopDomain={storeKey} 
-        tenantId={tenantId} 
+        tenantId={authTenantId} 
         ordersCount={orders.length}
-        debug={{ platform, reason }}
+        debug={{ platform, reason, resolved: isResolved }}
         userEmail={user?.email}
       />
 
@@ -524,7 +530,7 @@ export default function Orders() {
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
             onOrderUpdated={() => {
-              queryClient.invalidateQueries({ queryKey: ['orders', tenantId] });
+              queryClient.invalidateQueries({ queryKey: ['orders', authTenantId] });
               // Refresh selected order data
               base44.entities.Order.filter({ id: selectedOrder.id }).then(orders => {
                 if (orders.length > 0) setSelectedOrder(orders[0]);
