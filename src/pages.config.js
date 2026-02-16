@@ -62,6 +62,7 @@ import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import PnLAnalytics from './pages/PnLAnalytics';
+import SelectStore from './pages/SelectStore';
 import __Layout from './Layout.jsx';
 
 
@@ -81,6 +82,7 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "PnLAnalytics": PnLAnalytics,
+    "SelectStore": SelectStore,
 }
 
 export const pagesConfig = {
