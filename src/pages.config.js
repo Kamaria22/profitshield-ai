@@ -56,6 +56,10 @@ import Products from './pages/Products';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import Tasks from './pages/Tasks';
+import AuditLogs from './pages/AuditLogs';
+import SystemHealth from './pages/SystemHealth';
+import FounderDashboard from './pages/FounderDashboard';
+import DataCompliance from './pages/DataCompliance';
 import __Layout from './Layout.jsx';
 
 
@@ -69,6 +73,10 @@ export const PAGES = {
     "Settings": Settings,
     "Shipping": Shipping,
     "Tasks": Tasks,
+    "AuditLogs": AuditLogs,
+    "SystemHealth": SystemHealth,
+    "FounderDashboard": FounderDashboard,
+    "DataCompliance": DataCompliance,
 }
 
 export const pagesConfig = {

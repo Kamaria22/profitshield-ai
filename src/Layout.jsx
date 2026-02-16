@@ -42,6 +42,8 @@ const navItems = [
   { name: 'Shipping', page: 'Shipping', icon: Truck },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle },
+  { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, adminOnly: true },
+  { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings },
 ];
 
@@ -201,7 +203,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
+            {navItems.filter(item => !item.adminOnly || user?.role === 'admin').map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
               return (
@@ -224,6 +226,9 @@ export default function Layout({ children, currentPageName }) {
                     <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
                       {pendingAlerts}
                     </Badge>
+                  )}
+                  {item.adminOnly && (
+                    <Badge variant="outline" className="ml-auto text-xs">Admin</Badge>
                   )}
                 </Link>
               );
