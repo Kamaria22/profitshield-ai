@@ -1,5 +1,18 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// ============================================
+// GLOBAL RISK INTELLIGENCE CONSTANTS
+// ============================================
+const GLOBAL_MODEL_BLEND_WEIGHT = 0.30; // 30% global, 70% tenant
+const MIN_MERCHANTS_FOR_CROSS_SIGNAL = 3; // Privacy threshold
+const MIN_SAMPLE_FOR_WEIGHT_ADJUSTMENT = 20;
+const FEATURE_EFFECTIVENESS_HIGH = 0.5;
+const FEATURE_EFFECTIVENESS_LOW = 0.2;
+
+// ============================================
+// ANALYSIS FUNCTIONS
+// ============================================
+
 // Analyze outcomes and suggest model improvements
 function analyzeOutcomes(outcomes) {
   const analysis = {
@@ -401,6 +414,584 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, outcome_id: outcome.id, action: 'created' });
       }
 
+      // ============================================
+      // CHARGEBACK OUTCOME PROCESSING
+      // ============================================
+      case 'process_chargeback_outcome': {
+        const { 
+          tenant_id, 
+          order_id, 
+          dispute_reason, 
+          outcome, // won/lost
+          recovered_amount,
+          days_to_resolution,
+          evidence_submitted,
+          evidence_types 
+        } = params;
+
+        // Get order
+        const orders = await base44.asServiceRole.entities.Order.filter({ id: order_id });
+        if (!orders.length) {
+          return Response.json({ error: 'Order not found' }, { status: 404 });
+        }
+        const order = orders[0];
+
+        // Check for existing chargeback outcome
+        const existing = await base44.asServiceRole.entities.ChargebackOutcome.filter({
+          order_id,
+          tenant_id
+        });
+
+        let chargebackRecord;
+        const chargebackData = {
+          tenant_id,
+          platform: 'shopify',
+          order_id,
+          platform_order_id: order.platform_order_id,
+          dispute_reason,
+          dispute_amount: order.total_revenue || 0,
+          outcome: outcome || 'pending',
+          recovered_amount: recovered_amount || 0,
+          days_to_resolution,
+          evidence_submitted: evidence_submitted || false,
+          evidence_types: evidence_types || [],
+          original_risk_score: order.fraud_score,
+          original_risk_level: order.risk_level,
+          dispute_resolved_at: outcome !== 'pending' ? new Date().toISOString() : null
+        };
+
+        if (existing.length > 0) {
+          await base44.asServiceRole.entities.ChargebackOutcome.update(existing[0].id, chargebackData);
+          chargebackRecord = { ...existing[0], ...chargebackData };
+        } else {
+          chargebackRecord = await base44.asServiceRole.entities.ChargebackOutcome.create({
+            ...chargebackData,
+            dispute_opened_at: new Date().toISOString()
+          });
+        }
+
+        // Also record as OrderOutcome for model training
+        if (outcome === 'won' || outcome === 'lost') {
+          const outcomeType = dispute_reason === 'fraudulent' 
+            ? 'chargeback_fraud' 
+            : dispute_reason === 'product_not_received' 
+            ? 'chargeback_not_received'
+            : 'chargeback_other';
+
+          await base44.asServiceRole.entities.OrderOutcome.create({
+            tenant_id,
+            order_id,
+            platform_order_id: order.platform_order_id,
+            risk_score_at_creation: order.fraud_score,
+            risk_level_at_creation: order.risk_level,
+            outcome_type: outcomeType,
+            outcome_date: new Date().toISOString(),
+            financial_impact: {
+              original_value: order.total_revenue,
+              chargeback_amount: order.total_revenue,
+              chargeback_fee: 15, // Standard chargeback fee
+              net_loss: outcome === 'lost' ? order.total_revenue + 15 : 0
+            },
+            was_correct_prediction: order.risk_level === 'high',
+            prediction_analysis: order.risk_level === 'high' ? 'true_positive' : 'false_negative',
+            contributing_factors: order.risk_reasons || []
+          });
+
+          // Mark for model learning
+          await base44.asServiceRole.entities.ChargebackOutcome.update(chargebackRecord.id, {
+            fed_to_model: true,
+            fed_to_model_at: new Date().toISOString(),
+            lessons_learned: {
+              key_factors: order.risk_reasons || [],
+              prevention_suggestion: outcome === 'lost' 
+                ? 'Consider requiring signature confirmation for similar orders'
+                : 'Evidence submission was effective',
+              model_feedback_applied: true
+            }
+          });
+        }
+
+        return Response.json({
+          success: true,
+          chargeback_id: chargebackRecord.id,
+          model_feedback: outcome !== 'pending'
+        });
+      }
+
+      // ============================================
+      // GLOBAL + TENANT BLENDED SCORING
+      // ============================================
+      case 'get_blended_risk_weights': {
+        const { tenant_id, industry_vertical } = params;
+
+        // Get tenant-specific weights
+        const tenantModels = await base44.asServiceRole.entities.TenantRiskModel.filter({
+          tenant_id,
+          is_active: true
+        });
+
+        // Get global weights
+        const globalWeights = await base44.asServiceRole.entities.RiskFeatureWeight.filter({
+          scope: 'global'
+        });
+
+        // Get industry weights if available
+        let industryWeights = [];
+        if (industry_vertical) {
+          industryWeights = await base44.asServiceRole.entities.RiskFeatureWeight.filter({
+            scope: 'industry',
+            industry_vertical
+          });
+        }
+
+        // Build global weight map
+        const globalWeightMap = {};
+        for (const gw of globalWeights) {
+          globalWeightMap[gw.feature_name] = {
+            weight: gw.weight,
+            confidence: gw.confidence || 0.5
+          };
+        }
+
+        // Build industry weight map
+        const industryWeightMap = {};
+        for (const iw of industryWeights) {
+          industryWeightMap[iw.feature_name] = {
+            weight: iw.weight,
+            confidence: iw.confidence || 0.5
+          };
+        }
+
+        // Get tenant weights
+        const tenantWeights = tenantModels.length > 0 ? tenantModels[0].weights : {};
+
+        // Blend weights: 70% tenant, 20% industry (if exists), 10% global
+        // OR: 70% tenant, 30% global if no industry
+        const blendedWeights = {};
+        const allFeatures = new Set([
+          ...Object.keys(tenantWeights),
+          ...Object.keys(globalWeightMap),
+          ...Object.keys(industryWeightMap)
+        ]);
+
+        for (const feature of allFeatures) {
+          const tenantW = tenantWeights[feature] || 0;
+          const globalW = globalWeightMap[feature]?.weight || 0;
+          const industryW = industryWeightMap[feature]?.weight || 0;
+
+          if (industryWeights.length > 0 && industryW > 0) {
+            // Tenant 70%, Industry 20%, Global 10%
+            blendedWeights[feature] = Math.round(
+              tenantW * 0.70 + industryW * 0.20 + globalW * 0.10
+            );
+          } else {
+            // Tenant 70%, Global 30%
+            blendedWeights[feature] = Math.round(
+              tenantW * (1 - GLOBAL_MODEL_BLEND_WEIGHT) + 
+              globalW * GLOBAL_MODEL_BLEND_WEIGHT
+            );
+          }
+        }
+
+        return Response.json({
+          success: true,
+          blended_weights: blendedWeights,
+          sources: {
+            tenant: !!tenantModels.length,
+            industry: industryWeights.length > 0,
+            global: globalWeights.length > 0
+          },
+          blend_ratio: industryWeights.length > 0 
+            ? { tenant: 0.70, industry: 0.20, global: 0.10 }
+            : { tenant: 0.70, global: 0.30 }
+        });
+      }
+
+      // ============================================
+      // CROSS-MERCHANT SIGNAL AGGREGATION
+      // ============================================
+      case 'update_cross_merchant_signals': {
+        // Admin only - scheduled job
+        if (user?.role !== 'admin') {
+          return Response.json({ error: 'Admin access required' }, { status: 403 });
+        }
+
+        const { signal_type, days = 90 } = params;
+
+        // Get all outcomes across tenants (anonymized aggregation)
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        const allOutcomes = await base44.asServiceRole.entities.OrderOutcome.filter({});
+        const recentOutcomes = allOutcomes.filter(o => new Date(o.created_date) >= startDate);
+
+        // Group by tenant for privacy check
+        const outcomesByTenant = {};
+        for (const outcome of recentOutcomes) {
+          if (!outcomesByTenant[outcome.tenant_id]) {
+            outcomesByTenant[outcome.tenant_id] = [];
+          }
+          outcomesByTenant[outcome.tenant_id].push(outcome);
+        }
+
+        const merchantCount = Object.keys(outcomesByTenant).length;
+        if (merchantCount < MIN_MERCHANTS_FOR_CROSS_SIGNAL) {
+          return Response.json({
+            success: false,
+            message: `Need at least ${MIN_MERCHANTS_FOR_CROSS_SIGNAL} merchants for cross-merchant signals`,
+            current_merchants: merchantCount
+          });
+        }
+
+        // Aggregate risk factors
+        const factorStats = {};
+        let totalBadOutcomes = 0;
+        let totalOutcomes = recentOutcomes.length;
+
+        for (const outcome of recentOutcomes) {
+          const isBad = outcome.outcome_type?.includes('chargeback') ||
+                        outcome.outcome_type?.includes('fraud') ||
+                        outcome.outcome_type?.includes('abuse');
+          
+          if (isBad) totalBadOutcomes++;
+
+          for (const factor of (outcome.contributing_factors || [])) {
+            if (!factorStats[factor]) {
+              factorStats[factor] = { total: 0, bad: 0, tenants: new Set() };
+            }
+            factorStats[factor].total++;
+            factorStats[factor].tenants.add(outcome.tenant_id);
+            if (isBad) factorStats[factor].bad++;
+          }
+        }
+
+        const baselineRate = totalOutcomes > 0 ? totalBadOutcomes / totalOutcomes : 0;
+        const signalsCreated = [];
+
+        // Create/update cross-merchant signals
+        for (const [factor, stats] of Object.entries(factorStats)) {
+          // Privacy check: only if appears in 3+ merchants
+          if (stats.tenants.size < MIN_MERCHANTS_FOR_CROSS_SIGNAL) continue;
+          if (stats.total < 10) continue; // Minimum sample
+
+          const badRate = stats.bad / stats.total;
+          const liftRatio = baselineRate > 0 ? badRate / baselineRate : 1;
+
+          // Only create signal if significantly higher than baseline
+          if (liftRatio < 1.5) continue;
+
+          const signalKey = `factor_${factor.replace(/\s+/g, '_').toLowerCase()}`;
+          
+          // Check existing
+          const existing = await base44.asServiceRole.entities.CrossMerchantSignal.filter({
+            signal_key: signalKey,
+            signal_type: 'velocity_pattern'
+          });
+
+          const signalData = {
+            signal_type: 'velocity_pattern',
+            signal_key: signalKey,
+            risk_score_contribution: Math.min(Math.round(liftRatio * 5), 25),
+            confidence: Math.min(stats.total / 100, 0.95),
+            merchant_count: stats.tenants.size,
+            occurrence_count: stats.total,
+            bad_outcome_rate: Math.round(badRate * 100) / 100,
+            baseline_rate: Math.round(baselineRate * 100) / 100,
+            lift_ratio: Math.round(liftRatio * 100) / 100,
+            last_updated_at: new Date().toISOString(),
+            is_active: true
+          };
+
+          if (existing.length > 0) {
+            await base44.asServiceRole.entities.CrossMerchantSignal.update(existing[0].id, signalData);
+          } else {
+            await base44.asServiceRole.entities.CrossMerchantSignal.create({
+              ...signalData,
+              first_detected_at: new Date().toISOString()
+            });
+          }
+
+          signalsCreated.push(signalKey);
+        }
+
+        // Also update global RiskFeatureWeight
+        for (const [factor, stats] of Object.entries(factorStats)) {
+          if (stats.tenants.size < MIN_MERCHANTS_FOR_CROSS_SIGNAL) continue;
+          if (stats.total < MIN_SAMPLE_FOR_WEIGHT_ADJUSTMENT) continue;
+
+          const badRate = stats.bad / stats.total;
+          const effectiveness = badRate;
+
+          const existing = await base44.asServiceRole.entities.RiskFeatureWeight.filter({
+            scope: 'global',
+            feature_name: factor
+          });
+
+          const weightData = {
+            scope: 'global',
+            model_type: 'fraud_detection',
+            feature_name: factor,
+            weight: Math.round(10 + effectiveness * 30), // 10-40 range
+            confidence: Math.min(stats.total / 200, 0.95),
+            sample_size: stats.total,
+            true_positive_rate: badRate,
+            effectiveness_trend: 'stable',
+            last_recalibrated_at: new Date().toISOString()
+          };
+
+          if (existing.length > 0) {
+            await base44.asServiceRole.entities.RiskFeatureWeight.update(existing[0].id, weightData);
+          } else {
+            await base44.asServiceRole.entities.RiskFeatureWeight.create(weightData);
+          }
+        }
+
+        return Response.json({
+          success: true,
+          signals_created: signalsCreated.length,
+          signals: signalsCreated,
+          merchant_count: merchantCount,
+          outcomes_analyzed: totalOutcomes
+        });
+      }
+
+      // ============================================
+      // WEEKLY RISK RECALIBRATION
+      // ============================================
+      case 'weekly_risk_recalibration': {
+        // Scheduled job - admin only
+        if (user?.role !== 'admin') {
+          return Response.json({ error: 'Admin access required' }, { status: 403 });
+        }
+
+        const results = { tenants_processed: 0, models_updated: 0, errors: [] };
+
+        // Get all active tenants
+        const tenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
+
+        for (const tenant of tenants) {
+          try {
+            // Get outcomes for this tenant
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+
+            const outcomes = await base44.asServiceRole.entities.OrderOutcome.filter({
+              tenant_id: tenant.id,
+              learning_applied: false
+            });
+
+            if (outcomes.length < MIN_SAMPLE_FOR_WEIGHT_ADJUSTMENT) {
+              results.tenants_processed++;
+              continue;
+            }
+
+            // Get current model
+            const models = await base44.asServiceRole.entities.TenantRiskModel.filter({
+              tenant_id: tenant.id,
+              is_active: true
+            });
+
+            if (!models.length) {
+              results.tenants_processed++;
+              continue;
+            }
+
+            const currentModel = models[0];
+            const analysis = analyzeOutcomes(outcomes);
+            const suggestedWeights = generateWeightSuggestions(currentModel.weights, analysis);
+            const suggestedThresholds = generateThresholdSuggestions(currentModel.thresholds, analysis);
+
+            // Check if significant changes needed
+            const weightChanges = Object.keys(suggestedWeights).filter(k => 
+              Math.abs(suggestedWeights[k] - (currentModel.weights[k] || 0)) > 3
+            );
+
+            if (weightChanges.length > 0 || 
+                Math.abs(suggestedThresholds.high_risk - currentModel.thresholds.high_risk) > 3) {
+              
+              // Deactivate old model
+              await base44.asServiceRole.entities.TenantRiskModel.update(currentModel.id, {
+                is_active: false,
+                deactivated_at: new Date().toISOString()
+              });
+
+              // Create new model
+              await base44.asServiceRole.entities.TenantRiskModel.create({
+                tenant_id: tenant.id,
+                version: (currentModel.version || 0) + 1,
+                is_active: true,
+                weights: suggestedWeights,
+                thresholds: suggestedThresholds,
+                source: 'weekly_recalibration',
+                activated_at: new Date().toISOString(),
+                parent_version_id: currentModel.id,
+                performance_metrics: {
+                  sample_size: outcomes.length,
+                  precision: analysis.precision,
+                  recall: analysis.recall,
+                  f1_score: analysis.f1_score
+                }
+              });
+
+              // Mark outcomes as used
+              for (const outcome of outcomes) {
+                await base44.asServiceRole.entities.OrderOutcome.update(outcome.id, {
+                  learning_applied: true,
+                  learning_applied_at: new Date().toISOString()
+                });
+              }
+
+              results.models_updated++;
+            }
+
+            results.tenants_processed++;
+
+          } catch (err) {
+            results.errors.push({ tenant_id: tenant.id, error: err.message });
+          }
+        }
+
+        // Update global moat metrics
+        await updateMoatMetrics(base44, results);
+
+        return Response.json({
+          success: true,
+          ...results
+        });
+      }
+
+      // ============================================
+      // CALCULATE RISK ROI METRICS
+      // ============================================
+      case 'calculate_risk_roi': {
+        const { tenant_id, period_type = 'monthly' } = params;
+
+        const now = new Date();
+        let startDate, period;
+
+        if (period_type === 'weekly') {
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 7);
+          period = `${now.getFullYear()}-W${Math.ceil(now.getDate() / 7)}`;
+        } else {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // Get orders for period
+        const orders = await base44.asServiceRole.entities.Order.filter({ tenant_id });
+        const periodOrders = orders.filter(o => new Date(o.order_date || o.created_date) >= startDate);
+
+        // Get outcomes
+        const outcomes = await base44.asServiceRole.entities.OrderOutcome.filter({ tenant_id });
+        const periodOutcomes = outcomes.filter(o => new Date(o.created_date) >= startDate);
+
+        // Get chargebacks
+        const chargebacks = await base44.asServiceRole.entities.ChargebackOutcome.filter({ tenant_id });
+        const periodChargebacks = chargebacks.filter(c => new Date(c.created_date) >= startDate);
+
+        // Calculate metrics
+        const metrics = {
+          tenant_id,
+          period,
+          period_type,
+          orders_analyzed: periodOrders.length,
+          high_risk_orders: periodOrders.filter(o => o.risk_level === 'high').length,
+          
+          // Chargebacks
+          chargebacks_total: periodChargebacks.length,
+          chargebacks_won: periodChargebacks.filter(c => c.outcome === 'won').length,
+          chargebacks_lost: periodChargebacks.filter(c => c.outcome === 'lost').length,
+          chargeback_amount_total: periodChargebacks.reduce((s, c) => s + (c.dispute_amount || 0), 0),
+          chargeback_amount_recovered: periodChargebacks.filter(c => c.outcome === 'won')
+            .reduce((s, c) => s + (c.recovered_amount || c.dispute_amount || 0), 0),
+
+          // Prevention estimates
+          chargebacks_prevented: 0,
+          chargeback_amount_prevented: 0,
+          fraud_orders_blocked: 0,
+          fraud_loss_avoided: 0,
+
+          // AI performance
+          ai_interventions_total: 0,
+          ai_interventions_correct: 0,
+          false_positive_count: 0,
+          true_positive_count: 0
+        };
+
+        // Count AI interventions
+        for (const outcome of periodOutcomes) {
+          metrics.ai_interventions_total++;
+          
+          if (outcome.prediction_analysis === 'true_positive') {
+            metrics.ai_interventions_correct++;
+            metrics.true_positive_count++;
+            
+            // Estimate prevented loss
+            if (outcome.outcome_type?.includes('chargeback') || outcome.outcome_type?.includes('fraud')) {
+              const wasHeld = outcome.action_taken === 'held' || outcome.action_taken === 'cancelled';
+              if (wasHeld) {
+                metrics.chargebacks_prevented++;
+                metrics.chargeback_amount_prevented += outcome.financial_impact?.original_value || 0;
+              }
+            }
+          } else if (outcome.prediction_analysis === 'true_negative') {
+            metrics.ai_interventions_correct++;
+          } else if (outcome.prediction_analysis === 'false_positive') {
+            metrics.false_positive_count++;
+          }
+        }
+
+        // High risk orders that were blocked
+        const blockedHighRisk = periodOrders.filter(o => 
+          o.risk_level === 'high' && 
+          (o.status === 'cancelled' || o.recommended_action === 'cancel')
+        );
+        metrics.fraud_orders_blocked = blockedHighRisk.length;
+        metrics.fraud_loss_avoided = blockedHighRisk.reduce((s, o) => s + (o.total_revenue || 0), 0);
+
+        // Calculate rates
+        metrics.ai_accuracy_percent = metrics.ai_interventions_total > 0
+          ? Math.round((metrics.ai_interventions_correct / metrics.ai_interventions_total) * 100)
+          : 0;
+
+        metrics.false_positive_rate = metrics.true_positive_count + metrics.false_positive_count > 0
+          ? Math.round((metrics.false_positive_count / (metrics.true_positive_count + metrics.false_positive_count)) * 100) / 100
+          : 0;
+
+        metrics.true_positive_rate = metrics.ai_interventions_total > 0
+          ? Math.round((metrics.true_positive_count / metrics.ai_interventions_total) * 100) / 100
+          : 0;
+
+        // Margin recovered
+        metrics.margin_recovered = metrics.fraud_loss_avoided + 
+                                   metrics.chargeback_amount_prevented + 
+                                   metrics.chargeback_amount_recovered;
+
+        // ROI calculation (assuming $50/month subscription)
+        const subscriptionCost = 50;
+        metrics.roi_multiple = subscriptionCost > 0 
+          ? Math.round((metrics.margin_recovered / subscriptionCost) * 10) / 10
+          : 0;
+
+        metrics.estimated_annual_savings = metrics.margin_recovered * (period_type === 'weekly' ? 52 : 12);
+
+        // Save or update
+        const existing = await base44.asServiceRole.entities.RiskROIMetric.filter({
+          tenant_id,
+          period,
+          period_type
+        });
+
+        if (existing.length > 0) {
+          await base44.asServiceRole.entities.RiskROIMetric.update(existing[0].id, metrics);
+        } else {
+          await base44.asServiceRole.entities.RiskROIMetric.create(metrics);
+        }
+
+        return Response.json({ success: true, metrics });
+      }
+
       default:
         return Response.json({ error: 'Unknown action' }, { status: 400 });
     }
@@ -409,3 +1000,65 @@ Deno.serve(async (req) => {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+// ============================================
+// HELPER: Update Moat Metrics
+// ============================================
+async function updateMoatMetrics(base44, recalibrationResults) {
+  const now = new Date();
+  const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  // Get aggregate stats
+  const allOutcomes = await base44.asServiceRole.entities.OrderOutcome.filter({});
+  const allSignals = await base44.asServiceRole.entities.CrossMerchantSignal.filter({ is_active: true });
+  const allTenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
+
+  // Calculate metrics
+  let totalTP = 0, totalFP = 0, totalTN = 0, totalFN = 0;
+  for (const outcome of allOutcomes) {
+    if (outcome.prediction_analysis === 'true_positive') totalTP++;
+    else if (outcome.prediction_analysis === 'false_positive') totalFP++;
+    else if (outcome.prediction_analysis === 'true_negative') totalTN++;
+    else if (outcome.prediction_analysis === 'false_negative') totalFN++;
+  }
+
+  const accuracy = (totalTP + totalTN) / (allOutcomes.length || 1);
+  const falsePositiveRate = totalFP / ((totalTP + totalFP) || 1);
+  const chargebackPrevention = totalTP / ((totalTP + totalFN) || 1);
+
+  // Update MoatMetric
+  const existing = await base44.asServiceRole.entities.MoatMetric.filter({
+    period,
+    period_type: 'monthly'
+  });
+
+  const moatData = {
+    period,
+    period_type: 'monthly',
+    data_moat: {
+      total_orders_processed: allOutcomes.length,
+      unique_fraud_patterns: allSignals.length,
+      cross_merchant_signals: allSignals.filter(s => s.merchant_count >= 3).length,
+      data_uniqueness_score: Math.min(allOutcomes.length / 1000, 100),
+      model_accuracy_advantage: Math.round(accuracy * 100)
+    },
+    ai_moat: {
+      model_versions_deployed: recalibrationResults.models_updated,
+      retraining_cycles: 1,
+      personalization_depth: allTenants.length,
+      prediction_accuracy: Math.round(accuracy * 100)
+    },
+    overall_moat_score: Math.round(
+      (accuracy * 40) + 
+      (allSignals.length * 0.5) + 
+      (allTenants.length * 2)
+    ),
+    competitive_position: accuracy > 0.8 ? 'strong' : accuracy > 0.6 ? 'competitive' : 'developing'
+  };
+
+  if (existing.length > 0) {
+    await base44.asServiceRole.entities.MoatMetric.update(existing[0].id, moatData);
+  } else {
+    await base44.asServiceRole.entities.MoatMetric.create(moatData);
+  }
+}
