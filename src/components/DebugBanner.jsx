@@ -40,8 +40,9 @@ export default function DebugBanner({ shopDomain, tenantId, ordersCount, debug, 
         
         <div className="text-slate-400 font-semibold">Tenant Resolution:</div>
         <div className="pl-2">
-          <div>url_shop_param: <span className="text-pink-400">{debug?.url_shop_param || 'null'}</span></div>
-          <div>resolved_via: <span className="text-yellow-400">{debug?.resolved_via || 'unknown'}</span></div>
+          <div>resolved: <span className={debug?.resolved ? 'text-emerald-400' : 'text-red-400'}>{debug?.resolved ? 'YES' : 'NO'}</span></div>
+          <div>platform: <span className="text-yellow-400">{debug?.platform || 'null'}</span></div>
+          <div>reason: <span className="text-pink-400">{debug?.reason || 'null'}</span></div>
           <div>shop_domain: <span className="text-emerald-400">{shopDomain || 'null'}</span></div>
           <div>tenant_id: <span className="text-blue-400 font-bold">{tenantId || 'null'}</span></div>
         </div>
