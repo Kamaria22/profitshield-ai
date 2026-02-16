@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Users, Plus, Search, Filter, ArrowLeft, Mail, Tag, 
-  TrendingUp, DollarSign, AlertTriangle, UserCheck 
+  TrendingUp, DollarSign, AlertTriangle, UserCheck, Loader2 
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -26,6 +26,7 @@ import CustomerTable from '@/components/customers/CustomerTable';
 import CreateSegmentDialog from '@/components/customers/CreateSegmentDialog';
 import SegmentInsightsCard from '@/components/customers/SegmentInsightsCard';
 import AIInsightsPanel from '@/components/customers/AIInsightsPanel';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 
 export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +37,9 @@ export default function Customers() {
   const [actionDialog, setActionDialog] = useState(null);
   
   const queryClient = useQueryClient();
-  const tenantId = localStorage.getItem('resolved_tenant_id');
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  const tenantId = resolverCheck.tenantId;
 
   // Fetch segments
   const { data: segments = [], isLoading: segmentsLoading } = useQuery({
@@ -135,7 +138,16 @@ export default function Customers() {
 
   const formatCurrency = (val) => `$${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
 
-  if (!tenantId) {
+  // Loading state
+  if (resolver?.status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (!resolverCheck.ok) {
     return (
       <div className="p-6 text-center text-slate-500">
         No store connected. Please connect your store first.

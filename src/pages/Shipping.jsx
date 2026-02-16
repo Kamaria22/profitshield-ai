@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -8,7 +8,8 @@ import {
   TrendingDown, 
   AlertTriangle,
   DollarSign,
-  Package
+  Package,
+  Loader2
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,40 +38,34 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 
 export default function Shipping() {
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
   const [dateRange, setDateRange] = useState('30');
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
-      }
-    } catch (e) {
-      console.log('Error loading user:', e);
-    }
-  };
+  
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  const tenantId = resolverCheck.tenantId;
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders-shipping', tenant?.id, dateRange],
+    queryKey: ['orders-shipping', tenantId, dateRange],
     queryFn: async () => {
-      if (!tenant?.id) return [];
+      if (!tenantId) return [];
       return base44.entities.Order.filter({ 
-        tenant_id: tenant.id 
+        tenant_id: tenantId 
       }, '-order_date', 500);
     },
-    enabled: !!tenant?.id
+    enabled: resolverCheck.ok
   });
+  
+  // Loading state
+  if (resolver?.status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   // Filter by date range
   const filteredOrders = React.useMemo(() => {
