@@ -4,7 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -16,7 +17,10 @@ import {
   RefreshCw,
   Sparkles,
   Plus,
-  ExternalLink
+  Zap,
+  Shield,
+  Activity,
+  BarChart3
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,19 +37,49 @@ import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import MetricCard from '../components/dashboard/MetricCard';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import ProfitChart from '../components/dashboard/ProfitChart';
-import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '../components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
+
+// Micro-animation variants
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -10 }
+};
+
+const staggerContainer = {
+  animate: { transition: { staggerChildren: 0.08 } }
+};
+
+const pulseGlow = {
+  animate: {
+    boxShadow: [
+      '0 0 0 0 rgba(16, 185, 129, 0)',
+      '0 0 0 8px rgba(16, 185, 129, 0.1)',
+      '0 0 0 0 rgba(16, 185, 129, 0)'
+    ],
+    transition: { duration: 2, repeat: Infinity }
+  }
+};
 
 export default function Home() {
   // Platform resolver with requireResolved gating
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   
-  // SINGLE SOURCE OF TRUTH
-  const isResolved = resolverCheck.ok;
+  // SINGLE SOURCE OF TRUTH - using shared helpers
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
   const authTenantId = resolverCheck.tenantId;
+  
+  // Query keys with platform/store identity
+  const ordersQueryKey = buildQueryKey('orders-home', resolverCheck);
+  const settingsQueryKey = buildQueryKey('tenantSettings', resolverCheck);
+  const tokenQueryKey = buildQueryKey('oauthToken', resolverCheck);
+  const leaksQueryKey = buildQueryKey('profitLeaks', resolverCheck);
+  const alertsQueryKey = buildQueryKey('pendingAlerts', resolverCheck);
   
   // Raw values for display
   const tenant = resolver?.tenant || null;
@@ -62,29 +96,29 @@ export default function Home() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Check OAuth token status and tenant settings - ONLY when resolved
+  // Check OAuth token status and tenant settings - ONLY when canQuery
   const { data: tenantSettings } = useQuery({
-    queryKey: ['tenantSettings', authTenantId],
+    queryKey: settingsQueryKey,
     queryFn: async () => {
-      if (!authTenantId) return null;
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: authTenantId });
+      if (!queryFilter?.tenant_id) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
-    enabled: isResolved && !!authTenantId
+    enabled: canQuery
   });
 
   const { data: tokenStatus } = useQuery({
-    queryKey: ['oauthToken', authTenantId],
+    queryKey: tokenQueryKey,
     queryFn: async () => {
-      if (!authTenantId) return { hasToken: false };
+      if (!queryFilter?.tenant_id) return { hasToken: false };
       const tokens = await base44.entities.OAuthToken.filter({ 
-        tenant_id: authTenantId, 
+        tenant_id: queryFilter.tenant_id, 
         platform: 'shopify',
         is_valid: true 
       });
       return { hasToken: tokens.length > 0 };
     },
-    enabled: isResolved && !!authTenantId
+    enabled: canQuery
   });
 
   // In demo mode, we don't require Shopify connection
@@ -198,41 +232,41 @@ export default function Home() {
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', authTenantId, dateRange],
+    queryKey: [...ordersQueryKey, dateRange],
     queryFn: async () => {
-      if (!authTenantId) return [];
-      console.log('[Home] Fetching orders for tenant:', authTenantId);
+      if (!queryFilter?.tenant_id) return [];
+      console.log('[Home] Fetching orders for tenant:', queryFilter.tenant_id);
       const allOrders = await base44.entities.Order.filter({ 
-        tenant_id: authTenantId 
+        tenant_id: queryFilter.tenant_id 
       }, '-order_date', 500);
       console.log('[Home] Fetched', allOrders.length, 'orders');
       return allOrders;
     },
-    enabled: isResolved && !!authTenantId
+    enabled: canQuery
   });
 
   const { data: profitLeaks = [], isLoading: leaksLoading } = useQuery({
-    queryKey: ['profitLeaks', authTenantId],
+    queryKey: leaksQueryKey,
     queryFn: async () => {
-      if (!authTenantId) return [];
+      if (!queryFilter?.tenant_id) return [];
       return base44.entities.ProfitLeak.filter({ 
-        tenant_id: authTenantId,
+        tenant_id: queryFilter.tenant_id,
         is_resolved: false 
       }, '-impact_amount', 10);
     },
-    enabled: isResolved && !!authTenantId
+    enabled: canQuery
   });
 
   const { data: pendingAlerts = [] } = useQuery({
-    queryKey: ['pendingAlerts', authTenantId],
+    queryKey: alertsQueryKey,
     queryFn: async () => {
-      if (!authTenantId) return [];
+      if (!queryFilter?.tenant_id) return [];
       return base44.entities.Alert.filter({ 
-        tenant_id: authTenantId,
+        tenant_id: queryFilter.tenant_id,
         status: 'pending' 
       }, '-created_date', 5);
     },
-    enabled: isResolved && !!authTenantId
+    enabled: canQuery
   });
 
   // Calculate metrics
@@ -291,55 +325,94 @@ export default function Home() {
   if (tenantLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-emerald-500 mx-auto mb-4 animate-spin" />
-          <p className="text-slate-500">Loading your store...</p>
-        </div>
+        <motion.div 
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="inline-block"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+          </motion.div>
+          <p className="text-slate-500 mt-6 font-medium">Loading your store...</p>
+        </motion.div>
       </div>
     );
   }
 
   if (!tenant && !tenantLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Sparkles className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Welcome to ProfitShield AI</h2>
-          <p className="text-slate-500 mb-4">Connect your Shopify store to get started</p>
+      <motion.div 
+        className="flex items-center justify-center min-h-[60vh]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="text-center max-w-md">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-500/30"
+          >
+            <Sparkles className="w-10 h-10 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Welcome to ProfitShield AI</h2>
+          <p className="text-slate-500 mb-6">Connect your Shopify store to unlock intelligent profit protection</p>
           {tenantError && (
             <p className="text-red-500 text-sm mb-4">{tenantError}</p>
           )}
           <Link to={createPageUrl('Onboarding')}>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/25 px-8 py-6 text-lg rounded-xl">
               Connect Store
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </Link>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-8"
+      initial="initial"
+      animate="animate"
+      variants={staggerContainer}
+    >
       {/* Debug Banner */}
       <DebugBanner 
         shopDomain={storeKey} 
         tenantId={authTenantId} 
         ordersCount={orders.length}
-        debug={{ platform, reason, resolved: isResolved }}
+        debug={{ platform, reason, resolved: canQuery }}
         userEmail={user?.email}
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Header with glassmorphism */}
+      <motion.div 
+        variants={fadeInUp}
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border border-slate-200/50 shadow-sm"
+      >
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500">Your profit health at a glance</p>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
+              <Activity className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+              Dashboard
+            </h1>
+          </div>
+          <p className="text-slate-500 ml-12">Your profit health at a glance</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow transition-shadow">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -352,178 +425,267 @@ export default function Home() {
             variant="outline" 
             onClick={() => createTestOrderMutation.mutate()}
             disabled={createTestOrderMutation.isPending || !authTenantId}
-            className="gap-2"
+            className="gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.02]"
           >
             <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
-            {createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Create Demo Order' : 'Create Test Order'}
+            {createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Demo Order' : 'Test Order'}
           </Button>
           <Button 
-            variant="outline" 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending || !authTenantId || !tokenStatus?.hasToken}
             title={!tokenStatus?.hasToken ? 'Connect Shopify to sync real orders' : ''}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all hover:scale-[1.02]"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            {syncMutation.isPending ? 'Syncing...' : 'Sync Orders'}
+            {syncMutation.isPending ? 'Syncing...' : 'Sync'}
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Top Section: Score + Alerts */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Profit Integrity Score */}
-        <Card className="lg:col-span-1">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center">
-              <h3 className="text-sm font-medium text-slate-500 mb-4">Profit Integrity Score</h3>
-              <ProfitIntegrityScore 
-                score={tenant.profit_integrity_score || 0} 
-                previousScore={tenant.profit_integrity_score ? tenant.profit_integrity_score - 5 : undefined}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Top Section: Score + Metrics */}
+      <motion.div variants={fadeInUp} className="grid lg:grid-cols-3 gap-6">
+        {/* Profit Integrity Score - Premium Card */}
+        <motion.div 
+          className="lg:col-span-1"
+          whileHover={{ y: -2 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+        >
+          <Card className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-0 shadow-2xl shadow-slate-900/20 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/5" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl" />
+            <CardContent className="pt-6 relative z-10">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2 mb-4">
+                  <Shield className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Profit Integrity</h3>
+                </div>
+                <ProfitIntegrityScore 
+                  score={tenant?.profit_integrity_score || 0} 
+                  previousScore={tenant?.profit_integrity_score ? tenant.profit_integrity_score - 5 : undefined}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {/* Key Metrics Grid */}
+        {/* Key Metrics Grid - Enhanced */}
         <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4">
-          <MetricCard
-            title="True Net Profit"
-            value={metrics.totalProfit}
-            prefix="$"
-            icon={DollarSign}
-            iconColor="text-emerald-600"
-            iconBg="bg-emerald-50"
-            valueColor={metrics.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}
-            loading={ordersLoading}
-          />
-          <MetricCard
-            title="Total Revenue"
-            value={metrics.totalRevenue}
-            prefix="$"
-            icon={TrendingUp}
-            iconColor="text-blue-600"
-            iconBg="bg-blue-50"
-            loading={ordersLoading}
-          />
-          <MetricCard
-            title="Average Margin"
-            value={metrics.avgMargin.toFixed(1)}
-            suffix="%"
-            icon={metrics.avgMargin >= 0 ? TrendingUp : TrendingDown}
-            iconColor={metrics.avgMargin >= 0 ? 'text-emerald-600' : 'text-red-600'}
-            iconBg={metrics.avgMargin >= 0 ? 'bg-emerald-50' : 'bg-red-50'}
-            valueColor={metrics.avgMargin >= 0 ? 'text-emerald-600' : 'text-red-600'}
-            loading={ordersLoading}
-          />
-          <MetricCard
-            title="Orders"
-            value={metrics.orderCount}
-            icon={ShoppingCart}
-            iconColor="text-purple-600"
-            iconBg="bg-purple-50"
-            loading={ordersLoading}
-          />
-        </div>
-      </div>
+          <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
+            <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-lg shadow-emerald-500/5 hover:shadow-emerald-500/10 transition-shadow">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-emerald-700/70">True Net Profit</span>
+                  <div className="p-2 rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/30">
+                    <DollarSign className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <p className={`text-3xl font-bold ${metrics.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  ${metrics.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                {metrics.totalProfit >= 0 && (
+                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                    <Zap className="w-3 h-3" /> Healthy profit margin
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-      {/* Shopify Connection Info */}
-      {authTenantId && tokenStatus?.hasToken === false && !isDemoMode && (
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+          <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
+            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100 shadow-lg shadow-blue-500/5 hover:shadow-blue-500/10 transition-shadow">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-blue-700/70">Total Revenue</span>
+                  <div className="p-2 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/30">
+                    <BarChart3 className="w-4 h-4 text-white" />
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-red-800">Shopify Connection Required</p>
-                  <p className="text-sm text-red-600">
-                    Connect your Shopify store to sync real orders
-                  </p>
+                <p className="text-3xl font-bold text-slate-800">
+                  ${metrics.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">Last {dateRange} days</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
+            <Card className={`bg-gradient-to-br ${metrics.avgMargin >= 20 ? 'from-teal-50 to-white border-teal-100' : metrics.avgMargin >= 0 ? 'from-amber-50 to-white border-amber-100' : 'from-red-50 to-white border-red-100'} shadow-lg transition-shadow`}>
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-slate-600">Average Margin</span>
+                  <div className={`p-2 rounded-xl shadow-lg ${metrics.avgMargin >= 20 ? 'bg-teal-500 shadow-teal-500/30' : metrics.avgMargin >= 0 ? 'bg-amber-500 shadow-amber-500/30' : 'bg-red-500 shadow-red-500/30'}`}>
+                    {metrics.avgMargin >= 0 ? <TrendingUp className="w-4 h-4 text-white" /> : <TrendingDown className="w-4 h-4 text-white" />}
+                  </div>
                 </div>
-              </div>
-              <Link to={`/settings${window.location.search}`}>
-                <Button className="bg-red-600 hover:bg-red-700 text-white">
-                  Connect Store
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <p className={`text-3xl font-bold ${metrics.avgMargin >= 20 ? 'text-teal-700' : metrics.avgMargin >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
+                  {metrics.avgMargin.toFixed(1)}%
+                </p>
+                <p className={`text-xs mt-1 ${metrics.avgMargin >= 20 ? 'text-teal-600' : metrics.avgMargin >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {metrics.avgMargin >= 20 ? 'Excellent' : metrics.avgMargin >= 10 ? 'Good' : metrics.avgMargin >= 0 ? 'Needs attention' : 'Critical'}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
+            <Card className="bg-gradient-to-br from-violet-50 to-white border-violet-100 shadow-lg shadow-violet-500/5 hover:shadow-violet-500/10 transition-shadow">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-violet-700/70">Orders</span>
+                  <div className="p-2 rounded-xl bg-violet-500 shadow-lg shadow-violet-500/30">
+                    <ShoppingCart className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-slate-800">{metrics.orderCount}</p>
+                <p className="text-xs text-violet-600 mt-1">
+                  ${metrics.avgOrderValue.toFixed(0)} avg order value
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Shopify Connection Info - Modern Alert */}
+      <AnimatePresence>
+        {authTenantId && tokenStatus?.hasToken === false && !isDemoMode && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Card className="bg-gradient-to-r from-red-50 to-rose-50 border-red-200/50 shadow-lg shadow-red-500/5">
+              <CardContent className="py-5">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-red-500 rounded-2xl shadow-lg shadow-red-500/30">
+                      <AlertTriangle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-red-800">Shopify Connection Required</p>
+                      <p className="text-sm text-red-600/80">
+                        Connect your Shopify store to sync real orders
+                      </p>
+                    </div>
+                  </div>
+                  <Link to={`/settings${window.location.search}`}>
+                    <Button className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all">
+                      Connect Store
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
-      {/* Demo Mode Info */}
-      {authTenantId && isDemoMode && !tokenStatus?.hasToken && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
+      {/* Demo Mode Info - Modern Alert */}
+      <AnimatePresence>
+        {authTenantId && isDemoMode && !tokenStatus?.hasToken && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50 shadow-lg shadow-blue-500/5">
+              <CardContent className="py-5">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <motion.div 
+                      className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/30"
+                      animate={{ rotate: [0, 5, -5, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </motion.div>
+                    <div>
+                      <p className="font-semibold text-blue-800">Demo Mode Active</p>
+                      <p className="text-sm text-blue-600/80">
+                        Create demo orders to explore. Connect Shopify for real data.
+                      </p>
+                    </div>
+                  </div>
+                  <Link to={`/settings${window.location.search}`}>
+                    <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 shadow-sm hover:shadow transition-all">
+                      Connect Store
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
                 </div>
-                <div>
-                  <p className="font-semibold text-blue-800">Demo Mode Active</p>
-                  <p className="text-sm text-blue-600">
-                    Create demo orders to explore the app. Connect Shopify to sync real orders.
-                  </p>
-                </div>
-              </div>
-              <Link to={`/settings${window.location.search}`}>
-                <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                  Connect Store
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pending Shopify Actions */}
-      <PendingShopifyActionsPanel tenantId={authTenantId} />
+      <motion.div variants={fadeInUp}>
+        <PendingShopifyActionsPanel tenantId={authTenantId} />
+      </motion.div>
 
-      {/* Alerts Banner */}
-      {pendingAlerts.length > 0 && (
-        <Card className="bg-amber-50 border-amber-200">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+      {/* Alerts Banner - Modern */}
+      <AnimatePresence>
+        {pendingAlerts.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200/50 shadow-lg shadow-amber-500/5 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl" />
+              <CardContent className="py-5 relative">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <motion.div 
+                      className="p-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl shadow-lg shadow-amber-500/30"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <AlertTriangle className="w-5 h-5 text-white" />
+                    </motion.div>
+                    <div>
+                      <p className="font-semibold text-amber-800">
+                        {pendingAlerts.length} Alert{pendingAlerts.length !== 1 ? 's' : ''} Requiring Attention
+                      </p>
+                      <p className="text-sm text-amber-600/80">
+                        {pendingAlerts.filter(a => a.severity === 'high' || a.severity === 'critical').length} high priority
+                      </p>
+                    </div>
+                  </div>
+                  <Link to={createPageUrl('Alerts')}>
+                    <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100 shadow-sm hover:shadow transition-all">
+                      View Alerts
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
                 </div>
-                <div>
-                  <p className="font-semibold text-amber-800">
-                    {pendingAlerts.length} Alert{pendingAlerts.length !== 1 ? 's' : ''} Requiring Attention
-                  </p>
-                  <p className="text-sm text-amber-600">
-                    {pendingAlerts.filter(a => a.severity === 'high' || a.severity === 'critical').length} high priority
-                  </p>
-                </div>
-              </div>
-              <Link to={createPageUrl('Alerts')}>
-                <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
-                  View Alerts
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Benchmark Comparison */}
-      <BenchmarkComparison tenantId={authTenantId} />
+      <motion.div variants={fadeInUp}>
+        <BenchmarkComparison tenantId={authTenantId} />
+      </motion.div>
 
       {/* Profit Chart */}
-      <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
+      <motion.div variants={fadeInUp}>
+        <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
+      </motion.div>
 
-      {/* Hidden Profit Leaks */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      {/* Hidden Profit Leaks - Modern Section */}
+      <motion.div variants={fadeInUp}>
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Hidden Profit Leaks</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              Hidden Profit Leaks
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
               {topLeaks.length > 0 
                 ? `${profitLeaks.length} leak${profitLeaks.length !== 1 ? 's' : ''} detected · $${totalLeakImpact.toLocaleString()} total impact`
                 : 'No profit leaks detected'}
@@ -531,7 +693,7 @@ export default function Home() {
           </div>
           {profitLeaks.length > 3 && (
             <Link to={createPageUrl('Alerts')}>
-              <Button variant="ghost" className="text-emerald-600">
+              <Button variant="ghost" className="text-emerald-600 hover:bg-emerald-50">
                 View All
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
@@ -542,69 +704,99 @@ export default function Home() {
         {topLeaks.length > 0 ? (
           <div className="grid gap-4">
             {topLeaks.map((leak, index) => (
-              <ProfitLeakCard key={leak.id} leak={leak} index={index} />
+              <motion.div
+                key={leak.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <ProfitLeakCard leak={leak} index={index} />
+              </motion.div>
             ))}
           </div>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center">
-              <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <TrendingUp className="w-6 h-6 text-emerald-600" />
-              </div>
-              <p className="text-slate-600 font-medium">No profit leaks detected</p>
-              <p className="text-sm text-slate-500 mt-1">Your store is running efficiently</p>
+          <Card className="border-dashed border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white">
+            <CardContent className="py-12 text-center">
+              <motion.div 
+                className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30"
+                animate={{ rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                <TrendingUp className="w-8 h-8 text-white" />
+              </motion.div>
+              <p className="text-slate-800 font-semibold text-lg">No profit leaks detected</p>
+              <p className="text-sm text-slate-500 mt-2">Your store is running efficiently</p>
             </CardContent>
           </Card>
         )}
-      </div>
+      </motion.div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">High Risk Orders</p>
-              <p className={`text-2xl font-bold ${metrics.highRiskOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                {metrics.highRiskOrders}
-              </p>
+      {/* Quick Stats Grid - Modern Glassmorphism */}
+      <motion.div variants={fadeInUp} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.highRiskOrders > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50 shadow-red-500/10' : 'bg-white/80'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">High Risk Orders</p>
+                <p className={`text-2xl font-bold ${metrics.highRiskOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                  {metrics.highRiskOrders}
+                </p>
+              </div>
+              <div className={`p-2.5 rounded-xl ${metrics.highRiskOrders > 0 ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-slate-100'}`}>
+                <AlertTriangle className={`w-5 h-5 ${metrics.highRiskOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
+              </div>
             </div>
-            <AlertTriangle className={`w-8 h-8 ${metrics.highRiskOrders > 0 ? 'text-red-200' : 'text-slate-200'}`} />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Negative Margin</p>
-              <p className={`text-2xl font-bold ${metrics.negativeMarginOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                {metrics.negativeMarginOrders}
-              </p>
+          </Card>
+        </motion.div>
+
+        <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.negativeMarginOrders > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50 shadow-amber-500/10' : 'bg-white/80'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Negative Margin</p>
+                <p className={`text-2xl font-bold ${metrics.negativeMarginOrders > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                  {metrics.negativeMarginOrders}
+                </p>
+              </div>
+              <div className={`p-2.5 rounded-xl ${metrics.negativeMarginOrders > 0 ? 'bg-amber-500 shadow-lg shadow-amber-500/30' : 'bg-slate-100'}`}>
+                <TrendingDown className={`w-5 h-5 ${metrics.negativeMarginOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
+              </div>
             </div>
-            <TrendingDown className={`w-8 h-8 ${metrics.negativeMarginOrders > 0 ? 'text-red-200' : 'text-slate-200'}`} />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Avg Order Value</p>
-              <p className="text-2xl font-bold text-slate-900">
-                ${metrics.avgOrderValue.toFixed(0)}
-              </p>
+          </Card>
+        </motion.div>
+
+        <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card className="p-5 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Avg Order Value</p>
+                <p className="text-2xl font-bold text-slate-900">
+                  ${metrics.avgOrderValue.toFixed(0)}
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-100">
+                <ShoppingCart className="w-5 h-5 text-slate-400" />
+              </div>
             </div>
-            <ShoppingCart className="w-8 h-8 text-slate-200" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Total Refunds</p>
-              <p className={`text-2xl font-bold ${metrics.totalRefunds > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                ${metrics.totalRefunds.toFixed(0)}
-              </p>
+          </Card>
+        </motion.div>
+
+        <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
+          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.totalRefunds > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50 shadow-rose-500/10' : 'bg-white/80'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Total Refunds</p>
+                <p className={`text-2xl font-bold ${metrics.totalRefunds > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                  ${metrics.totalRefunds.toFixed(0)}
+                </p>
+              </div>
+              <div className={`p-2.5 rounded-xl ${metrics.totalRefunds > 0 ? 'bg-rose-500 shadow-lg shadow-rose-500/30' : 'bg-slate-100'}`}>
+                <Package className={`w-5 h-5 ${metrics.totalRefunds > 0 ? 'text-white' : 'text-slate-400'}`} />
+              </div>
             </div>
-            <Package className={`w-8 h-8 ${metrics.totalRefunds > 0 ? 'text-red-200' : 'text-slate-200'}`} />
-          </div>
-        </Card>
-      </div>
-    </div>
+          </Card>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
