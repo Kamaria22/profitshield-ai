@@ -8,7 +8,8 @@ import {
   clearContext,
   hasValidContext,
   hardResetAllContexts,
-  listPersistedStores
+  listPersistedStores,
+  getActiveStoreKey
 } from '@/components/platformContext';
 
 /**
