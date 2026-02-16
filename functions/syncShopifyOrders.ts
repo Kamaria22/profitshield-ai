@@ -374,6 +374,13 @@ Deno.serve(async (req) => {
     }
     
     console.log('[syncShopifyOrders] Sync complete. Created:', created, 'Updated:', updated, 'Newest:', newestOrderNumber);
+
+    // Trigger profit alert checks for new/updated orders
+    try {
+      await base44.asServiceRole.functions.invoke('checkProfitAlerts', { tenant_id: tenant.id });
+    } catch (alertError) {
+      console.log('[syncShopifyOrders] Alert check skipped:', alertError.message);
+    }
     
     return Response.json({ 
       success: true,

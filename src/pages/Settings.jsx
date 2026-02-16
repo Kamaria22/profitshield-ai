@@ -52,6 +52,7 @@ import { toast } from 'sonner';
 
 import CostMappingTable from '../components/settings/CostMappingTable';
 import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
+import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
 import { useTenantResolver } from '../components/useTenantResolver';
 
 export default function Settings() {
@@ -499,9 +500,13 @@ export default function Settings() {
 
         {/* Alerts Tab */}
         <TabsContent value="alerts" className="mt-6 space-y-6">
+          {/* Profit Alert Rules */}
+          <ProfitAlertRulesManager tenantId={tenantId} userEmail={user?.email} />
+
+          {/* General Alert Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Alert Settings</CardTitle>
+              <CardTitle>Risk Alert Settings</CardTitle>
               <CardDescription>Configure risk thresholds and notification preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -543,26 +548,6 @@ export default function Settings() {
                   <Switch 
                     checked={settings?.enable_risk_alerts !== false}
                     onCheckedChange={(v) => handleSettingsChange('enable_risk_alerts', v)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Shipping Loss Alerts</p>
-                    <p className="text-sm text-slate-500">Alert when shipping cost exceeds charged amount</p>
-                  </div>
-                  <Switch 
-                    checked={settings?.enable_shipping_alerts === true}
-                    onCheckedChange={(v) => handleSettingsChange('enable_shipping_alerts', v)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Discount Protection</p>
-                    <p className="text-sm text-slate-500">Alert on excessive discount stacking</p>
-                  </div>
-                  <Switch 
-                    checked={settings?.enable_discount_protection === true}
-                    onCheckedChange={(v) => handleSettingsChange('enable_discount_protection', v)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
