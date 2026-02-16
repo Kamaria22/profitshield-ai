@@ -33,13 +33,28 @@ import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import MetricCard from '../components/dashboard/MetricCard';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import ProfitChart from '../components/dashboard/ProfitChart';
-import { usePlatformResolver, RESOLVER_STATUS } from '../components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '../components/usePlatformResolver';
 import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
 
 export default function Home() {
-  const { tenant, tenantId, storeKey, platform, status, reason, user } = usePlatformResolver();
+  // Platform resolver with requireResolved gating
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  // SINGLE SOURCE OF TRUTH
+  const isResolved = resolverCheck.ok;
+  const authTenantId = resolverCheck.tenantId;
+  
+  // Raw values for display
+  const tenant = resolver?.tenant || null;
+  const storeKey = resolver?.storeKey || null;
+  const platform = resolver?.platform || null;
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
+  const reason = resolver?.reason || null;
+  const user = resolver?.user || null;
+  
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
   const tenantError = status === RESOLVER_STATUS.ERROR ? 'No store connected' : null;
   const shopDomain = platform === 'shopify' ? storeKey : null;
@@ -47,29 +62,29 @@ export default function Home() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Check OAuth token status and tenant settings
+  // Check OAuth token status and tenant settings - ONLY when resolved
   const { data: tenantSettings } = useQuery({
-    queryKey: ['tenantSettings', tenantId],
+    queryKey: ['tenantSettings', authTenantId],
     queryFn: async () => {
-      if (!tenantId) return null;
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+      if (!authTenantId) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: authTenantId });
       return settings[0] || null;
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: isResolved && !!authTenantId
   });
 
   const { data: tokenStatus } = useQuery({
-    queryKey: ['oauthToken', tenantId],
+    queryKey: ['oauthToken', authTenantId],
     queryFn: async () => {
-      if (!tenantId) return { hasToken: false };
+      if (!authTenantId) return { hasToken: false };
       const tokens = await base44.entities.OAuthToken.filter({ 
-        tenant_id: tenantId, 
+        tenant_id: authTenantId, 
         platform: 'shopify',
         is_valid: true 
       });
       return { hasToken: tokens.length > 0 };
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: isResolved && !!authTenantId
   });
 
   // In demo mode, we don't require Shopify connection
@@ -78,8 +93,8 @@ export default function Home() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      if (!tenantId) throw new Error('No store connected');
-      const response = await base44.functions.invoke('syncShopifyOrders', { tenant_id: tenantId });
+      if (!authTenantId) throw new Error('No store connected');
+      const response = await base44.functions.invoke('syncShopifyOrders', { tenant_id: authTenantId });
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
@@ -113,7 +128,7 @@ export default function Home() {
 
   const createTestOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!tenantId) throw new Error('No store connected');
+      if (!authTenantId) throw new Error('No store connected');
       
       // If in demo mode without token, create local demo order
       if (isDemoMode && !tokenStatus?.hasToken) {
@@ -123,7 +138,7 @@ export default function Home() {
         const product = products[Math.floor(Math.random() * products.length)];
         
         const demoOrder = {
-          tenant_id: tenantId,
+          tenant_id: authTenantId,
           platform_order_id: `demo_${Date.now()}`,
           order_number: `#${orderNum}`,
           customer_email: `demo${orderNum}@example.com`,
@@ -144,7 +159,7 @@ export default function Home() {
       }
       
       // Otherwise use Shopify API
-      const response = await base44.functions.invoke('createShopifyTestOrder', { tenant_id: tenantId });
+      const response = await base44.functions.invoke('createShopifyTestOrder', { tenant_id: authTenantId });
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
@@ -183,41 +198,41 @@ export default function Home() {
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', tenantId, dateRange],
+    queryKey: ['orders', authTenantId, dateRange],
     queryFn: async () => {
-      if (!tenantId) return [];
-      console.log('[Home] Fetching orders for tenant:', tenantId);
+      if (!authTenantId) return [];
+      console.log('[Home] Fetching orders for tenant:', authTenantId);
       const allOrders = await base44.entities.Order.filter({ 
-        tenant_id: tenantId 
+        tenant_id: authTenantId 
       }, '-order_date', 500);
       console.log('[Home] Fetched', allOrders.length, 'orders');
       return allOrders;
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: isResolved && !!authTenantId
   });
 
   const { data: profitLeaks = [], isLoading: leaksLoading } = useQuery({
-    queryKey: ['profitLeaks', tenantId],
+    queryKey: ['profitLeaks', authTenantId],
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!authTenantId) return [];
       return base44.entities.ProfitLeak.filter({ 
-        tenant_id: tenantId,
+        tenant_id: authTenantId,
         is_resolved: false 
       }, '-impact_amount', 10);
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: isResolved && !!authTenantId
   });
 
   const { data: pendingAlerts = [] } = useQuery({
-    queryKey: ['pendingAlerts', tenantId],
+    queryKey: ['pendingAlerts', authTenantId],
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!authTenantId) return [];
       return base44.entities.Alert.filter({ 
-        tenant_id: tenantId,
+        tenant_id: authTenantId,
         status: 'pending' 
       }, '-created_date', 5);
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: isResolved && !!authTenantId
   });
 
   // Calculate metrics
@@ -310,9 +325,9 @@ export default function Home() {
       {/* Debug Banner */}
       <DebugBanner 
         shopDomain={storeKey} 
-        tenantId={tenantId} 
+        tenantId={authTenantId} 
         ordersCount={orders.length}
-        debug={{ platform, reason }}
+        debug={{ platform, reason, resolved: isResolved }}
         userEmail={user?.email}
       />
 
@@ -336,7 +351,7 @@ export default function Home() {
           <Button 
             variant="outline" 
             onClick={() => createTestOrderMutation.mutate()}
-            disabled={createTestOrderMutation.isPending || !tenantId}
+            disabled={createTestOrderMutation.isPending || !authTenantId}
             className="gap-2"
           >
             <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
@@ -345,7 +360,7 @@ export default function Home() {
           <Button 
             variant="outline" 
             onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || !tenantId || !tokenStatus?.hasToken}
+            disabled={syncMutation.isPending || !authTenantId || !tokenStatus?.hasToken}
             title={!tokenStatus?.hasToken ? 'Connect Shopify to sync real orders' : ''}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
@@ -412,7 +427,7 @@ export default function Home() {
       </div>
 
       {/* Shopify Connection Info */}
-      {tenantId && tokenStatus?.hasToken === false && !isDemoMode && (
+      {authTenantId && tokenStatus?.hasToken === false && !isDemoMode && (
         <Card className="bg-red-50 border-red-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -439,7 +454,7 @@ export default function Home() {
       )}
       
       {/* Demo Mode Info */}
-      {tenantId && isDemoMode && !tokenStatus?.hasToken && (
+      {authTenantId && isDemoMode && !tokenStatus?.hasToken && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -466,7 +481,7 @@ export default function Home() {
       )}
 
       {/* Pending Shopify Actions */}
-      <PendingShopifyActionsPanel tenantId={tenantId} />
+      <PendingShopifyActionsPanel tenantId={authTenantId} />
 
       {/* Alerts Banner */}
       {pendingAlerts.length > 0 && (
@@ -498,7 +513,7 @@ export default function Home() {
       )}
 
       {/* Benchmark Comparison */}
-      <BenchmarkComparison tenantId={tenantId} />
+      <BenchmarkComparison tenantId={authTenantId} />
 
       {/* Profit Chart */}
       <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
