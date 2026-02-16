@@ -50,7 +50,7 @@ export default function Settings() {
   const [user, setUser] = useState(null);
   const [tenant, setTenant] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [activeTab, setActiveTab] = useState('costs');
+  const [activeTab, setActiveTab] = useState('general');
   const [newCostDialog, setNewCostDialog] = useState(false);
   const [newCost, setNewCost] = useState({ sku: '', product_title: '', cost_per_unit: '' });
   const queryClient = useQueryClient();
@@ -166,6 +166,10 @@ export default function Settings() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-slate-100">
+          <TabsTrigger value="general" className="gap-2">
+            <SettingsIcon className="w-4 h-4" />
+            General
+          </TabsTrigger>
           <TabsTrigger value="costs" className="gap-2">
             <DollarSign className="w-4 h-4" />
             Costs
@@ -183,6 +187,50 @@ export default function Settings() {
             Viral Tools
           </TabsTrigger>
         </TabsList>
+
+        {/* General Tab */}
+        <TabsContent value="general" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Display Settings</CardTitle>
+              <CardDescription>Control what data is displayed in the app</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <div>
+                  <p className="font-medium">Demo Mode (Show Sample Data)</p>
+                  <p className="text-sm text-slate-500">
+                    When enabled, shows sample/demo orders alongside real data. 
+                    Disable to see only real Shopify-synced orders.
+                  </p>
+                </div>
+                <Switch 
+                  checked={settings?.demo_mode !== false}
+                  onCheckedChange={(v) => handleSettingsChange('demo_mode', v)}
+                />
+              </div>
+              
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-900">Demo Mode is {settings?.demo_mode !== false ? 'ON' : 'OFF'}</p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      {settings?.demo_mode !== false 
+                        ? 'Sample data is included in your views. Turn off to see only real orders from Shopify.'
+                        : 'Only real Shopify-synced orders are shown. Turn on to include demo data for testing.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={saveSettings} className="gap-2">
+                <Save className="w-4 h-4" />
+                Save Settings
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Costs Tab */}
         <TabsContent value="costs" className="mt-6 space-y-6">
