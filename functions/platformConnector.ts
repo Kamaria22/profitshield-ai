@@ -447,6 +447,79 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, results });
       }
 
+      case 'deregister_webhooks': {
+        const { integration_id } = params;
+        const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration_id });
+        if (!integrations.length) {
+          return Response.json({ error: 'Integration not found' }, { status: 404 });
+        }
+
+        const integration = integrations[0];
+        const client = await getPlatformClient(integration, encryptionKey);
+        const errors = [];
+        const deleted = [];
+
+        // Get registered webhooks
+        const webhookEndpoints = integration.webhook_endpoints || {};
+        
+        for (const [topic, webhookId] of Object.entries(webhookEndpoints)) {
+          try {
+            if (webhookId && client.deleteWebhook) {
+              await client.deleteWebhook(webhookId);
+              deleted.push(topic);
+            }
+          } catch (error) {
+            errors.push({ topic, error: error.message });
+          }
+        }
+
+        // Clear webhook endpoints from integration
+        await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+          webhook_endpoints: {}
+        });
+
+        return Response.json({ success: true, deleted, errors });
+      }
+
+      case 'reconnect_platform': {
+        const { integration_id, credentials } = params;
+        const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration_id });
+        if (!integrations.length) {
+          return Response.json({ error: 'Integration not found' }, { status: 404 });
+        }
+
+        const integration = integrations[0];
+        
+        // Encrypt new credentials
+        const encryptedCreds = await encryptCredentials(credentials, encryptionKey);
+        
+        // Update integration with new credentials
+        await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+          credentials_encrypted: encryptedCreds,
+          status: 'pending'
+        });
+
+        // Test connection
+        try {
+          const updatedIntegrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration_id });
+          const client = await getPlatformClient(updatedIntegrations[0], encryptionKey);
+          await client.getOrders({ limit: '1' });
+          
+          await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+            status: 'connected',
+            error_log: []
+          });
+
+          return Response.json({ success: true, status: 'connected' });
+        } catch (error) {
+          await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+            status: 'error',
+            error_log: [{ timestamp: new Date().toISOString(), error_type: 'connection', message: error.message }]
+          });
+          return Response.json({ success: false, error: error.message }, { status: 400 });
+        }
+      }
+
       case 'get_platform_config': {
         const { platform } = params;
         return Response.json({ config: PLATFORM_CONFIGS[platform] || null });
