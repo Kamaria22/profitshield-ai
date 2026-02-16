@@ -54,19 +54,28 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
-// Helper to check if user is admin
+// Helper to check if user is admin - with null safety
 function isUserAdmin(user) {
-  const role = user?.app_role?.toLowerCase();
+  if (!user) return false;
+  const role = (user.app_role || user.role || '').toLowerCase();
   return role === 'owner' || role === 'admin';
 }
 
-// Debug Panel Component
-function DebugPanel({ resolver, userEmail }) {
-  const urlParams = parseQuery(window.location.search);
+// Debug Panel Component - receives search as prop for stability
+function DebugPanel({ resolver, userEmail, search }) {
+  // Safely parse search - never access window directly
+  const urlParams = parseQuery(search || '');
   const persisted = getPersistedContext();
+  
+  // Safe check for debug mode
   const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
   
   if (!showDebug) return null;
+  
+  // Safe resolver access
+  const safeResolver = resolver || {};
+  const safeStatus = safeResolver.status || 'unknown';
+  const safeStores = Array.isArray(safeResolver.availableStores) ? safeResolver.availableStores : [];
   
   return (
     <div className="fixed bottom-4 left-4 z-50 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-lg max-w-sm">
@@ -76,16 +85,16 @@ function DebugPanel({ resolver, userEmail }) {
       </div>
       <div className="space-y-1">
         <p><span className="text-slate-400">Status:</span> <span className={
-          resolver.status === RESOLVER_STATUS.RESOLVED ? 'text-green-400' :
-          resolver.status === RESOLVER_STATUS.ERROR ? 'text-red-400' :
+          safeStatus === RESOLVER_STATUS.RESOLVED ? 'text-green-400' :
+          safeStatus === RESOLVER_STATUS.ERROR ? 'text-red-400' :
           'text-yellow-400'
-        }>{resolver.status}</span></p>
-        <p><span className="text-slate-400">Tenant:</span> {resolver.tenantId || 'null'}</p>
-        <p><span className="text-slate-400">Platform:</span> {resolver.platform || 'null'}</p>
-        <p><span className="text-slate-400">StoreKey:</span> {resolver.storeKey || 'null'}</p>
-        <p><span className="text-slate-400">Integration:</span> {resolver.integration?.id || 'null'}</p>
-        <p><span className="text-slate-400">Reason:</span> {resolver.reason || 'null'}</p>
-        <p><span className="text-slate-400">Stores:</span> {resolver.availableStores?.length || 0}</p>
+        }>{safeStatus}</span></p>
+        <p><span className="text-slate-400">Tenant:</span> {safeResolver.tenantId || 'null'}</p>
+        <p><span className="text-slate-400">Platform:</span> {safeResolver.platform || 'null'}</p>
+        <p><span className="text-slate-400">StoreKey:</span> {safeResolver.storeKey || 'null'}</p>
+        <p><span className="text-slate-400">Integration:</span> {safeResolver.integration?.id || 'null'}</p>
+        <p><span className="text-slate-400">Reason:</span> {safeResolver.reason || 'null'}</p>
+        <p><span className="text-slate-400">Stores:</span> {safeStores.length}</p>
         <div className="border-t border-slate-700 mt-2 pt-2">
           <p className="text-slate-400 mb-1">Persisted:</p>
           <p className="truncate"><span className="text-slate-500">platform:</span> {persisted.platform || 'null'}</p>
@@ -101,21 +110,26 @@ function LayoutContent({ children, currentPageName }) {
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission, role, user: permUser } = usePermissions();
   
-  // Use unified platform resolver
-  const resolver = usePlatformResolver();
-  const { 
-    status, 
-    tenantId, 
-    tenant, 
-    user, 
-    platform, 
-    storeKey,
-    integration,
-    availableStores,
-    reason
-  } = resolver;
+  // Safe permissions hook usage
+  const permissionsData = usePermissions() || {};
+  const { hasPermission = () => true, role = null, user: permUser = null } = permissionsData;
+  
+  // Use unified platform resolver with fallback
+  const resolver = usePlatformResolver() || {};
+  
+  // Destructure with safe defaults
+  const status = resolver.status || RESOLVER_STATUS.RESOLVING;
+  const tenantId = resolver.tenantId || null;
+  const tenant = resolver.tenant || null;
+  const user = resolver.user || null;
+  const platform = resolver.platform || null;
+  const storeKey = resolver.storeKey || null;
+  const integration = resolver.integration || null;
+  const reason = resolver.reason || null;
+  
+  // SAFE: Always ensure availableStores is an array
+  const stores = Array.isArray(resolver.availableStores) ? resolver.availableStores : [];
 
   // Load alerts when tenant is resolved
   useEffect(() => {
@@ -132,27 +146,37 @@ function LayoutContent({ children, currentPageName }) {
         tenant_id: tenantId, 
         status: 'pending' 
       });
-      setPendingAlerts(alerts.length);
+      setPendingAlerts(Array.isArray(alerts) ? alerts.length : 0);
     } catch (e) {
       console.log('Error loading alerts:', e.message);
       setPendingAlerts(0);
     }
   };
 
-  // Redirect to SelectStore if needed
+  // SAFE redirect to SelectStore - proper URL joining
   useEffect(() => {
     if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore') {
-      const returnPath = encodeURIComponent(currentPageName);
-      navigate(createPageUrl('SelectStore', location.search) + `&return=${returnPath}`);
+      const returnPath = encodeURIComponent(currentPageName || 'Home');
+      const base = createPageUrl('SelectStore', location.search);
+      // Safe joiner: check if URL already has ? 
+      const joiner = base.includes('?') ? '&' : '?';
+      navigate(`${base}${joiner}return=${returnPath}`);
     }
   }, [status, currentPageName, navigate, location.search]);
 
   const handleLogout = () => {
-    base44.auth.logout();
+    try {
+      base44.auth.logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+      // Force reload as fallback
+      window.location.href = '/';
+    }
   };
 
   // Don't show layout for onboarding, auth pages, or store selection
-  if (['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'].includes(currentPageName)) {
+  const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'];
+  if (bypassLayoutPages.includes(currentPageName)) {
     return <>{children}</>;
   }
 
@@ -206,21 +230,25 @@ function LayoutContent({ children, currentPageName }) {
             </button>
           </div>
 
-          {/* Store Info */}
+          {/* Store Info - safe null checks */}
           {tenant && (
             <div className="px-4 py-3 border-b border-slate-200">
               <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
               <p className="text-sm font-medium text-slate-900 truncate">
-                {integration?.store_name || tenant.shop_name || storeKey}
+                {integration?.store_name || tenant?.shop_name || storeKey || 'Unknown Store'}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <Badge variant="outline" className="text-xs capitalize">
-                  {platform}
-                </Badge>
-                <Badge variant="outline" className="text-xs capitalize">
-                  {tenant.subscription_tier}
-                </Badge>
-                {tenant.profit_integrity_score && (
+                {platform && (
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {platform}
+                  </Badge>
+                )}
+                {tenant?.subscription_tier && (
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {tenant.subscription_tier}
+                  </Badge>
+                )}
+                {tenant?.profit_integrity_score && (
                   <Badge className="text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
                     <TrendingUp className="w-3 h-3 mr-1" />
                     {tenant.profit_integrity_score}
@@ -233,8 +261,8 @@ function LayoutContent({ children, currentPageName }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
-              // Check permission
-              if (item.permission && !hasPermission(item.permission)) return false;
+              // Check permission - safe call
+              if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) return false;
               // Check adminOnly
               if (item.adminOnly && !isAdmin) return false;
               return true;
@@ -267,7 +295,7 @@ function LayoutContent({ children, currentPageName }) {
             })}
           </nav>
 
-          {/* User Menu */}
+          {/* User Menu - safe null checks */}
           {activeUser && (
             <div className="p-4 border-t border-slate-200">
               <DropdownMenu>
@@ -275,14 +303,14 @@ function LayoutContent({ children, currentPageName }) {
                   <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors">
                     <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
                       <span className="text-sm font-medium text-slate-600">
-                        {activeUser.full_name?.charAt(0) || activeUser.email?.charAt(0) || 'U'}
+                        {(activeUser.full_name || activeUser.email || 'U').charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div className="flex-1 text-left min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">
                         {activeUser.full_name || 'User'}
                       </p>
-                      <p className="text-xs text-slate-500 truncate">{activeUser.email}</p>
+                      <p className="text-xs text-slate-500 truncate">{activeUser.email || ''}</p>
                       {role && <p className="text-xs text-emerald-600 capitalize">{role}</p>}
                     </div>
                     <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -319,8 +347,8 @@ function LayoutContent({ children, currentPageName }) {
           </button>
 
           <div className="flex-1 flex items-center gap-4 lg:ml-4">
-            {/* Store Switcher - show if multiple stores */}
-            {availableStores.length > 1 && <StoreSwitcher />}
+            {/* Store Switcher - SAFE: only show if stores array has multiple items */}
+            {stores.length > 1 && <StoreSwitcher />}
           </div>
 
           <div className="flex items-center gap-3">
@@ -355,19 +383,23 @@ function LayoutContent({ children, currentPageName }) {
           {children}
         </main>
 
-        {/* MerchantAI Chat - with error boundary */}
+        {/* MerchantAI Chat - with error boundary, safe checks */}
         {tenantId && activeUser && (
           <ErrorBoundary fallback={null}>
             <MerchantAIChat 
               tenantId={tenantId} 
-              currentPage={currentPageName}
+              currentPage={currentPageName || 'Home'}
             />
           </ErrorBoundary>
         )}
       </div>
 
-      {/* Debug Panel */}
-      <DebugPanel resolver={resolver} userEmail={activeUser?.email} />
+      {/* Debug Panel - pass search prop instead of using window */}
+      <DebugPanel 
+        resolver={resolver} 
+        userEmail={activeUser?.email} 
+        search={location.search}
+      />
     </div>
   );
 }

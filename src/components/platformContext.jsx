@@ -15,35 +15,57 @@ const STORAGE_KEYS = {
 
 /**
  * Parses URL search string for platform context params
+ * SAFE: Always returns an object with all keys, never throws
  * @param {string} search - URL search string
  * @returns {Object} Parsed params
  */
 export function parseQuery(search) {
-  const params = new URLSearchParams(search || '');
-  
-  // Normalize boolean-like params
-  const embedded = params.get('embedded');
-  const debug = params.get('debug');
-  
-  return {
-    // Generic
-    platform: params.get('platform'),
-    store: params.get('store'),
-    
-    // Shopify-specific
-    shop: params.get('shop'),
-    host: params.get('host'),
-    
-    // WooCommerce-specific
-    site: params.get('site'),
-    
-    // BigCommerce-specific
-    store_hash: params.get('store_hash'),
-    
-    // Flags
-    embedded: (embedded === '1' || embedded === 'true') ? '1' : null,
-    debug: (debug === '1' || debug === 'true') ? '1' : null
+  const defaults = {
+    platform: null,
+    store: null,
+    shop: null,
+    host: null,
+    site: null,
+    store_hash: null,
+    embedded: null,
+    debug: null
   };
+  
+  // Safe handling of null/undefined search
+  if (!search || typeof search !== 'string') {
+    return defaults;
+  }
+  
+  try {
+    const params = new URLSearchParams(search);
+    
+    // Normalize boolean-like params
+    const embedded = params.get('embedded');
+    const debug = params.get('debug');
+    
+    return {
+      // Generic
+      platform: params.get('platform') || null,
+      store: params.get('store') || null,
+      
+      // Shopify-specific
+      shop: params.get('shop') || null,
+      host: params.get('host') || null,
+      
+      // WooCommerce-specific
+      site: params.get('site') || null,
+      
+      // BigCommerce-specific
+      store_hash: params.get('store_hash') || null,
+      
+      // Flags
+      embedded: (embedded === '1' || embedded === 'true') ? '1' : null,
+      debug: (debug === '1' || debug === 'true') ? '1' : null
+    };
+  } catch (e) {
+    console.warn('Error parsing query:', e.message);
+    return defaults;
+  }
 }
 
 /**
@@ -124,59 +146,81 @@ export function detectPlatformFromUrl(urlParams) {
 
 /**
  * Retrieves persisted platform context from localStorage
+ * SAFE: Always returns an object with all keys, never throws
  * @returns {Object} Persisted context
  */
 export function getPersistedContext() {
-  if (typeof localStorage === 'undefined') {
-    return {
-      platform: null,
-      storeKey: null,
-      tenantId: null,
-      host: null,
-      embedded: null,
-      debug: null,
-      integrationId: null
-    };
+  const defaults = {
+    platform: null,
+    storeKey: null,
+    tenantId: null,
+    host: null,
+    embedded: null,
+    debug: null,
+    integrationId: null
+  };
+  
+  // Safe check for localStorage availability (SSR, incognito, etc.)
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return defaults;
   }
   
-  return {
-    platform: localStorage.getItem(STORAGE_KEYS.PLATFORM),
-    storeKey: localStorage.getItem(STORAGE_KEYS.STORE_KEY),
-    tenantId: localStorage.getItem(STORAGE_KEYS.TENANT_ID),
-    host: localStorage.getItem(STORAGE_KEYS.HOST),
-    embedded: localStorage.getItem(STORAGE_KEYS.EMBEDDED),
-    debug: localStorage.getItem(STORAGE_KEYS.DEBUG),
-    integrationId: localStorage.getItem(STORAGE_KEYS.INTEGRATION_ID)
-  };
+  try {
+    return {
+      platform: localStorage.getItem(STORAGE_KEYS.PLATFORM) || null,
+      storeKey: localStorage.getItem(STORAGE_KEYS.STORE_KEY) || null,
+      tenantId: localStorage.getItem(STORAGE_KEYS.TENANT_ID) || null,
+      host: localStorage.getItem(STORAGE_KEYS.HOST) || null,
+      embedded: localStorage.getItem(STORAGE_KEYS.EMBEDDED) || null,
+      debug: localStorage.getItem(STORAGE_KEYS.DEBUG) || null,
+      integrationId: localStorage.getItem(STORAGE_KEYS.INTEGRATION_ID) || null
+    };
+  } catch (e) {
+    // localStorage blocked (incognito mode in some browsers)
+    console.warn('localStorage not available:', e.message);
+    return defaults;
+  }
 }
 
 /**
  * Persists platform context to localStorage
- * Only overwrites if value is truthy
+ * SAFE: Only overwrites if value is truthy, never throws
  * @param {Object} context
  */
 export function persistContext({ platform, storeKey, tenantId, host, embedded, debug, integrationId }) {
-  if (typeof localStorage === 'undefined') return;
+  // Safe check for localStorage availability
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
   
-  if (platform) localStorage.setItem(STORAGE_KEYS.PLATFORM, platform);
-  if (storeKey) localStorage.setItem(STORAGE_KEYS.STORE_KEY, storeKey);
-  if (tenantId) localStorage.setItem(STORAGE_KEYS.TENANT_ID, tenantId);
-  if (host) localStorage.setItem(STORAGE_KEYS.HOST, host);
-  if (embedded !== undefined && embedded !== null) {
-    localStorage.setItem(STORAGE_KEYS.EMBEDDED, embedded);
+  try {
+    if (platform) localStorage.setItem(STORAGE_KEYS.PLATFORM, platform);
+    if (storeKey) localStorage.setItem(STORAGE_KEYS.STORE_KEY, storeKey);
+    if (tenantId) localStorage.setItem(STORAGE_KEYS.TENANT_ID, tenantId);
+    if (host) localStorage.setItem(STORAGE_KEYS.HOST, host);
+    if (embedded !== undefined && embedded !== null) {
+      localStorage.setItem(STORAGE_KEYS.EMBEDDED, embedded);
+    }
+    if (debug !== undefined && debug !== null) {
+      localStorage.setItem(STORAGE_KEYS.DEBUG, debug);
+    }
+    if (integrationId) localStorage.setItem(STORAGE_KEYS.INTEGRATION_ID, integrationId);
+  } catch (e) {
+    // localStorage blocked (incognito mode in some browsers)
+    console.warn('Cannot persist context:', e.message);
   }
-  if (debug !== undefined && debug !== null) {
-    localStorage.setItem(STORAGE_KEYS.DEBUG, debug);
-  }
-  if (integrationId) localStorage.setItem(STORAGE_KEYS.INTEGRATION_ID, integrationId);
 }
 
 /**
  * Clears persisted context
+ * SAFE: Never throws even if localStorage unavailable
  */
 export function clearPersistedContext() {
-  if (typeof localStorage === 'undefined') return;
-  Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  
+  try {
+    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+  } catch (e) {
+    console.warn('Cannot clear context:', e.message);
+  }
 }
 
 /**
@@ -219,29 +263,37 @@ export function buildQueryString({ platform, storeKey, host, embedded, debug }) 
 /**
  * Creates a page URL that preserves platform context
  * Priority: A) URL params, B) localStorage
+ * GUARANTEE: Always rebuilds full context from either source
  * @param {string} pageName - Page name to navigate to
  * @param {string} [currentSearch] - Current URL search string
  * @returns {string} Full URL path with preserved query params
  */
 export function createPageUrl(pageName, currentSearch) {
+  // Safely handle null/undefined pageName
+  const safePage = (pageName || 'Home').toLowerCase();
+  
   // Parse current URL params (Priority A)
-  const urlParams = parseQuery(currentSearch);
+  const urlParams = parseQuery(currentSearch || '');
   const urlContext = detectPlatformFromUrl(urlParams);
   
   // Get persisted context (Priority B fallback)
   const persisted = getPersistedContext();
   
-  // Merge with URL taking priority
+  // Merge with URL taking priority, ALWAYS rebuild if either source has data
   const merged = {
-    platform: urlContext.platform || persisted.platform,
-    storeKey: urlContext.storeKey || persisted.storeKey,
-    host: urlParams.host || persisted.host,
-    embedded: urlParams.embedded || persisted.embedded,
-    debug: urlParams.debug || persisted.debug
+    platform: urlContext.platform || persisted.platform || null,
+    storeKey: urlContext.storeKey || persisted.storeKey || null,
+    host: urlParams.host || persisted.host || null,
+    embedded: urlParams.embedded || persisted.embedded || null,
+    debug: urlParams.debug || persisted.debug || null
   };
   
-  const queryString = buildQueryString(merged);
-  const basePath = `/${pageName.toLowerCase()}`;
+  // Only build query string if we have valid platform context
+  const queryString = (merged.platform && merged.storeKey) 
+    ? buildQueryString(merged) 
+    : '';
+  
+  const basePath = `/${safePage}`;
   
   return queryString ? `${basePath}?${queryString}` : basePath;
 }
