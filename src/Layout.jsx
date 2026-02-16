@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 
 const navItems = [
   { name: 'Dashboard', page: 'Home', icon: LayoutDashboard, permission: 'dashboard_view' },
+  { name: 'P&L Analytics', page: 'PnLAnalytics', icon: TrendingUp, permission: 'dashboard_view' },
   { name: 'Orders', page: 'Orders', icon: ShoppingCart, permission: 'orders_view' },
   { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
   { name: 'Customers', page: 'Customers', icon: Users, permission: 'customers_view' },
