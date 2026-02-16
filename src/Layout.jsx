@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { createPageUrl, persistShopifyContext, getPersistedShopifyContext } from './components/utils/createPageUrl';
+import { createPageUrl, persistShopifyContext, getPersistedShopifyContext } from '@/components/utils/createPageUrl';
 import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard,
