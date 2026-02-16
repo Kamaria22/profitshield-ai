@@ -24,7 +24,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { parseQuery, getPersistedContext } from '@/components/platformContext';
+import { useLocation } from 'react-router-dom';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -60,8 +64,15 @@ const SYNC_FREQUENCIES = [
 ];
 
 export default function Integrations() {
-  const { tenantId, status } = usePlatformResolver();
+  const location = useLocation();
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  const { tenantId, status, user } = resolver;
+  
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [selfTestDialogOpen, setSelfTestDialogOpen] = useState(false);
+  const [selfTestResult, setSelfTestResult] = useState(null);
+  const [selfTestLoading, setSelfTestLoading] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [webhooksDialogOpen, setWebhooksDialogOpen] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
@@ -249,6 +260,51 @@ export default function Integrations() {
     }
   });
 
+  // Check if user is admin
+  const isAdmin = user && (user.app_role === 'admin' || user.app_role === 'owner' || user.role === 'admin' || user.role === 'owner');
+
+  // Run resolver self-test
+  const runSelfTest = async () => {
+    setSelfTestLoading(true);
+    setSelfTestResult(null);
+    
+    try {
+      const urlParams = parseQuery(location.search);
+      const persistedContext = getPersistedContext();
+      
+      const response = await base44.functions.invoke('runResolverSelfTest', {
+        urlParams: {
+          shop: urlParams.shop,
+          platform: urlParams.platform,
+          storeKey: urlParams.storeKey,
+          host: urlParams.host,
+          embedded: urlParams.embedded,
+          debug: urlParams.debug
+        },
+        persistedContext: {
+          platform: persistedContext.platform,
+          storeKey: persistedContext.storeKey,
+          tenantId: persistedContext.tenantId,
+          integrationId: persistedContext.integrationId,
+          persistedAt: persistedContext.persistedAt
+        }
+      });
+      
+      setSelfTestResult(response.data);
+    } catch (e) {
+      setSelfTestResult({ error: e.message });
+    } finally {
+      setSelfTestLoading(false);
+    }
+  };
+
+  const copyTestResult = () => {
+    if (selfTestResult) {
+      navigator.clipboard.writeText(JSON.stringify(selfTestResult, null, 2));
+      toast.success('Copied to clipboard');
+    }
+  };
+
   const resetConnectionForm = () => {
     setSelectedPlatform(null);
     setCredentials({});
@@ -368,7 +424,14 @@ export default function Integrations() {
           <h1 className="text-2xl font-bold text-slate-900">Platform Integrations</h1>
           <p className="text-slate-500">Connect e-commerce platforms for two-way order sync and risk scoring</p>
         </div>
-        <Dialog open={connectDialogOpen} onOpenChange={(open) => { setConnectDialogOpen(open); if (!open) resetConnectionForm(); }}>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setSelfTestDialogOpen(true)}>
+              <Activity className="w-4 h-4 mr-2" />
+              Self-Test
+            </Button>
+          )}
+          <Dialog open={connectDialogOpen} onOpenChange={(open) => { setConnectDialogOpen(open); if (!open) resetConnectionForm(); }}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-700">
               <Link2 className="w-4 h-4 mr-2" />
@@ -1135,6 +1198,109 @@ export default function Integrations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Self-Test Dialog (Admin Only) */}
+      {isAdmin && (
+        <Dialog open={selfTestDialogOpen} onOpenChange={setSelfTestDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Resolver Self-Test</DialogTitle>
+              <DialogDescription>
+                Run a diagnostic test of the platform resolver logic
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <Button 
+                onClick={runSelfTest} 
+                disabled={selfTestLoading}
+                className="w-full"
+              >
+                {selfTestLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running Test...</>
+                ) : (
+                  <><Activity className="w-4 h-4 mr-2" /> Run Self-Test</>
+                )}
+              </Button>
+              
+              {selfTestResult && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {selfTestResult.status === 'resolved' ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : selfTestResult.status === 'needs_selection' ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-600" />
+                      )}
+                      <span className="font-medium capitalize">{selfTestResult.status || 'Error'}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={copyTestResult}>
+                      Copy JSON
+                    </Button>
+                  </div>
+                  
+                  {selfTestResult.error ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      {selfTestResult.error}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="text-slate-500 text-xs">Priority</p>
+                          <p className="font-medium">{selfTestResult.chosenPriority || 'None'}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="text-slate-500 text-xs">Reason</p>
+                          <p className="font-medium">{selfTestResult.reason || 'None'}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="text-slate-500 text-xs">Platform</p>
+                          <p className="font-medium">{selfTestResult.resolvedPlatform || 'None'}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="text-slate-500 text-xs">Store Key</p>
+                          <p className="font-medium truncate">{selfTestResult.resolvedStoreKey || 'None'}</p>
+                        </div>
+                      </div>
+                      
+                      {selfTestResult.flags && Object.values(selfTestResult.flags).some(Boolean) && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-sm font-medium text-amber-800 mb-2">Flags Detected:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(selfTestResult.flags).filter(([_, v]) => v).map(([key]) => (
+                              <Badge key={key} variant="outline" className="text-amber-700 border-amber-300">
+                                {key.replace(/_/g, ' ')}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selfTestResult.trace && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Trace ({selfTestResult.trace.length} steps):</p>
+                          <ScrollArea className="h-48 border rounded-lg p-3 bg-slate-900 text-slate-100">
+                            <pre className="text-xs font-mono whitespace-pre-wrap">
+                              {selfTestResult.trace.map((step, i) => (
+                                <div key={i} className={step.ok ? 'text-green-400' : 'text-red-400'}>
+                                  {step.ok ? '✓' : '✗'} {step.step} {step.note ? `- ${step.note}` : ''}
+                                </div>
+                              ))}
+                            </pre>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Disconnect Confirmation Dialog */}
       <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
