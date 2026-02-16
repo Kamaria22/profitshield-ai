@@ -54,11 +54,14 @@ import CostMappingTable from '../components/settings/CostMappingTable';
 import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
 import RiskModelConfig from '../components/settings/RiskModelConfig';
+import RoleManagement from '../components/settings/RoleManagement';
 import { useTenantResolver } from '@/components/useTenantResolver';
 import { createPageUrl } from '@/components/shopifyContext';
+import { usePermissions, RequirePermission } from '@/components/usePermissions';
 
 export default function Settings() {
   const { tenant, tenantId, shopDomain, user, loading: tenantLoading } = useTenantResolver();
+  const { hasPermission } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
   const [newCostDialog, setNewCostDialog] = useState(false);
@@ -243,6 +246,12 @@ export default function Settings() {
             <Shield className="w-4 h-4" />
             Compliance
           </TabsTrigger>
+          {hasPermission('users_manage') && (
+            <TabsTrigger value="roles" className="gap-2">
+              <Users className="w-4 h-4" />
+              Roles
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Tab */}
@@ -661,6 +670,13 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Roles Tab */}
+        {hasPermission('users_manage') && (
+          <TabsContent value="roles" className="mt-6 space-y-6">
+            <RoleManagement tenantId={tenantId} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
