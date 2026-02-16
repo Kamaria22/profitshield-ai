@@ -691,6 +691,33 @@ export function getTenantFilter(resolverCheck) {
 }
 
 /**
+ * INVARIANT ENFORCER: Throws if filter doesn't match resolver's tenantId
+ * Use this before any database query to catch bugs where wrong tenant data could leak
+ * @param {object} resolverCheck - Result from requireResolved()
+ * @param {object} filter - The filter object being used in query
+ * @param {string} queryName - Name of the query for debugging
+ * @throws {Error} If filter.tenant_id is missing or doesn't match
+ */
+export function assertTenantIsolation(resolverCheck, filter, queryName = 'unknown') {
+  // Invariant 1: resolver must be ok
+  if (!resolverCheck?.ok) {
+    throw new Error(`[INVARIANT] ${queryName}: Cannot query without resolved context`);
+  }
+  
+  // Invariant 2: filter must have tenant_id
+  if (!filter || !filter.tenant_id) {
+    throw new Error(`[INVARIANT] ${queryName}: Missing tenant_id in filter`);
+  }
+  
+  // Invariant 3: tenant_id must match
+  if (filter.tenant_id !== resolverCheck.tenantId) {
+    throw new Error(`[INVARIANT] ${queryName}: tenant_id mismatch (filter=${filter.tenant_id}, resolver=${resolverCheck.tenantId})`);
+  }
+  
+  return true;
+}
+
+/**
  * Build a deterministic query key that includes store identity (prevents cross-store cache bleed)
  * @param {string} base - Base query key name (e.g., 'orders', 'alerts')
  * @param {object} resolverCheck - Result from requireResolved()
