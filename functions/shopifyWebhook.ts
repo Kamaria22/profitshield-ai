@@ -24,7 +24,7 @@ function generateIdempotencyKey(tenantId, topic, eventId) {
 
 // Calculate profit for an order
 function calculateOrderProfit(order, costMappings, settings) {
-  const revenue = order.total_price || 0;
+  const revenue = parseFloat(order.total_price) || 0;
   const shippingCharged = order.shipping_lines?.reduce((sum, l) => sum + parseFloat(l.price || 0), 0) || 0;
   const taxTotal = order.tax_lines?.reduce((sum, l) => sum + parseFloat(l.price || 0), 0) || 0;
   const discountTotal = order.discount_codes?.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0) || 0;
