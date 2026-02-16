@@ -22,8 +22,10 @@ import {
   Users,
   ClipboardList,
   Link2,
-  Loader2
+  Loader2,
+  Brain
 } from 'lucide-react';
+import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -47,6 +49,7 @@ const navItems = [
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
+  { name: 'Founder AI', page: 'FounderDashboard', icon: Brain, permission: 'settings_manage', adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
@@ -300,10 +303,18 @@ function LayoutContent({ children, currentPageName }) {
           )}
           {children}
         </main>
-      </div>
-    </div>
-  );
-}
+
+        {/* MerchantAI Chat */}
+        {tenantId && (
+          <MerchantAIChat 
+            tenantId={tenantId} 
+            currentPage={currentPageName}
+          />
+        )}
+        </div>
+        </div>
+        );
+        }
 
 export default function Layout({ children, currentPageName }) {
   return (
