@@ -41,6 +41,7 @@ const navItems = [
   { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
   { name: 'Customers', page: 'Customers', icon: Users, permission: 'customers_view' },
   { name: 'Shipping', page: 'Shipping', icon: Truck, permission: 'orders_view' },
+  { name: 'Risk Intelligence', page: 'Intelligence', icon: Shield, permission: 'risk_rules_view' },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
