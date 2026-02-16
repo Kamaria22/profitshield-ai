@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { X, AlertTriangle, CheckCircle, Package, Truck, CreditCard, RotateCcw, Percent, MapPin } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, Package, Truck, CreditCard, RotateCcw, Percent, MapPin, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { base44 } from '@/api/base44Client';
+import RiskAnalysisCard from './RiskAnalysisCard';
 
-export default function OrderDetailPanel({ order, onClose }) {
+export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
+  const [analyzing, setAnalyzing] = useState(false);
   if (!order) return null;
 
   const isProfitable = (order.net_profit || 0) >= 0;
@@ -21,11 +24,21 @@ export default function OrderDetailPanel({ order, onClose }) {
     { label: 'Refunds', value: -(order.refund_amount || 0), type: 'negative' },
   ].filter(item => item.value !== 0);
 
-  const riskReasonIcons = {
-    'new_customer_high_aov': AlertTriangle,
-    'address_mismatch': MapPin,
-    'discount_stacking': Percent,
-    'high_return_rate_sku': RotateCcw,
+  const handleAnalyzeRisk = async () => {
+    setAnalyzing(true);
+    try {
+      const result = await base44.functions.invoke('analyzeOrderRisk', {
+        order_id: order.id,
+        tenant_id: order.tenant_id
+      });
+      if (result.data?.success && onOrderUpdated) {
+        onOrderUpdated();
+      }
+    } catch (error) {
+      console.error('Risk analysis failed:', error);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -57,36 +70,26 @@ export default function OrderDetailPanel({ order, onClose }) {
               </p>
             </div>
 
-            {/* Risk Assessment */}
-            {order.risk_level && order.risk_level !== 'low' && (
-              <div className={`p-4 rounded-xl ${order.risk_level === 'high' ? 'bg-red-50' : 'bg-yellow-50'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className={`w-5 h-5 ${order.risk_level === 'high' ? 'text-red-600' : 'text-yellow-600'}`} />
-                  <p className={`font-semibold ${order.risk_level === 'high' ? 'text-red-700' : 'text-yellow-700'}`}>
-                    {order.risk_level === 'high' ? 'High Risk Order' : 'Medium Risk'}
-                  </p>
-                </div>
-                
-                {order.risk_reasons?.length > 0 && (
-                  <ul className="space-y-1 text-sm mt-3">
-                    {order.risk_reasons.map((reason, i) => (
-                      <li key={i} className={`flex items-center gap-2 ${order.risk_level === 'high' ? 'text-red-600' : 'text-yellow-600'}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                        {reason}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {order.recommended_action && order.recommended_action !== 'none' && (
-                  <div className={`mt-3 p-3 rounded-lg ${order.risk_level === 'high' ? 'bg-red-100' : 'bg-yellow-100'}`}>
-                    <p className={`text-sm font-medium ${order.risk_level === 'high' ? 'text-red-700' : 'text-yellow-700'}`}>
-                      Recommended: {order.recommended_action.replace('_', ' ')}
-                    </p>
-                  </div>
-                )}
+            {/* Risk Analysis Card */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-slate-900">Risk Analysis</h3>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleAnalyzeRisk}
+                  disabled={analyzing}
+                >
+                  {analyzing ? (
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                  )}
+                  {analyzing ? 'Analyzing...' : 'Re-analyze'}
+                </Button>
               </div>
-            )}
+              <RiskAnalysisCard order={order} />
+            </div>
 
             {/* Profit Breakdown */}
             <div>
