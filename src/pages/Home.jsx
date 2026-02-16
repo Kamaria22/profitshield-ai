@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/components/shopifyContext';
+import { createPageUrl } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -33,13 +33,16 @@ import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import MetricCard from '../components/dashboard/MetricCard';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import ProfitChart from '../components/dashboard/ProfitChart';
-import { useTenantResolver } from '../components/useTenantResolver';
+import { usePlatformResolver, RESOLVER_STATUS } from '../components/usePlatformResolver';
 import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
 
 export default function Home() {
-  const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
+  const { tenant, tenantId, storeKey, platform, status, reason, user } = usePlatformResolver();
+  const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
+  const tenantError = status === RESOLVER_STATUS.ERROR ? 'No store connected' : null;
+  const shopDomain = platform === 'shopify' ? storeKey : null;
   const [dateRange, setDateRange] = useState('30');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -306,10 +309,10 @@ export default function Home() {
     <div className="space-y-6">
       {/* Debug Banner */}
       <DebugBanner 
-        shopDomain={shopDomain} 
+        shopDomain={storeKey} 
         tenantId={tenantId} 
         ordersCount={orders.length}
-        debug={debug}
+        debug={{ platform, reason }}
         userEmail={user?.email}
       />
 
