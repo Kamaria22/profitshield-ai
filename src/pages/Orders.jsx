@@ -104,8 +104,41 @@ export default function Orders() {
   const settingsQueryKey = ['tenantSettings', platform, storeKey, authTenantId];
 
   // =====================================================
-  // EARLY RETURN: No valid context - show Connect Store banner
-  // This MUST come before any useQuery hooks that depend on queryFilter
+  // DATA QUERIES - Hooks MUST be called unconditionally (React rules)
+  // enabled flag gates actual execution
+  // =====================================================
+  
+  // Load tenant settings - only enabled when queryFilter is valid
+  const { data: tenantSettings } = useQuery({
+    queryKey: settingsQueryKey,
+    queryFn: async () => {
+      if (!queryFilter?.tenant_id) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
+      return settings[0] || null;
+    },
+    enabled: !!queryFilter && !hasInvariantViolation
+  });
+
+  // Fetch orders with deterministic cache key - only enabled when queryFilter is valid
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ordersQueryKey,
+    queryFn: async () => {
+      if (!queryFilter?.tenant_id) {
+        console.warn('[Orders] queryFn called but no valid filter - returning empty');
+        return [];
+      }
+      console.log('[Orders] Fetching with filter:', JSON.stringify(queryFilter), 'key:', ordersQueryKey);
+      const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
+      console.log('[Orders] Returned count:', allOrders.length);
+      return allOrders;
+    },
+    enabled: !!queryFilter && !hasInvariantViolation
+  });
+
+  const isLoading = resolverLoading || ordersLoading;
+
+  // =====================================================
+  // EARLY RETURN: Loading state
   // =====================================================
   if (resolverLoading || status === RESOLVER_STATUS.RESOLVING) {
     return (
@@ -115,6 +148,9 @@ export default function Orders() {
     );
   }
 
+  // =====================================================
+  // EARLY RETURN: No valid context - show Connect Store banner
+  // =====================================================
   if (!queryFilter || hasInvariantViolation || status === RESOLVER_STATUS.ERROR) {
     return (
       <div className="space-y-6">
@@ -147,34 +183,6 @@ export default function Orders() {
       </div>
     );
   }
-
-  // =====================================================
-  // DATA QUERIES - Only run when queryFilter is valid
-  // =====================================================
-  
-  // Load tenant settings
-  const { data: tenantSettings } = useQuery({
-    queryKey: settingsQueryKey,
-    queryFn: async () => {
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
-      return settings[0] || null;
-    },
-    enabled: !!queryFilter
-  });
-
-  // Fetch orders with deterministic cache key
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ordersQueryKey,
-    queryFn: async () => {
-      console.log('[Orders] Fetching with filter:', JSON.stringify(queryFilter), 'key:', ordersQueryKey);
-      const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
-      console.log('[Orders] Returned count:', allOrders.length);
-      return allOrders;
-    },
-    enabled: !!queryFilter
-  });
-
-  const isLoading = ordersLoading;
 
   // Apply filters
   const filteredOrders = useMemo(() => {
