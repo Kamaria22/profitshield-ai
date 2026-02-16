@@ -290,7 +290,7 @@ export default function Orders() {
     }
 
     return result;
-  }, [orders, filters, searchTerm]);
+  }, [orders, filters, searchTerm, tenantSettings]);
 
   // Calculate summary stats
   const stats = React.useMemo(() => ({
@@ -329,9 +329,16 @@ export default function Orders() {
       />
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Orders</h1>
-        <p className="text-slate-500">View and analyze order profitability</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Orders</h1>
+          <p className="text-slate-500">
+            View and analyze order profitability
+            {tenantSettings?.demo_mode === false && (
+              <Badge variant="outline" className="ml-2 text-xs">Real orders only</Badge>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* Stats Bar */}
