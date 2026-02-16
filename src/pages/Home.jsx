@@ -42,7 +42,17 @@ export default function Home() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Check OAuth token status
+  // Check OAuth token status and tenant settings
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenantSettings', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+      return settings[0] || null;
+    },
+    enabled: !!tenantId && !tenantLoading
+  });
+
   const { data: tokenStatus } = useQuery({
     queryKey: ['oauthToken', tenantId],
     queryFn: async () => {
@@ -56,6 +66,10 @@ export default function Home() {
     },
     enabled: !!tenantId && !tenantLoading
   });
+
+  // In demo mode, we don't require Shopify connection
+  const isDemoMode = tenantSettings?.demo_mode !== false;
+  const canOperate = tokenStatus?.hasToken || isDemoMode;
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -95,22 +109,57 @@ export default function Home() {
   const createTestOrderMutation = useMutation({
     mutationFn: async () => {
       if (!tenantId) throw new Error('No store connected');
+      
+      // If in demo mode without token, create local demo order
+      if (isDemoMode && !tokenStatus?.hasToken) {
+        const orderNum = Math.floor(1000 + Math.random() * 9000);
+        const price = (Math.random() * 150 + 25).toFixed(2);
+        const products = ['Blue T-Shirt', 'Running Shoes', 'Wireless Earbuds', 'Coffee Mug', 'Backpack'];
+        const product = products[Math.floor(Math.random() * products.length)];
+        
+        const demoOrder = {
+          tenant_id: tenantId,
+          platform_order_id: `demo_${Date.now()}`,
+          order_number: `#${orderNum}`,
+          customer_email: `demo${orderNum}@example.com`,
+          customer_name: 'Demo Customer',
+          order_date: new Date().toISOString(),
+          status: 'paid',
+          total_revenue: parseFloat(price),
+          total_cogs: parseFloat(price) * 0.4,
+          net_profit: parseFloat(price) * 0.3,
+          margin_pct: 30,
+          is_demo: true,
+          confidence: 'medium',
+          risk_level: 'low'
+        };
+        
+        await base44.entities.Order.create(demoOrder);
+        return { order_number: demoOrder.order_number, total_price: price, product_title: product, is_demo: true };
+      }
+      
+      // Otherwise use Shopify API
       const response = await base44.functions.invoke('createShopifyTestOrder', { tenant_id: tenantId });
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
     onSuccess: (data) => {
-      toast.success(`Created Shopify order ${data.order_number} ($${data.total_price})`, {
-        description: `Product: ${data.product_title}`,
-        action: {
-          label: 'View in Shopify',
-          onClick: () => {
-            window.open(`https://${shopDomain}/admin/orders/${data.order_id}`, '_blank');
+      if (data.is_demo) {
+        toast.success(`Created demo order ${data.order_number} ($${data.total_price})`, {
+          description: `Product: ${data.product_title}`
+        });
+      } else {
+        toast.success(`Created Shopify order ${data.order_number} ($${data.total_price})`, {
+          description: `Product: ${data.product_title}`,
+          action: {
+            label: 'View in Shopify',
+            onClick: () => {
+              window.open(`https://${shopDomain}/admin/orders/${data.order_id}`, '_blank');
+            }
           }
-        }
-      });
-      // Auto-sync after creating test order
-      setTimeout(() => syncMutation.mutate(), 2000);
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
       const msg = error.message || error.response?.data?.error || 'Failed to create test order';
@@ -282,18 +331,17 @@ export default function Home() {
           <Button 
             variant="outline" 
             onClick={() => createTestOrderMutation.mutate()}
-            disabled={createTestOrderMutation.isPending || !tenantId || !tokenStatus?.hasToken}
+            disabled={createTestOrderMutation.isPending || !tenantId}
             className="gap-2"
-            title={!tokenStatus?.hasToken ? 'Connect Shopify first in Settings' : ''}
           >
             <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} />
-            {createTestOrderMutation.isPending ? 'Creating...' : 'Create Test Order'}
+            {createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Create Demo Order' : 'Create Test Order'}
           </Button>
           <Button 
             variant="outline" 
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending || !tenantId || !tokenStatus?.hasToken}
-            title={!tokenStatus?.hasToken ? 'Connect Shopify first in Settings' : ''}
+            title={!tokenStatus?.hasToken ? 'Connect Shopify to sync real orders' : ''}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
             {syncMutation.isPending ? 'Syncing...' : 'Sync Orders'}
@@ -358,8 +406,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Shopify Connection Warning */}
-      {tenantId && tokenStatus?.hasToken === false && (
+      {/* Shopify Connection Info */}
+      {tenantId && tokenStatus?.hasToken === false && !isDemoMode && (
         <Card className="bg-red-50 border-red-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -370,12 +418,39 @@ export default function Home() {
                 <div>
                   <p className="font-semibold text-red-800">Shopify Connection Required</p>
                   <p className="text-sm text-red-600">
-                    Connect your Shopify store to sync orders and create test orders
+                    Connect your Shopify store to sync real orders
                   </p>
                 </div>
               </div>
               <Link to={`/settings${window.location.search}`}>
                 <Button className="bg-red-600 hover:bg-red-700 text-white">
+                  Connect Store
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Demo Mode Info */}
+      {tenantId && isDemoMode && !tokenStatus?.hasToken && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-800">Demo Mode Active</p>
+                  <p className="text-sm text-blue-600">
+                    Create demo orders to explore the app. Connect Shopify to sync real orders.
+                  </p>
+                </div>
+              </div>
+              <Link to={`/settings${window.location.search}`}>
+                <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
                   Connect Store
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
