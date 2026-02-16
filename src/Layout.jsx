@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { createPageUrl } from './utils';
+// Custom createPageUrl that preserves query string (especially ?shop=)
+const createPageUrl = (pageName) => {
+  const base = `/${pageName.toLowerCase()}`;
+  const qs = window.location.search || "";
+  return `${base}${qs}`;
+};
 import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard,
