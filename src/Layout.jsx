@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, parseQuery, getPersistedContext } from '@/components/platformContext';
@@ -7,6 +7,8 @@ import { PermissionsProvider, usePermissions } from '@/components/usePermissions
 import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
+import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
+import { maskEmail } from '@/components/utils/safeLog';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -27,7 +29,9 @@ import {
   Loader2,
   Brain,
   Bug,
-  Store
+  Store,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +42,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+
+// Debug panel visibility persistence key
+const DEBUG_CLOSED_KEY = 'profitshield_debug_closed';
+const DEBUG_CLOSED_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 const navItems = [
   { name: 'Dashboard', page: 'Home', icon: LayoutDashboard, permission: 'dashboard_view' },
@@ -63,9 +71,23 @@ function isUserAdmin(user) {
   return role === 'owner' || role === 'admin';
 }
 
-// Debug Panel with full trace visibility - 100% null-safe
-function DebugPanel({ resolver, userEmail, search }) {
-  const [visible, setVisible] = React.useState(true);
+// Debug Panel with full trace visibility - 100% null-safe + memoized
+const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search }) {
+  const [visible, setVisible] = React.useState(() => {
+    // Check if user closed it recently (persist for 24h)
+    try {
+      const closed = localStorage.getItem(DEBUG_CLOSED_KEY);
+      if (closed) {
+        const closedAt = parseInt(closed, 10);
+        if (Date.now() - closedAt < DEBUG_CLOSED_TTL) {
+          return false;
+        }
+        localStorage.removeItem(DEBUG_CLOSED_KEY);
+      }
+    } catch (e) {}
+    return true;
+  });
+  const [copied, setCopied] = React.useState(false);
   
   // Safe URL param parsing
   let urlParams = {};
@@ -84,6 +106,39 @@ function DebugPanel({ resolver, userEmail, search }) {
   }
   
   const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
+  
+  const handleClose = useCallback(() => {
+    setVisible(false);
+    try {
+      localStorage.setItem(DEBUG_CLOSED_KEY, String(Date.now()));
+    } catch (e) {}
+  }, []);
+  
+  const handleCopy = useCallback(async () => {
+    try {
+      const payload = {
+        timestamp: new Date().toISOString(),
+        route: window.location.pathname,
+        search: window.location.search,
+        resolver: {
+          status: resolver?.status,
+          tenantId: resolver?.tenantId ? `${resolver.tenantId.slice(0, 8)}...` : null,
+          platform: resolver?.platform,
+          storeKey: resolver?.storeKey,
+          reason: resolver?.reason,
+          trace: resolver?.trace
+        },
+        persisted,
+        userEmail: userEmail ? maskEmail(userEmail) : null
+      };
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  }, [resolver, persisted, userEmail]);
+  
   if (!showDebug || !visible) return null;
   
   // Fully defensive resolver access
@@ -119,9 +174,18 @@ function DebugPanel({ resolver, userEmail, search }) {
         <span className="font-bold">Resolver Debug</span>
         <span className="ml-auto text-slate-500">{duration}</span>
         <button 
-          onClick={() => setVisible(false)}
-          className="ml-2 text-slate-400 hover:text-white"
-          title="Close debug panel"
+          onClick={handleCopy}
+          className="ml-2 text-slate-400 hover:text-emerald-400 transition-colors"
+          title="Copy debug info"
+          aria-label="Copy debug information to clipboard"
+        >
+          {copied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+        </button>
+        <button 
+          onClick={handleClose}
+          className="text-slate-400 hover:text-white transition-colors"
+          title="Close debug panel (hidden for 24h)"
+          aria-label="Close debug panel"
         >
           <X className="w-4 h-4" />
         </button>
@@ -168,7 +232,24 @@ function DebugPanel({ resolver, userEmail, search }) {
       )}
     </div>
   );
-}
+});
+
+// Memoized nav items filtering
+const useFilteredNavItems = (hasPermission, isAdmin) => {
+  return useMemo(() => {
+    return navItems.filter(item => {
+      // Permission check
+      if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) {
+        return false;
+      }
+      // Admin-only items require BOTH adminOnly flag AND admin role
+      if (item.adminOnly && !isAdmin) {
+        return false;
+      }
+      return true;
+    });
+  }, [hasPermission, isAdmin]);
+};
 
 function LayoutContent({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -258,6 +339,22 @@ function LayoutContent({ children, currentPageName }) {
   const activeUser = user || permUser;
   const isAdmin = isUserAdmin(activeUser);
   
+  // Memoized nav items
+  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin);
+  
+  // Memoized handlers
+  const handleLogoutMemo = useCallback(() => {
+    try {
+      base44.auth.logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+      window.location.href = '/';
+    }
+  }, []);
+  
+  const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
+  const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
+  
   // Store info - only display when resolved
   const storeDisplayName = isResolved && resolver.integration?.store_name 
     ? resolver.integration.store_name 
@@ -297,8 +394,9 @@ function LayoutContent({ children, currentPageName }) {
               <span className="font-bold text-lg text-slate-900">ProfitShield</span>
             </Link>
             <button 
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 hover:bg-slate-100 rounded"
+              onClick={handleSidebarClose}
+              className="lg:hidden p-1 hover:bg-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              aria-label="Close sidebar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -344,33 +442,31 @@ function LayoutContent({ children, currentPageName }) {
             </div>
           )}
 
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navItems.filter(item => {
-              if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) return false;
-              if (item.adminOnly && !isAdmin) return false;
-              return true;
-            }).map((item) => {
+          {/* Navigation - keyboard accessible */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
+            {filteredNavItems.map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
               return (
                 <Link
                   key={item.page}
                   to={createPageUrl(item.page, location.search)}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={handleSidebarClose}
                   className={`
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-colors duration-150
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
                     ${isActive 
                       ? 'bg-emerald-50 text-emerald-700' 
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }
                   `}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} aria-hidden="true" />
                   {item.name}
                   {item.page === 'Alerts' && pendingAlerts > 0 && (
-                    <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
+                    <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
                       {pendingAlerts}
                     </Badge>
                   )}
@@ -408,7 +504,7 @@ function LayoutContent({ children, currentPageName }) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                  <DropdownMenuItem onClick={handleLogoutMemo} className="text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign out
                   </DropdownMenuItem>
@@ -424,8 +520,9 @@ function LayoutContent({ children, currentPageName }) {
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
           <button 
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg"
+            onClick={handleSidebarOpen}
+            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            aria-label="Open sidebar"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -510,11 +607,16 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function Layout({ children, currentPageName }) {
+  // Get resolver context for error boundary
+  const resolverContext = useMemo(() => ({}), []); // Will be populated by LayoutContent
+  
   return (
-    <PermissionsProvider>
-      <LayoutContent currentPageName={currentPageName}>
-        {children}
-      </LayoutContent>
-    </PermissionsProvider>
+    <GlobalErrorBoundary resolverContext={resolverContext}>
+      <PermissionsProvider>
+        <LayoutContent currentPageName={currentPageName}>
+          {children}
+        </LayoutContent>
+      </PermissionsProvider>
+    </GlobalErrorBoundary>
   );
 }
