@@ -46,214 +46,58 @@ export default function Orders() {
     confidence: 'all'
   });
 
-  // Direct tenant resolution without hook - for debugging
-  const [tenantState, setTenantState] = useState({
-    tenant: null,
-    tenantId: null,
-    shopDomain: null,
-    loading: true,
-    debug: { env: 'prod', resolved_via: null, url_shop_param: null }
+  // Use unified platform resolver
+  const { 
+    status, 
+    tenantId, 
+    tenant, 
+    platform, 
+    storeKey, 
+    user, 
+    reason,
+    loading: resolverLoading 
+  } = usePlatformResolver();
+
+  // Load tenant settings
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenantSettings', tenantId],
+    queryFn: async () => {
+      const settings = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+      return settings[0] || null;
+    },
+    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
   });
-  
-  const [queryInfo, setQueryInfo] = useState({ 
-    filter: null, 
-    count: 0, 
-    dateStart: null,
-    dateEnd: null,
-    dateField: 'order_date'
-  });
-  
-  const [currentUser, setCurrentUser] = useState(null);
-  const [tenantSettings, setTenantSettings] = useState(null);
 
-  // Resolve tenant directly on mount using shared utilities
-  // Priority: A) URL param ?shop= > B) localStorage > C) user.tenant_id
-  // NO fallback to first tenant
-  useEffect(() => {
-    async function resolveTenant() {
-      const urlParams = parseQuery(window.location.search);
-      const persisted = getPersistedShopifyContext();
-      
-      const debug = {
-        env: 'prod',
-        url_shop_param: urlParams.shop,
-        resolved_via: null,
-        pathname: window.location.pathname
-      };
-      
-      console.log('[Orders] URL:', window.location.href);
-      console.log('[Orders] shop param:', urlParams.shop);
-      
-      let resolvedTenant = null;
-      let resolvedShopDomain = null;
-      let user = null;
-      
-      // Get current user
-      try {
-        user = await base44.auth.me();
-        setCurrentUser(user);
-        console.log('[Orders] User:', user?.email, 'tenant_id:', user?.tenant_id);
-      } catch (e) {
-        console.log('[Orders] No user auth');
-      }
-      
-      // PRIORITY A: URL shop param
-      if (urlParams.shop) {
-        resolvedShopDomain = normalizeShopDomain(urlParams.shop);
-        debug.resolved_via = 'url_param';
-        console.log('[Orders] Looking up tenant by shop_domain:', resolvedShopDomain);
-        
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
-        console.log('[Orders] Found tenants:', tenants.length);
-        
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          persistShopifyContext({
-            shop: resolvedShopDomain,
-            host: urlParams.host,
-            tenantId: resolvedTenant.id
-          });
-        }
-      }
-      
-      // PRIORITY B: localStorage fallback
-      if (!resolvedTenant && persisted.shopDomain) {
-        debug.resolved_via = 'localStorage_shop';
-        console.log('[Orders] Trying localStorage fallback:', persisted.shopDomain);
-        
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = persisted.shopDomain;
-        }
-      } else if (!resolvedTenant && persisted.tenantId) {
-        debug.resolved_via = 'localStorage_tenant';
-        console.log('[Orders] Trying localStorage tenant_id:', persisted.tenantId);
-        
-        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = resolvedTenant.shop_domain;
-        }
-      }
-      
-      // PRIORITY C: User's tenant_id
-      if (!resolvedTenant && user?.tenant_id) {
-        debug.resolved_via = 'user_tenant';
-        const tenants = await base44.entities.Tenant.filter({ id: user.tenant_id });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = resolvedTenant.shop_domain;
-          persistShopifyContext({
-            shop: resolvedShopDomain,
-            tenantId: resolvedTenant.id
-          });
-        }
-      }
-      
-      // NO FALLBACK
-      if (!resolvedTenant) {
-        console.warn('[Orders] No tenant resolved.');
-        setTenantState({
-          tenant: null,
-          tenantId: null,
-          shopDomain: null,
-          loading: false,
-          debug
-        });
-        return;
-      }
-      
-      debug.tenant_id = resolvedTenant.id;
-      debug.shop_domain = resolvedShopDomain;
-      
-      console.log('[Orders] Final resolved tenant:', resolvedTenant.id);
-      
-      // Load tenant settings for demo_mode
-      if (resolvedTenant.id) {
-        const settingsData = await base44.entities.TenantSettings.filter({ tenant_id: resolvedTenant.id });
-        if (settingsData.length > 0) {
-          setTenantSettings(settingsData[0]);
-        }
-      }
-      
-      setTenantState({
-        tenant: resolvedTenant,
-        tenantId: resolvedTenant.id,
-        shopDomain: resolvedShopDomain,
-        loading: false,
-        debug
-      });
-    }
-    
-    resolveTenant();
-  }, []);
-
-  const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = tenantState;
-
-  // Build the query filter object - never null in display, always show actual filter
-  const queryFilter = tenantId ? { tenant_id: tenantId } : {};
-  
+  // Fetch orders
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', tenantId],
     queryFn: async () => {
-      if (!tenantId) {
-        console.log('[Orders] No tenantId, returning empty');
-        setQueryInfo({ filter: {}, count: 0, dateStart: null, dateEnd: null, dateField: 'order_date' });
-        return [];
-      }
-      
-      console.log('[Orders] ====== QUERY START ======');
-      console.log('[Orders] Environment: PRODUCTION');
-      console.log('[Orders] tenant_id:', tenantId);
-      console.log('[Orders] Query filter:', JSON.stringify(queryFilter));
-      
-      // Fetch all orders for tenant, sorted by order_date desc
-      const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
-      
-      console.log('[Orders] ====== QUERY RESULT ======');
+      console.log('[Orders] Fetching orders for tenant:', tenantId);
+      const allOrders = await base44.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 1000);
       console.log('[Orders] Returned count:', allOrders.length);
-      if (allOrders.length > 0) {
-        console.log('[Orders] First order:', allOrders[0].order_number, allOrders[0].order_date);
-        console.log('[Orders] Last order:', allOrders[allOrders.length-1].order_number, allOrders[allOrders.length-1].order_date);
-      }
-      
-      const now = new Date();
-      const dateStart = subDays(now, 30);
-      
-      // Set queryInfo with the same filter object used in the query
-      setQueryInfo({ 
-        filter: queryFilter, 
-        count: allOrders.length,
-        dateStart: dateStart.toISOString(),
-        dateEnd: now.toISOString(),
-        dateField: 'order_date'
-      });
-      
       return allOrders;
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
   });
 
-  const isLoading = tenantLoading || ordersLoading;
+  const isLoading = resolverLoading || ordersLoading || status === RESOLVER_STATUS.RESOLVING;
 
   // Apply filters
-  const filteredOrders = React.useMemo(() => {
+  const filteredOrders = useMemo(() => {
     let result = [...orders];
 
-    // Demo mode filter: when demo_mode is false, only show real Shopify orders
-    const demoMode = tenantSettings?.demo_mode !== false; // default true
+    // Demo mode filter
+    const demoMode = tenantSettings?.demo_mode !== false;
     if (!demoMode) {
-      // Only show orders with platform_order_id (real Shopify orders) and is_demo !== true
       result = result.filter(o => o.platform_order_id && o.is_demo !== true);
     }
 
-    // Date range filter on order_date
+    // Date range filter
     const days = parseInt(filters.dateRange);
     const startDate = subDays(new Date(), days);
     result = result.filter(o => o.order_date && new Date(o.order_date) >= startDate);
 
-    // Search: order_number, platform_order_id, customer_email, customer_name, notes
+    // Search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(o => 
@@ -291,7 +135,7 @@ export default function Orders() {
   }, [orders, filters, searchTerm, tenantSettings]);
 
   // Calculate summary stats
-  const stats = React.useMemo(() => ({
+  const stats = useMemo(() => ({
     totalOrders: filteredOrders.length,
     totalRevenue: filteredOrders.reduce((sum, o) => sum + (o.total_revenue || 0), 0),
     totalProfit: filteredOrders.reduce((sum, o) => sum + (o.net_profit || 0), 0),
@@ -312,18 +156,24 @@ export default function Orders() {
     setSearchTerm('');
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Debug Banner */}
       <DebugBanner 
-        shopDomain={shopDomain} 
+        shopDomain={storeKey} 
         tenantId={tenantId} 
         ordersCount={orders.length}
-        debug={debug}
-        queryFilter={queryInfo.filter}
-        dateRange={filters.dateRange}
-        queryInfo={queryInfo}
-        userEmail={currentUser?.email}
+        debug={{ platform, reason }}
+        userEmail={user?.email}
       />
 
       {/* Header */}
