@@ -26,7 +26,8 @@ import {
   Link2,
   Loader2,
   Brain,
-  Bug
+  Bug,
+  Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,24 +63,59 @@ function isUserAdmin(user) {
   return role === 'owner' || role === 'admin';
 }
 
-// Debug Panel with full trace visibility
+// Debug Panel with full trace visibility - 100% null-safe
 function DebugPanel({ resolver, userEmail, search }) {
-  const urlParams = parseQuery(search || '');
-  const persisted = getPersistedContext();
+  // Safe URL param parsing
+  let urlParams = {};
+  try {
+    urlParams = parseQuery(search || '') || {};
+  } catch (e) {
+    urlParams = {};
+  }
+  
+  // Safe persisted context
+  let persisted = {};
+  try {
+    persisted = getPersistedContext() || {};
+  } catch (e) {
+    persisted = {};
+  }
   
   const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
   if (!showDebug) return null;
   
+  // Fully defensive resolver access
   const safeResolver = resolver || {};
-  const trace = safeResolver.trace || {};
+  const trace = safeResolver.trace || { startedAt: null, finishedAt: null, chosenBy: null, steps: [] };
   const stores = Array.isArray(safeResolver.availableStores) ? safeResolver.availableStores : [];
+  const steps = Array.isArray(trace.steps) ? trace.steps : [];
+  
+  // Safe duration calc
+  let duration = '...';
+  try {
+    if (typeof trace.finishedAt === 'number' && typeof trace.startedAt === 'number') {
+      duration = `${trace.finishedAt - trace.startedAt}ms`;
+    }
+  } catch (e) {
+    duration = 'invalid';
+  }
+  
+  // Safe date formatting
+  let persistedAtDisplay = 'null';
+  try {
+    if (persisted.persistedAt) {
+      persistedAtDisplay = new Date(persisted.persistedAt).toISOString();
+    }
+  } catch (e) {
+    persistedAtDisplay = 'invalid';
+  }
   
   return (
     <div className="fixed bottom-4 left-4 z-50 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-lg max-w-md max-h-[60vh] overflow-auto">
       <div className="flex items-center gap-2 mb-2 border-b border-slate-700 pb-2">
         <Bug className="w-4 h-4 text-amber-400" />
         <span className="font-bold">Resolver Debug</span>
-        <span className="ml-auto text-slate-500">{trace.finishedAt ? `${trace.finishedAt - trace.startedAt}ms` : '...'}</span>
+        <span className="ml-auto text-slate-500">{duration}</span>
       </div>
       
       <div className="space-y-1 mb-3">
@@ -106,16 +142,16 @@ function DebugPanel({ resolver, userEmail, search }) {
         <p className="truncate"><span className="text-slate-500">platform:</span> {persisted.platform || 'null'}</p>
         <p className="truncate"><span className="text-slate-500">storeKey:</span> {persisted.storeKey || 'null'}</p>
         <p className="truncate"><span className="text-slate-500">tenantId:</span> {persisted.tenantId || 'null'}</p>
-        <p className="truncate"><span className="text-slate-500">persistedAt:</span> {persisted.persistedAt ? new Date(persisted.persistedAt).toISOString() : 'null'}</p>
+        <p className="truncate"><span className="text-slate-500">persistedAt:</span> {persistedAtDisplay}</p>
       </div>
       
-      {Array.isArray(trace.steps) && trace.steps.length > 0 && (
+      {steps.length > 0 && (
         <div className="border-t border-slate-700 pt-2">
-          <p className="text-slate-400 mb-1">Trace ({trace.steps.length} steps):</p>
+          <p className="text-slate-400 mb-1">Trace ({steps.length} steps):</p>
           <div className="space-y-1 max-h-32 overflow-auto">
-            {trace.steps.map((step, i) => (
-              <p key={i} className={step.ok ? 'text-slate-300' : 'text-red-400'}>
-                {step.ok ? '✓' : '✗'} {step.step} {step.note ? `- ${step.note}` : ''}
+            {steps.map((step, i) => (
+              <p key={i} className={step?.ok ? 'text-slate-300' : 'text-red-400'}>
+                {step?.ok ? '✓' : '✗'} {step?.step || 'unknown'} {step?.note ? `- ${step.note}` : ''}
               </p>
             ))}
           </div>
@@ -135,30 +171,31 @@ function LayoutContent({ children, currentPageName }) {
   const permissionsData = usePermissions() || {};
   const { hasPermission = () => true, role = null, user: permUser = null } = permissionsData;
   
-  // Platform resolver
+  // Platform resolver - single source of truth
   const resolver = usePlatformResolver() || {};
   const resolverCheck = requireResolved(resolver);
   
-  // Safe destructure
+  // ONLY use resolverCheck for gated data - these are the authoritative values
+  const isResolved = resolverCheck.ok;
+  const authTenantId = resolverCheck.tenantId;
+  const authIntegrationId = resolverCheck.integrationId;
+  
+  // Raw resolver values ONLY for display when resolved
   const status = resolver.status || RESOLVER_STATUS.RESOLVING;
-  const tenantId = resolver.tenantId || null;
-  const tenant = resolver.tenant || null;
   const user = resolver.user || null;
-  const platform = resolver.platform || null;
-  const storeKey = resolver.storeKey || null;
-  const integration = resolver.integration || null;
   const stores = Array.isArray(resolver.availableStores) ? resolver.availableStores : [];
 
-  // Load alerts when resolved
+  // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
-    if (resolverCheck.ok && resolverCheck.tenantId) {
-      loadAlerts(resolverCheck.tenantId);
+    if (isResolved && authTenantId) {
+      loadAlerts(authTenantId);
     } else {
       setPendingAlerts(0);
     }
-  }, [resolverCheck.ok, resolverCheck.tenantId]);
+  }, [isResolved, authTenantId]);
 
   const loadAlerts = async (tid) => {
+    if (!tid) return;
     try {
       const alerts = await base44.entities.Alert.filter({ 
         tenant_id: tid, 
@@ -211,6 +248,18 @@ function LayoutContent({ children, currentPageName }) {
   const showMissingContextBanner = status === RESOLVER_STATUS.ERROR;
   const activeUser = user || permUser;
   const isAdmin = isUserAdmin(activeUser);
+  
+  // Store info - only display when resolved
+  const storeDisplayName = isResolved && resolver.integration?.store_name 
+    ? resolver.integration.store_name 
+    : isResolved && resolver.tenant?.shop_name 
+    ? resolver.tenant.shop_name 
+    : isResolved && resolver.storeKey 
+    ? resolver.storeKey 
+    : null;
+  const platformDisplay = isResolved ? resolver.platform : null;
+  const subscriptionTier = isResolved && resolver.tenant?.subscription_tier ? resolver.tenant.subscription_tier : null;
+  const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -246,31 +295,43 @@ function LayoutContent({ children, currentPageName }) {
             </button>
           </div>
 
-          {/* Store Info */}
-          {tenant && (
+          {/* Store Info - only when resolved */}
+          {isResolved && storeDisplayName ? (
             <div className="px-4 py-3 border-b border-slate-200">
               <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
               <p className="text-sm font-medium text-slate-900 truncate">
-                {integration?.store_name || tenant?.shop_name || storeKey || 'Unknown Store'}
+                {storeDisplayName}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {platform && (
+                {platformDisplay && (
                   <Badge variant="outline" className="text-xs capitalize">
-                    {platform}
+                    {platformDisplay}
                   </Badge>
                 )}
-                {tenant?.subscription_tier && (
+                {subscriptionTier && (
                   <Badge variant="outline" className="text-xs capitalize">
-                    {tenant.subscription_tier}
+                    {subscriptionTier}
                   </Badge>
                 )}
-                {tenant?.profit_integrity_score && (
+                {profitScore && (
                   <Badge className="text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
                     <TrendingUp className="w-3 h-3 mr-1" />
-                    {tenant.profit_integrity_score}
+                    {profitScore}
                   </Badge>
                 )}
               </div>
+            </div>
+          ) : !isResolved && (
+            <div className="px-4 py-3 border-b border-slate-200">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
+              <p className="text-sm text-slate-500">No store selected</p>
+              <Link 
+                to={createPageUrl('Integrations', location.search)}
+                className="text-xs text-emerald-600 hover:underline mt-1 inline-flex items-center gap-1"
+              >
+                <Store className="w-3 h-3" />
+                Connect Store
+              </Link>
             </div>
           )}
 
@@ -362,7 +423,8 @@ function LayoutContent({ children, currentPageName }) {
 
           <div className="flex-1 flex items-center gap-4 lg:ml-4">
             <ResolverHealthIndicator />
-            {stores.length > 1 && <StoreSwitcher />}
+            {/* StoreSwitcher only when RESOLVED and multiple stores */}
+            {isResolved && stores.length > 1 && <StoreSwitcher />}
           </div>
 
           <div className="flex items-center gap-3">
@@ -397,11 +459,11 @@ function LayoutContent({ children, currentPageName }) {
           {children}
         </main>
 
-        {/* MerchantAI Chat */}
-        {resolverCheck.ok && activeUser && (
+        {/* MerchantAI Chat - only when resolved */}
+        {isResolved && authTenantId && activeUser && (
           <ErrorBoundary fallback={null}>
             <MerchantAIChat 
-              tenantId={resolverCheck.tenantId} 
+              tenantId={authTenantId} 
               currentPage={currentPageName || 'Home'}
             />
           </ErrorBoundary>
