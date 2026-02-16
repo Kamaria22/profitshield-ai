@@ -1,15 +1,66 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { X, AlertTriangle, CheckCircle, Package, Truck, CreditCard, RotateCcw, Percent, MapPin, RefreshCw, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, Package, Truck, CreditCard, RotateCcw, Percent, MapPin, RefreshCw, Loader2, Ban, Eye, FileSignature, Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { base44 } from '@/api/base44Client';
 import RiskAnalysisCard from './RiskAnalysisCard';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+const actionConfig = {
+  cancel: { 
+    icon: Ban, 
+    label: 'Cancel Order', 
+    color: 'bg-red-600 hover:bg-red-700',
+    description: 'This will mark the order as cancelled. This action cannot be undone.',
+    newStatus: 'cancelled'
+  },
+  hold: { 
+    icon: Pause, 
+    label: 'Hold Shipment', 
+    color: 'bg-amber-600 hover:bg-amber-700',
+    description: 'This will put the order on hold pending review.',
+    newStatus: 'pending',
+    addTag: 'on-hold'
+  },
+  verify: { 
+    icon: Eye, 
+    label: 'Mark for Verification', 
+    color: 'bg-blue-600 hover:bg-blue-700',
+    description: 'This will flag the order for customer verification.',
+    addTag: 'needs-verification'
+  },
+  signature: { 
+    icon: FileSignature, 
+    label: 'Require Signature', 
+    color: 'bg-indigo-600 hover:bg-indigo-700',
+    description: 'This will add a signature requirement note to the order.',
+    addTag: 'signature-required'
+  },
+  release: {
+    icon: Play,
+    label: 'Release Order',
+    color: 'bg-emerald-600 hover:bg-emerald-700',
+    description: 'This will release the order from hold and clear risk flags.',
+    removeTag: 'on-hold'
+  }
+};
 
 export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
   const [analyzing, setAnalyzing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   if (!order) return null;
 
   const isProfitable = (order.net_profit || 0) >= 0;
@@ -41,6 +92,70 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
     }
   };
 
+  const handleAction = async (actionType) => {
+    setActionLoading(true);
+    try {
+      const config = actionConfig[actionType];
+      const currentTags = order.tags || [];
+      let newTags = [...currentTags];
+      
+      // Handle tag modifications
+      if (config.addTag && !newTags.includes(config.addTag)) {
+        newTags.push(config.addTag);
+      }
+      if (config.removeTag) {
+        newTags = newTags.filter(t => t !== config.removeTag);
+      }
+      
+      // Build update object
+      const updateData = { tags: newTags };
+      if (config.newStatus) {
+        updateData.status = config.newStatus;
+      }
+      
+      // Clear recommended action after taking it
+      updateData.recommended_action = 'none';
+      
+      // Update the order
+      await base44.entities.Order.update(order.id, updateData);
+      
+      // Log the action
+      const user = await base44.auth.me();
+      await base44.entities.AuditLog.create({
+        tenant_id: order.tenant_id,
+        actor_email: user?.email || 'unknown',
+        actor_role: user?.role || 'user',
+        action: `risk_action_${actionType}`,
+        entity_type: 'order',
+        entity_id: order.id,
+        old_value: { 
+          status: order.status, 
+          tags: order.tags,
+          recommended_action: order.recommended_action 
+        },
+        new_value: updateData,
+        metadata: {
+          order_number: order.order_number,
+          risk_level: order.risk_level,
+          fraud_score: order.fraud_score
+        }
+      });
+      
+      if (onOrderUpdated) {
+        onOrderUpdated();
+      }
+    } catch (error) {
+      console.error('Action failed:', error);
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
+    }
+  };
+
+  const isOnHold = (order.tags || []).includes('on-hold');
+  const needsVerification = (order.tags || []).includes('needs-verification');
+  const signatureRequired = (order.tags || []).includes('signature-required');
+
   return (
     <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-xl z-50 border-l border-slate-200">
       <div className="flex flex-col h-full">
@@ -70,6 +185,27 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
               </p>
             </div>
 
+            {/* Status Tags */}
+            {(isOnHold || needsVerification || signatureRequired) && (
+              <div className="flex flex-wrap gap-2">
+                {isOnHold && (
+                  <Badge className="bg-amber-100 text-amber-700">
+                    <Pause className="w-3 h-3 mr-1" /> On Hold
+                  </Badge>
+                )}
+                {needsVerification && (
+                  <Badge className="bg-blue-100 text-blue-700">
+                    <Eye className="w-3 h-3 mr-1" /> Needs Verification
+                  </Badge>
+                )}
+                {signatureRequired && (
+                  <Badge className="bg-indigo-100 text-indigo-700">
+                    <FileSignature className="w-3 h-3 mr-1" /> Signature Required
+                  </Badge>
+                )}
+              </div>
+            )}
+
             {/* Risk Analysis Card */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -90,6 +226,65 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
               </div>
               <RiskAnalysisCard order={order} />
             </div>
+
+            {/* Action Buttons */}
+            {(order.recommended_action && order.recommended_action !== 'none' || isOnHold) && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900">Quick Actions</h3>
+                <div className="flex flex-wrap gap-2">
+                  {order.recommended_action === 'cancel' && order.status !== 'cancelled' && (
+                    <Button 
+                      size="sm" 
+                      className={actionConfig.cancel.color}
+                      onClick={() => setConfirmAction('cancel')}
+                      disabled={actionLoading}
+                    >
+                      <Ban className="w-4 h-4 mr-1" /> Cancel Order
+                    </Button>
+                  )}
+                  {order.recommended_action === 'hold' && !isOnHold && (
+                    <Button 
+                      size="sm" 
+                      className={actionConfig.hold.color}
+                      onClick={() => setConfirmAction('hold')}
+                      disabled={actionLoading}
+                    >
+                      <Pause className="w-4 h-4 mr-1" /> Hold Shipment
+                    </Button>
+                  )}
+                  {order.recommended_action === 'verify' && !needsVerification && (
+                    <Button 
+                      size="sm" 
+                      className={actionConfig.verify.color}
+                      onClick={() => setConfirmAction('verify')}
+                      disabled={actionLoading}
+                    >
+                      <Eye className="w-4 h-4 mr-1" /> Mark for Verification
+                    </Button>
+                  )}
+                  {order.recommended_action === 'signature' && !signatureRequired && (
+                    <Button 
+                      size="sm" 
+                      className={actionConfig.signature.color}
+                      onClick={() => setConfirmAction('signature')}
+                      disabled={actionLoading}
+                    >
+                      <FileSignature className="w-4 h-4 mr-1" /> Require Signature
+                    </Button>
+                  )}
+                  {isOnHold && (
+                    <Button 
+                      size="sm" 
+                      className={actionConfig.release.color}
+                      onClick={() => setConfirmAction('release')}
+                      disabled={actionLoading}
+                    >
+                      <Play className="w-4 h-4 mr-1" /> Release Order
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Profit Breakdown */}
             <div>
@@ -168,6 +363,33 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
           </div>
         </ScrollArea>
       </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction && actionConfig[confirmAction]?.label}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction && actionConfig[confirmAction]?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleAction(confirmAction)}
+              disabled={actionLoading}
+              className={confirmAction && actionConfig[confirmAction]?.color}
+            >
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : null}
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
