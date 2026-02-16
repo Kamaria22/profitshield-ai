@@ -80,13 +80,12 @@ export default function Layout({ children, currentPageName }) {
         }
       }
       
-      // PRIORITY 3: Fall back to first tenant (demo mode)
+      // No fallback - require explicit tenant resolution
       if (!resolvedTenant) {
-        console.log('[Layout] Falling back to first tenant');
-        const tenants = await base44.entities.Tenant.filter({}, '-created_date', 1);
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-        }
+        console.warn('[Layout] No tenant could be resolved. shop param missing and user has no tenant.');
+        setTenant(null);
+        setPendingAlerts(0);
+        return;
       }
       
       if (resolvedTenant) {
