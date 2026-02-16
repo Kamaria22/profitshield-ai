@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
-import { parseQuery, getPersistedContext } from '@/components/platformContext';
+import { parseQuery, getPersistedContext, hardResetAllContexts, listPersistedStores } from '@/components/platformContext';
 import { useLocation } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -73,6 +73,8 @@ export default function Integrations() {
   const [selfTestDialogOpen, setSelfTestDialogOpen] = useState(false);
   const [selfTestResult, setSelfTestResult] = useState(null);
   const [selfTestLoading, setSelfTestLoading] = useState(false);
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  const [repairLoading, setRepairLoading] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [webhooksDialogOpen, setWebhooksDialogOpen] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
@@ -305,6 +307,79 @@ export default function Integrations() {
     }
   };
 
+  // Hard reset context (admin only, debug)
+  const handleHardReset = async () => {
+    const result = hardResetAllContexts();
+    toast.success(`Cleared ${result.cleared} context entries`);
+    // Clear query cache too
+    queryClient.clear();
+    // Redirect to SelectStore
+    window.location.href = '/selectstore';
+  };
+
+  // Repair integration - recreate missing records
+  const handleRepairIntegration = async () => {
+    if (!tenantId) return;
+    setRepairLoading(true);
+    
+    try {
+      // Check if tenant exists
+      const tenants = await base44.entities.Tenant.filter({ id: tenantId });
+      if (!tenants.length) {
+        toast.error('Tenant not found');
+        return;
+      }
+      const tenant = tenants[0];
+      
+      // Check for existing integrations
+      const existingIntegrations = await base44.entities.PlatformIntegration.filter({ tenant_id: tenantId });
+      
+      if (existingIntegrations.length === 0 && tenant.shop_domain) {
+        // Create missing PlatformIntegration
+        const newIntegration = await base44.entities.PlatformIntegration.create({
+          tenant_id: tenantId,
+          platform: tenant.platform || 'shopify',
+          store_key: tenant.shop_domain,
+          store_url: `https://${tenant.shop_domain}`,
+          store_name: tenant.shop_name || tenant.shop_domain,
+          status: 'connected',
+          is_primary: true,
+          api_version: '2024-01',
+          scopes: ['read_orders', 'read_products', 'read_customers'],
+          sync_config: { auto_sync_enabled: true, sync_frequency_minutes: 15 }
+        });
+        
+        // Log to audit
+        await base44.entities.AuditLog.create({
+          tenant_id: tenantId,
+          action_type: 'manual_override',
+          entity_type: 'PlatformIntegration',
+          entity_id: newIntegration.id,
+          details: { action: 'repair_integration', repaired: true },
+          user_email: user?.email || 'admin'
+        });
+        
+        toast.success('Integration repaired successfully');
+        refetchIntegrations();
+      } else if (existingIntegrations.length > 0) {
+        // Check for disconnected integrations and offer to reconnect
+        const disconnected = existingIntegrations.filter(i => i.status !== 'connected');
+        if (disconnected.length > 0) {
+          toast.info(`Found ${disconnected.length} disconnected integration(s). Use Reconnect button.`);
+        } else {
+          toast.info('All integrations appear healthy');
+        }
+      } else {
+        toast.error('No shop_domain found on tenant. Cannot auto-repair.');
+      }
+    } catch (e) {
+      toast.error(`Repair failed: ${e.message}`);
+    } finally {
+      setRepairLoading(false);
+      setRepairDialogOpen(false);
+    }
+  };
+
   const resetConnectionForm = () => {
     setSelectedPlatform(null);
     setCredentials({});
@@ -426,10 +501,16 @@ export default function Integrations() {
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Button variant="outline" onClick={() => setSelfTestDialogOpen(true)}>
-              <Activity className="w-4 h-4 mr-2" />
-              Self-Test
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setRepairDialogOpen(true)}>
+                <Settings className="w-4 h-4 mr-2" />
+                Repair
+              </Button>
+              <Button variant="outline" onClick={() => setSelfTestDialogOpen(true)}>
+                <Activity className="w-4 h-4 mr-2" />
+                Self-Test
+              </Button>
+            </>
           )}
           <Dialog open={connectDialogOpen} onOpenChange={(open) => { setConnectDialogOpen(open); if (!open) resetConnectionForm(); }}>
           <DialogTrigger asChild>
@@ -1299,6 +1380,51 @@ export default function Integrations() {
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Repair Integration Dialog (Admin Only) */}
+      {isAdmin && (
+        <Dialog open={repairDialogOpen} onOpenChange={setRepairDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Repair Integration</DialogTitle>
+              <DialogDescription>
+                This will attempt to fix missing PlatformIntegration records and sync jobs.
+                Use this if the resolver cannot find your store.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="p-3 bg-slate-50 rounded-lg text-sm">
+                <p className="font-medium mb-2">Current State:</p>
+                <p>Tenant ID: {tenantId ? `${tenantId.slice(0, 8)}...` : 'None'}</p>
+                <p>Integrations: {integrations.length}</p>
+                <p>Connected: {integrations.filter(i => i.status === 'connected').length}</p>
+              </div>
+              
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                <p className="font-medium">Warning:</p>
+                <p>Only use this if you're experiencing resolver issues. This will create missing records.</p>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleHardReset}
+                className="text-red-600 hover:text-red-700"
+              >
+                Hard Reset Context
+              </Button>
+              <div className="flex-1" />
+              <Button variant="outline" onClick={() => setRepairDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleRepairIntegration} disabled={repairLoading}>
+                {repairLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Repair Integration
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
