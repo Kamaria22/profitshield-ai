@@ -54,6 +54,7 @@ import DataCompliance from './pages/DataCompliance';
 import FounderDashboard from './pages/FounderDashboard';
 import Home from './pages/Home';
 import Integrations from './pages/Integrations';
+import Intelligence from './pages/Intelligence';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
 import PnLAnalytics from './pages/PnLAnalytics';
@@ -63,7 +64,6 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import Intelligence from './pages/Intelligence';
 import __Layout from './Layout.jsx';
 
 
@@ -75,6 +75,7 @@ export const PAGES = {
     "FounderDashboard": FounderDashboard,
     "Home": Home,
     "Integrations": Integrations,
+    "Intelligence": Intelligence,
     "Onboarding": Onboarding,
     "Orders": Orders,
     "PnLAnalytics": PnLAnalytics,
@@ -84,7 +85,6 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "Intelligence": Intelligence,
 }
 
 export const pagesConfig = {

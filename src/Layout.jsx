@@ -5,6 +5,7 @@ import { createPageUrl, parseQuery, getPersistedContext } from '@/components/pla
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import {
   LayoutDashboard,
@@ -360,6 +361,7 @@ function LayoutContent({ children, currentPageName }) {
           </button>
 
           <div className="flex-1 flex items-center gap-4 lg:ml-4">
+            <ResolverHealthIndicator />
             {stores.length > 1 && <StoreSwitcher />}
           </div>
 
