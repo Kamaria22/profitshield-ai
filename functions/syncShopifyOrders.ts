@@ -165,22 +165,37 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'No valid Shopify token found. Please reconnect your store.' }, { status: 400 });
     }
     
-    // Decrypt access token
+    // Decrypt access token using AES-GCM (matches encryption in shopifyAuth)
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
     const encryptedToken = tokens[0].encrypted_access_token;
     
-    // Simple XOR decryption (matches encryption in shopifyAuth)
     let accessToken;
     try {
-      const encrypted = atob(encryptedToken);
-      let decrypted = '';
-      for (let i = 0; i < encrypted.length; i++) {
-        decrypted += String.fromCharCode(encrypted.charCodeAt(i) ^ encryptionKey.charCodeAt(i % encryptionKey.length));
-      }
-      accessToken = decrypted;
+      const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+      const iv = combined.slice(0, 12);
+      const encrypted = combined.slice(12);
+      
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode((encryptionKey || '').padEnd(32, '0').slice(0, 32));
+      
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+      
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        cryptoKey,
+        encrypted
+      );
+      
+      accessToken = new TextDecoder().decode(decrypted);
     } catch (e) {
       console.error('Token decryption failed:', e);
-      return Response.json({ error: 'Failed to decrypt access token' }, { status: 500 });
+      return Response.json({ error: 'Failed to decrypt access token. Please reconnect your store.' }, { status: 500 });
     }
     
     console.log('[syncShopifyOrders] Fetching orders from Shopify for:', tenant.shop_domain);
