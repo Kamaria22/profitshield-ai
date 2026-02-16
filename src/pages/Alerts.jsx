@@ -6,14 +6,16 @@ import {
   CheckCircle, 
   Clock,
   Filter,
-  Bell
+  Bell,
+  Loader2,
+  Store
 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
@@ -24,26 +26,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
+import { createPageUrl } from '@/components/platformContext';
 
 import AlertCard from '../components/alerts/AlertCard';
 
 export default function Alerts() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('pending');
   const [typeFilter, setTypeFilter] = useState('all');
   const queryClient = useQueryClient();
   
-  const { tenantId, user, status } = usePlatformResolver();
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  // Derived booleans
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const alertsQueryKey = buildQueryKey('alerts', resolverCheck);
+  
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
+  const user = resolver?.user || null;
+  const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
 
+  // Fetch alerts - only when canQuery
   const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ['alerts', tenantId],
+    queryKey: alertsQueryKey,
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!queryFilter?.tenant_id) return [];
       return base44.entities.Alert.filter({ 
-        tenant_id: tenantId 
+        tenant_id: queryFilter.tenant_id 
       }, '-created_date', 500);
     },
-    enabled: !!tenantId && status === RESOLVER_STATUS.RESOLVED
+    enabled: canQuery
   });
 
   const updateAlertMutation = useMutation({
@@ -55,13 +71,9 @@ export default function Alerts() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['alerts', tenantId]);
+      queryClient.invalidateQueries({ queryKey: alertsQueryKey });
     }
   });
-
-  const handleStatusChange = (id, status) => {
-    updateAlertMutation.mutate({ id, status });
-  };
 
   // Filter alerts by status and type
   const filteredAlerts = React.useMemo(() => {
@@ -85,6 +97,46 @@ export default function Alerts() {
     all: alerts.length,
     highPriority: alerts.filter(a => a.status === 'pending' && (a.severity === 'high' || a.severity === 'critical')).length
   }), [alerts]);
+
+  // EARLY RETURN: Loading
+  if (resolverLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  // EARLY RETURN: No valid context
+  if (!canQuery || status === RESOLVER_STATUS.ERROR) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-amber-100 rounded-full mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">No Store Connected</h2>
+              <p className="text-slate-600 mb-4 max-w-md">
+                Connect your store to view alerts.
+              </p>
+              <Link to={createPageUrl('Integrations', location.search)}>
+                <Button className="gap-2">
+                  <Store className="w-4 h-4" />
+                  Connect Store
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const handleStatusChange = (id, newStatus) => {
+    updateAlertMutation.mutate({ id, status: newStatus });
+  };
 
   return (
     <div className="space-y-6">
