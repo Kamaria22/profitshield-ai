@@ -9,11 +9,20 @@ const SENSITIVE_PATTERNS = [
   /key/i,
   /authorization/i,
   /cookie/i,
-  /session/i
+  /session/i,
+  /credential/i,
+  /bearer/i,
+  /api_key/i,
+  /apikey/i,
+  /access_token/i,
+  /refresh_token/i,
+  /private/i
 ];
 
 const EMAIL_REGEX = /([a-zA-Z0-9._-]+)@([a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
 const DOMAIN_REGEX = /([a-z0-9-]+\.myshopify\.com)/gi;
+const PHONE_REGEX = /(\+?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4})/g;
+const ORDER_NAME_REGEX = /(#[0-9]{4,})/g;
 
 /**
  * Mask email addresses (ro***@gmail.com)
@@ -39,6 +48,35 @@ export function maskDomain(domain) {
 }
 
 /**
+ * Mask phone number (***-***-1234)
+ */
+export function maskPhone(phone) {
+  if (!phone || typeof phone !== 'string') return 'unknown';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '***';
+  return `***-***-${digits.slice(-4)}`;
+}
+
+/**
+ * Mask address (123 *** St)
+ */
+export function maskAddress(address) {
+  if (!address || typeof address !== 'string') return 'unknown';
+  const parts = address.split(' ');
+  if (parts.length <= 2) return '***';
+  return `${parts[0]} *** ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Mask order name (#****1234)
+ */
+export function maskOrderName(name) {
+  if (!name || typeof name !== 'string') return 'unknown';
+  if (name.length <= 5) return '***';
+  return `#****${name.slice(-4)}`;
+}
+
+/**
  * Sanitize an object for safe logging
  */
 export function sanitizeForLog(obj, depth = 0) {
@@ -52,6 +90,10 @@ export function sanitizeForLog(obj, depth = 0) {
     });
     // Mask domains
     sanitized = sanitized.replace(DOMAIN_REGEX, maskDomain);
+    // Mask phone numbers
+    sanitized = sanitized.replace(PHONE_REGEX, maskPhone);
+    // Mask order names
+    sanitized = sanitized.replace(ORDER_NAME_REGEX, maskOrderName);
     return sanitized;
   }
   
