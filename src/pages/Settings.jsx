@@ -501,7 +501,7 @@ export default function Settings() {
                   <div>
                     <Label>Embed Code</Label>
                     <div className="mt-2 p-3 bg-slate-900 rounded-lg text-green-400 text-sm font-mono">
-                      {`<a href="https://profitshield.ai/badge/${tenant?.id}"><img src="https://profitshield.ai/api/badge/${tenant?.id}" alt="ProfitShield Score" /></a>`}
+                      {`<a href="https://profitshield.ai/badge/${tenantId}"><img src="https://profitshield.ai/api/badge/${tenantId}" alt="ProfitShield Score" /></a>`}
                     </div>
                     <Button variant="outline" size="sm" className="mt-2">
                       Copy Code
