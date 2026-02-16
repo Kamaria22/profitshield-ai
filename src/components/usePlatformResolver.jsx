@@ -63,7 +63,20 @@ function traceStep(step, data, ok, note) {
 }
 
 /**
- * Initial state factory
+ * Stable trace shape - NEVER returns null/undefined fields
+ */
+function getStableTrace() {
+  return {
+    startedAt: null,
+    finishedAt: null,
+    chosenBy: null,
+    steps: []
+  };
+}
+
+/**
+ * Initial state factory - ALWAYS returns complete, stable shape
+ * This ensures destructuring never fails
  */
 function getInitialState() {
   return {
@@ -77,11 +90,33 @@ function getInitialState() {
     integrationId: null,
     availableStores: [],
     reason: null,
+    trace: getStableTrace()
+  };
+}
+
+/**
+ * Ensures state shape is always valid - defensive normalization
+ */
+function normalizeState(state) {
+  const base = getInitialState();
+  if (!state || typeof state !== 'object') return base;
+  
+  return {
+    status: state.status || RESOLVER_STATUS.RESOLVING,
+    tenantId: state.tenantId || null,
+    tenant: state.tenant || null,
+    user: state.user || null,
+    platform: state.platform || null,
+    storeKey: state.storeKey || null,
+    integration: state.integration || null,
+    integrationId: state.integrationId || null,
+    availableStores: Array.isArray(state.availableStores) ? state.availableStores : [],
+    reason: state.reason || null,
     trace: {
-      startedAt: null,
-      finishedAt: null,
-      chosenBy: null,
-      steps: []
+      startedAt: state.trace?.startedAt ?? null,
+      finishedAt: state.trace?.finishedAt ?? null,
+      chosenBy: state.trace?.chosenBy ?? null,
+      steps: Array.isArray(state.trace?.steps) ? state.trace.steps : []
     }
   };
 }
@@ -558,58 +593,74 @@ export function usePlatformResolver() {
     resolve();
   }, [resolve]);
 
-  // Build return object with safe defaults
+  // Build return object with GUARANTEED stable shape using normalizeState
+  const normalized = normalizeState(state);
+
   return {
-    // Core state
-    status: state.status || RESOLVER_STATUS.RESOLVING,
-    tenantId: state.tenantId || null,
-    tenant: state.tenant || null,
-    user: state.user || null,
-    platform: state.platform || null,
-    storeKey: state.storeKey || null,
-    integration: state.integration || null,
-    integrationId: state.integrationId || null,
-    availableStores: Array.isArray(state.availableStores) ? state.availableStores : [],
-    reason: state.reason || null,
-    trace: state.trace || { startedAt: null, finishedAt: null, chosenBy: null, steps: [] },
-    
+    // Core state - all guaranteed non-undefined
+    status: normalized.status,
+    tenantId: normalized.tenantId,
+    tenant: normalized.tenant,
+    user: normalized.user,
+    platform: normalized.platform,
+    storeKey: normalized.storeKey,
+    integration: normalized.integration,
+    integrationId: normalized.integrationId,
+    availableStores: normalized.availableStores,
+    reason: normalized.reason,
+    trace: normalized.trace,
+
     // Actions
     selectStore,
     refresh,
     reset,
-    
+
     // Legacy compatibility
-    shopDomain: state.platform === 'shopify' ? state.storeKey : null,
-    loading: state.status === RESOLVER_STATUS.RESOLVING
+    shopDomain: normalized.platform === 'shopify' ? normalized.storeKey : null,
+    loading: normalized.status === RESOLVER_STATUS.RESOLVING
   };
-}
+  }
 
 /**
  * Helper to check if resolver is ready for data queries
+ * GUARANTEED to return stable shape - never throws, never returns undefined fields
  * @param {object} resolver - Resolver state
  * @returns {{ ok: boolean, tenantId: string|null, integrationId: string|null, status: string, reason: string|null }}
  */
 export function requireResolved(resolver) {
-  if (!resolver) {
-    return { ok: false, tenantId: null, integrationId: null, status: RESOLVER_STATUS.ERROR, reason: 'resolver_undefined' };
+  // Defensive: handle null/undefined/invalid resolver
+  if (!resolver || typeof resolver !== 'object') {
+    return { 
+      ok: false, 
+      tenantId: null, 
+      integrationId: null, 
+      status: RESOLVER_STATUS.ERROR, 
+      reason: 'resolver_undefined' 
+    };
   }
   
-  if (resolver.status === RESOLVER_STATUS.RESOLVED && resolver.tenantId) {
+  const status = resolver.status || RESOLVER_STATUS.ERROR;
+  const tenantId = resolver.tenantId || null;
+  const integrationId = resolver.integrationId || null;
+  const reason = resolver.reason || null;
+  
+  // Only ok if RESOLVED AND has tenantId
+  if (status === RESOLVER_STATUS.RESOLVED && tenantId) {
     return { 
       ok: true, 
-      tenantId: resolver.tenantId, 
-      integrationId: resolver.integrationId,
-      status: resolver.status,
+      tenantId, 
+      integrationId,
+      status,
       reason: null
     };
   }
   
   return { 
     ok: false, 
-    tenantId: resolver.tenantId || null, 
-    integrationId: resolver.integrationId || null,
-    status: resolver.status || RESOLVER_STATUS.ERROR,
-    reason: resolver.reason || 'not_resolved'
+    tenantId, 
+    integrationId,
+    status,
+    reason: reason || 'not_resolved'
   };
 }
 
