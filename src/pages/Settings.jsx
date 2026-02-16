@@ -53,6 +53,7 @@ import { toast } from 'sonner';
 import CostMappingTable from '../components/settings/CostMappingTable';
 import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
+import RiskModelConfig from '../components/settings/RiskModelConfig';
 import { useTenantResolver } from '../components/useTenantResolver';
 
 export default function Settings() {
@@ -236,6 +237,10 @@ export default function Settings() {
           <TabsTrigger value="viral" className="gap-2">
             <Share2 className="w-4 h-4" />
             Viral Tools
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="gap-2">
+            <Shield className="w-4 h-4" />
+            Compliance
           </TabsTrigger>
         </TabsList>
 
@@ -572,6 +577,7 @@ export default function Settings() {
 
         {/* Risk Rules Tab */}
         <TabsContent value="risk-rules" className="mt-6 space-y-6">
+          <RiskModelConfig tenantId={tenantId} />
           <CustomRiskRulesManager tenantId={tenantId} />
         </TabsContent>
 
@@ -628,6 +634,28 @@ export default function Settings() {
               <Button onClick={saveSettings} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Settings
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Compliance Tab */}
+        <TabsContent value="compliance" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-emerald-600" />
+                Data & Compliance
+              </CardTitle>
+              <CardDescription>Manage data exports and GDPR compliance</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-slate-600">
+                Access full data export capabilities, GDPR deletion tools, and compliance documentation.
+              </p>
+              <Button variant="outline" onClick={() => window.location.href = '/datacompliance' + window.location.search}>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open Compliance Dashboard
               </Button>
             </CardContent>
           </Card>
