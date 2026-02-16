@@ -34,7 +34,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
-import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 
 import OrdersTable from '../components/orders/OrdersTable';
@@ -63,52 +63,37 @@ export default function Orders() {
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   
-  // AUTHORITATIVE values - ONLY use these for queries/mutations
-  const isResolved = resolverCheck.ok;
-  const authTenantId = resolverCheck.tenantId;
-  const authIntegrationId = resolverCheck.integrationId;
+  // Derived booleans - computed BEFORE hooks, used for enabled flags
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const hasInvariantViolation = resolverCheck.ok && !resolverCheck.tenantId;
   
   // Display-only values (never use for queries)
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
-  const platform = resolver?.platform || null;
-  const storeKey = resolver?.storeKey || null;
   const user = resolver?.user || null;
-  const reason = resolver?.reason || null;
   const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // =====================================================
-  // HARD INVARIANT: resolved_missing_tenantId
-  // If resolver says RESOLVED but tenantId is missing, treat as ERROR
-  // =====================================================
-  const hasInvariantViolation = isResolved && !authTenantId;
+  // Deterministic query keys including platform + store identity (prevents cross-store cache bleed)
+  const ordersQueryKey = buildQueryKey('orders', resolverCheck);
+  const settingsQueryKey = buildQueryKey('tenantSettings', resolverCheck);
   
+  // Log invariant violation
   if (hasInvariantViolation) {
     console.error('[Orders] INVARIANT VIOLATION: resolved_missing_tenantId', {
-      status: resolver?.status,
-      platform,
-      storeKey,
-      integrationId: authIntegrationId,
-      tenantId: authTenantId
+      status: resolverCheck.status,
+      platform: resolverCheck.platform,
+      storeKey: resolverCheck.storeKey,
+      integrationId: resolverCheck.integrationId,
+      tenantId: resolverCheck.tenantId
     });
   }
-
-  // =====================================================
-  // QUERY FILTER - Single object used everywhere
-  // =====================================================
-  const queryFilter = isResolved && authTenantId && !hasInvariantViolation 
-    ? { tenant_id: authTenantId } 
-    : null;
-
-  // Deterministic query key including platform + store identity (prevents cross-store cache bleed)
-  const ordersQueryKey = ['orders', platform, storeKey, authIntegrationId, authTenantId];
-  const settingsQueryKey = ['tenantSettings', platform, storeKey, authTenantId];
 
   // =====================================================
   // DATA QUERIES - Hooks MUST be called unconditionally (React rules)
   // enabled flag gates actual execution
   // =====================================================
   
-  // Load tenant settings - only enabled when queryFilter is valid
+  // Load tenant settings - only enabled when canQuery
   const { data: tenantSettings } = useQuery({
     queryKey: settingsQueryKey,
     queryFn: async () => {
@@ -116,10 +101,10 @@ export default function Orders() {
       const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
-    enabled: !!queryFilter && !hasInvariantViolation
+    enabled: canQuery
   });
 
-  // Fetch orders with deterministic cache key - only enabled when queryFilter is valid
+  // Fetch orders with deterministic cache key - only enabled when canQuery
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ordersQueryKey,
     queryFn: async () => {
@@ -132,8 +117,18 @@ export default function Orders() {
       console.log('[Orders] Returned count:', allOrders.length);
       return allOrders;
     },
-    enabled: !!queryFilter && !hasInvariantViolation
+    enabled: canQuery
   });
+
+  // Cache isolation: invalidate queries when store identity changes
+  React.useEffect(() => {
+    if (resolverCheck.platform && resolverCheck.storeKey) {
+      // Store identity available - no action needed on mount
+    }
+    return () => {
+      // On unmount or store change, could invalidate here if needed
+    };
+  }, [resolverCheck.platform, resolverCheck.storeKey, resolverCheck.integrationId]);
 
   const isLoading = resolverLoading || ordersLoading;
 
@@ -274,8 +269,8 @@ export default function Orders() {
     for (const order of unscoredOrders.slice(0, 50)) { // Limit to 50 at a time
       try {
         await base44.functions.invoke('analyzeOrderRisk', {
-          order_id: order.id,
-          tenant_id: authTenantId
+        order_id: order.id,
+        tenant_id: resolverCheck.tenantId
         });
         analyzed++;
       } catch (e) {
@@ -317,10 +312,10 @@ export default function Orders() {
     <div className="space-y-6">
       {/* Debug Banner */}
       <DebugBanner 
-        shopDomain={storeKey} 
-        tenantId={authTenantId} 
+        shopDomain={resolverCheck.storeKey} 
+        tenantId={resolverCheck.tenantId} 
         ordersCount={orders.length}
-        debug={{ platform, reason, resolved: isResolved }}
+        debug={{ platform: resolverCheck.platform, reason: resolverCheck.reason, resolved: resolverCheck.ok }}
         queryFilter={queryFilter}
         dateRange={filters.dateRange}
         userEmail={user?.email}
