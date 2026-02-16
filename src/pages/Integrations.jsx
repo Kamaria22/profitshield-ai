@@ -17,6 +17,12 @@ import {
   AlertTriangle, Clock, ArrowUpDown, Play, Pause, Trash2, Eye, Zap,
   TrendingUp, Shield, Activity, Loader2
 } from 'lucide-react';
+import {
+  normalizeShopDomain,
+  parseQuery,
+  getPersistedShopifyContext,
+  persistShopifyContext
+} from '@/components/shopifyContext';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -66,16 +72,36 @@ export default function Integrations() {
   const loadTenant = async () => {
     try {
       const user = await base44.auth.me();
-      const urlParams = new URLSearchParams(window.location.search);
-      let shop = urlParams.get('shop');
+      const urlParams = parseQuery(window.location.search);
+      const persisted = getPersistedShopifyContext();
       
-      if (shop) {
-        const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+      let resolvedTenantId = null;
+      
+      // PRIORITY A: URL shop param
+      if (urlParams.shop) {
+        const shopDomain = normalizeShopDomain(urlParams.shop);
         const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
-        if (tenants.length) setTenantId(tenants[0].id);
-      } else if (user?.tenant_id) {
-        setTenantId(user.tenant_id);
+        if (tenants.length) {
+          resolvedTenantId = tenants[0].id;
+          persistShopifyContext({ shop: shopDomain, host: urlParams.host, tenantId: resolvedTenantId });
+        }
       }
+      
+      // PRIORITY B: localStorage
+      if (!resolvedTenantId && persisted.shopDomain) {
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
+        if (tenants.length) resolvedTenantId = tenants[0].id;
+      } else if (!resolvedTenantId && persisted.tenantId) {
+        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
+        if (tenants.length) resolvedTenantId = tenants[0].id;
+      }
+      
+      // PRIORITY C: user.tenant_id
+      if (!resolvedTenantId && user?.tenant_id) {
+        resolvedTenantId = user.tenant_id;
+      }
+      
+      if (resolvedTenantId) setTenantId(resolvedTenantId);
     } catch (e) {
       console.error('Error loading tenant:', e);
     }

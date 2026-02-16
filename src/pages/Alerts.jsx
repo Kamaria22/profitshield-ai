@@ -24,6 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  normalizeShopDomain,
+  parseQuery,
+  getPersistedShopifyContext,
+  persistShopifyContext
+} from '@/components/shopifyContext';
 
 import AlertCard from '../components/alerts/AlertCard';
 
@@ -43,10 +49,41 @@ export default function Alerts() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
-      if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) setTenant(tenants[0]);
+      // Use shared tenant resolution
+      const urlParams = parseQuery(window.location.search);
+      const persisted = getPersistedShopifyContext();
+      
+      let resolvedTenant = null;
+      
+      // PRIORITY A: URL shop param
+      if (urlParams.shop) {
+        const shopDomain = normalizeShopDomain(urlParams.shop);
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          persistShopifyContext({ shop: shopDomain, host: urlParams.host, tenantId: resolvedTenant.id });
+        }
       }
+      
+      // PRIORITY B: localStorage
+      if (!resolvedTenant && persisted.shopDomain) {
+        const tenants = await base44.entities.Tenant.filter({ shop_domain: persisted.shopDomain });
+        if (tenants.length > 0) resolvedTenant = tenants[0];
+      } else if (!resolvedTenant && persisted.tenantId) {
+        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
+        if (tenants.length > 0) resolvedTenant = tenants[0];
+      }
+      
+      // PRIORITY C: user.tenant_id
+      if (!resolvedTenant && currentUser?.tenant_id) {
+        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          persistShopifyContext({ shop: resolvedTenant.shop_domain, tenantId: resolvedTenant.id });
+        }
+      }
+      
+      if (resolvedTenant) setTenant(resolvedTenant);
     } catch (e) {
       console.log('Error loading user:', e);
     }
