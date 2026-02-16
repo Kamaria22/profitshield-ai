@@ -1,21 +1,24 @@
 import React, { useState, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { format, subDays } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { 
   Search, 
-  Filter, 
   Download,
   SlidersHorizontal,
   X,
   Loader2,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Store,
+  AlertTriangle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -32,12 +35,14 @@ import {
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { createPageUrl } from '@/components/platformContext';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
 import DebugBanner from '../components/DebugBanner';
 
 export default function Orders() {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,15 +57,18 @@ export default function Orders() {
   });
   const [analyzingRisk, setAnalyzingRisk] = useState(false);
 
-  // Use unified platform resolver with requireResolved gating
+  // =====================================================
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  // =====================================================
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   
-  // SINGLE SOURCE OF TRUTH: Only use resolverCheck for gated operations
+  // AUTHORITATIVE values - ONLY use these for queries/mutations
   const isResolved = resolverCheck.ok;
   const authTenantId = resolverCheck.tenantId;
+  const authIntegrationId = resolverCheck.integrationId;
   
-  // Raw values for display only
+  // Display-only values (never use for queries)
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const platform = resolver?.platform || null;
   const storeKey = resolver?.storeKey || null;
@@ -68,44 +76,105 @@ export default function Orders() {
   const reason = resolver?.reason || null;
   const resolverLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // SINGLE queryFilter object - used for ALL Order queries and debug display
-  // INVARIANT: If isResolved but no authTenantId, this is an error state
-  const queryFilter = isResolved && authTenantId ? { tenant_id: authTenantId } : null;
+  // =====================================================
+  // HARD INVARIANT: resolved_missing_tenantId
+  // If resolver says RESOLVED but tenantId is missing, treat as ERROR
+  // =====================================================
+  const hasInvariantViolation = isResolved && !authTenantId;
   
-  // Hard invariant check
-  if (isResolved && !authTenantId) {
-    console.warn('[Orders] INVARIANT VIOLATION: resolved=true but tenantId is null/undefined');
+  if (hasInvariantViolation) {
+    console.error('[Orders] INVARIANT VIOLATION: resolved_missing_tenantId', {
+      status: resolver?.status,
+      platform,
+      storeKey,
+      integrationId: authIntegrationId,
+      tenantId: authTenantId
+    });
   }
 
-  // Load tenant settings - ONLY when queryFilter is valid
+  // =====================================================
+  // QUERY FILTER - Single object used everywhere
+  // =====================================================
+  const queryFilter = isResolved && authTenantId && !hasInvariantViolation 
+    ? { tenant_id: authTenantId } 
+    : null;
+
+  // Deterministic query key including platform + store identity (prevents cross-store cache bleed)
+  const ordersQueryKey = ['orders', platform, storeKey, authIntegrationId, authTenantId];
+  const settingsQueryKey = ['tenantSettings', platform, storeKey, authTenantId];
+
+  // =====================================================
+  // EARLY RETURN: No valid context - show Connect Store banner
+  // This MUST come before any useQuery hooks that depend on queryFilter
+  // =====================================================
+  if (resolverLoading || status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (!queryFilter || hasInvariantViolation || status === RESOLVER_STATUS.ERROR) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-amber-100 rounded-full mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">No Store Connected</h2>
+              <p className="text-slate-600 mb-4 max-w-md">
+                {hasInvariantViolation 
+                  ? 'Store resolved but tenant data is missing. Please reconnect your store.'
+                  : 'Connect your store to view and analyze orders.'}
+              </p>
+              <Link to={createPageUrl('Integrations', location.search)}>
+                <Button className="gap-2">
+                  <Store className="w-4 h-4" />
+                  Connect Store
+                </Button>
+              </Link>
+              {hasInvariantViolation && (
+                <p className="text-xs text-red-600 mt-4 font-mono">
+                  Error: resolved_missing_tenantId
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // =====================================================
+  // DATA QUERIES - Only run when queryFilter is valid
+  // =====================================================
+  
+  // Load tenant settings
   const { data: tenantSettings } = useQuery({
-    queryKey: ['tenantSettings', authTenantId],
+    queryKey: settingsQueryKey,
     queryFn: async () => {
-      if (!queryFilter) return null;
       const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
       return settings[0] || null;
     },
     enabled: !!queryFilter
   });
 
-  // Fetch orders - ONLY when queryFilter is valid (never null)
+  // Fetch orders with deterministic cache key
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', queryFilter?.tenant_id],
+    queryKey: ordersQueryKey,
     queryFn: async () => {
-      // HARD GATE: Never query without valid filter
-      if (!queryFilter || !queryFilter.tenant_id) {
-        console.warn('[Orders] Skipping query - no valid queryFilter');
-        return [];
-      }
-      console.log('[Orders] Fetching orders with filter:', JSON.stringify(queryFilter));
+      console.log('[Orders] Fetching with filter:', JSON.stringify(queryFilter), 'key:', ordersQueryKey);
       const allOrders = await base44.entities.Order.filter(queryFilter, '-order_date', 1000);
       console.log('[Orders] Returned count:', allOrders.length);
       return allOrders;
     },
-    enabled: !!queryFilter && !!queryFilter.tenant_id
+    enabled: !!queryFilter
   });
 
-  const isLoading = resolverLoading || ordersLoading || status === RESOLVER_STATUS.RESOLVING;
+  const isLoading = ordersLoading;
 
   // Apply filters
   const filteredOrders = useMemo(() => {
@@ -208,7 +277,7 @@ export default function Orders() {
     }
 
     setAnalyzingRisk(false);
-    queryClient.invalidateQueries({ queryKey: ['orders', authTenantId] });
+    queryClient.invalidateQueries({ queryKey: ordersQueryKey });
     toast.success(`Analyzed ${analyzed} orders${failed > 0 ? `, ${failed} failed` : ''}`);
   };
 
@@ -545,7 +614,7 @@ export default function Orders() {
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
             onOrderUpdated={() => {
-              queryClient.invalidateQueries({ queryKey: ['orders', authTenantId] });
+              queryClient.invalidateQueries({ queryKey: ordersQueryKey });
               // Refresh selected order data
               base44.entities.Order.filter({ id: selectedOrder.id }).then(orders => {
                 if (orders.length > 0) setSelectedOrder(orders[0]);
