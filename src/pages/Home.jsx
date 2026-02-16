@@ -36,6 +36,7 @@ import ProfitChart from '../components/dashboard/ProfitChart';
 import { useTenantResolver } from '../components/useTenantResolver';
 import DebugBanner from '../components/DebugBanner';
 import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
+import BenchmarkComparison from '../components/dashboard/BenchmarkComparison';
 
 export default function Home() {
   const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
@@ -492,6 +493,9 @@ export default function Home() {
           </CardContent>
         </Card>
       )}
+
+      {/* Benchmark Comparison */}
+      <BenchmarkComparison tenantId={tenantId} />
 
       {/* Profit Chart */}
       <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
