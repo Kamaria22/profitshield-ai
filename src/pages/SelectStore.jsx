@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Store, ShoppingBag, Package, RefreshCw, AlertTriangle,
+  Store, ShoppingBag, Package, AlertTriangle,
   CheckCircle, XCircle, ArrowRight, Loader2
 } from 'lucide-react';
 
@@ -37,34 +37,31 @@ const PLATFORM_CONFIG = {
 export default function SelectStore() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { 
-    status, 
-    availableStores, 
-    selectStore, 
-    user,
-    reason 
-  } = usePlatformResolver();
+  const resolver = usePlatformResolver();
+  
+  // Safe destructure
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
+  const reason = resolver?.reason || null;
+  const selectStore = resolver?.selectStore;
+  
+  // SAFE: Always treat as array
+  const availableStores = Array.isArray(resolver?.availableStores) ? resolver.availableStores : [];
 
   // Get return URL from query params or default to home
   const urlParams = new URLSearchParams(location.search);
   const returnTo = urlParams.get('return') || 'Home';
 
   const handleSelectStore = async (integration) => {
+    if (!integration || !selectStore) return;
+    
     await selectStore(integration);
     
-    // Build proper query string based on platform
-    let queryStr = '';
-    if (integration.platform === 'shopify') {
-      queryStr = `?shop=${integration.store_key}`;
-    } else if (integration.platform === 'woocommerce') {
-      queryStr = `?platform=woocommerce&site=${integration.store_key}`;
-    } else if (integration.platform === 'bigcommerce') {
-      queryStr = `?platform=bigcommerce&store_hash=${integration.store_key}`;
-    } else {
-      queryStr = `?platform=${integration.platform}&store=${integration.store_key}`;
-    }
+    // Build URL with new context using createPageUrl with overrides
+    const url = createPageUrl(returnTo, location.search, {
+      platform: integration.platform,
+      storeKey: integration.store_key
+    });
     
-    const url = createPageUrl(returnTo, queryStr);
     navigate(url);
   };
 
@@ -87,9 +84,16 @@ export default function SelectStore() {
     );
   }
 
-  const hasConnectedStores = availableStores.some(s => s.status === 'connected');
-  const connectedStores = availableStores.filter(s => s.status === 'connected');
-  const disconnectedStores = availableStores.filter(s => s.status !== 'connected');
+  const connectedStores = availableStores.filter(s => s?.status === 'connected');
+  const disconnectedStores = availableStores.filter(s => s && s.status !== 'connected');
+
+  // Group stores by platform
+  const groupedStores = {};
+  connectedStores.forEach(store => {
+    const platform = store?.platform || 'other';
+    if (!groupedStores[platform]) groupedStores[platform] = [];
+    groupedStores[platform].push(store);
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -109,39 +113,47 @@ export default function SelectStore() {
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* Connected Stores */}
-          {connectedStores.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Connected Stores</p>
-              {connectedStores.map((integration) => {
-                const config = PLATFORM_CONFIG[integration.platform] || PLATFORM_CONFIG.shopify;
-                const Icon = config.icon;
+          {/* Connected Stores - Grouped by Platform */}
+          {Object.keys(groupedStores).length > 0 && (
+            <div className="space-y-4">
+              {Object.entries(groupedStores).map(([platform, stores]) => {
+                const config = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.shopify;
                 
                 return (
-                  <button
-                    key={integration.id}
-                    onClick={() => handleSelectStore(integration)}
-                    className="w-full p-4 rounded-lg border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left flex items-center gap-4"
-                  >
-                    <div className={`p-2 rounded-lg ${config.iconBg}`}>
-                      <Icon className={`w-5 h-5 ${config.iconColor}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 truncate">
-                        {integration.store_name || integration.store_key}
-                      </p>
-                      <p className="text-sm text-slate-500 truncate">
-                        {integration.store_key}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={config.color}>
-                        {config.name}
-                      </Badge>
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
-                    </div>
-                  </button>
+                  <div key={platform} className="space-y-2">
+                    <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                      <config.icon className={`w-4 h-4 ${config.iconColor}`} />
+                      {config.name} Stores
+                    </p>
+                    {stores.map((integration) => {
+                      if (!integration) return null;
+                      const Icon = config.icon;
+                      
+                      return (
+                        <button
+                          key={integration.id}
+                          onClick={() => handleSelectStore(integration)}
+                          className="w-full p-4 rounded-lg border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left flex items-center gap-4"
+                        >
+                          <div className={`p-2 rounded-lg ${config.iconBg}`}>
+                            <Icon className={`w-5 h-5 ${config.iconColor}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-900 truncate">
+                              {integration.store_name || integration.store_key || 'Unknown Store'}
+                            </p>
+                            <p className="text-sm text-slate-500 truncate">
+                              {integration.store_key || ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <ArrowRight className="w-4 h-4 text-slate-400" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>
@@ -152,6 +164,7 @@ export default function SelectStore() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-500">Disconnected Stores</p>
               {disconnectedStores.map((integration) => {
+                if (!integration) return null;
                 const config = PLATFORM_CONFIG[integration.platform] || PLATFORM_CONFIG.shopify;
                 const Icon = config.icon;
                 
@@ -165,15 +178,15 @@ export default function SelectStore() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-600 truncate">
-                        {integration.store_name || integration.store_key}
+                        {integration.store_name || integration.store_key || 'Unknown Store'}
                       </p>
                       <p className="text-sm text-slate-400 truncate">
-                        {integration.store_key}
+                        {integration.store_key || ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-slate-500">
-                        {integration.status}
+                        {integration.status || 'unknown'}
                       </Badge>
                       <XCircle className="w-4 h-4 text-slate-400" />
                     </div>

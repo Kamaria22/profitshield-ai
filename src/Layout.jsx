@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, parseQuery, getPersistedContext } from '@/components/platformContext';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
@@ -54,53 +54,72 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
-// Helper to check if user is admin - with null safety
+// Safe admin check
 function isUserAdmin(user) {
   if (!user) return false;
   const role = (user.app_role || user.role || '').toLowerCase();
   return role === 'owner' || role === 'admin';
 }
 
-// Debug Panel Component - receives search as prop for stability
+// Debug Panel with full trace visibility
 function DebugPanel({ resolver, userEmail, search }) {
-  // Safely parse search - never access window directly
   const urlParams = parseQuery(search || '');
   const persisted = getPersistedContext();
   
-  // Safe check for debug mode
   const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
-  
   if (!showDebug) return null;
   
-  // Safe resolver access
   const safeResolver = resolver || {};
-  const safeStatus = safeResolver.status || 'unknown';
-  const safeStores = Array.isArray(safeResolver.availableStores) ? safeResolver.availableStores : [];
+  const trace = safeResolver.trace || {};
+  const stores = Array.isArray(safeResolver.availableStores) ? safeResolver.availableStores : [];
   
   return (
-    <div className="fixed bottom-4 left-4 z-50 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-lg max-w-sm">
+    <div className="fixed bottom-4 left-4 z-50 bg-slate-900 text-white text-xs p-3 rounded-lg shadow-lg max-w-md max-h-[60vh] overflow-auto">
       <div className="flex items-center gap-2 mb-2 border-b border-slate-700 pb-2">
         <Bug className="w-4 h-4 text-amber-400" />
-        <span className="font-bold">Debug Panel</span>
+        <span className="font-bold">Resolver Debug</span>
+        <span className="ml-auto text-slate-500">{trace.finishedAt ? `${trace.finishedAt - trace.startedAt}ms` : '...'}</span>
       </div>
-      <div className="space-y-1">
-        <p><span className="text-slate-400">Status:</span> <span className={
-          safeStatus === RESOLVER_STATUS.RESOLVED ? 'text-green-400' :
-          safeStatus === RESOLVER_STATUS.ERROR ? 'text-red-400' :
-          'text-yellow-400'
-        }>{safeStatus}</span></p>
+      
+      <div className="space-y-1 mb-3">
+        <p>
+          <span className="text-slate-400">Status:</span>{' '}
+          <span className={
+            safeResolver.status === RESOLVER_STATUS.RESOLVED ? 'text-green-400' :
+            safeResolver.status === RESOLVER_STATUS.ERROR ? 'text-red-400' :
+            safeResolver.status === RESOLVER_STATUS.NEEDS_SELECTION ? 'text-yellow-400' :
+            'text-blue-400'
+          }>{safeResolver.status || 'unknown'}</span>
+        </p>
+        <p><span className="text-slate-400">ChosenBy:</span> {trace.chosenBy || 'null'}</p>
+        <p><span className="text-slate-400">Reason:</span> {safeResolver.reason || 'null'}</p>
         <p><span className="text-slate-400">Tenant:</span> {safeResolver.tenantId || 'null'}</p>
         <p><span className="text-slate-400">Platform:</span> {safeResolver.platform || 'null'}</p>
-        <p><span className="text-slate-400">StoreKey:</span> {safeResolver.storeKey || 'null'}</p>
-        <p><span className="text-slate-400">Integration:</span> {safeResolver.integration?.id || 'null'}</p>
-        <p><span className="text-slate-400">Reason:</span> {safeResolver.reason || 'null'}</p>
-        <p><span className="text-slate-400">Stores:</span> {safeStores.length}</p>
-        <div className="border-t border-slate-700 mt-2 pt-2">
-          <p className="text-slate-400 mb-1">Persisted:</p>
-          <p className="truncate"><span className="text-slate-500">platform:</span> {persisted.platform || 'null'}</p>
-          <p className="truncate"><span className="text-slate-500">storeKey:</span> {persisted.storeKey || 'null'}</p>
-        </div>
+        <p><span className="text-slate-400">StoreKey:</span> <span className="truncate">{safeResolver.storeKey || 'null'}</span></p>
+        <p><span className="text-slate-400">IntegrationId:</span> {safeResolver.integrationId || 'null'}</p>
+        <p><span className="text-slate-400">Stores:</span> {stores.length}</p>
       </div>
+      
+      <div className="border-t border-slate-700 pt-2 mb-2">
+        <p className="text-slate-400 mb-1">Persisted Context:</p>
+        <p className="truncate"><span className="text-slate-500">platform:</span> {persisted.platform || 'null'}</p>
+        <p className="truncate"><span className="text-slate-500">storeKey:</span> {persisted.storeKey || 'null'}</p>
+        <p className="truncate"><span className="text-slate-500">tenantId:</span> {persisted.tenantId || 'null'}</p>
+        <p className="truncate"><span className="text-slate-500">persistedAt:</span> {persisted.persistedAt ? new Date(persisted.persistedAt).toISOString() : 'null'}</p>
+      </div>
+      
+      {Array.isArray(trace.steps) && trace.steps.length > 0 && (
+        <div className="border-t border-slate-700 pt-2">
+          <p className="text-slate-400 mb-1">Trace ({trace.steps.length} steps):</p>
+          <div className="space-y-1 max-h-32 overflow-auto">
+            {trace.steps.map((step, i) => (
+              <p key={i} className={step.ok ? 'text-slate-300' : 'text-red-400'}>
+                {step.ok ? '✓' : '✗'} {step.step} {step.note ? `- ${step.note}` : ''}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -111,14 +130,15 @@ function LayoutContent({ children, currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Safe permissions hook usage
+  // Safe permissions
   const permissionsData = usePermissions() || {};
   const { hasPermission = () => true, role = null, user: permUser = null } = permissionsData;
   
-  // Use unified platform resolver with fallback
+  // Platform resolver
   const resolver = usePlatformResolver() || {};
+  const resolverCheck = requireResolved(resolver);
   
-  // Destructure with safe defaults
+  // Safe destructure
   const status = resolver.status || RESOLVER_STATUS.RESOLVING;
   const tenantId = resolver.tenantId || null;
   const tenant = resolver.tenant || null;
@@ -126,39 +146,35 @@ function LayoutContent({ children, currentPageName }) {
   const platform = resolver.platform || null;
   const storeKey = resolver.storeKey || null;
   const integration = resolver.integration || null;
-  const reason = resolver.reason || null;
-  
-  // SAFE: Always ensure availableStores is an array
   const stores = Array.isArray(resolver.availableStores) ? resolver.availableStores : [];
 
-  // Load alerts when tenant is resolved
+  // Load alerts when resolved
   useEffect(() => {
-    if (status === RESOLVER_STATUS.RESOLVED && tenantId) {
-      loadAlerts();
+    if (resolverCheck.ok && resolverCheck.tenantId) {
+      loadAlerts(resolverCheck.tenantId);
     } else {
       setPendingAlerts(0);
     }
-  }, [status, tenantId]);
+  }, [resolverCheck.ok, resolverCheck.tenantId]);
 
-  const loadAlerts = async () => {
+  const loadAlerts = async (tid) => {
     try {
       const alerts = await base44.entities.Alert.filter({ 
-        tenant_id: tenantId, 
+        tenant_id: tid, 
         status: 'pending' 
       });
       setPendingAlerts(Array.isArray(alerts) ? alerts.length : 0);
     } catch (e) {
-      console.log('Error loading alerts:', e.message);
+      console.warn('Error loading alerts:', e.message);
       setPendingAlerts(0);
     }
   };
 
-  // SAFE redirect to SelectStore - proper URL joining
+  // Safe redirect to SelectStore
   useEffect(() => {
     if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore') {
       const returnPath = encodeURIComponent(currentPageName || 'Home');
       const base = createPageUrl('SelectStore', location.search);
-      // Safe joiner: check if URL already has ? 
       const joiner = base.includes('?') ? '&' : '?';
       navigate(`${base}${joiner}return=${returnPath}`);
     }
@@ -169,12 +185,11 @@ function LayoutContent({ children, currentPageName }) {
       base44.auth.logout();
     } catch (e) {
       console.error('Logout error:', e);
-      // Force reload as fallback
       window.location.href = '/';
     }
   };
 
-  // Don't show layout for onboarding, auth pages, or store selection
+  // Bypass layout for certain pages
   const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'];
   if (bypassLayoutPages.includes(currentPageName)) {
     return <>{children}</>;
@@ -230,7 +245,7 @@ function LayoutContent({ children, currentPageName }) {
             </button>
           </div>
 
-          {/* Store Info - safe null checks */}
+          {/* Store Info */}
           {tenant && (
             <div className="px-4 py-3 border-b border-slate-200">
               <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
@@ -261,9 +276,7 @@ function LayoutContent({ children, currentPageName }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
-              // Check permission - safe call
               if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) return false;
-              // Check adminOnly
               if (item.adminOnly && !isAdmin) return false;
               return true;
             }).map((item) => {
@@ -295,7 +308,7 @@ function LayoutContent({ children, currentPageName }) {
             })}
           </nav>
 
-          {/* User Menu - safe null checks */}
+          {/* User Menu */}
           {activeUser && (
             <div className="p-4 border-t border-slate-200">
               <DropdownMenu>
@@ -347,7 +360,6 @@ function LayoutContent({ children, currentPageName }) {
           </button>
 
           <div className="flex-1 flex items-center gap-4 lg:ml-4">
-            {/* Store Switcher - SAFE: only show if stores array has multiple items */}
             {stores.length > 1 && <StoreSwitcher />}
           </div>
 
@@ -383,18 +395,18 @@ function LayoutContent({ children, currentPageName }) {
           {children}
         </main>
 
-        {/* MerchantAI Chat - with error boundary, safe checks */}
-        {tenantId && activeUser && (
+        {/* MerchantAI Chat */}
+        {resolverCheck.ok && activeUser && (
           <ErrorBoundary fallback={null}>
             <MerchantAIChat 
-              tenantId={tenantId} 
+              tenantId={resolverCheck.tenantId} 
               currentPage={currentPageName || 'Home'}
             />
           </ErrorBoundary>
         )}
       </div>
 
-      {/* Debug Panel - pass search prop instead of using window */}
+      {/* Debug Panel */}
       <DebugPanel 
         resolver={resolver} 
         userEmail={activeUser?.email} 
@@ -404,7 +416,7 @@ function LayoutContent({ children, currentPageName }) {
   );
 }
 
-// Simple error boundary for chat
+// Error boundary for chat
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -414,7 +426,7 @@ class ErrorBoundary extends React.Component {
     return { hasError: true };
   }
   componentDidCatch(error, info) {
-    console.error('MerchantAI Chat error:', error, info);
+    console.error('Component error:', error, info);
   }
   render() {
     if (this.state.hasError) {
