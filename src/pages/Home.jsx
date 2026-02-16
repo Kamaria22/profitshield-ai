@@ -34,7 +34,7 @@ import { useTenantResolver } from '../components/useTenantResolver';
 import DebugBanner from '../components/DebugBanner';
 
 export default function Home() {
-  const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug } = useTenantResolver();
+  const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
   const [dateRange, setDateRange] = useState('30');
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -168,6 +168,7 @@ export default function Home() {
         tenantId={tenantId} 
         ordersCount={orders.length}
         debug={debug}
+        userEmail={user?.email}
       />
 
       {/* Header */}

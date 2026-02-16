@@ -2,13 +2,19 @@ import React from 'react';
 import { Bug } from 'lucide-react';
 
 /**
- * Temporary debug banner showing tenant resolution info
- * Remove in production
+ * Debug banner showing tenant resolution info.
+ * Only visible if URL has ?debug=1 OR user email is rohan.a.roberts@gmail.com
  */
-export default function DebugBanner({ shopDomain, tenantId, ordersCount, debug, queryFilter, dateRange, queryInfo }) {
+export default function DebugBanner({ shopDomain, tenantId, ordersCount, debug, queryFilter, dateRange, queryInfo, userEmail }) {
   const [visible, setVisible] = React.useState(true);
   
-  if (!visible) return null;
+  // Production gating: only show for debug mode or specific admin
+  const urlParams = new URLSearchParams(window.location.search);
+  const debugParam = urlParams.get('debug') === '1';
+  const isAdmin = userEmail === 'rohan.a.roberts@gmail.com';
+  const showDebug = debugParam || isAdmin;
+  
+  if (!showDebug || !visible) return null;
   
   const filterStr = queryFilter ? JSON.stringify(queryFilter) : 'null';
   

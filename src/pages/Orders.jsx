@@ -61,8 +61,12 @@ export default function Orders() {
     dateEnd: null,
     dateField: 'order_date'
   });
+  
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Resolve tenant directly on mount
+  // Priority: A) URL param ?shop= > B) localStorage > C) user.tenant_id
+  // NO fallback to first tenant
   useEffect(() => {
     async function resolveTenant() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -80,8 +84,18 @@ export default function Orders() {
       
       let resolvedTenant = null;
       let resolvedShopDomain = null;
+      let user = null;
       
-      // Method 1: URL shop param
+      // Get current user for debug panel gating
+      try {
+        user = await base44.auth.me();
+        setCurrentUser(user);
+        console.log('[Orders] User:', user?.email, 'tenant_id:', user?.tenant_id);
+      } catch (e) {
+        console.log('[Orders] No user auth');
+      }
+      
+      // PRIORITY A: URL shop param
       if (shopParam) {
         resolvedShopDomain = shopParam.includes('.myshopify.com') 
           ? shopParam.toLowerCase().trim()
@@ -95,29 +109,13 @@ export default function Orders() {
         
         if (tenants.length > 0) {
           resolvedTenant = tenants[0];
+          // Persist for navigation fallback
+          localStorage.setItem('resolved_shop_domain', resolvedShopDomain);
+          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
         }
       }
       
-      // Method 2: User's tenant_id
-      if (!resolvedTenant) {
-        try {
-          const user = await base44.auth.me();
-          console.log('[Orders] User:', user?.email, 'tenant_id:', user?.tenant_id);
-          
-          if (user?.tenant_id) {
-            debug.resolved_via = 'user_tenant';
-            const tenants = await base44.entities.Tenant.filter({ id: user.tenant_id });
-            if (tenants.length > 0) {
-              resolvedTenant = tenants[0];
-              resolvedShopDomain = resolvedTenant.shop_domain;
-            }
-          }
-        } catch (e) {
-          console.log('[Orders] No user auth');
-        }
-      }
-      
-      // Method 3: localStorage fallback
+      // PRIORITY B: localStorage fallback
       if (!resolvedTenant) {
         const storedShopDomain = localStorage.getItem('resolved_shop_domain');
         const storedTenantId = localStorage.getItem('resolved_tenant_id');
@@ -140,9 +138,22 @@ export default function Orders() {
         }
       }
       
-      // No fallback - require explicit tenant resolution
+      // PRIORITY C: User's tenant_id
+      if (!resolvedTenant && user?.tenant_id) {
+        debug.resolved_via = 'user_tenant';
+        const tenants = await base44.entities.Tenant.filter({ id: user.tenant_id });
+        if (tenants.length > 0) {
+          resolvedTenant = tenants[0];
+          resolvedShopDomain = resolvedTenant.shop_domain;
+          // Persist for navigation
+          localStorage.setItem('resolved_shop_domain', resolvedShopDomain);
+          localStorage.setItem('resolved_tenant_id', resolvedTenant.id);
+        }
+      }
+      
+      // NO FALLBACK - require explicit tenant resolution
       if (!resolvedTenant) {
-        console.warn('[Orders] No tenant resolved. shop param missing and no user tenant.');
+        console.warn('[Orders] No tenant resolved. shop param missing and no fallback.');
         setTenantState({
           tenant: null,
           tenantId: null,
@@ -172,17 +183,17 @@ export default function Orders() {
 
   const { tenant, tenantId, shopDomain, loading: tenantLoading, debug } = tenantState;
 
+  // Build the query filter object once - reuse for query and debug display
+  const queryFilter = tenantId ? { tenant_id: tenantId } : null;
+  
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', tenantId],
     queryFn: async () => {
-      if (!tenantId) {
+      if (!queryFilter) {
         console.log('[Orders] No tenantId, returning empty');
         setQueryInfo({ filter: null, count: 0, dateStart: null, dateEnd: null, dateField: 'order_date' });
         return [];
       }
-      
-      // Simple query: just tenant_id, no date filtering at DB level
-      const queryFilter = { tenant_id: tenantId };
       
       console.log('[Orders] ====== QUERY START ======');
       console.log('[Orders] Environment: PRODUCTION');
@@ -202,6 +213,7 @@ export default function Orders() {
       const now = new Date();
       const dateStart = subDays(now, 30);
       
+      // Set queryInfo with the same filter object used in the query
       setQueryInfo({ 
         filter: queryFilter, 
         count: allOrders.length,
@@ -296,6 +308,7 @@ export default function Orders() {
         queryFilter={queryInfo.filter}
         dateRange={filters.dateRange}
         queryInfo={queryInfo}
+        userEmail={currentUser?.email}
       />
 
       {/* Header */}
