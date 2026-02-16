@@ -60,6 +60,7 @@ import AuditLogs from './pages/AuditLogs';
 import SystemHealth from './pages/SystemHealth';
 import FounderDashboard from './pages/FounderDashboard';
 import DataCompliance from './pages/DataCompliance';
+import Integrations from './pages/Integrations';
 import __Layout from './Layout.jsx';
 
 
@@ -77,6 +78,7 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "FounderDashboard": FounderDashboard,
     "DataCompliance": DataCompliance,
+    "Integrations": Integrations,
 }
 
 export const pagesConfig = {
