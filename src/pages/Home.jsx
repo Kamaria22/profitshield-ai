@@ -35,6 +35,7 @@ import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import ProfitChart from '../components/dashboard/ProfitChart';
 import { useTenantResolver } from '../components/useTenantResolver';
 import DebugBanner from '../components/DebugBanner';
+import PendingShopifyActionsPanel from '../components/alerts/PendingShopifyActionsPanel';
 
 export default function Home() {
   const { tenant, tenantId, shopDomain, loading: tenantLoading, error: tenantError, debug, user } = useTenantResolver();
@@ -459,6 +460,9 @@ export default function Home() {
           </CardContent>
         </Card>
       )}
+
+      {/* Pending Shopify Actions */}
+      <PendingShopifyActionsPanel tenantId={tenantId} />
 
       {/* Alerts Banner */}
       {pendingAlerts.length > 0 && (
