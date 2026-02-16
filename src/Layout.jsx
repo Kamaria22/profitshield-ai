@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import {
-  createPageUrl,
-  normalizeShopDomain,
-  parseQuery,
-  getPersistedShopifyContext,
-  persistShopifyContext,
-  isUserAdmin
-} from '@/components/shopifyContext';
+import { createPageUrl, parseQuery, getPersistedContext, persistContext } from '@/components/platformContext';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
+import StoreSwitcher from '@/components/StoreSwitcher';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -26,7 +21,8 @@ import {
   TrendingUp,
   Users,
   ClipboardList,
-  Link2
+  Link2,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,114 +51,74 @@ const navItems = [
 
 function LayoutContent({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState(null);
-  const [tenant, setTenant] = useState(null);
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
   const { hasPermission, role } = usePermissions();
+  
+  // Use unified platform resolver
+  const { 
+    status, 
+    tenantId, 
+    tenant, 
+    user, 
+    platform, 
+    storeKey,
+    integration,
+    availableStores,
+    reason
+  } = usePlatformResolver();
 
+  // Load alerts when tenant is resolved
   useEffect(() => {
-    loadUserAndTenant();
-  }, [location.search]);
+    if (status === RESOLVER_STATUS.RESOLVED && tenantId) {
+      loadAlerts();
+    }
+  }, [status, tenantId]);
 
-  const loadUserAndTenant = async () => {
+  const loadAlerts = async () => {
     try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      
-      // Parse URL params
-      const urlParams = parseQuery(location.search);
-      const persisted = getPersistedShopifyContext();
-      
-      let resolvedTenant = null;
-      let resolvedShopDomain = null;
-      let resolvedHost = urlParams.host || persisted.host;
-      
-      // PRIORITY A: URL shop param
-      if (urlParams.shop) {
-        resolvedShopDomain = normalizeShopDomain(urlParams.shop);
-        console.log('[Layout] Resolving tenant from shop param:', resolvedShopDomain);
-        
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          console.log('[Layout] Found tenant:', resolvedTenant.id);
-        }
-      }
-
-      // PRIORITY B: localStorage fallback
-      if (!resolvedTenant && persisted.shopDomain) {
-        console.log('[Layout] Trying localStorage fallback:', persisted.shopDomain);
-        resolvedShopDomain = persisted.shopDomain;
-        
-        const tenants = await base44.entities.Tenant.filter({ shop_domain: resolvedShopDomain });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-        }
-      } else if (!resolvedTenant && persisted.tenantId) {
-        console.log('[Layout] Trying localStorage tenant_id fallback:', persisted.tenantId);
-        
-        const tenants = await base44.entities.Tenant.filter({ id: persisted.tenantId });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = resolvedTenant.shop_domain;
-        }
-      }
-      
-      // PRIORITY C: user.tenant_id fallback
-      if (!resolvedTenant && currentUser?.tenant_id) {
-        console.log('[Layout] Using user.tenant_id fallback:', currentUser.tenant_id);
-        
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0) {
-          resolvedTenant = tenants[0];
-          resolvedShopDomain = resolvedTenant.shop_domain;
-        }
-      }
-
-      // NO FALLBACK to first tenant - require explicit resolution
-      if (!resolvedTenant) {
-        console.warn('[Layout] No tenant resolved. Missing shop param and no valid fallback.');
-        setTenant(null);
-        setPendingAlerts(0);
-        return;
-      }
-      
-      // Persist resolved context for navigation (including embedded/debug flags)
-      persistShopifyContext({
-        shop: resolvedShopDomain,
-        host: resolvedHost,
-        tenantId: resolvedTenant.id,
-        embedded: urlParams.embedded ?? persisted.embedded,
-        debug: urlParams.debug ?? persisted.debug
-      });
-      
-      setTenant(resolvedTenant);
-      console.log('[Layout] Resolved tenant:', resolvedTenant.id, 'shop:', resolvedShopDomain);
-      
-      // Load alerts for the resolved tenant
       const alerts = await base44.entities.Alert.filter({ 
-        tenant_id: resolvedTenant.id, 
+        tenant_id: tenantId, 
         status: 'pending' 
       });
       setPendingAlerts(alerts.length);
     } catch (e) {
-      console.log('User not logged in or error:', e.message);
+      console.log('Error loading alerts:', e.message);
     }
   };
+
+  // Redirect to SelectStore if needed
+  useEffect(() => {
+    if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore') {
+      navigate(createPageUrl('SelectStore', location.search) + `&return=${currentPageName}`);
+    }
+  }, [status, currentPageName, navigate, location.search]);
 
   const handleLogout = () => {
     base44.auth.logout();
   };
 
-  // Don't show layout for onboarding or auth pages
-  if (['Onboarding', 'ShopifyAuth', 'ShopifyCallback'].includes(currentPageName)) {
+  // Don't show layout for onboarding, auth pages, or store selection
+  if (['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'].includes(currentPageName)) {
     return <>{children}</>;
   }
 
+  // Loading state
+  if (status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   const urlParams = parseQuery(location.search);
-  const persisted = getPersistedShopifyContext();
-  const showMissingContextBanner = !tenant && !persisted.tenantId && !urlParams.shop;
+  const persisted = getPersistedContext();
+  const showMissingContextBanner = status === RESOLVER_STATUS.ERROR;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -202,8 +158,13 @@ function LayoutContent({ children, currentPageName }) {
           {tenant && (
             <div className="px-4 py-3 border-b border-slate-200">
               <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
-              <p className="text-sm font-medium text-slate-900 truncate">{tenant.shop_name || tenant.shop_domain}</p>
+              <p className="text-sm font-medium text-slate-900 truncate">
+                {integration?.store_name || tenant.shop_name || storeKey}
+              </p>
               <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-xs capitalize">
+                  {platform}
+                </Badge>
                 <Badge variant="outline" className="text-xs capitalize">
                   {tenant.subscription_tier}
                 </Badge>
@@ -220,7 +181,6 @@ function LayoutContent({ children, currentPageName }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
-              // Check permission-based access
               if (item.permission && !hasPermission(item.permission)) return false;
               return true;
             }).map((item) => {
@@ -303,7 +263,10 @@ function LayoutContent({ children, currentPageName }) {
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex-1 lg:flex-none" />
+          <div className="flex-1 flex items-center gap-4 lg:ml-4">
+            {/* Store Switcher - show if multiple stores */}
+            {availableStores.length > 1 && <StoreSwitcher />}
+          </div>
 
           <div className="flex items-center gap-3">
             <Link to={createPageUrl('Alerts', location.search)}>
@@ -323,11 +286,15 @@ function LayoutContent({ children, currentPageName }) {
         <main className="p-4 lg:p-6">
           {showMissingContextBanner && (
             <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
-              <p className="font-medium mb-1">Embedded Context Missing</p>
-              <p>No store resolved. Open the app with a shop param:</p>
-              <code className="block mt-2 p-2 bg-yellow-100 rounded text-xs">
-                /orders?shop=yourstore.myshopify.com&host=YOUR_HOST_VALUE&embedded=1
-              </code>
+              <p className="font-medium mb-1">No Store Connected</p>
+              <p>Please connect a store to continue.</p>
+              <Button 
+                size="sm" 
+                className="mt-2"
+                onClick={() => navigate(createPageUrl('Integrations', location.search))}
+              >
+                Connect Store
+              </Button>
             </div>
           )}
           {children}

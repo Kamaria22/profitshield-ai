@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -7,7 +7,8 @@ import {
   Filter, 
   Download,
   SlidersHorizontal,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,13 +28,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  normalizeShopDomain,
-  parseQuery,
-  getPersistedShopifyContext,
-  persistShopifyContext
-} from '@/components/shopifyContext';
+import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
