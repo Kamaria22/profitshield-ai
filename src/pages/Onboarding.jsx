@@ -19,6 +19,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
@@ -27,7 +30,32 @@ const steps = [
   { id: 'connect', title: 'Connect Store', icon: Store },
   { id: 'scan', title: 'Analyze Data', icon: Scan },
   { id: 'results', title: 'View Results', icon: Sparkles },
-  { id: 'protect', title: 'Enable Protection', icon: Shield },
+  { id: 'rules', title: 'Risk Rules', icon: Shield },
+  { id: 'sync', title: 'Sync Setup', icon: Zap },
+];
+
+const defaultRiskRules = [
+  {
+    name: 'High Value First Orders',
+    description: 'Flag first-time customers with large orders',
+    conditions: [{ field: 'is_first_order', operator: 'equals', value: 'true' }, { field: 'order_value', operator: 'greater_than', value: '500' }],
+    risk_adjustment: 25,
+    action: 'verify'
+  },
+  {
+    name: 'Excessive Discounts',
+    description: 'Orders with more than 30% discount',
+    conditions: [{ field: 'discount_pct', operator: 'greater_than', value: '30' }],
+    risk_adjustment: 15,
+    action: 'flag'
+  },
+  {
+    name: 'International High Value',
+    description: 'High value orders shipping internationally',
+    conditions: [{ field: 'shipping_country', operator: 'not_equals', value: 'US' }, { field: 'order_value', operator: 'greater_than', value: '300' }],
+    risk_adjustment: 20,
+    action: 'verify'
+  }
 ];
 
 export default function Onboarding() {
@@ -41,6 +69,15 @@ export default function Onboarding() {
     discount_protection: true,
     shipping_alerts: true,
     risk_alerts: true
+  });
+  const [selectedRules, setSelectedRules] = useState([0, 1]); // Default first two rules selected
+  const [syncSettings, setSyncSettings] = useState({
+    auto_sync_enabled: true,
+    sync_frequency_minutes: 15,
+    two_way_sync: true,
+    push_tags: true,
+    push_notes: true,
+    auto_hold_high_risk: false
   });
 
   useEffect(() => {
@@ -131,8 +168,16 @@ export default function Onboarding() {
     setCurrentStep('results');
   };
 
+  const proceedToRules = () => {
+    setCurrentStep('rules');
+  };
+
+  const proceedToSync = () => {
+    setCurrentStep('sync');
+  };
+
   const completeOnboarding = async () => {
-    setCurrentStep('protect');
+    setCurrentStep('completing');
     
     // Save settings and mark onboarding complete
     if (user?.tenant_id) {
@@ -161,6 +206,43 @@ export default function Onboarding() {
             enable_discount_protection: protections.discount_protection,
             enable_shipping_alerts: protections.shipping_alerts,
             enable_risk_alerts: protections.risk_alerts
+          });
+        }
+
+        // Create selected risk rules
+        for (const index of selectedRules) {
+          const rule = defaultRiskRules[index];
+          if (rule) {
+            await base44.entities.RiskRule.create({
+              tenant_id: user.tenant_id,
+              name: rule.name,
+              description: rule.description,
+              is_active: true,
+              priority: 50,
+              conditions: rule.conditions,
+              risk_adjustment: rule.risk_adjustment,
+              action: rule.action,
+              notification: true
+            });
+          }
+        }
+
+        // Update platform integration with sync settings
+        const integrations = await base44.entities.PlatformIntegration.filter({ tenant_id: user.tenant_id });
+        if (integrations.length > 0) {
+          await base44.entities.PlatformIntegration.update(integrations[0].id, {
+            sync_config: {
+              auto_sync_enabled: syncSettings.auto_sync_enabled,
+              sync_frequency_minutes: syncSettings.sync_frequency_minutes,
+              sync_products: true,
+              sync_customers: true
+            },
+            two_way_sync: {
+              enabled: syncSettings.two_way_sync,
+              push_tags: syncSettings.push_tags,
+              push_notes: syncSettings.push_notes,
+              auto_hold_high_risk: syncSettings.auto_hold_high_risk
+            }
           });
         }
       } catch (e) {
@@ -406,17 +488,220 @@ export default function Onboarding() {
                 <Button 
                   size="lg" 
                   className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={completeOnboarding}
+                  onClick={proceedToRules}
                 >
-                  Go to Dashboard
+                  Set Up Risk Rules
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 4: Completing */}
-          {currentStep === 'protect' && (
+          {/* Step 4: Risk Rules */}
+          {currentStep === 'rules' && (
+            <motion.div
+              key="rules"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                      <Shield className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Customize Risk Detection</h2>
+                      <p className="text-slate-500">Select rules to automatically flag risky orders</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {defaultRiskRules.map((rule, index) => (
+                      <div 
+                        key={index}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          selectedRules.includes(index) 
+                            ? 'border-emerald-500 bg-emerald-50' 
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        onClick={() => {
+                          if (selectedRules.includes(index)) {
+                            setSelectedRules(selectedRules.filter(i => i !== index));
+                          } else {
+                            setSelectedRules([...selectedRules, index]);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                              selectedRules.includes(index) ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+                            }`}>
+                              {selectedRules.includes(index) && <CheckCircle className="w-3 h-3 text-white" />}
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-900">{rule.name}</p>
+                              <p className="text-sm text-slate-500">{rule.description}</p>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {rule.conditions.map((c, i) => (
+                                  <Badge key={i} variant="outline" className="text-xs">
+                                    {c.field.replace('_', ' ')} {c.operator.replace('_', ' ')} {c.value}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge className={rule.risk_adjustment > 15 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}>
+                            +{rule.risk_adjustment} pts
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-sm text-slate-500 mt-4 text-center">
+                    You can add more custom rules later in Settings
+                  </p>
+                </CardContent>
+              </Card>
+
+              <div className="text-center">
+                <Button 
+                  size="lg" 
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={proceedToSync}
+                >
+                  Configure Sync
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 5: Sync Setup */}
+          {currentStep === 'sync' && (
+            <motion.div
+              key="sync"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                      <Zap className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Automated Sync Settings</h2>
+                      <p className="text-slate-500">Configure how ProfitShield syncs with your store</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                      <div>
+                        <p className="font-medium text-slate-900">Auto-Sync Orders</p>
+                        <p className="text-sm text-slate-500">Automatically sync new orders from your store</p>
+                      </div>
+                      <Switch 
+                        checked={syncSettings.auto_sync_enabled}
+                        onCheckedChange={(v) => setSyncSettings({ ...syncSettings, auto_sync_enabled: v })}
+                      />
+                    </div>
+
+                    {syncSettings.auto_sync_enabled && (
+                      <div className="p-4 bg-slate-50 rounded-xl">
+                        <Label className="text-sm font-medium text-slate-700">Sync Frequency</Label>
+                        <div className="flex gap-2 mt-2">
+                          {[5, 15, 30, 60].map((mins) => (
+                            <Button
+                              key={mins}
+                              variant={syncSettings.sync_frequency_minutes === mins ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setSyncSettings({ ...syncSettings, sync_frequency_minutes: mins })}
+                              className={syncSettings.sync_frequency_minutes === mins ? 'bg-emerald-600' : ''}
+                            >
+                              {mins < 60 ? `${mins}m` : '1h'}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <div>
+                        <p className="font-medium text-slate-900 flex items-center gap-2">
+                          Two-Way Sync
+                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">Recommended</Badge>
+                        </p>
+                        <p className="text-sm text-slate-500">Push risk data back to your store</p>
+                      </div>
+                      <Switch 
+                        checked={syncSettings.two_way_sync}
+                        onCheckedChange={(v) => setSyncSettings({ ...syncSettings, two_way_sync: v })}
+                      />
+                    </div>
+
+                    {syncSettings.two_way_sync && (
+                      <div className="ml-4 space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">Add Risk Tags to Orders</p>
+                            <p className="text-xs text-slate-500">e.g., "high-risk", "medium-risk"</p>
+                          </div>
+                          <Switch 
+                            checked={syncSettings.push_tags}
+                            onCheckedChange={(v) => setSyncSettings({ ...syncSettings, push_tags: v })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">Add Risk Notes</p>
+                            <p className="text-xs text-slate-500">Detailed risk analysis in order notes</p>
+                          </div>
+                          <Switch 
+                            checked={syncSettings.push_notes}
+                            onCheckedChange={(v) => setSyncSettings({ ...syncSettings, push_notes: v })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">Auto-Hold High Risk Orders</p>
+                            <p className="text-xs text-slate-500">Automatically hold fulfillment for review</p>
+                          </div>
+                          <Switch 
+                            checked={syncSettings.auto_hold_high_risk}
+                            onCheckedChange={(v) => setSyncSettings({ ...syncSettings, auto_hold_high_risk: v })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="text-center">
+                <Button 
+                  size="lg" 
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={completeOnboarding}
+                >
+                  Complete Setup
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 6: Completing */}
+          {currentStep === 'completing' && (
             <motion.div
               key="protect"
               initial={{ opacity: 0, y: 20 }}
