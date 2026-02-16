@@ -33,8 +33,14 @@ import {
   Star,
   Gift,
   Rocket,
-  FlaskConical
+  FlaskConical,
+  Settings
 } from 'lucide-react';
+
+import AutopilotStatusPanel from '@/components/autopilot/AutopilotStatusPanel';
+import DecisionQueue from '@/components/autopilot/DecisionQueue';
+import DataFlywheelViz from '@/components/autopilot/DataFlywheelViz';
+import ExperimentsPanel from '@/components/autopilot/ExperimentsPanel';
 import {
   Select,
   SelectContent,
@@ -43,6 +49,48 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+
+// Strategic Memory Summary Component
+function StrategicMemorySummary() {
+  const { data: memories = [], isLoading } = useQuery({
+    queryKey: ['strategicMemories'],
+    queryFn: () => base44.entities.StrategicMemory.filter({ is_active: true }, '-times_referenced', 10)
+  });
+
+  if (isLoading) {
+    return <div className="text-center py-4"><Loader2 className="w-4 h-4 animate-spin mx-auto" /></div>;
+  }
+
+  if (memories.length === 0) {
+    return <p className="text-sm text-slate-500 text-center py-4">No strategic memories yet</p>;
+  }
+
+  const typeColors = {
+    experiment_result: 'bg-purple-100 text-purple-700',
+    pricing_insight: 'bg-emerald-100 text-emerald-700',
+    fraud_pattern: 'bg-red-100 text-red-700',
+    conversion_lever: 'bg-blue-100 text-blue-700',
+    churn_driver: 'bg-amber-100 text-amber-700'
+  };
+
+  return (
+    <div className="space-y-2">
+      {memories.slice(0, 5).map((memory) => (
+        <div key={memory.id} className="p-2 bg-slate-50 rounded">
+          <div className="flex items-center justify-between mb-1">
+            <Badge className={typeColors[memory.memory_type] || 'bg-slate-100 text-slate-700'} variant="outline">
+              {memory.memory_type?.replace(/_/g, ' ')}
+            </Badge>
+            <span className="text-xs text-slate-400">
+              {Math.round((memory.confidence || 0) * 100)}% conf
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 line-clamp-2">{memory.insight}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function FounderDashboard() {
   const [question, setQuestion] = useState('');
@@ -293,8 +341,9 @@ export default function FounderDashboard() {
         </div>
       )}
 
-      <Tabs defaultValue="insights">
+      <Tabs defaultValue="autopilot">
         <TabsList className="flex-wrap">
+          <TabsTrigger value="autopilot">Autopilot</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="growth">Growth</TabsTrigger>
           <TabsTrigger value="risk-roi">Risk ROI</TabsTrigger>
@@ -302,6 +351,40 @@ export default function FounderDashboard() {
           <TabsTrigger value="moat">Moat Strength</TabsTrigger>
           <TabsTrigger value="roadmap">Strategic Roadmap</TabsTrigger>
         </TabsList>
+
+        {/* Autopilot Tab */}
+        <TabsContent value="autopilot" className="mt-4">
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left Column - Status & Controls */}
+            <div className="lg:col-span-1 space-y-4">
+              <AutopilotStatusPanel />
+            </div>
+
+            {/* Middle Column - Decisions & Experiments */}
+            <div className="lg:col-span-1 space-y-4">
+              <DecisionQueue limit={10} />
+              <ExperimentsPanel />
+            </div>
+
+            {/* Right Column - Flywheel & Memory */}
+            <div className="lg:col-span-1 space-y-4">
+              <DataFlywheelViz />
+              
+              {/* Strategic Memory Summary */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-purple-600" />
+                    Strategic Memory
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StrategicMemorySummary />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
         <TabsContent value="insights" className="space-y-4 mt-4">
           {insightsLoading ? (
