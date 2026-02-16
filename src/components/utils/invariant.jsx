@@ -42,23 +42,40 @@ export function softInvariant(condition, message, context = {}) {
   logTelemetryEvent('soft_invariant', { message, ...context });
 }
 
-// Rate-limited telemetry logging
-const telemetryCache = new Map();
-const MAX_EVENTS_PER_DAY = 20;
+// Rate-limited telemetry logging via backend
 const CACHE_KEY_PREFIX = 'telemetry_';
+const MAX_LOCAL_EVENTS = 20;
 
-function logTelemetryEvent(type, payload) {
+async function logTelemetryEvent(type, payload) {
   try {
     const today = new Date().toISOString().split('T')[0];
     const cacheKey = `${CACHE_KEY_PREFIX}${today}`;
     
-    // Check rate limit
+    // Check local rate limit
     const cached = localStorage.getItem(cacheKey);
     const count = cached ? parseInt(cached, 10) : 0;
     
-    if (count >= MAX_EVENTS_PER_DAY) {
-      return; // Rate limited
+    if (count >= MAX_LOCAL_EVENTS) {
+      return; // Rate limited locally
     }
+    
+    // Import base44 dynamically to avoid circular deps
+    const { base44 } = await import('@/api/base44Client');
+    
+    // Send to backend (backend also enforces rate limit)
+    await base44.functions.invoke('logClientEvent', {
+      level: type,
+      message: payload.message,
+      route: payload.route,
+      platform: payload.platform,
+      store_key_masked: payload.storeKey,
+      tenant_id_partial: payload.tenantId ? payload.tenantId.slice(0, 8) : null,
+      context: payload.context,
+      viewport: typeof window !== 'undefined' ? {
+        width: window.innerWidth,
+        height: window.innerHeight
+      } : null
+    });
     
     localStorage.setItem(cacheKey, String(count + 1));
     
@@ -68,7 +85,7 @@ function logTelemetryEvent(type, payload) {
       .forEach(k => localStorage.removeItem(k));
       
   } catch (e) {
-    // Silently fail if localStorage unavailable
+    // Silently fail - telemetry should never break the app
   }
 }
 

@@ -395,7 +395,7 @@ function LayoutContent({ children, currentPageName }) {
             </Link>
             <button 
               onClick={handleSidebarClose}
-              className="lg:hidden p-1 hover:bg-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="lg:hidden p-1 hover:bg-slate-100 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               aria-label="Close sidebar"
             >
               <X className="w-5 h-5" />
@@ -442,7 +442,7 @@ function LayoutContent({ children, currentPageName }) {
             </div>
           )}
 
-          {/* Navigation - keyboard accessible */}
+          {/* Navigation - keyboard accessible with focus states */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
             {filteredNavItems.map((item) => {
               const isActive = currentPageName === item.page;
@@ -454,8 +454,8 @@ function LayoutContent({ children, currentPageName }) {
                   onClick={handleSidebarClose}
                   className={`
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                    transition-colors duration-150
-                    focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
+                    transition-all duration-150
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2
                     ${isActive 
                       ? 'bg-emerald-50 text-emerald-700' 
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -521,8 +521,8 @@ function LayoutContent({ children, currentPageName }) {
         <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
           <button 
             onClick={handleSidebarOpen}
-            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            aria-label="Open sidebar"
+            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -535,10 +535,15 @@ function LayoutContent({ children, currentPageName }) {
 
           <div className="flex items-center gap-3">
             <Link to={createPageUrl('Alerts', location.search)}>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                aria-label={pendingAlerts > 0 ? `View ${pendingAlerts} pending alerts` : 'View alerts'}
+              >
                 <Bell className="w-5 h-5" />
                 {pendingAlerts > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center" aria-hidden="true">
                     {pendingAlerts > 9 ? '9+' : pendingAlerts}
                   </span>
                 )}
@@ -550,13 +555,14 @@ function LayoutContent({ children, currentPageName }) {
         {/* Page content */}
         <main className="p-4 lg:p-6">
           {showMissingContextBanner && (
-            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
               <p className="font-medium mb-1">No Store Connected</p>
               <p>Please connect a store to continue.</p>
               <Button 
                 size="sm" 
-                className="mt-2"
+                className="mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
                 onClick={() => navigate(createPageUrl('Integrations', location.search))}
+                aria-label="Go to integrations to connect store"
               >
                 Connect Store
               </Button>
