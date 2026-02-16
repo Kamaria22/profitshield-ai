@@ -11,7 +11,12 @@ import {
   Plus,
   Save,
   AlertTriangle,
-  Check
+  Check,
+  Store,
+  RefreshCw,
+  ExternalLink,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,12 +53,28 @@ import CostMappingTable from '../components/settings/CostMappingTable';
 import { useTenantResolver } from '../components/useTenantResolver';
 
 export default function Settings() {
-  const { tenant, tenantId, user, loading: tenantLoading } = useTenantResolver();
+  const { tenant, tenantId, shopDomain, user, loading: tenantLoading } = useTenantResolver();
   const [settings, setSettings] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
   const [newCostDialog, setNewCostDialog] = useState(false);
   const [newCost, setNewCost] = useState({ sku: '', product_title: '', cost_per_unit: '' });
+  const [connecting, setConnecting] = useState(false);
   const queryClient = useQueryClient();
+
+  // Check if we have a valid OAuth token
+  const { data: tokenStatus, refetch: refetchToken } = useQuery({
+    queryKey: ['oauthToken', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return { hasToken: false };
+      const tokens = await base44.entities.OAuthToken.filter({ 
+        tenant_id: tenantId, 
+        platform: 'shopify',
+        is_valid: true 
+      });
+      return { hasToken: tokens.length > 0, token: tokens[0] };
+    },
+    enabled: !!tenantId && !tenantLoading
+  });
 
   useEffect(() => {
     if (tenantId) {
@@ -67,6 +88,32 @@ export default function Settings() {
       if (settingsData.length > 0) setSettings(settingsData[0]);
     } catch (e) {
       console.log('Error loading settings:', e);
+    }
+  };
+
+  const handleReconnectShopify = async () => {
+    if (!shopDomain) {
+      toast.error('No shop domain found');
+      return;
+    }
+    
+    setConnecting(true);
+    try {
+      const response = await base44.functions.invoke('shopifyAuth', { 
+        action: 'install', 
+        shop: shopDomain 
+      });
+      
+      if (response.data?.install_url) {
+        window.location.href = response.data.install_url;
+      } else {
+        toast.error('Failed to get install URL');
+      }
+    } catch (e) {
+      toast.error('Failed to initiate Shopify connection');
+      console.error(e);
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -184,6 +231,75 @@ export default function Settings() {
 
         {/* General Tab */}
         <TabsContent value="general" className="mt-6 space-y-6">
+          {/* Shopify Connection Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="w-5 h-5" />
+                Shopify Connection
+              </CardTitle>
+              <CardDescription>Manage your Shopify store connection</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  {tokenStatus?.hasToken ? (
+                    <CheckCircle className="w-6 h-6 text-emerald-500" />
+                  ) : (
+                    <XCircle className="w-6 h-6 text-red-500" />
+                  )}
+                  <div>
+                    <p className="font-medium">
+                      {shopDomain || 'No store connected'}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {tokenStatus?.hasToken 
+                        ? 'Connected and syncing orders' 
+                        : 'Not connected - orders will not sync'}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleReconnectShopify}
+                  disabled={connecting || !shopDomain}
+                  variant={tokenStatus?.hasToken ? 'outline' : 'default'}
+                  className={!tokenStatus?.hasToken ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                >
+                  {connecting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : tokenStatus?.hasToken ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reconnect
+                    </>
+                  ) : (
+                    <>
+                      <Store className="w-4 h-4 mr-2" />
+                      Connect Shopify
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {!tokenStatus?.hasToken && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-red-900">Shopify Connection Required</p>
+                      <p className="text-sm text-red-700 mt-1">
+                        Your Shopify access token is missing or expired. Click "Connect Shopify" to authorize and start syncing orders.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Data Display Settings</CardTitle>
