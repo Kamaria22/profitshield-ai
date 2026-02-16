@@ -23,7 +23,13 @@ import {
   ChevronRight,
   Lightbulb,
   Bell,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Zap,
+  BarChart3,
+  Activity,
+  CheckCircle2,
+  XCircle,
+  Percent
 } from 'lucide-react';
 import {
   Select,
@@ -51,6 +57,24 @@ export default function FounderDashboard() {
   const { data: milestones = [] } = useQuery({
     queryKey: ['milestones'],
     queryFn: () => base44.entities.StrategicMilestone.filter({})
+  });
+
+  // Risk ROI metrics across all tenants (aggregated)
+  const { data: riskROI = [] } = useQuery({
+    queryKey: ['riskROIMetrics'],
+    queryFn: () => base44.entities.RiskROIMetric.filter({}, '-created_date', 50)
+  });
+
+  // Cross-merchant signals
+  const { data: crossSignals = [] } = useQuery({
+    queryKey: ['crossMerchantSignals'],
+    queryFn: () => base44.entities.CrossMerchantSignal.filter({ is_active: true })
+  });
+
+  // Global risk feature weights
+  const { data: globalWeights = [] } = useQuery({
+    queryKey: ['globalRiskWeights'],
+    queryFn: () => base44.entities.RiskFeatureWeight.filter({ scope: 'global' })
   });
 
   const generateBriefMutation = useMutation({
@@ -99,6 +123,21 @@ export default function FounderDashboard() {
   });
 
   const moatData = moatMetrics[0];
+
+  // Aggregate ROI metrics
+  const aggregatedROI = React.useMemo(() => {
+    if (riskROI.length === 0) return null;
+    
+    return {
+      totalChargebacksPrevented: riskROI.reduce((s, r) => s + (r.chargebacks_prevented || 0), 0),
+      totalFraudBlocked: riskROI.reduce((s, r) => s + (r.fraud_orders_blocked || 0), 0),
+      totalMarginRecovered: riskROI.reduce((s, r) => s + (r.margin_recovered || 0), 0),
+      avgAccuracy: riskROI.reduce((s, r) => s + (r.ai_accuracy_percent || 0), 0) / riskROI.length,
+      avgFalsePositiveRate: riskROI.reduce((s, r) => s + (r.false_positive_rate || 0), 0) / riskROI.length,
+      totalOrdersAnalyzed: riskROI.reduce((s, r) => s + (r.orders_analyzed || 0), 0),
+      tenantCount: new Set(riskROI.map(r => r.tenant_id)).size
+    };
+  }, [riskROI]);
 
   const severityColors = {
     critical: 'bg-red-100 text-red-700',
@@ -189,9 +228,60 @@ export default function FounderDashboard() {
         </CardContent>
       </Card>
 
+      {/* Risk ROI Summary Cards */}
+      {aggregatedROI && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-emerald-700">Chargebacks Prevented</span>
+                <Shield className="w-5 h-5 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-bold text-emerald-700">{aggregatedROI.totalChargebacksPrevented}</p>
+              <p className="text-xs text-emerald-600 mt-1">Across {aggregatedROI.tenantCount} merchants</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-blue-700">Margin Recovered</span>
+                <DollarSign className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="text-2xl font-bold text-blue-700">${aggregatedROI.totalMarginRecovered.toLocaleString()}</p>
+              <p className="text-xs text-blue-600 mt-1">Total loss avoided</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-purple-700">AI Accuracy</span>
+                <Brain className="w-5 h-5 text-purple-600" />
+              </div>
+              <p className="text-2xl font-bold text-purple-700">{aggregatedROI.avgAccuracy.toFixed(1)}%</p>
+              <p className="text-xs text-purple-600 mt-1">{aggregatedROI.totalOrdersAnalyzed.toLocaleString()} orders analyzed</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-amber-700">False Positive Rate</span>
+                <Percent className="w-5 h-5 text-amber-600" />
+              </div>
+              <p className="text-2xl font-bold text-amber-700">{(aggregatedROI.avgFalsePositiveRate * 100).toFixed(1)}%</p>
+              <p className="text-xs text-amber-600 mt-1">Lower is better</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Tabs defaultValue="insights">
         <TabsList>
           <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="risk-roi">Risk ROI</TabsTrigger>
+          <TabsTrigger value="global-intel">Global Intelligence</TabsTrigger>
           <TabsTrigger value="moat">Moat Strength</TabsTrigger>
           <TabsTrigger value="roadmap">Strategic Roadmap</TabsTrigger>
         </TabsList>
@@ -308,6 +398,146 @@ export default function FounderDashboard() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Risk ROI Tab */}
+        <TabsContent value="risk-roi" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-emerald-600" />
+                Risk Intelligence ROI by Tenant
+              </CardTitle>
+              <CardDescription>Performance metrics showing value delivered to each merchant</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-96 overflow-auto">
+                {riskROI.slice(0, 20).map((roi) => (
+                  <div key={roi.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">{roi.period} ({roi.period_type})</p>
+                      <p className="text-xs text-slate-500 truncate max-w-[200px]">Tenant: {roi.tenant_id?.slice(0, 8)}...</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="text-center">
+                        <p className="font-bold text-emerald-600">{roi.chargebacks_prevented || 0}</p>
+                        <p className="text-xs text-slate-500">Prevented</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-blue-600">${(roi.margin_recovered || 0).toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">Saved</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold text-purple-600">{roi.ai_accuracy_percent || 0}%</p>
+                        <p className="text-xs text-slate-500">Accuracy</p>
+                      </div>
+                      <Badge className={roi.roi_multiple >= 5 ? 'bg-emerald-100 text-emerald-700' : roi.roi_multiple >= 2 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}>
+                        {roi.roi_multiple || 0}x ROI
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {riskROI.length === 0 && (
+                  <p className="text-center text-slate-500 py-4">No ROI data yet. Run weekly recalibration to generate metrics.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Global Intelligence Tab */}
+        <TabsContent value="global-intel" className="mt-4 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-600" />
+                  Cross-Merchant Signals
+                </CardTitle>
+                <CardDescription>Anonymized risk patterns detected across multiple merchants</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-auto">
+                  {crossSignals.map((signal) => (
+                    <div key={signal.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                      <div>
+                        <p className="text-sm font-medium">{signal.signal_key.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-slate-500">{signal.merchant_count} merchants contributing</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className="bg-red-100 text-red-700">+{signal.risk_score_contribution} pts</Badge>
+                        <p className="text-xs text-slate-500 mt-1">{(signal.bad_outcome_rate * 100).toFixed(0)}% bad outcome rate</p>
+                      </div>
+                    </div>
+                  ))}
+                  {crossSignals.length === 0 && (
+                    <p className="text-center text-slate-500 py-4">No cross-merchant signals yet. Need 3+ merchants with outcomes.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-purple-600" />
+                  Global Risk Feature Weights
+                </CardTitle>
+                <CardDescription>AI-learned feature importance from all merchant data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-auto">
+                  {globalWeights.sort((a, b) => b.weight - a.weight).map((weight) => (
+                    <div key={weight.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                      <div>
+                        <p className="text-sm font-medium">{weight.feature_name.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-slate-500">Sample: {weight.sample_size || 0} | Confidence: {((weight.confidence || 0) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress value={weight.weight} className="w-20 h-2" />
+                        <span className="text-sm font-bold w-8">{weight.weight}</span>
+                        {weight.effectiveness_trend === 'improving' && <TrendingUp className="w-4 h-4 text-emerald-500" />}
+                        {weight.effectiveness_trend === 'declining' && <TrendingDown className="w-4 h-4 text-red-500" />}
+                      </div>
+                    </div>
+                  ))}
+                  {globalWeights.length === 0 && (
+                    <p className="text-center text-slate-500 py-4">No global weights yet. Run weekly recalibration.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Defensibility Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-emerald-700">{crossSignals.length}</p>
+                  <p className="text-xs text-emerald-600">Global Signals</p>
+                </div>
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <Activity className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-blue-700">{globalWeights.length}</p>
+                  <p className="text-xs text-blue-600">Feature Weights</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  <Users className="w-6 h-6 text-purple-600 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-purple-700">{aggregatedROI?.tenantCount || 0}</p>
+                  <p className="text-xs text-purple-600">Active Merchants</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 rounded-lg">
+                  <Shield className="w-6 h-6 text-amber-600 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-amber-700">{aggregatedROI?.totalOrdersAnalyzed?.toLocaleString() || 0}</p>
+                  <p className="text-xs text-amber-600">Orders Processed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="moat" className="mt-4">
