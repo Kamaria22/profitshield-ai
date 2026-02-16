@@ -252,6 +252,7 @@ Deno.serve(async (req) => {
         shipping_address: orderData.shipping_address,
         discount_codes: orderData.discount_codes?.map(d => d.code) || [],
         is_first_order: !orderData.customer || orderData.customer.orders_count <= 1,
+        is_demo: false, // Real Shopify order, not demo data
         ...profitData,
         ...riskData,
         platform_data: orderData
