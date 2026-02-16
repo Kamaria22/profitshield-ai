@@ -36,6 +36,15 @@ Deno.serve(async (req) => {
       case 'ask':
         return Response.json(await answerFounderQuestion(base44, params.question));
       
+      case 'auto_create_milestones':
+        return Response.json(await autoCreateMilestones(base44));
+      
+      case 'link_insight_to_milestone':
+        return Response.json(await linkInsightToMilestone(base44, params.insight_id, params.milestone_id));
+      
+      case 'send_critical_notifications':
+        return Response.json(await sendCriticalNotifications(base44, params.founder_email));
+      
       default:
         return Response.json({ error: 'Unknown action' }, { status: 400 });
     }
@@ -162,8 +171,15 @@ async function generateWeeklyBrief(base44) {
     });
   }
 
+  // Auto-create milestones from high-impact insights
+  const milestoneResult = await autoCreateMilestones(base44);
+  
+  // Auto-link insights to existing milestones where relevant
+  await autoLinkInsightsToMilestones(base44, insights);
+
   return {
     success: true,
+    milestones_created: milestoneResult.milestones_created,
     brief: {
       summary: `Weekly Brief: $${mrr} MRR | ${activeTenants} active tenants | ${last7DaysOrders} orders this week | ${highRiskOrders} high-risk flagged`,
       key_metrics: {
@@ -414,7 +430,49 @@ async function identifyGrowthOpportunities(base44) {
     });
   }
 
+  // Create insights for significant opportunities
+  for (const opp of opportunities) {
+    if (opp.potential_revenue >= 100 || opp.type === 'expansion') {
+      await base44.asServiceRole.entities.FounderInsight.create({
+        insight_type: 'growth_opportunity',
+        title: opp.title,
+        summary: opp.recommendation || `Potential revenue: $${opp.potential_revenue || 0}`,
+        severity: opp.potential_revenue >= 500 ? 'high' : 'medium',
+        impact_score: Math.min(100, (opp.potential_revenue || 50) / 10),
+        recommendations: (opp.actions || []).map(a => ({ action: a, priority: 'medium', effort: 'medium' })),
+        period: new Date().toISOString().split('T')[0],
+        expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      });
+    }
+  }
+
   return { opportunities };
+}
+
+async function autoLinkInsightsToMilestones(base44, insights) {
+  const milestones = await base44.asServiceRole.entities.StrategicMilestone.filter({});
+  
+  for (const insight of insights) {
+    if (insight.linked_milestone_id) continue;
+    
+    // Simple keyword matching for auto-linking
+    const insightText = `${insight.title} ${insight.summary}`.toLowerCase();
+    
+    for (const milestone of milestones) {
+      const milestoneText = `${milestone.name} ${milestone.description || ''}`.toLowerCase();
+      
+      // Check for significant overlap
+      const insightWords = insightText.split(/\s+/).filter(w => w.length > 4);
+      const matchCount = insightWords.filter(w => milestoneText.includes(w)).length;
+      
+      if (matchCount >= 2) {
+        await base44.asServiceRole.entities.FounderInsight.update(insight.id, {
+          linked_milestone_id: milestone.id
+        });
+        break;
+      }
+    }
+  }
 }
 
 async function answerFounderQuestion(base44, question) {
@@ -455,6 +513,172 @@ Provide a concise, actionable answer focused on business strategy, growth, and c
   });
 
   return response;
+}
+
+async function autoCreateMilestones(base44) {
+  const createdMilestones = [];
+  
+  // Get unactioned growth opportunity insights
+  const insights = await base44.asServiceRole.entities.FounderInsight.filter({
+    is_actioned: false
+  });
+  
+  const growthInsights = insights.filter(i => 
+    ['growth_opportunity', 'moat_alert', 'milestone_suggestion'].includes(i.insight_type) &&
+    !i.auto_created_milestone_id &&
+    (i.severity === 'critical' || i.severity === 'high' || i.impact_score >= 70)
+  );
+
+  // Get existing milestones to avoid duplicates
+  const existingMilestones = await base44.asServiceRole.entities.StrategicMilestone.filter({});
+  const existingNames = new Set(existingMilestones.map(m => m.name.toLowerCase()));
+
+  for (const insight of growthInsights) {
+    // Use AI to generate milestone from insight
+    const milestoneData = await generateMilestoneFromInsight(base44, insight, existingNames);
+    
+    if (milestoneData && !existingNames.has(milestoneData.name.toLowerCase())) {
+      const milestone = await base44.asServiceRole.entities.StrategicMilestone.create(milestoneData);
+      
+      // Link insight to milestone
+      await base44.asServiceRole.entities.FounderInsight.update(insight.id, {
+        auto_created_milestone_id: milestone.id,
+        is_actioned: true
+      });
+      
+      createdMilestones.push(milestone);
+      existingNames.add(milestoneData.name.toLowerCase());
+    }
+  }
+
+  return { 
+    success: true, 
+    milestones_created: createdMilestones.length,
+    milestones: createdMilestones 
+  };
+}
+
+async function generateMilestoneFromInsight(base44, insight, existingNames) {
+  const prompt = `Based on this business insight, generate a strategic milestone for a SaaS roadmap.
+
+Insight Type: ${insight.insight_type}
+Title: ${insight.title}
+Summary: ${insight.summary}
+Severity: ${insight.severity}
+Impact Score: ${insight.impact_score || 'N/A'}
+Recommendations: ${JSON.stringify(insight.recommendations || [])}
+
+Existing milestone names to avoid duplicating: ${Array.from(existingNames).slice(0, 20).join(', ')}
+
+Generate a milestone that would address this insight. Be specific and actionable.`;
+
+  try {
+    const response = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Short, actionable milestone name' },
+          description: { type: 'string', description: 'Detailed description of what to achieve' },
+          category: { type: 'string', enum: ['product', 'growth', 'revenue', 'technical', 'market_expansion', 'enterprise', 'ai_capability', 'platform'] },
+          phase: { type: 'string', enum: ['year_1_2', 'year_3_5', 'year_5_7', 'year_7_10'] },
+          priority: { type: 'number', description: '1-100, higher = more critical' },
+          moat_contribution: { type: 'array', items: { type: 'string', enum: ['data_moat', 'workflow_moat', 'network_moat', 'ai_moat', 'platform_moat', 'economic_moat'] } },
+          estimated_revenue_impact: { type: 'number', description: 'Estimated monthly revenue impact in dollars' },
+          should_create: { type: 'boolean', description: 'True if this is valuable enough to create as milestone' }
+        }
+      }
+    });
+
+    if (!response.should_create) return null;
+
+    return {
+      name: response.name,
+      description: response.description,
+      category: response.category || 'growth',
+      phase: response.phase || 'year_1_2',
+      status: 'planned',
+      priority: response.priority || 50,
+      moat_contribution: response.moat_contribution || [],
+      estimated_revenue_impact: response.estimated_revenue_impact,
+      notes: `Auto-generated from insight: ${insight.title}`
+    };
+  } catch (e) {
+    console.error('Failed to generate milestone from insight:', e);
+    return null;
+  }
+}
+
+async function linkInsightToMilestone(base44, insightId, milestoneId) {
+  await base44.asServiceRole.entities.FounderInsight.update(insightId, {
+    linked_milestone_id: milestoneId
+  });
+  return { success: true };
+}
+
+async function sendCriticalNotifications(base44, founderEmail) {
+  if (!founderEmail) {
+    return { success: false, error: 'Founder email required' };
+  }
+
+  // Get critical unnotified insights
+  const insights = await base44.asServiceRole.entities.FounderInsight.filter({
+    notification_sent: false
+  });
+
+  const criticalInsights = insights.filter(i => 
+    i.severity === 'critical' || 
+    (i.severity === 'high' && i.impact_score >= 80)
+  );
+
+  if (criticalInsights.length === 0) {
+    return { success: true, notifications_sent: 0 };
+  }
+
+  // Build email content
+  const insightsList = criticalInsights.map(i => 
+    `• [${i.severity.toUpperCase()}] ${i.title}\n  ${i.summary}`
+  ).join('\n\n');
+
+  const emailBody = `
+ProfitShield Founder Alert
+
+${criticalInsights.length} critical insight(s) require your attention:
+
+${insightsList}
+
+---
+Recommended Actions:
+${criticalInsights.flatMap(i => i.recommendations?.slice(0, 2) || []).map(r => `• ${r.action}`).join('\n')}
+
+View full details in your Founder AI Dashboard.
+  `.trim();
+
+  // Send email
+  try {
+    await base44.asServiceRole.integrations.Core.SendEmail({
+      to: founderEmail,
+      subject: `🚨 ProfitShield Alert: ${criticalInsights.length} Critical Insight(s)`,
+      body: emailBody
+    });
+
+    // Mark as notified
+    for (const insight of criticalInsights) {
+      await base44.asServiceRole.entities.FounderInsight.update(insight.id, {
+        notification_sent: true,
+        notification_sent_at: new Date().toISOString()
+      });
+    }
+
+    return { 
+      success: true, 
+      notifications_sent: criticalInsights.length,
+      insights_notified: criticalInsights.map(i => i.id)
+    };
+  } catch (e) {
+    console.error('Failed to send notification:', e);
+    return { success: false, error: e.message };
+  }
 }
 
 async function assessCompetitivePosition(base44) {
