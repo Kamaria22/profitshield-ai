@@ -86,7 +86,26 @@ export default function Layout({ children, currentPageName }) {
           resolvedTenant = tenants[0];
         }
       }
-      
+
+      // PRIORITY 3: localStorage fallback
+      if (!resolvedTenant) {
+        const storedShopDomain = localStorage.getItem('resolved_shop_domain');
+        const storedTenantId = localStorage.getItem('resolved_tenant_id');
+        console.log('[Layout] Trying localStorage fallback:', storedShopDomain, storedTenantId);
+
+        if (storedShopDomain) {
+          const tenants = await base44.entities.Tenant.filter({ shop_domain: storedShopDomain });
+          if (tenants.length > 0) {
+            resolvedTenant = tenants[0];
+          }
+        } else if (storedTenantId) {
+          const tenants = await base44.entities.Tenant.filter({ id: storedTenantId });
+          if (tenants.length > 0) {
+            resolvedTenant = tenants[0];
+          }
+        }
+      }
+
       // No fallback - require explicit tenant resolution
       if (!resolvedTenant) {
         console.warn('[Layout] No tenant could be resolved. shop param missing and user has no tenant.');
