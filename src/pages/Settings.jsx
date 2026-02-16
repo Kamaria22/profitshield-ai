@@ -208,8 +208,11 @@ export default function Settings() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-slate-100">
           <TabsTrigger value="general" className="gap-2">
-            <SettingsIcon className="w-4 h-4" />
-            General
+            <Store className="w-4 h-4" />
+            Store
+            {!tokenStatus?.hasToken && (
+              <span className="w-2 h-2 bg-red-500 rounded-full" />
+            )}
           </TabsTrigger>
           <TabsTrigger value="costs" className="gap-2">
             <DollarSign className="w-4 h-4" />
