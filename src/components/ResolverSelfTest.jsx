@@ -270,6 +270,61 @@ const TEST_CASES = [
         return { pass: false, detail: e.message };
       }
     }
+  },
+  {
+    id: 'tenant_isolation_invariant',
+    name: 'Tenant isolation invariant enforced',
+    description: 'assertTenantIsolation throws on mismatch',
+    run: async () => {
+      const { assertTenantIsolation } = await import('@/components/usePlatformResolver');
+      
+      const resolverCheck = { ok: true, tenantId: 'tenant-correct' };
+      
+      // Test 1: Correct filter should pass
+      let correctPassed = false;
+      try {
+        assertTenantIsolation(resolverCheck, { tenant_id: 'tenant-correct' }, 'test1');
+        correctPassed = true;
+      } catch (e) {
+        correctPassed = false;
+      }
+      
+      // Test 2: Mismatched filter should throw
+      let mismatchThrew = false;
+      try {
+        assertTenantIsolation(resolverCheck, { tenant_id: 'tenant-wrong' }, 'test2');
+        mismatchThrew = false;
+      } catch (e) {
+        mismatchThrew = e.message.includes('INVARIANT');
+      }
+      
+      // Test 3: Null filter should throw
+      let nullThrew = false;
+      try {
+        assertTenantIsolation(resolverCheck, null, 'test3');
+        nullThrew = false;
+      } catch (e) {
+        nullThrew = e.message.includes('INVARIANT');
+      }
+      
+      // Test 4: Unresolved resolver should throw
+      let unresolvedThrew = false;
+      try {
+        assertTenantIsolation({ ok: false, tenantId: null }, { tenant_id: 'any' }, 'test4');
+        unresolvedThrew = false;
+      } catch (e) {
+        unresolvedThrew = e.message.includes('INVARIANT');
+      }
+      
+      const pass = correctPassed && mismatchThrew && nullThrew && unresolvedThrew;
+      
+      return { 
+        pass, 
+        detail: pass 
+          ? 'All invariant checks passed' 
+          : `correct=${correctPassed}, mismatch=${mismatchThrew}, null=${nullThrew}, unresolved=${unresolvedThrew}`
+      };
+    }
   }
 ];
 
