@@ -9,6 +9,7 @@ import {
   persistShopifyContext,
   isUserAdmin
 } from '@/components/shopifyContext';
+import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -38,25 +39,26 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 const navItems = [
-  { name: 'Dashboard', page: 'Home', icon: LayoutDashboard },
-  { name: 'Orders', page: 'Orders', icon: ShoppingCart },
-  { name: 'Products', page: 'Products', icon: Package },
-  { name: 'Customers', page: 'Customers', icon: Users },
-  { name: 'Shipping', page: 'Shipping', icon: Truck },
-  { name: 'Tasks', page: 'Tasks', icon: ClipboardList },
-  { name: 'Alerts', page: 'Alerts', icon: AlertTriangle },
-  { name: 'Integrations', page: 'Integrations', icon: Link2 },
-  { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, adminOnly: true },
-  { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, adminOnly: true },
-  { name: 'Settings', page: 'Settings', icon: Settings },
+  { name: 'Dashboard', page: 'Home', icon: LayoutDashboard, permission: 'dashboard_view' },
+  { name: 'Orders', page: 'Orders', icon: ShoppingCart, permission: 'orders_view' },
+  { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
+  { name: 'Customers', page: 'Customers', icon: Users, permission: 'customers_view' },
+  { name: 'Shipping', page: 'Shipping', icon: Truck, permission: 'orders_view' },
+  { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
+  { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
+  { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
+  { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
+  { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
+  { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
-export default function Layout({ children, currentPageName }) {
+function LayoutContent({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [tenant, setTenant] = useState(null);
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const location = useLocation();
+  const { hasPermission, role } = usePermissions();
 
   useEffect(() => {
     loadUserAndTenant();
@@ -157,7 +159,6 @@ export default function Layout({ children, currentPageName }) {
     return <>{children}</>;
   }
 
-  const isAdmin = isUserAdmin(user);
   const urlParams = parseQuery(location.search);
   const persisted = getPersistedShopifyContext();
   const showMissingContextBanner = !tenant && !persisted.tenantId && !urlParams.shop;
@@ -218,8 +219,9 @@ export default function Layout({ children, currentPageName }) {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navItems.filter(item => {
-              if (!item.adminOnly) return true;
-              return isAdmin;
+              // Check permission-based access
+              if (item.permission && !hasPermission(item.permission)) return false;
+              return true;
             }).map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
@@ -244,9 +246,6 @@ export default function Layout({ children, currentPageName }) {
                       {pendingAlerts}
                     </Badge>
                   )}
-                  {item.adminOnly && (
-                    <Badge variant="outline" className="ml-auto text-xs">Admin</Badge>
-                  )}
                 </Link>
               );
             })}
@@ -268,6 +267,7 @@ export default function Layout({ children, currentPageName }) {
                         {user.full_name || 'User'}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                      {role && <p className="text-xs text-emerald-600 capitalize">{role}</p>}
                     </div>
                     <ChevronDown className="w-4 h-4 text-slate-400" />
                   </button>
@@ -333,5 +333,15 @@ export default function Layout({ children, currentPageName }) {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function Layout({ children, currentPageName }) {
+  return (
+    <PermissionsProvider>
+      <LayoutContent currentPageName={currentPageName}>
+        {children}
+      </LayoutContent>
+    </PermissionsProvider>
   );
 }
