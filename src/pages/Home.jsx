@@ -49,6 +49,7 @@ import { useReviewPrompt } from '../components/growth/useReviewPrompt';
 import TierUpgradePrompt from '../components/billing/TierUpgradePrompt';
 import ProfitOptimizationPanel from '../components/ai/ProfitOptimizationPanel';
 import AIAnalyticsPanel from '../components/dashboard/AIAnalyticsPanel';
+import AIAutoActionsPanel from '../components/ai/AIAutoActionsPanel';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -768,6 +769,11 @@ export default function Home() {
           syncing={syncMutation.isPending}
         />
         <BenchmarkComparison tenantId={authTenantId} />
+      </motion.div>
+
+      {/* AI Auto-Actions Panel */}
+      <motion.div variants={fadeInUp}>
+        <AIAutoActionsPanel tenantId={authTenantId} />
       </motion.div>
 
       {/* AI Analytics - Key Trends, Anomalies, NL Query */}

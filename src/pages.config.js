@@ -58,6 +58,7 @@ import Intelligence from './pages/Intelligence';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
 import PnLAnalytics from './pages/PnLAnalytics';
+import Pricing from './pages/Pricing';
 import Products from './pages/Products';
 import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
@@ -66,7 +67,6 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import Pricing from './pages/Pricing';
 import __Layout from './Layout.jsx';
 
 
@@ -82,6 +82,7 @@ export const PAGES = {
     "Onboarding": Onboarding,
     "Orders": Orders,
     "PnLAnalytics": PnLAnalytics,
+    "Pricing": Pricing,
     "Products": Products,
     "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
@@ -90,7 +91,6 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "Pricing": Pricing,
 }
 
 export const pagesConfig = {
