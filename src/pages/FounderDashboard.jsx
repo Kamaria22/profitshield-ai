@@ -41,6 +41,9 @@ import AutopilotStatusPanel from '@/components/autopilot/AutopilotStatusPanel';
 import DecisionQueue from '@/components/autopilot/DecisionQueue';
 import DataFlywheelViz from '@/components/autopilot/DataFlywheelViz';
 import ExperimentsPanel from '@/components/autopilot/ExperimentsPanel';
+import BoardReportPanel from '@/components/governance/BoardReportPanel';
+import StrategicBriefPanel from '@/components/governance/StrategicBriefPanel';
+import RegionalExpansionPanel from '@/components/governance/RegionalExpansionPanel';
 import {
   Select,
   SelectContent,
@@ -344,6 +347,9 @@ export default function FounderDashboard() {
       <Tabs defaultValue="autopilot">
         <TabsList className="flex-wrap">
           <TabsTrigger value="autopilot">Autopilot</TabsTrigger>
+          <TabsTrigger value="ceo-brief">CEO Brief</TabsTrigger>
+          <TabsTrigger value="board">Board View</TabsTrigger>
+          <TabsTrigger value="expansion">Global Expansion</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="growth">Growth</TabsTrigger>
           <TabsTrigger value="risk-roi">Risk ROI</TabsTrigger>
@@ -384,6 +390,21 @@ export default function FounderDashboard() {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        {/* CEO Brief Tab */}
+        <TabsContent value="ceo-brief" className="mt-4">
+          <StrategicBriefPanel />
+        </TabsContent>
+
+        {/* Board View Tab */}
+        <TabsContent value="board" className="mt-4">
+          <BoardReportPanel />
+        </TabsContent>
+
+        {/* Global Expansion Tab */}
+        <TabsContent value="expansion" className="mt-4">
+          <RegionalExpansionPanel />
         </TabsContent>
 
         <TabsContent value="insights" className="space-y-4 mt-4">
