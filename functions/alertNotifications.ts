@@ -247,10 +247,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Determine alert template and if it's a crime
+    // Determine alert template and if it's a scam
     const alertType = alertData.alert_type || alertData.type || 'default';
     const template = ALERT_TEMPLATES[alertType] || ALERT_TEMPLATES.default;
-    const isCrime = template.isCrime || alertData.is_criminal || alertData.fraud_detected;
+    const isScam = template.isScam || alertData.is_scam || alertData.fraud_detected;
 
     // Get recipient email
     const recipientEmail = settings?.notification_email || 
@@ -273,9 +273,9 @@ Deno.serve(async (req) => {
     // Send email notification
     if (notification_channels.includes('email')) {
       try {
-        const emailBody = generateEmailBody(alertData, tenant, isCrime);
-        const subject = isCrime 
-          ? `🚨 CRIME ALERT: ${alertData.title || template.subject}`
+        const emailBody = generateEmailBody(alertData, tenant, isScam);
+        const subject = isScam 
+          ? `🚨 SCAM ALERT: ${alertData.title || template.subject}`
           : template.subject;
 
         await base44.asServiceRole.integrations.Core.SendEmail({
@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
 
     // Generate SMS body (for logging/future SMS integration)
     if (notification_channels.includes('sms')) {
-      const smsBody = generateSMSBody(alertData, isCrime);
+      const smsBody = generateSMSBody(alertData, isScam);
       // SMS would require Twilio or similar integration
       // For now, log the SMS that would be sent
       console.log('SMS would be sent:', smsBody);
@@ -341,7 +341,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       alert_id: alertData.id,
-      is_crime: isCrime,
+      is_scam: isScam,
       results
     });
 
