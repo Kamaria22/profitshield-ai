@@ -20,19 +20,26 @@ export function SyncProvider({ children, tenantId }) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingChanges, setPendingChanges] = useState(0);
 
-  // Monitor online status
+  // Monitor online status - with defensive checks
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncStatus('idle');
-      // Trigger sync when coming back online
-      triggerSync();
+      // Trigger sync when coming back online (with delay to avoid race)
+      if (tenantId) {
+        setTimeout(() => triggerSync(true), 1000);
+      }
     };
 
     const handleOffline = () => {
       setIsOnline(false);
       setSyncStatus('offline');
     };
+
+    // Check initial online status
+    if (typeof navigator !== 'undefined') {
+      setIsOnline(navigator.onLine);
+    }
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -41,7 +48,7 @@ export function SyncProvider({ children, tenantId }) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [tenantId]);
 
   // Auto-sync on login/mount - with debounce to prevent excessive calls
   useEffect(() => {
@@ -52,116 +59,110 @@ export function SyncProvider({ children, tenantId }) {
     }
   }, [tenantId]);
 
-  // Set up real-time subscriptions for auto-sync
+  // Set up real-time subscriptions for auto-sync - with defensive error handling
   useEffect(() => {
     if (!tenantId) return;
 
     const subscriptions = [];
 
-    // Subscribe to order changes
-    try {
-      const orderUnsub = base44.entities.Order.subscribe((event) => {
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        if (event.type === 'create') {
-          notifications?.sendNotification('New Order', {
-            body: `Order received`,
-            channel: 'sync_status'
-          });
+    // Helper to safely subscribe
+    const safeSubscribe = (entityName, handler) => {
+      try {
+        if (base44.entities[entityName]?.subscribe) {
+          const unsub = base44.entities[entityName].subscribe(handler);
+          if (typeof unsub === 'function') {
+            subscriptions.push(unsub);
+          }
         }
-      });
-      subscriptions.push(orderUnsub);
-    } catch (e) {
-      console.warn('Order subscription failed:', e);
-    }
+      } catch (e) {
+        // Silently ignore subscription failures - non-critical
+      }
+    };
+
+    // Subscribe to order changes
+    safeSubscribe('Order', (event) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      if (event?.type === 'create' && notifications?.sendNotification) {
+        notifications.sendNotification('New Order', {
+          body: 'Order received',
+          channel: 'sync_status'
+        });
+      }
+    });
 
     // Subscribe to alert changes
-    try {
-      const alertUnsub = base44.entities.Alert.subscribe((event) => {
-        queryClient.invalidateQueries({ queryKey: ['alerts'] });
-        if (event.type === 'create' && event.data) {
-          const severity = event.data.severity || 'normal';
-          notifications?.sendNotification(`New ${severity} Alert`, {
-            body: event.data.title || 'New alert requires attention',
-            channel: severity === 'critical' ? 'alert_critical' : severity === 'high' ? 'alert_high' : 'alert_normal'
-          });
-        }
-      });
-      subscriptions.push(alertUnsub);
-    } catch (e) {
-      console.warn('Alert subscription failed:', e);
-    }
+    safeSubscribe('Alert', (event) => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      if (event?.type === 'create' && event?.data && notifications?.sendNotification) {
+        const severity = event.data.severity || 'normal';
+        notifications.sendNotification(`New ${severity} Alert`, {
+          body: event.data.title || 'New alert requires attention',
+          channel: severity === 'critical' ? 'alert_critical' : severity === 'high' ? 'alert_high' : 'alert_normal'
+        });
+      }
+    });
 
     // Subscribe to fraud ring detection
-    try {
-      const fraudUnsub = base44.entities.FraudRing.subscribe((event) => {
-        if (event.type === 'create') {
-          queryClient.invalidateQueries({ queryKey: ['fraudRings'] });
-          notifications?.sendNotification('Fraud Ring Detected!', {
+    safeSubscribe('FraudRing', (event) => {
+      if (event?.type === 'create') {
+        queryClient.invalidateQueries({ queryKey: ['fraudRings'] });
+        if (notifications?.sendNotification) {
+          notifications.sendNotification('Fraud Ring Detected!', {
             body: `New fraud ring affecting ${event.data?.total_merchants_affected || 'multiple'} merchants`,
             channel: 'fraud_detected',
             requireInteraction: true
           });
         }
-      });
-      subscriptions.push(fraudUnsub);
-    } catch (e) {
-      console.warn('Fraud ring subscription failed:', e);
-    }
+      }
+    });
 
     // Subscribe to churn predictions
-    try {
-      const churnUnsub = base44.entities.ChurnPrediction.subscribe((event) => {
-        if (event.type === 'create' || event.type === 'update') {
-          if (event.data?.risk_level === 'critical' || event.data?.risk_level === 'high') {
-            queryClient.invalidateQueries({ queryKey: ['churn'] });
-            notifications?.sendNotification('Churn Risk Alert', {
-              body: `High churn risk detected - ${event.data.churn_probability}% probability`,
-              channel: 'churn_risk'
-            });
-          }
+    safeSubscribe('ChurnPrediction', (event) => {
+      if ((event?.type === 'create' || event?.type === 'update') && 
+          (event?.data?.risk_level === 'critical' || event?.data?.risk_level === 'high')) {
+        queryClient.invalidateQueries({ queryKey: ['churn'] });
+        if (notifications?.sendNotification) {
+          notifications.sendNotification('Churn Risk Alert', {
+            body: `High churn risk detected - ${event.data.churn_probability}% probability`,
+            channel: 'churn_risk'
+          });
         }
-      });
-      subscriptions.push(churnUnsub);
-    } catch (e) {
-      console.warn('Churn subscription failed:', e);
-    }
+      }
+    });
 
     // Subscribe to revenue anomalies
-    try {
-      const anomalyUnsub = base44.entities.RevenueAnomaly.subscribe((event) => {
-        if (event.type === 'create') {
-          queryClient.invalidateQueries({ queryKey: ['revenueAnomalies'] });
-          notifications?.sendNotification('Revenue Anomaly Detected', {
-            body: event.data?.metric_name ? `${event.data.metric_name} changed by ${event.data.change_percentage?.toFixed(1)}%` : 'Unusual revenue pattern detected',
+    safeSubscribe('RevenueAnomaly', (event) => {
+      if (event?.type === 'create') {
+        queryClient.invalidateQueries({ queryKey: ['revenueAnomalies'] });
+        if (notifications?.sendNotification) {
+          const body = event.data?.metric_name 
+            ? `${event.data.metric_name} changed by ${event.data.change_percentage?.toFixed(1)}%` 
+            : 'Unusual revenue pattern detected';
+          notifications.sendNotification('Revenue Anomaly Detected', {
+            body,
             channel: 'revenue_anomaly'
           });
         }
-      });
-      subscriptions.push(anomalyUnsub);
-    } catch (e) {
-      console.warn('Anomaly subscription failed:', e);
-    }
+      }
+    });
 
     // Subscribe to data access anomalies (security)
-    try {
-      const securityUnsub = base44.entities.DataAccessAnomaly.subscribe((event) => {
-        if (event.type === 'create' && (event.data?.severity === 'critical' || event.data?.severity === 'high')) {
-          queryClient.invalidateQueries({ queryKey: ['security'] });
-          notifications?.sendNotification('Security Alert!', {
-            body: `${event.data.anomaly_type?.replace(/_/g, ' ')} detected in ${event.data.region_code}`,
+    safeSubscribe('DataAccessAnomaly', (event) => {
+      if (event?.type === 'create' && (event?.data?.severity === 'critical' || event?.data?.severity === 'high')) {
+        queryClient.invalidateQueries({ queryKey: ['security'] });
+        if (notifications?.sendNotification) {
+          notifications.sendNotification('Security Alert!', {
+            body: `${event.data.anomaly_type?.replace(/_/g, ' ') || 'Anomaly'} detected in ${event.data.region_code || 'region'}`,
             channel: 'alert_critical',
             requireInteraction: true
           });
         }
-      });
-      subscriptions.push(securityUnsub);
-    } catch (e) {
-      console.warn('Security subscription failed:', e);
-    }
+      }
+    });
 
     return () => {
       subscriptions.forEach(unsub => {
-        try { unsub(); } catch (e) {}
+        try { if (typeof unsub === 'function') unsub(); } catch (e) {}
       });
     };
   }, [tenantId, queryClient, notifications]);
@@ -193,26 +194,32 @@ export function SyncProvider({ children, tenantId }) {
   }, [tenantId, isOnline, lastSyncTime]);
 
   const triggerSync = useCallback(async (silent = false) => {
-    if (!tenantId || !isOnline) return;
+    // Defensive: check all prerequisites
+    if (!tenantId || !isOnline || !queryClient) return;
+
+    // Prevent concurrent syncs
+    if (syncStatus === 'syncing') return;
 
     setSyncStatus('syncing');
 
     try {
-      // Invalidate all relevant queries to refresh data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['orders'] }),
-        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
-        queryClient.invalidateQueries({ queryKey: ['profitLeaks'] }),
-        queryClient.invalidateQueries({ queryKey: ['tenantSettings'] }),
-        queryClient.invalidateQueries({ queryKey: ['syncJobs'] })
-      ]);
+      // Invalidate all relevant queries to refresh data - with individual error handling
+      const invalidations = [
+        queryClient.invalidateQueries({ queryKey: ['orders'] }).catch(() => null),
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }).catch(() => null),
+        queryClient.invalidateQueries({ queryKey: ['profitLeaks'] }).catch(() => null),
+        queryClient.invalidateQueries({ queryKey: ['tenantSettings'] }).catch(() => null),
+        queryClient.invalidateQueries({ queryKey: ['syncJobs'] }).catch(() => null)
+      ];
+      
+      await Promise.all(invalidations);
 
       setSyncStatus('synced');
       setLastSyncTime(Date.now());
       setPendingChanges(0);
 
-      if (!silent) {
-        notifications?.sendNotification('Sync Complete', {
+      if (!silent && notifications?.sendNotification) {
+        notifications.sendNotification('Sync Complete', {
           body: 'All data is up to date',
           channel: 'sync_status',
           silent: true
@@ -231,8 +238,13 @@ export function SyncProvider({ children, tenantId }) {
       if (!silent) {
         toast.error('Sync failed. Will retry automatically.');
       }
+      
+      // Auto-recover after error
+      setTimeout(() => {
+        setSyncStatus(prev => prev === 'error' ? 'idle' : prev);
+      }, 5000);
     }
-  }, [tenantId, isOnline, queryClient, notifications]);
+  }, [tenantId, isOnline, queryClient, notifications, syncStatus]);
 
   const value = {
     syncStatus,

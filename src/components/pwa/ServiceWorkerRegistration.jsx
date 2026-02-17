@@ -32,50 +32,63 @@ export function useServiceWorker() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     // Register service worker only in production environments with actual sw.js file
-    // Skip registration in preview/sandbox environments where sw.js doesn't exist
-    const isPreviewEnvironment = window.location.hostname.includes('preview-sandbox') || 
-                                  window.location.hostname.includes('localhost');
+    // Skip registration entirely in preview/sandbox/localhost environments
+    const hostname = window.location.hostname || '';
+    const isPreviewEnvironment = 
+      hostname.includes('preview-sandbox') || 
+      hostname.includes('localhost') ||
+      hostname.includes('127.0.0.1') ||
+      hostname.includes('.base44.app');  // Skip all base44 preview environments
     
+    // Only register service worker in true production (custom domains)
     if ('serviceWorker' in navigator && !isPreviewEnvironment) {
-      // Check if sw.js exists before attempting registration
-      fetch('/sw.js', { method: 'HEAD' })
-        .then(response => {
-          if (response.ok && response.headers.get('content-type')?.includes('javascript')) {
-            return navigator.serviceWorker.register('/sw.js');
-          }
-          return Promise.reject(new Error('Service worker file not available'));
-        })
-        .then((reg) => {
-          if (reg) {
-            setRegistration(reg);
-            
-            // Check for updates
-            reg.addEventListener('updatefound', () => {
-              const newWorker = reg.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    setUpdateAvailable(true);
-                    toast.info('App update available!', {
-                      action: {
-                        label: 'Update',
-                        onClick: () => updateApp()
-                      }
-                    });
-                  }
-                });
-              }
-            });
-          }
-        })
-        .catch(() => {
-          // Silently ignore - service worker not available in this environment
-        });
+      // Defensive: wrap entire registration in try-catch
+      try {
+        // Check if sw.js exists and is JavaScript before attempting registration
+        fetch('/sw.js', { method: 'HEAD' })
+          .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (response.ok && contentType.includes('javascript')) {
+              return navigator.serviceWorker.register('/sw.js');
+            }
+            // Silently skip - file doesn't exist or isn't JS
+            return null;
+          })
+          .then((reg) => {
+            if (reg) {
+              setRegistration(reg);
+              
+              // Check for updates
+              reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      setUpdateAvailable(true);
+                      toast.info('App update available!', {
+                        action: {
+                          label: 'Update',
+                          onClick: () => updateApp()
+                        }
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          })
+          .catch(() => {
+            // Silently ignore - service worker not available
+          });
 
-      // Handle controller change (new SW activated)
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-      });
+        // Handle controller change (new SW activated)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      } catch (swError) {
+        // Silently ignore any service worker errors
+        console.debug('Service worker setup skipped:', swError.message);
+      }
     }
 
     return () => {
