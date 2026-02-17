@@ -48,10 +48,10 @@ import CapitalAllocationPanel from '@/components/empire/CapitalAllocationPanel';
 import PricingIntelligencePanel from '@/components/empire/PricingIntelligencePanel';
 import NetworkStatusPanel from '@/components/empire/NetworkStatusPanel';
 import EmpireRoadmapPanel from '@/components/empire/EmpireRoadmapPanel';
-import MAAcquisitionPanel from '@/components/dominance/MAAcquisitionPanel';
+import MABriefPanel from '@/components/dominance/MABriefPanel';
 import LockInDashboard from '@/components/dominance/LockInDashboard';
-import SatelliteRadarPanel from '@/components/dominance/SatelliteRadarPanel';
 import ShadowBoardPanel from '@/components/dominance/ShadowBoardPanel';
+import SatelliteRadarPanel from '@/components/dominance/SatelliteRadarPanel';
 import {
   Select,
   SelectContent,
@@ -1000,9 +1000,9 @@ export default function FounderDashboard() {
           <EmpireRoadmapPanel />
         </TabsContent>
 
-        {/* M&A Acquisition Tab */}
+        {/* M&A Engine Tab */}
         <TabsContent value="ma" className="mt-4">
-          <MAAcquisitionPanel />
+          <MABriefPanel />
         </TabsContent>
 
         {/* Lock-In Dashboard Tab */}
