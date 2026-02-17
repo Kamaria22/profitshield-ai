@@ -56,6 +56,10 @@ import WarRoomConsole from '@/components/empire/WarRoomConsole';
 import SimulationLab from '@/components/empire/SimulationLab';
 import IPOReadinessPanel from '@/components/empire/IPOReadinessPanel';
 import FounderControlPanel from '@/components/empire/FounderControlPanel';
+import AbsorptionRadarPanel from '@/components/supremacy/AbsorptionRadarPanel';
+import AIEvolutionPanel from '@/components/supremacy/AIEvolutionPanel';
+import DataFortressPanel from '@/components/supremacy/DataFortressPanel';
+import CapitalReadinessPanel from '@/components/supremacy/CapitalReadinessPanel';
 import {
   Select,
   SelectContent,
@@ -380,6 +384,10 @@ export default function FounderDashboard() {
           <TabsTrigger value="simulation">Simulation</TabsTrigger>
           <TabsTrigger value="ipo">IPO Ready</TabsTrigger>
           <TabsTrigger value="control">Control</TabsTrigger>
+          <TabsTrigger value="absorption">Absorption</TabsTrigger>
+          <TabsTrigger value="ai-evolution">AI Evolution</TabsTrigger>
+          <TabsTrigger value="fortress">Data Fortress</TabsTrigger>
+          <TabsTrigger value="capital">Capital</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
@@ -1046,6 +1054,26 @@ export default function FounderDashboard() {
         {/* Founder Control Panel Tab */}
         <TabsContent value="control" className="mt-4">
           <FounderControlPanel />
+        </TabsContent>
+
+        {/* Competitive Absorption Tab */}
+        <TabsContent value="absorption" className="mt-4">
+          <AbsorptionRadarPanel />
+        </TabsContent>
+
+        {/* AI Model Evolution Tab */}
+        <TabsContent value="ai-evolution" className="mt-4">
+          <AIEvolutionPanel />
+        </TabsContent>
+
+        {/* Data Fortress Tab */}
+        <TabsContent value="fortress" className="mt-4">
+          <DataFortressPanel />
+        </TabsContent>
+
+        {/* Capital Readiness Tab */}
+        <TabsContent value="capital" className="mt-4">
+          <CapitalReadinessPanel />
         </TabsContent>
       </Tabs>
     </div>
