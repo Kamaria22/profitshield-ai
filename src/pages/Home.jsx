@@ -46,6 +46,7 @@ import SyncHealthCard from '../components/dashboard/SyncHealthCard';
 import OnboardingProgressBar from '../components/growth/OnboardingProgressBar';
 import ReviewRequestModal from '../components/growth/ReviewRequestModal';
 import { useReviewPrompt } from '../components/growth/useReviewPrompt';
+import TierUpgradePrompt from '../components/billing/TierUpgradePrompt';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -450,6 +451,11 @@ export default function Home() {
         debug={{ platform, reason, resolved: canQuery }}
         userEmail={user?.email}
       />
+
+      {/* Tier Upgrade Prompt */}
+      {tenant && (
+        <TierUpgradePrompt tenant={tenant} />
+      )}
 
       {/* Onboarding Progress */}
       {tenant && (
