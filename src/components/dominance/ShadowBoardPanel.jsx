@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Brain, AlertTriangle, RefreshCw, CheckCircle2, XCircle, Shield } from 'lucide-react';
+import { Users, Brain, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 const voteColors = {
@@ -37,7 +37,7 @@ export default function ShadowBoardPanel() {
     mutationFn: () => base44.functions.invoke('shadowBoard', { action: 'run_session' }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['shadowBoardSummary'] });
-      toast.success(`Shadow Board: ${res.data?.scenarios_analyzed || 0} scenarios, ${res.data?.votes_recorded || 0} votes, health ${res.data?.strategic_health_score?.toFixed(0) || 0}`);
+      toast.success(`Shadow Board: ${res.data?.votes_recorded || 0} decisions analyzed, health score: ${res.data?.strategic_health_score?.toFixed(0) || 0}`);
     }
   });
 
@@ -52,79 +52,71 @@ export default function ShadowBoardPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6 text-slate-700" />
-            Shadow Board Council
+            <Users className="w-6 h-6 text-indigo-600" />
+            Shadow Board AI Council
           </h2>
-          <p className="text-sm text-slate-500">AI governance oversight</p>
+          <p className="text-sm text-slate-500">Multi-agent strategic oversight</p>
         </div>
-        <Button size="sm" onClick={() => runSessionMutation.mutate()} disabled={runSessionMutation.isPending}>
+        <Button size="sm" onClick={() => runSessionMutation.mutate()} disabled={runSessionMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700">
           {runSessionMutation.isPending ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Brain className="w-4 h-4 mr-1" />}
           Run Session
         </Button>
       </div>
 
-      {/* Divergence Warning */}
-      {summary.latest_session?.divergence_count > 0 && (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="py-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              <p className="font-medium text-amber-800">{summary.latest_session.divergence_count} strategic divergence warning(s)</p>
+      {/* Active Scenarios */}
+      {summary.active_scenarios?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Shield className="w-4 h-4 text-amber-600" />
+              Active Risk Scenarios
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {summary.active_scenarios.map((scenario, i) => (
+                <div key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                  <div>
+                    <p className="text-sm font-medium">{scenario.title}</p>
+                    <p className="text-xs text-slate-500">{scenario.type?.replace('_', ' ')}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{(scenario.probability * 100).toFixed(0)}% prob</Badge>
+                    <Badge className={resilienceColors[scenario.resilience]}>{scenario.resilience}</Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Active Scenarios */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Shield className="w-4 h-4 text-blue-600" />
-            Active Risk Scenarios
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 max-h-48 overflow-auto">
-            {(summary.active_scenarios || []).map((scenario, i) => (
-              <div key={i} className="p-2 bg-slate-50 rounded flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{scenario.title}</p>
-                  <p className="text-xs text-slate-500 capitalize">{scenario.type?.replace('_', ' ')}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{scenario.risk_score} risk</Badge>
-                  <Badge className={resilienceColors[scenario.resilience]}>{scenario.resilience}</Badge>
-                </div>
-              </div>
-            ))}
-            {!summary.active_scenarios?.length && <p className="text-sm text-slate-400 text-center py-4">Run session to analyze scenarios</p>}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Latest Session Votes */}
       {summary.latest_session?.votes?.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Latest Session Votes</CardTitle>
+            <CardTitle className="text-base">Latest Board Decisions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {summary.latest_session.votes.map((vote, i) => (
                 <div key={i} className={`p-3 rounded-lg ${vote.divergence_warning ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="font-medium text-sm">{vote.title}</p>
-                    <Badge className={voteColors[vote.recommendation]}>{vote.recommendation}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 capitalize">{vote.category}</span>
-                    <span>{(vote.confidence * 100).toFixed(0)}% confidence</span>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{vote.title}</p>
+                      <p className="text-xs text-slate-500">{vote.category}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {vote.divergence_warning && <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                      <Badge className={voteColors[vote.recommendation]}>
+                        {vote.recommendation === 'approve' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                        {vote.recommendation === 'reject' && <XCircle className="w-3 h-3 mr-1" />}
+                        {vote.recommendation}
+                      </Badge>
+                    </div>
                   </div>
                   {vote.divergence_warning && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-amber-700">
-                      <AlertTriangle className="w-3 h-3" />
-                      Strategic divergence - review recommended
-                    </div>
+                    <p className="text-xs text-amber-700 mt-2">⚠️ Strategic divergence: Board split on this decision</p>
                   )}
                 </div>
               ))}
@@ -138,21 +130,25 @@ export default function ShadowBoardPanel() {
         <Card className="border-red-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-red-700 flex items-center gap-2">
-              <XCircle className="w-4 h-4" />
-              High-Risk Decisions
+              <AlertTriangle className="w-4 h-4" />
+              Flagged Decisions
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {summary.high_risk_decisions.map((d, i) => (
+              {summary.high_risk_decisions.map((decision, i) => (
                 <div key={i} className="p-2 bg-red-50 rounded">
-                  <p className="font-medium text-sm">{d.title}</p>
-                  <p className="text-xs text-red-600">{d.divergence_warning ? 'Board split on decision' : 'Rejected by board'}</p>
+                  <p className="text-sm font-medium">{decision.title}</p>
+                  <p className="text-xs text-red-600">{decision.divergence_warning ? 'Board divergence' : 'Rejected by majority'}</p>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {!summary.latest_session && (
+        <Card><CardContent className="py-8 text-center text-slate-500">Run a Shadow Board session to analyze strategic decisions</CardContent></Card>
       )}
     </div>
   );
