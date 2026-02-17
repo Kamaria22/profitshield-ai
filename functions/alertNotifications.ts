@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
         details: {
           alert_type: alertType,
           severity: alertData.severity,
-          is_crime: isCrime,
+          is_scam: isScam,
           channels: notification_channels,
           results: results
         },
