@@ -59,13 +59,13 @@ import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
 import PnLAnalytics from './pages/PnLAnalytics';
 import Products from './pages/Products';
+import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
 import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import Referrals from './pages/Referrals';
 import __Layout from './Layout.jsx';
 
 
@@ -82,13 +82,13 @@ export const PAGES = {
     "Orders": Orders,
     "PnLAnalytics": PnLAnalytics,
     "Products": Products,
+    "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
     "SelectStore": SelectStore,
     "Settings": Settings,
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "Referrals": Referrals,
 }
 
 export const pagesConfig = {

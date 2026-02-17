@@ -48,6 +48,10 @@ import CapitalAllocationPanel from '@/components/empire/CapitalAllocationPanel';
 import PricingIntelligencePanel from '@/components/empire/PricingIntelligencePanel';
 import NetworkStatusPanel from '@/components/empire/NetworkStatusPanel';
 import EmpireRoadmapPanel from '@/components/empire/EmpireRoadmapPanel';
+import MAAcquisitionPanel from '@/components/dominance/MAAcquisitionPanel';
+import LockInDashboard from '@/components/dominance/LockInDashboard';
+import SatelliteRadarPanel from '@/components/dominance/SatelliteRadarPanel';
+import ShadowBoardPanel from '@/components/dominance/ShadowBoardPanel';
 import {
   Select,
   SelectContent,
@@ -364,6 +368,10 @@ export default function FounderDashboard() {
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
           <TabsTrigger value="network">CDNP</TabsTrigger>
           <TabsTrigger value="empire">Empire</TabsTrigger>
+          <TabsTrigger value="ma">M&A</TabsTrigger>
+          <TabsTrigger value="lockin">Lock-In</TabsTrigger>
+          <TabsTrigger value="satellite">Satellite</TabsTrigger>
+          <TabsTrigger value="shadowboard">Shadow Board</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
@@ -990,6 +998,26 @@ export default function FounderDashboard() {
         {/* Empire Blueprint Tab */}
         <TabsContent value="empire" className="mt-4">
           <EmpireRoadmapPanel />
+        </TabsContent>
+
+        {/* M&A Acquisition Tab */}
+        <TabsContent value="ma" className="mt-4">
+          <MAAcquisitionPanel />
+        </TabsContent>
+
+        {/* Lock-In Dashboard Tab */}
+        <TabsContent value="lockin" className="mt-4">
+          <LockInDashboard />
+        </TabsContent>
+
+        {/* Satellite Intelligence Tab */}
+        <TabsContent value="satellite" className="mt-4">
+          <SatelliteRadarPanel />
+        </TabsContent>
+
+        {/* Shadow Board Tab */}
+        <TabsContent value="shadowboard" className="mt-4">
+          <ShadowBoardPanel />
         </TabsContent>
       </Tabs>
     </div>
