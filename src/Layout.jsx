@@ -55,6 +55,7 @@ const DEBUG_CLOSED_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 const navItems = [
   { name: 'Dashboard', page: 'Home', icon: LayoutDashboard, permission: 'dashboard_view' },
+  { name: 'AI Insights', page: 'AIInsights', icon: Brain, permission: 'dashboard_view' },
   { name: 'P&L Analytics', page: 'PnLAnalytics', icon: TrendingUp, permission: 'dashboard_view' },
   { name: 'Orders', page: 'Orders', icon: ShoppingCart, permission: 'orders_view' },
   { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
