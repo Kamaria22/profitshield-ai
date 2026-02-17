@@ -25,8 +25,10 @@ import { Separator } from '@/components/ui/separator';
 
 import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
+import EmailVerificationStep from '../components/onboarding/EmailVerificationStep';
 
 const steps = [
+  { id: 'verify', title: 'Verify Account', icon: Shield },
   { id: 'connect', title: 'Connect Store', icon: Store },
   { id: 'scan', title: 'Analyze Data', icon: Scan },
   { id: 'results', title: 'View Results', icon: Sparkles },
@@ -61,7 +63,8 @@ const defaultRiskRules = [
 export default function Onboarding() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [currentStep, setCurrentStep] = useState('connect');
+  const [currentStep, setCurrentStep] = useState('verify');
+  const [verificationData, setVerificationData] = useState(null);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanMessage, setScanMessage] = useState('Connecting to Shopify...');
   const [analysisResults, setAnalysisResults] = useState(null);
@@ -89,6 +92,16 @@ export default function Onboarding() {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       
+      // Check if already verified and has 2FA
+      if (currentUser?.two_factor_enabled && currentUser?.verified_email) {
+        setCurrentStep('connect');
+        setVerificationData({
+          email: currentUser.verified_email,
+          phone: currentUser.verified_phone,
+          twoFAMethod: currentUser.two_factor_method
+        });
+      }
+      
       // Check if already onboarded
       if (currentUser?.tenant_id) {
         const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
@@ -99,6 +112,11 @@ export default function Onboarding() {
     } catch (e) {
       console.log('User not logged in');
     }
+  };
+
+  const handleVerificationComplete = (data) => {
+    setVerificationData(data);
+    setCurrentStep('connect');
   };
 
   const startScan = async () => {
@@ -306,6 +324,14 @@ export default function Onboarding() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 pb-12">
         <AnimatePresence mode="wait">
+          {/* Step 0: Email Verification & 2FA */}
+          {currentStep === 'verify' && (
+            <EmailVerificationStep 
+              user={user} 
+              onComplete={handleVerificationComplete}
+            />
+          )}
+
           {/* Step 1: Connect */}
           {currentStep === 'connect' && (
             <motion.div
