@@ -36,7 +36,8 @@ import {
   Store,
   Copy,
   CheckCircle,
-  Gift
+  Gift,
+  CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -508,12 +509,18 @@ function LayoutContent({ children, currentPageName }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem asChild>
-                    <Link to={createPageUrl('Settings', location.search)}>
-                      <Settings className="w-4 h-4 mr-2" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                            <Link to={createPageUrl('Settings', location.search)}>
+                              <Settings className="w-4 h-4 mr-2" />
+                              Settings
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={createPageUrl('Pricing', location.search)}>
+                              <CreditCard className="w-4 h-4 mr-2" />
+                              Upgrade Plan
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogoutMemo} className="text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign out
