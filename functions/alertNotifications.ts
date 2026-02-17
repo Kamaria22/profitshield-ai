@@ -4,61 +4,61 @@ const ALERT_TEMPLATES = {
   fraud_detected: {
     subject: '🚨 URGENT: Fraud Detected on Your Store',
     severity: 'critical',
-    isCrime: true
+    isScam: true
   },
   fraud_ring: {
     subject: '🚨 CRITICAL: Fraud Ring Detected - Multiple Orders Affected',
     severity: 'critical',
-    isCrime: true
+    isScam: true
   },
   chargeback: {
     subject: '⚠️ Chargeback Alert: Immediate Action Required',
     severity: 'high',
-    isCrime: false
+    isScam: false
   },
   high_risk_order: {
     subject: '⚠️ High Risk Order Detected',
     severity: 'high',
-    isCrime: false
+    isScam: false
   },
   suspicious_activity: {
     subject: '⚠️ Suspicious Activity Detected on Your Account',
     severity: 'high',
-    isCrime: true
+    isScam: true
   },
   data_breach_attempt: {
     subject: '🚨 CRITICAL: Potential Data Breach Attempt Detected',
     severity: 'critical',
-    isCrime: true
+    isScam: true
   },
   revenue_anomaly: {
     subject: '📊 Revenue Anomaly Alert',
     severity: 'medium',
-    isCrime: false
+    isScam: false
   },
   churn_risk: {
     subject: '📉 Customer Churn Risk Alert',
     severity: 'medium',
-    isCrime: false
+    isScam: false
   },
   margin_alert: {
     subject: '💰 Profit Margin Alert',
     severity: 'medium',
-    isCrime: false
+    isScam: false
   },
   supplier_risk: {
     subject: '📦 Supplier Risk Alert',
     severity: 'medium',
-    isCrime: false
+    isScam: false
   },
   default: {
     subject: '🔔 ProfitShield Alert',
     severity: 'medium',
-    isCrime: false
+    isScam: false
   }
 };
 
-function generateEmailBody(alert, tenant, isCrime) {
+function generateEmailBody(alert, tenant, isScam) {
   const storeName = tenant?.shop_name || 'Your Store';
   const timestamp = new Date().toLocaleString('en-US', { 
     dateStyle: 'full', 
@@ -66,13 +66,13 @@ function generateEmailBody(alert, tenant, isCrime) {
     timeZone: 'America/New_York'
   });
 
-  let crimeNotice = '';
-  if (isCrime) {
-    crimeNotice = `
+  let scamNotice = '';
+  if (isScam) {
+    scamNotice = `
 <div style="background: #FEE2E2; border: 2px solid #DC2626; border-radius: 8px; padding: 16px; margin: 16px 0;">
-  <h3 style="color: #DC2626; margin: 0 0 8px 0;">⚠️ POTENTIAL CRIMINAL ACTIVITY DETECTED</h3>
+  <h3 style="color: #DC2626; margin: 0 0 8px 0;">⚠️ POTENTIAL SCAM ACTIVITY DETECTED</h3>
   <p style="margin: 0; color: #7F1D1D;">
-    This alert indicates potential fraudulent or criminal activity. We recommend:
+    This alert indicates potential fraudulent or scam activity. We recommend:
   </p>
   <ul style="color: #7F1D1D; margin: 8px 0;">
     <li>Do NOT fulfill any flagged orders until verified</li>
@@ -98,7 +98,7 @@ function generateEmailBody(alert, tenant, isCrime) {
   </div>
   
   <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;">
-    ${crimeNotice}
+    ${scamNotice}
     
     <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
       <h2 style="color: #0F172A; margin: 0 0 12px 0; font-size: 18px;">${alert.title || 'Alert Notification'}</h2>
@@ -169,12 +169,12 @@ function generateEmailBody(alert, tenant, isCrime) {
 </html>`;
 }
 
-function generateSMSBody(alert, isCrime) {
+function generateSMSBody(alert, isScam) {
   const severity = alert.severity?.toUpperCase() || 'ALERT';
   let message = `ProfitShield ${severity}: ${alert.title || 'New Alert'}`;
   
-  if (isCrime) {
-    message += ' ⚠️ POTENTIAL FRAUD/CRIME DETECTED.';
+  if (isScam) {
+    message += ' ⚠️ POTENTIAL FRAUD/SCAM DETECTED.';
   }
   
   if (alert.order_id) {

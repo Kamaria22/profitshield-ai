@@ -377,7 +377,7 @@ Deno.serve(async (req) => {
       workflow_found: !!workflow,
       automatic_actions: [],
       suggested_actions: workflow.suggested_actions || [],
-      is_crime: ['fraud_detected', 'fraud_ring', 'data_breach_attempt', 'suspicious_activity'].includes(alertType),
+      is_scam: ['fraud_detected', 'fraud_ring', 'data_breach_attempt', 'suspicious_activity'].includes(alertType),
       dry_run: dry_run
     };
 
@@ -426,7 +426,7 @@ Deno.serve(async (req) => {
         workflow_type: alertType,
         actions_executed: results.automatic_actions.length,
         dry_run: dry_run,
-        is_crime: results.is_crime
+        is_scam: results.is_scam
       },
       timestamp: new Date().toISOString()
     });
