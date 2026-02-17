@@ -11,13 +11,13 @@ import {
   Plus,
   Save,
   AlertTriangle,
-  Check,
   Store,
   RefreshCw,
   ExternalLink,
   CheckCircle,
   XCircle,
-  Shield
+  Shield,
+  Download
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,7 @@ import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
 import RiskModelConfig from '../components/settings/RiskModelConfig';
 import RoleManagement from '../components/settings/RoleManagement';
+import DataExportPanel from '../components/settings/DataExportPanel';
 import { useTenantResolver } from '@/components/useTenantResolver';
 import { createPageUrl } from '@/components/shopifyContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
@@ -241,6 +242,10 @@ export default function Settings() {
           <TabsTrigger value="viral" className="gap-2">
             <Share2 className="w-4 h-4" />
             Viral Tools
+          </TabsTrigger>
+          <TabsTrigger value="export" className="gap-2">
+            <Download className="w-4 h-4" />
+            Data Export
           </TabsTrigger>
           <TabsTrigger value="compliance" className="gap-2">
             <Shield className="w-4 h-4" />
@@ -647,6 +652,11 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Data Export Tab */}
+        <TabsContent value="export" className="mt-6">
+          <DataExportPanel tenantId={tenantId} />
         </TabsContent>
 
         {/* Compliance Tab */}
