@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { createPageUrl } from '@/components/platformContext';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { 
   CheckCircle2, 
@@ -15,7 +18,9 @@ import {
   Settings,
   Users,
   Sparkles,
-  Trophy
+  Trophy,
+  ArrowRight,
+  Rocket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -54,21 +59,44 @@ export default function OnboardingProgressBar({ tenantId, compact = false }) {
   // Don't show if fully complete
   if (completionPct === 100) return null;
 
+  // Show prominent CTA if user hasn't started onboarding (0% complete or no store connected)
+  const needsOnboarding = completionPct === 0 || !completedSteps.includes('store_connected');
+
   if (compact) {
     return (
-      <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+      <Card className={`border-2 ${needsOnboarding ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200' : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'}`}>
         <CardContent className="py-3 px-4">
           <div className="flex items-center gap-3">
-            <Sparkles className="w-5 h-5 text-emerald-600" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-emerald-800">Getting Started</span>
-                <span className="text-sm text-emerald-600">{completionPct}%</span>
-              </div>
-              <Progress value={completionPct} className="h-2" />
-            </div>
-            {isActivated && (
-              <Badge className="bg-emerald-500 text-white">Activated!</Badge>
+            {needsOnboarding ? (
+              <>
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-lg shadow-indigo-500/30">
+                  <Rocket className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-indigo-900">Complete Setup to Unlock Full Access</p>
+                  <p className="text-xs text-indigo-600">You're currently in demo mode</p>
+                </div>
+                <Link to={createPageUrl('Onboarding')}>
+                  <Button size="sm" className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-500/25">
+                    Start Here
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-emerald-800">Getting Started</span>
+                    <span className="text-sm text-emerald-600">{completionPct}%</span>
+                  </div>
+                  <Progress value={completionPct} className="h-2" />
+                </div>
+                {isActivated && (
+                  <Badge className="bg-emerald-500 text-white">Activated!</Badge>
+                )}
+              </>
             )}
           </div>
         </CardContent>
@@ -77,21 +105,69 @@ export default function OnboardingProgressBar({ tenantId, compact = false }) {
   }
 
   return (
-    <Card className="bg-gradient-to-br from-slate-50 to-white border-slate-200 overflow-hidden">
+    <Card className={`overflow-hidden ${needsOnboarding ? 'bg-gradient-to-br from-indigo-50 via-purple-50 to-white border-2 border-indigo-200' : 'bg-gradient-to-br from-slate-50 to-white border-slate-200'}`}>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-600" />
-              Unlock ProfitShield's Power
-            </h3>
-            <p className="text-sm text-slate-500">Complete these steps to maximize your protection</p>
+        {needsOnboarding ? (
+          /* Prominent onboarding CTA for new users */
+          <div className="text-center py-4">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/30"
+            >
+              <Rocket className="w-8 h-8 text-white" />
+            </motion.div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Welcome to ProfitShield!</h3>
+            <p className="text-slate-600 mb-1">Complete the onboarding to unlock full access</p>
+            <p className="text-sm text-slate-500 mb-6">Choose your plan, connect your store, and start protecting your profits</p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+              <Link to={createPageUrl('Onboarding')}>
+                <Button size="lg" className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-500/25 px-8">
+                  <Rocket className="w-5 h-5 mr-2" />
+                  Start Onboarding
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+              <Link to={createPageUrl('Pricing')}>
+                <Button variant="outline" size="lg" className="border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+                  View Plans
+                </Button>
+              </Link>
+            </div>
+
+            <div className="flex items-center justify-center gap-6 text-sm text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                14-day free trial
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                No credit card required
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                Cancel anytime
+              </span>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-2xl font-bold text-emerald-600">{completionPct}%</span>
-            <p className="text-xs text-slate-500">Complete</p>
-          </div>
-        </div>
+        ) : (
+          /* Progress view for users who have started */
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-600" />
+                  Unlock ProfitShield's Power
+                </h3>
+                <p className="text-sm text-slate-500">Complete these steps to maximize your protection</p>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-emerald-600">{completionPct}%</span>
+                <p className="text-xs text-slate-500">Complete</p>
+              </div>
+            </div>
 
         <Progress value={completionPct} className="h-3 mb-6" />
 
@@ -144,16 +220,18 @@ export default function OnboardingProgressBar({ tenantId, compact = false }) {
           })}
         </div>
 
-        {isActivated && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mt-4 p-3 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg text-white text-center"
-          >
-            <Trophy className="w-6 h-6 mx-auto mb-1" />
-            <p className="font-semibold">You're Activated! 🎉</p>
-            <p className="text-sm opacity-90">ProfitShield is now protecting your profits</p>
-          </motion.div>
+            {isActivated && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-4 p-3 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg text-white text-center"
+              >
+                <Trophy className="w-6 h-6 mx-auto mb-1" />
+                <p className="font-semibold">You're Activated! 🎉</p>
+                <p className="text-sm opacity-90">ProfitShield is now protecting your profits</p>
+              </motion.div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
