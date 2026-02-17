@@ -7,9 +7,7 @@ import {
   Clock, 
   Bell,
   ShieldAlert,
-  TrendingDown,
-  Zap,
-  XCircle
+  Zap
 } from 'lucide-react';
 
 export default function AlertSummaryCards({ alerts = [] }) {
@@ -24,13 +22,23 @@ export default function AlertSummaryCards({ alerts = [] }) {
     const high = alerts.filter(a => a.severity === 'high' && a.status === 'pending');
     
     const todayAlerts = alerts.filter(a => {
-      const created = new Date(a.created_date);
-      return created >= today;
+      if (!a.created_date) return false;
+      try {
+        const created = new Date(a.created_date);
+        return !isNaN(created.getTime()) && created >= today;
+      } catch {
+        return false;
+      }
     });
 
     const weekAlerts = alerts.filter(a => {
-      const created = new Date(a.created_date);
-      return created >= weekAgo;
+      if (!a.created_date) return false;
+      try {
+        const created = new Date(a.created_date);
+        return !isNaN(created.getTime()) && created >= weekAgo;
+      } catch {
+        return false;
+      }
     });
 
     // Resolution rate

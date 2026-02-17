@@ -24,14 +24,18 @@ export default function AlertTrendsChart({ alerts = [] }) {
     // Count alerts per day by severity
     alerts.forEach(alert => {
       if (!alert.created_date) return;
-      const alertDate = format(startOfDay(parseISO(alert.created_date)), 'yyyy-MM-dd');
-      const dayData = days.find(d => d.date === alertDate);
-      if (dayData) {
-        const severity = alert.severity || 'medium';
-        if (dayData[severity] !== undefined) {
-          dayData[severity]++;
+      try {
+        const alertDate = format(startOfDay(parseISO(alert.created_date)), 'yyyy-MM-dd');
+        const dayData = days.find(d => d.date === alertDate);
+        if (dayData) {
+          const severity = alert.severity || 'medium';
+          if (dayData[severity] !== undefined) {
+            dayData[severity]++;
+          }
+          dayData.total++;
         }
-        dayData.total++;
+      } catch {
+        // Skip invalid date
       }
     });
 
