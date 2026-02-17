@@ -6,11 +6,9 @@ import {
   AlertTriangle, 
   CheckCircle, 
   Clock,
-  Filter,
   Bell,
   Loader2,
   Store,
-  ArrowUpDown,
   Calendar,
   SlidersHorizontal,
   X
@@ -19,7 +17,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Tabs,
   TabsList,
@@ -116,11 +113,15 @@ export default function Alerts() {
     }
 
     // Date range filter
-    if (dateRange.from && dateRange.to) {
+    if (dateRange?.from && dateRange?.to) {
       result = result.filter(a => {
         if (!a.created_date) return true;
-        const alertDate = parseISO(a.created_date);
-        return isWithinInterval(alertDate, { start: dateRange.from, end: dateRange.to });
+        try {
+          const alertDate = parseISO(a.created_date);
+          return isWithinInterval(alertDate, { start: dateRange.from, end: dateRange.to });
+        } catch {
+          return true;
+        }
       });
     }
 
