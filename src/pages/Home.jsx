@@ -427,7 +427,7 @@ export default function Home() {
 
   return (
     <motion.div 
-      className="space-y-8"
+      className="space-y-4 sm:space-y-6 lg:space-y-8 pb-6"
       initial="initial"
       animate="animate"
       variants={staggerContainer}
@@ -458,25 +458,41 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* Header with glassmorphism */}
+      {/* Header with glassmorphism - Responsive */}
       <motion.div 
         variants={fadeInUp}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border border-slate-200/50 shadow-sm"
+        className="flex flex-col gap-4 p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-gradient-to-r from-slate-50/80 to-white/80 backdrop-blur-sm border border-slate-200/50 shadow-sm"
       >
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
-              <Activity className="w-5 h-5 text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 sm:gap-3 mb-1">
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                Dashboard
+              </h1>
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-              Dashboard
-            </h1>
+            <p className="text-sm sm:text-base text-slate-500 ml-8 sm:ml-12">Your profit health at a glance</p>
           </div>
-          <p className="text-slate-500 ml-12">Your profit health at a glance</p>
+          <div className="hidden sm:block">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-36 lg:w-40 bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow transition-shadow">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        
+        {/* Mobile date range */}
+        <div className="sm:hidden">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-40 bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm hover:shadow transition-shadow">
+            <SelectTrigger className="w-full bg-white/80 backdrop-blur-sm border-slate-200 shadow-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -485,45 +501,49 @@ export default function Home() {
               <SelectItem value="90">Last 90 days</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Action buttons - responsive grid */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 sm:justify-end">
           <Button 
             variant="outline" 
             onClick={handleCreateTestOrder}
             disabled={createTestOrderMutation.isPending || !authTenantId}
-            className="gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
             aria-label={isDemoMode && !tokenStatus?.hasToken ? 'Create demo order' : 'Create test order'}
           >
-            <Plus className={`w-4 h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
-            {createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Demo Order' : 'Test Order'}
+            <Plus className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${createTestOrderMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
+            <span className="truncate">{createTestOrderMutation.isPending ? 'Creating...' : isDemoMode && !tokenStatus?.hasToken ? 'Demo' : 'Test Order'}</span>
           </Button>
           <Button 
             onClick={handleSync}
             disabled={syncMutation.isPending || !authTenantId || !tokenStatus?.hasToken}
             title={!tokenStatus?.hasToken ? 'Connect Shopify to sync real orders' : ''}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-emerald-600"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-emerald-600"
             aria-label="Sync orders from Shopify"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
-            {syncMutation.isPending ? 'Syncing...' : 'Sync'}
+            <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
+            <span className="truncate">{syncMutation.isPending ? 'Syncing...' : 'Sync'}</span>
           </Button>
         </div>
       </motion.div>
 
-      {/* Top Section: Score + Metrics */}
-      <motion.div variants={fadeInUp} className="grid lg:grid-cols-3 gap-6">
+      {/* Top Section: Score + Metrics - Responsive */}
+      <motion.div variants={fadeInUp} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Profit Integrity Score - Premium Card */}
         <motion.div 
-          className="lg:col-span-1"
+          className="md:col-span-2 lg:col-span-1 order-first"
           whileHover={{ y: -2 }}
           transition={{ type: 'spring', stiffness: 300 }}
         >
           <Card className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-0 shadow-2xl shadow-slate-900/20 overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/5" />
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl" />
-            <CardContent className="pt-6 relative z-10">
+            <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-emerald-500/20 rounded-full blur-3xl" />
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 relative z-10">
               <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2 mb-4">
-                  <Shield className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Profit Integrity</h3>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+                  <h3 className="text-xs sm:text-sm font-medium text-slate-400 uppercase tracking-wider">Profit Integrity</h3>
                 </div>
                 <ProfitIntegrityScore 
                   score={tenant?.profit_integrity_score || 0} 
@@ -534,77 +554,75 @@ export default function Home() {
           </Card>
         </motion.div>
 
-        {/* Key Metrics Grid - Enhanced */}
-        <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4">
+        {/* Key Metrics Grid - Enhanced & Responsive */}
+        <div className="md:col-span-2 lg:col-span-2 grid grid-cols-2 gap-3 sm:gap-4">
           <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
-            <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-lg shadow-emerald-500/5 hover:shadow-emerald-500/10 transition-shadow">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-emerald-700/70">True Net Profit</span>
-                  <div className="p-2 rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/30">
-                    <DollarSign className="w-4 h-4 text-white" />
+            <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-lg shadow-emerald-500/5 hover:shadow-emerald-500/10 transition-shadow h-full">
+              <CardContent className="pt-3 sm:pt-5 pb-3 sm:pb-5 px-3 sm:px-6">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <span className="text-xs sm:text-sm font-medium text-emerald-700/70">Net Profit</span>
+                  <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/30">
+                    <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                   </div>
                 </div>
-                <p className={`text-3xl font-bold ${metrics.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                  ${metrics.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold ${metrics.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  ${metrics.totalProfit >= 1000 ? `${(metrics.totalProfit / 1000).toFixed(1)}k` : metrics.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                {metrics.totalProfit >= 0 && (
-                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                    <Zap className="w-3 h-3" /> Healthy profit margin
-                  </p>
-                )}
+                <p className="text-[10px] sm:text-xs text-emerald-600 mt-1 hidden sm:flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Healthy margin
+                </p>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
-            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100 shadow-lg shadow-blue-500/5 hover:shadow-blue-500/10 transition-shadow">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-blue-700/70">Total Revenue</span>
-                  <div className="p-2 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/30">
-                    <BarChart3 className="w-4 h-4 text-white" />
+            <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100 shadow-lg shadow-blue-500/5 hover:shadow-blue-500/10 transition-shadow h-full">
+              <CardContent className="pt-3 sm:pt-5 pb-3 sm:pb-5 px-3 sm:px-6">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <span className="text-xs sm:text-sm font-medium text-blue-700/70">Revenue</span>
+                  <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-blue-500 shadow-lg shadow-blue-500/30">
+                    <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-slate-800">
-                  ${metrics.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">
+                  ${metrics.totalRevenue >= 1000 ? `${(metrics.totalRevenue / 1000).toFixed(1)}k` : metrics.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">Last {dateRange} days</p>
+                <p className="text-[10px] sm:text-xs text-blue-600 mt-1">Last {dateRange}d</p>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
-            <Card className={`bg-gradient-to-br ${metrics.avgMargin >= 20 ? 'from-teal-50 to-white border-teal-100' : metrics.avgMargin >= 0 ? 'from-amber-50 to-white border-amber-100' : 'from-red-50 to-white border-red-100'} shadow-lg transition-shadow`}>
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-slate-600">Average Margin</span>
-                  <div className={`p-2 rounded-xl shadow-lg ${metrics.avgMargin >= 20 ? 'bg-teal-500 shadow-teal-500/30' : metrics.avgMargin >= 0 ? 'bg-amber-500 shadow-amber-500/30' : 'bg-red-500 shadow-red-500/30'}`}>
-                    {metrics.avgMargin >= 0 ? <TrendingUp className="w-4 h-4 text-white" /> : <TrendingDown className="w-4 h-4 text-white" />}
+            <Card className={`bg-gradient-to-br ${metrics.avgMargin >= 20 ? 'from-teal-50 to-white border-teal-100' : metrics.avgMargin >= 0 ? 'from-amber-50 to-white border-amber-100' : 'from-red-50 to-white border-red-100'} shadow-lg transition-shadow h-full`}>
+              <CardContent className="pt-3 sm:pt-5 pb-3 sm:pb-5 px-3 sm:px-6">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <span className="text-xs sm:text-sm font-medium text-slate-600">Margin</span>
+                  <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl shadow-lg ${metrics.avgMargin >= 20 ? 'bg-teal-500 shadow-teal-500/30' : metrics.avgMargin >= 0 ? 'bg-amber-500 shadow-amber-500/30' : 'bg-red-500 shadow-red-500/30'}`}>
+                    {metrics.avgMargin >= 0 ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-white" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-white" />}
                   </div>
                 </div>
-                <p className={`text-3xl font-bold ${metrics.avgMargin >= 20 ? 'text-teal-700' : metrics.avgMargin >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold ${metrics.avgMargin >= 20 ? 'text-teal-700' : metrics.avgMargin >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
                   {metrics.avgMargin.toFixed(1)}%
                 </p>
-                <p className={`text-xs mt-1 ${metrics.avgMargin >= 20 ? 'text-teal-600' : metrics.avgMargin >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                  {metrics.avgMargin >= 20 ? 'Excellent' : metrics.avgMargin >= 10 ? 'Good' : metrics.avgMargin >= 0 ? 'Needs attention' : 'Critical'}
+                <p className={`text-[10px] sm:text-xs mt-1 ${metrics.avgMargin >= 20 ? 'text-teal-600' : metrics.avgMargin >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {metrics.avgMargin >= 20 ? 'Excellent' : metrics.avgMargin >= 10 ? 'Good' : 'Needs work'}
                 </p>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div whileHover={{ y: -2, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300 }}>
-            <Card className="bg-gradient-to-br from-violet-50 to-white border-violet-100 shadow-lg shadow-violet-500/5 hover:shadow-violet-500/10 transition-shadow">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-violet-700/70">Orders</span>
-                  <div className="p-2 rounded-xl bg-violet-500 shadow-lg shadow-violet-500/30">
-                    <ShoppingCart className="w-4 h-4 text-white" />
+            <Card className="bg-gradient-to-br from-violet-50 to-white border-violet-100 shadow-lg shadow-violet-500/5 hover:shadow-violet-500/10 transition-shadow h-full">
+              <CardContent className="pt-3 sm:pt-5 pb-3 sm:pb-5 px-3 sm:px-6">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
+                  <span className="text-xs sm:text-sm font-medium text-violet-700/70">Orders</span>
+                  <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-violet-500 shadow-lg shadow-violet-500/30">
+                    <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-slate-800">{metrics.orderCount}</p>
-                <p className="text-xs text-violet-600 mt-1">
-                  ${metrics.avgOrderValue.toFixed(0)} avg order value
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">{metrics.orderCount}</p>
+                <p className="text-[10px] sm:text-xs text-violet-600 mt-1">
+                  ${metrics.avgOrderValue.toFixed(0)} avg
                 </p>
               </CardContent>
             </Card>
@@ -733,8 +751,8 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Sync Health + Benchmark */}
-      <motion.div variants={fadeInUp} className="grid lg:grid-cols-2 gap-6">
+      {/* Sync Health + Benchmark - Responsive */}
+      <motion.div variants={fadeInUp} className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <SyncHealthCard 
           integration={resolver?.integration}
           syncJobs={syncJobs}
@@ -749,25 +767,25 @@ export default function Home() {
         <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
       </motion.div>
 
-      {/* Hidden Profit Leaks - Modern Section */}
+      {/* Hidden Profit Leaks - Modern Section - Responsive */}
       <motion.div variants={fadeInUp}>
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-5 gap-2">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-amber-500" />
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
               Hidden Profit Leaks
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
               {topLeaks.length > 0 
-                ? `${profitLeaks.length} leak${profitLeaks.length !== 1 ? 's' : ''} detected · $${totalLeakImpact.toLocaleString()} total impact`
+                ? `${profitLeaks.length} leak${profitLeaks.length !== 1 ? 's' : ''} · $${totalLeakImpact.toLocaleString()} impact`
                 : 'No profit leaks detected'}
             </p>
           </div>
           {profitLeaks.length > 3 && (
             <Link to={createPageUrl('Alerts')}>
-              <Button variant="ghost" className="text-emerald-600 hover:bg-emerald-50">
+              <Button variant="ghost" size="sm" className="text-emerald-600 hover:bg-emerald-50 text-xs sm:text-sm">
                 View All
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1" />
               </Button>
             </Link>
           )}
@@ -788,82 +806,82 @@ export default function Home() {
           </div>
         ) : (
           <Card className="border-dashed border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white">
-            <CardContent className="py-12 text-center">
+            <CardContent className="py-8 sm:py-12 text-center">
               <motion.div 
-                className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30"
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-lg shadow-emerald-500/30"
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 3, repeat: Infinity }}
               >
-                <TrendingUp className="w-8 h-8 text-white" />
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </motion.div>
-              <p className="text-slate-800 font-semibold text-lg">No profit leaks detected</p>
-              <p className="text-sm text-slate-500 mt-2">Your store is running efficiently</p>
+              <p className="text-slate-800 font-semibold text-base sm:text-lg">No profit leaks detected</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 sm:mt-2">Your store is running efficiently</p>
             </CardContent>
           </Card>
         )}
       </motion.div>
 
-      {/* Quick Stats Grid - Modern Glassmorphism */}
-      <motion.div variants={fadeInUp} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Quick Stats Grid - Modern Glassmorphism - Responsive */}
+      <motion.div variants={fadeInUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
-          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.highRiskOrders > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50 shadow-red-500/10' : 'bg-white/80'}`}>
+          <Card className={`p-3 sm:p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.highRiskOrders > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50 shadow-red-500/10' : 'bg-white/80'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">High Risk Orders</p>
-                <p className={`text-2xl font-bold ${metrics.highRiskOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">High Risk</p>
+                <p className={`text-lg sm:text-2xl font-bold ${metrics.highRiskOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
                   {metrics.highRiskOrders}
                 </p>
               </div>
-              <div className={`p-2.5 rounded-xl ${metrics.highRiskOrders > 0 ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-slate-100'}`}>
-                <AlertTriangle className={`w-5 h-5 ${metrics.highRiskOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
+              <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl ${metrics.highRiskOrders > 0 ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-slate-100'}`}>
+                <AlertTriangle className={`w-4 h-4 sm:w-5 sm:h-5 ${metrics.highRiskOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
               </div>
             </div>
           </Card>
         </motion.div>
 
         <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
-          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.negativeMarginOrders > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50 shadow-amber-500/10' : 'bg-white/80'}`}>
+          <Card className={`p-3 sm:p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.negativeMarginOrders > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50 shadow-amber-500/10' : 'bg-white/80'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Negative Margin</p>
-                <p className={`text-2xl font-bold ${metrics.negativeMarginOrders > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">Neg. Margin</p>
+                <p className={`text-lg sm:text-2xl font-bold ${metrics.negativeMarginOrders > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
                   {metrics.negativeMarginOrders}
                 </p>
               </div>
-              <div className={`p-2.5 rounded-xl ${metrics.negativeMarginOrders > 0 ? 'bg-amber-500 shadow-lg shadow-amber-500/30' : 'bg-slate-100'}`}>
-                <TrendingDown className={`w-5 h-5 ${metrics.negativeMarginOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
+              <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl ${metrics.negativeMarginOrders > 0 ? 'bg-amber-500 shadow-lg shadow-amber-500/30' : 'bg-slate-100'}`}>
+                <TrendingDown className={`w-4 h-4 sm:w-5 sm:h-5 ${metrics.negativeMarginOrders > 0 ? 'text-white' : 'text-slate-400'}`} />
               </div>
             </div>
           </Card>
         </motion.div>
 
         <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
-          <Card className="p-5 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <Card className="p-3 sm:p-5 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Avg Order Value</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">Avg Order</p>
+                <p className="text-lg sm:text-2xl font-bold text-slate-900">
                   ${metrics.avgOrderValue.toFixed(0)}
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-100">
-                <ShoppingCart className="w-5 h-5 text-slate-400" />
+              <div className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-slate-100">
+                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
               </div>
             </div>
           </Card>
         </motion.div>
 
         <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300 }}>
-          <Card className={`p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.totalRefunds > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50 shadow-rose-500/10' : 'bg-white/80'}`}>
+          <Card className={`p-3 sm:p-5 backdrop-blur-sm border-0 shadow-lg transition-all ${metrics.totalRefunds > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50 shadow-rose-500/10' : 'bg-white/80'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Total Refunds</p>
-                <p className={`text-2xl font-bold ${metrics.totalRefunds > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">Refunds</p>
+                <p className={`text-lg sm:text-2xl font-bold ${metrics.totalRefunds > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                   ${metrics.totalRefunds.toFixed(0)}
                 </p>
               </div>
-              <div className={`p-2.5 rounded-xl ${metrics.totalRefunds > 0 ? 'bg-rose-500 shadow-lg shadow-rose-500/30' : 'bg-slate-100'}`}>
-                <Package className={`w-5 h-5 ${metrics.totalRefunds > 0 ? 'text-white' : 'text-slate-400'}`} />
+              <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl ${metrics.totalRefunds > 0 ? 'bg-rose-500 shadow-lg shadow-rose-500/30' : 'bg-slate-100'}`}>
+                <Package className={`w-4 h-4 sm:w-5 sm:h-5 ${metrics.totalRefunds > 0 ? 'text-white' : 'text-slate-400'}`} />
               </div>
             </div>
           </Card>
