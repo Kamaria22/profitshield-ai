@@ -10,6 +10,9 @@ import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import ResolverSelfTest from '@/components/ResolverSelfTest';
 import { maskEmail } from '@/components/utils/safeLog';
+import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
+import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
+import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -537,7 +540,14 @@ function LayoutContent({ children, currentPageName }) {
             {isResolved && stores.length > 1 && <StoreSwitcher />}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Sync Status */}
+            <SyncStatusIndicator compact />
+
+            {/* Notification Settings */}
+            <NotificationSettingsButton />
+
+            {/* Alerts */}
             <Link to={createPageUrl('Alerts', location.search)}>
               <Button 
                 variant="ghost" 
@@ -644,9 +654,29 @@ function LayoutWithErrorBoundary({ children, currentPageName }) {
 export default function Layout({ children, currentPageName }) {
   return (
     <PermissionsProvider>
+      <NotificationProvider>
+        <LayoutWithProviders currentPageName={currentPageName}>
+          {children}
+        </LayoutWithProviders>
+      </NotificationProvider>
+    </PermissionsProvider>
+  );
+}
+
+function LayoutWithProviders({ children, currentPageName }) {
+  const resolver = usePlatformResolver() || {};
+  const resolverCheck = requireResolved(resolver);
+  const authTenantId = resolverCheck.tenantId;
+
+  return (
+    <SyncProvider tenantId={authTenantId}>
       <LayoutWithErrorBoundary currentPageName={currentPageName}>
         {children}
       </LayoutWithErrorBoundary>
-    </PermissionsProvider>
+      
+      {/* PWA Install & Update Banners */}
+      <InstallAppBanner />
+      <UpdateAvailableBanner />
+    </SyncProvider>
   );
 }
