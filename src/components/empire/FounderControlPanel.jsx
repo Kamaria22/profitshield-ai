@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { 
   Settings2, Rocket, Shield, Building, Globe, Landmark, 
-  Gauge, AlertTriangle, CheckCircle2
+  Gauge, AlertTriangle, CheckCircle2, Target, Brain
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -94,6 +94,76 @@ const modeConfig = {
       pricing_elasticity_sensitivity: 0.5,
       governance_strictness: 'standard',
       simulation_risk_tolerance: 0.5
+    }
+  },
+  silent_expansion: {
+    icon: Globe,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50',
+    borderColor: 'border-cyan-200',
+    description: 'Quiet geographic & segment expansion',
+    params: {
+      capital_allocation_bias: { marketing: 0.15, product: 0.35, acquisition: 0.2, infrastructure: 0.2, hiring: 0.1 },
+      acquisition_scoring_weight: 1.2,
+      pricing_elasticity_sensitivity: 0.4,
+      governance_strictness: 'standard',
+      simulation_risk_tolerance: 0.5
+    }
+  },
+  aggressive_absorption: {
+    icon: Target,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    description: 'Active competitor targeting & absorption',
+    params: {
+      capital_allocation_bias: { marketing: 0.35, product: 0.2, acquisition: 0.3, infrastructure: 0.1, hiring: 0.05 },
+      acquisition_scoring_weight: 2.5,
+      pricing_elasticity_sensitivity: 0.2,
+      governance_strictness: 'relaxed',
+      simulation_risk_tolerance: 0.8
+    }
+  },
+  defensive_fortress: {
+    icon: Shield,
+    color: 'text-slate-700',
+    bgColor: 'bg-slate-100',
+    borderColor: 'border-slate-300',
+    description: 'Maximum data sovereignty & compliance',
+    params: {
+      capital_allocation_bias: { marketing: 0.1, product: 0.2, acquisition: 0.05, infrastructure: 0.5, hiring: 0.15 },
+      acquisition_scoring_weight: 0.2,
+      pricing_elasticity_sensitivity: 0.9,
+      governance_strictness: 'maximum',
+      simulation_risk_tolerance: 0.2
+    }
+  },
+  capital_optimization: {
+    icon: Landmark,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    description: 'Optimize metrics for institutional capital',
+    params: {
+      capital_allocation_bias: { marketing: 0.2, product: 0.25, acquisition: 0.15, infrastructure: 0.25, hiring: 0.15 },
+      acquisition_scoring_weight: 0.6,
+      pricing_elasticity_sensitivity: 0.5,
+      governance_strictness: 'strict',
+      simulation_risk_tolerance: 0.4
+    }
+  },
+  ai_evolution: {
+    icon: Brain,
+    color: 'text-purple-700',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    description: 'Prioritize AI model improvement & governance',
+    params: {
+      capital_allocation_bias: { marketing: 0.1, product: 0.45, acquisition: 0.1, infrastructure: 0.25, hiring: 0.1 },
+      acquisition_scoring_weight: 0.5,
+      pricing_elasticity_sensitivity: 0.5,
+      governance_strictness: 'strict',
+      simulation_risk_tolerance: 0.4
     }
   }
 };
