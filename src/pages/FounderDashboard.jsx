@@ -52,6 +52,10 @@ import MABriefPanel from '@/components/dominance/MABriefPanel';
 import LockInDashboard from '@/components/dominance/LockInDashboard';
 import ShadowBoardPanel from '@/components/dominance/ShadowBoardPanel';
 import SatelliteRadarPanel from '@/components/dominance/SatelliteRadarPanel';
+import WarRoomConsole from '@/components/empire/WarRoomConsole';
+import SimulationLab from '@/components/empire/SimulationLab';
+import IPOReadinessPanel from '@/components/empire/IPOReadinessPanel';
+import FounderControlPanel from '@/components/empire/FounderControlPanel';
 import {
   Select,
   SelectContent,
@@ -372,6 +376,10 @@ export default function FounderDashboard() {
           <TabsTrigger value="lockin">Lock-In</TabsTrigger>
           <TabsTrigger value="satellite">Satellite</TabsTrigger>
           <TabsTrigger value="shadowboard">Shadow Board</TabsTrigger>
+          <TabsTrigger value="warroom">War Room</TabsTrigger>
+          <TabsTrigger value="simulation">Simulation</TabsTrigger>
+          <TabsTrigger value="ipo">IPO Ready</TabsTrigger>
+          <TabsTrigger value="control">Control</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
@@ -1018,6 +1026,26 @@ export default function FounderDashboard() {
         {/* Shadow Board Tab */}
         <TabsContent value="shadowboard" className="mt-4">
           <ShadowBoardPanel />
+        </TabsContent>
+
+        {/* War Room Tab */}
+        <TabsContent value="warroom" className="mt-4">
+          <WarRoomConsole />
+        </TabsContent>
+
+        {/* Simulation Lab Tab */}
+        <TabsContent value="simulation" className="mt-4">
+          <SimulationLab />
+        </TabsContent>
+
+        {/* IPO Readiness Tab */}
+        <TabsContent value="ipo" className="mt-4">
+          <IPOReadinessPanel />
+        </TabsContent>
+
+        {/* Founder Control Panel Tab */}
+        <TabsContent value="control" className="mt-4">
+          <FounderControlPanel />
         </TabsContent>
       </Tabs>
     </div>
