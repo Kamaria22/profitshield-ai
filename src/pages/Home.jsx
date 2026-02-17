@@ -47,6 +47,7 @@ import OnboardingProgressBar from '../components/growth/OnboardingProgressBar';
 import ReviewRequestModal from '../components/growth/ReviewRequestModal';
 import { useReviewPrompt } from '../components/growth/useReviewPrompt';
 import TierUpgradePrompt from '../components/billing/TierUpgradePrompt';
+import ProfitOptimizationPanel from '../components/ai/ProfitOptimizationPanel';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -771,6 +772,11 @@ export default function Home() {
       {/* Profit Chart */}
       <motion.div variants={fadeInUp}>
         <ProfitChart data={chartData} title={`Profit Trends (Last ${dateRange} Days)`} />
+      </motion.div>
+
+      {/* AI Profit Optimization */}
+      <motion.div variants={fadeInUp}>
+        <ProfitOptimizationPanel tenantId={authTenantId} />
       </motion.div>
 
       {/* Hidden Profit Leaks - Modern Section - Responsive */}
