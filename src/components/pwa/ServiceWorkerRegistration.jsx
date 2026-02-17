@@ -10,9 +10,16 @@ export function useServiceWorker() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // Defensive: ensure window is available
+    if (typeof window === 'undefined') return;
+    
     // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-      setIsInstalled(true);
+    try {
+      if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone) {
+        setIsInstalled(true);
+      }
+    } catch (e) {
+      // matchMedia not available
     }
 
     // Listen for install prompt
@@ -132,9 +139,10 @@ export function useServiceWorker() {
 }
 
 export function InstallAppBanner() {
-  const { installPrompt, isInstalled, installApp } = useServiceWorker();
+  const sw = useServiceWorker();
   const [dismissed, setDismissed] = useState(() => {
     try {
+      if (typeof localStorage === 'undefined') return false;
       const dismissedAt = localStorage.getItem('pwa_install_dismissed');
       if (dismissedAt) {
         // Show again after 7 days
@@ -146,11 +154,20 @@ export function InstallAppBanner() {
     }
   });
 
+  // Defensive: check if hook returned valid data
+  if (!sw) return null;
+  
+  const { installPrompt, isInstalled, installApp } = sw;
+
   if (isInstalled || !installPrompt || dismissed) return null;
 
   const handleDismiss = () => {
     setDismissed(true);
-    localStorage.setItem('pwa_install_dismissed', String(Date.now()));
+    try {
+      localStorage.setItem('pwa_install_dismissed', String(Date.now()));
+    } catch (e) {
+      // localStorage not available
+    }
   };
 
   return (
@@ -189,9 +206,12 @@ export function InstallAppBanner() {
 }
 
 export function UpdateAvailableBanner() {
-  const { updateAvailable, updateApp } = useServiceWorker();
-
-  if (!updateAvailable) return null;
+  const sw = useServiceWorker();
+  
+  // Defensive: check if hook returned valid data
+  if (!sw || !sw.updateAvailable) return null;
+  
+  const { updateApp } = sw;
 
   return (
     <div className="fixed top-16 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50 animate-in slide-in-from-top-4">
