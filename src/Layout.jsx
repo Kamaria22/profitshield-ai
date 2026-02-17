@@ -268,7 +268,7 @@ const useFilteredNavItems = (hasPermission, isAdmin) => {
   }, [hasPermission, isAdmin]);
 };
 
-function LayoutContent({ children, currentPageName }) {
+function LayoutContent({ children, currentPageName, resolver }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const location = useLocation();
