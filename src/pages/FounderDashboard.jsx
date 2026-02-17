@@ -44,6 +44,10 @@ import ExperimentsPanel from '@/components/autopilot/ExperimentsPanel';
 import BoardReportPanel from '@/components/governance/BoardReportPanel';
 import StrategicBriefPanel from '@/components/governance/StrategicBriefPanel';
 import RegionalExpansionPanel from '@/components/governance/RegionalExpansionPanel';
+import CapitalAllocationPanel from '@/components/empire/CapitalAllocationPanel';
+import PricingIntelligencePanel from '@/components/empire/PricingIntelligencePanel';
+import NetworkStatusPanel from '@/components/empire/NetworkStatusPanel';
+import EmpireRoadmapPanel from '@/components/empire/EmpireRoadmapPanel';
 import {
   Select,
   SelectContent,
@@ -356,6 +360,10 @@ export default function FounderDashboard() {
           <TabsTrigger value="global-intel">Global Intelligence</TabsTrigger>
           <TabsTrigger value="moat">Moat Strength</TabsTrigger>
           <TabsTrigger value="roadmap">Strategic Roadmap</TabsTrigger>
+          <TabsTrigger value="capital">Capital</TabsTrigger>
+          <TabsTrigger value="pricing">Pricing</TabsTrigger>
+          <TabsTrigger value="network">CDNP</TabsTrigger>
+          <TabsTrigger value="empire">Empire</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
@@ -962,6 +970,26 @@ export default function FounderDashboard() {
               );
             })}
           </div>
+        </TabsContent>
+
+        {/* Capital Allocation Tab */}
+        <TabsContent value="capital" className="mt-4">
+          <CapitalAllocationPanel />
+        </TabsContent>
+
+        {/* Pricing Intelligence Tab */}
+        <TabsContent value="pricing" className="mt-4">
+          <PricingIntelligencePanel />
+        </TabsContent>
+
+        {/* Commerce Data Network Tab */}
+        <TabsContent value="network" className="mt-4">
+          <NetworkStatusPanel />
+        </TabsContent>
+
+        {/* Empire Blueprint Tab */}
+        <TabsContent value="empire" className="mt-4">
+          <EmpireRoadmapPanel />
         </TabsContent>
       </Tabs>
     </div>
