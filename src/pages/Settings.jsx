@@ -56,12 +56,20 @@ import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManage
 import RiskModelConfig from '../components/settings/RiskModelConfig';
 import RoleManagement from '../components/settings/RoleManagement';
 import DataExportPanel from '../components/settings/DataExportPanel';
-import { useTenantResolver } from '@/components/useTenantResolver';
-import { createPageUrl } from '@/components/shopifyContext';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
+import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
 
 export default function Settings() {
-  const { tenant, tenantId, shopDomain, user, loading: tenantLoading } = useTenantResolver();
+  // Use platform resolver instead of deprecated tenant resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  
+  const tenant = resolver?.tenant || null;
+  const tenantId = resolverCheck.tenantId;
+  const shopDomain = resolver?.storeKey || null;
+  const user = resolver?.user || null;
+  const tenantLoading = resolver?.status === RESOLVER_STATUS.RESOLVING;
   const { hasPermission } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [activeTab, setActiveTab] = useState('general');

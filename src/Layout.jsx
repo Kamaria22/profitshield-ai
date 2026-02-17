@@ -70,6 +70,9 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
+// Bypass layout for these pages (public-facing or special flow)
+const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore', 'Pricing'];
+
 // Safe admin check
 function isUserAdmin(user) {
   if (!user) return false;
@@ -343,8 +346,7 @@ function LayoutContent({ children, currentPageName }) {
 
   // ============= EARLY RETURNS AFTER ALL HOOKS =============
   
-  // Bypass layout for certain pages
-  const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore'];
+  // Bypass layout for certain pages (defined at top of file)
   if (bypassLayoutPages.includes(currentPageName)) {
     return <>{children}</>;
   }
