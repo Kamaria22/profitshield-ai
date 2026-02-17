@@ -59,26 +59,37 @@ export function NotificationProvider({ children }) {
   const [permission, setPermission] = useState('default');
   const [isOpen, setIsOpen] = useState(false);
 
-  // Check notification permission
+  // Check notification permission - defensive
   useEffect(() => {
-    if ('Notification' in window) {
-      setPermission(Notification.permission);
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermission(Notification.permission);
+      }
+    } catch (e) {
+      // Notifications not available in this context
+      setPermission('denied');
     }
   }, []);
 
-  // Save preferences
+  // Save preferences - defensive
   useEffect(() => {
-    localStorage.setItem('profitshield_notification_prefs', JSON.stringify(preferences));
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('profitshield_notification_prefs', JSON.stringify(preferences));
+      }
+    } catch (e) {
+      // localStorage not available
+    }
   }, [preferences]);
 
-  // Request notification permission
+  // Request notification permission - defensive
   const requestPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
-      toast.error('Notifications not supported on this device');
-      return false;
-    }
-
     try {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        toast.error('Notifications not supported on this device');
+        return false;
+      }
+
       const result = await Notification.requestPermission();
       setPermission(result);
       if (result === 'granted') {
@@ -90,53 +101,67 @@ export function NotificationProvider({ children }) {
       }
     } catch (error) {
       console.error('Permission request failed:', error);
+      toast.error('Unable to request notification permission');
       return false;
     }
   }, []);
 
-  // Play notification sound
+  // Play notification sound - defensive with error recovery
   const playSound = useCallback((soundType) => {
     if (!preferences.soundEnabled) return;
     
     try {
-      // Create audio context for web audio API (works better on mobile)
+      // Check for AudioContext availability
+      if (typeof window === 'undefined') return;
+      
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        const audioCtx = new AudioContext();
-        
-        // Generate a simple tone based on sound type
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        // Different frequencies for different alert types
-        const frequencies = {
-          alert_critical: [800, 600, 800],
-          alert_high: [600, 400],
-          alert_normal: [440],
-          sync_complete: [523, 659],
-          fraud_detected: [300, 200, 300],
-          churn_risk: [400, 300],
-          revenue_anomaly: [500, 400, 500]
-        };
-        
-        const freqs = frequencies[soundType] || [440];
-        let time = audioCtx.currentTime;
-        
-        freqs.forEach((freq, i) => {
-          oscillator.frequency.setValueAtTime(freq, time + i * 0.15);
-        });
-        
-        gainNode.gain.setValueAtTime(preferences.soundVolume * 0.3, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + freqs.length * 0.15 + 0.1);
-        
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + freqs.length * 0.15 + 0.2);
+      if (!AudioContext) return;
+      
+      const audioCtx = new AudioContext();
+      
+      // Resume context if suspended (required for some browsers)
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
       }
+      
+      // Generate a simple tone based on sound type
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      // Different frequencies for different alert types
+      const frequencies = {
+        alert_critical: [800, 600, 800],
+        alert_high: [600, 400],
+        alert_normal: [440],
+        sync_complete: [523, 659],
+        fraud_detected: [300, 200, 300],
+        churn_risk: [400, 300],
+        revenue_anomaly: [500, 400, 500]
+      };
+      
+      const freqs = frequencies[soundType] || [440];
+      const time = audioCtx.currentTime;
+      
+      freqs.forEach((freq, i) => {
+        oscillator.frequency.setValueAtTime(freq, time + i * 0.15);
+      });
+      
+      const volume = Math.max(0.01, Math.min(1, preferences.soundVolume || 0.7));
+      gainNode.gain.setValueAtTime(volume * 0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + freqs.length * 0.15 + 0.1);
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + freqs.length * 0.15 + 0.2);
+      
+      // Clean up context after sound completes
+      setTimeout(() => {
+        try { audioCtx.close(); } catch (e) {}
+      }, 1000);
     } catch (error) {
-      console.warn('Could not play sound:', error);
+      // Silently fail - sound is non-critical
     }
   }, [preferences.soundEnabled, preferences.soundVolume]);
 
