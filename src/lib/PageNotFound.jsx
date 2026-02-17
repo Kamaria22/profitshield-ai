@@ -1,7 +1,7 @@
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-
+import { Shield, Home, ArrowRight } from 'lucide-react';
 
 export default function PageNotFound({}) {
     const location = useLocation();
@@ -20,22 +20,29 @@ export default function PageNotFound({}) {
     });
     
     return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="max-w-md w-full">
                 <div className="text-center space-y-6">
+                    {/* Logo */}
+                    <div className="flex justify-center mb-8">
+                        <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Shield className="w-8 h-8 text-white" />
+                        </div>
+                    </div>
+                    
                     {/* 404 Error Code */}
                     <div className="space-y-2">
-                        <h1 className="text-7xl font-light text-slate-300">404</h1>
-                        <div className="h-0.5 w-16 bg-slate-200 mx-auto"></div>
+                        <h1 className="text-7xl font-bold bg-gradient-to-r from-slate-300 to-slate-400 bg-clip-text text-transparent">404</h1>
+                        <div className="h-0.5 w-16 bg-emerald-500/30 mx-auto rounded-full"></div>
                     </div>
                     
                     {/* Main Message */}
                     <div className="space-y-3">
-                        <h2 className="text-2xl font-medium text-slate-800">
+                        <h2 className="text-2xl font-semibold text-slate-800">
                             Page Not Found
                         </h2>
                         <p className="text-slate-600 leading-relaxed">
-                            The page <span className="font-medium text-slate-700">"{pageName}"</span> could not be found in this application.
+                            The page <span className="font-medium text-emerald-600">"{pageName}"</span> doesn't exist or you don't have access.
                         </p>
                     </div>
                     
@@ -56,17 +63,24 @@ export default function PageNotFound({}) {
                         </div>
                     )}
                     
-                    {/* Action Button */}
-                    <div className="pt-6">
+                    {/* Action Buttons */}
+                    <div className="pt-6 flex flex-col sm:flex-row gap-3 justify-center">
                         <button 
                             onClick={() => window.location.href = '/'} 
-                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                            className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
                         >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                            Go Home
+                            <Home className="w-4 h-4 mr-2" />
+                            Go to Dashboard
                         </button>
+                        {!authData?.isAuthenticated && (
+                            <button 
+                                onClick={() => base44.auth.redirectToLogin()}
+                                className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-emerald-700 bg-white border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                            >
+                                Sign In
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
