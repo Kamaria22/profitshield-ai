@@ -111,7 +111,8 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
     persisted = {};
   }
   
-  const showDebug = urlParams.debug === '1' || userEmail === 'rohan.a.roberts@gmail.com';
+  // Only show debug panel for the app owner - never for marketplace users
+  const showDebug = userEmail === 'rohan.a.roberts@gmail.com';
   
   const handleClose = useCallback(() => {
     setVisible(false);
