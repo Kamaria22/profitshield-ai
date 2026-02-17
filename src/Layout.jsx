@@ -279,8 +279,7 @@ function LayoutContent({ children, currentPageName, resolver }) {
   const { hasPermission = () => true, role = null, user: permUser = null } = permissionsData;
   
   // Platform resolver - single source of truth
-  const resolver = usePlatformResolver() || {};
-  const resolverCheck = requireResolved(resolver);
+  const resolverCheck = requireResolved(resolver || {});
   
   // ONLY use resolverCheck for gated data - these are the authoritative values
   const isResolved = resolverCheck.ok;
