@@ -310,17 +310,14 @@ export function NotificationSettingsButton() {
       <SheetTrigger asChild>
         <Button 
           variant="ghost" 
-          size="icon" 
-          className="relative"
+          size="sm" 
+          className="relative gap-1.5 text-slate-600 hover:text-slate-900"
           aria-label="Notification settings"
         >
-          {preferences.enabled ? (
-            <Bell className="w-5 h-5" />
-          ) : (
-            <BellOff className="w-5 h-5 text-slate-400" />
-          )}
+          <Settings className="w-4 h-4" />
+          <span className="hidden sm:inline text-xs">Alerts</span>
           {preferences.enabled && permission === 'granted' && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full" />
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
           )}
         </Button>
       </SheetTrigger>
