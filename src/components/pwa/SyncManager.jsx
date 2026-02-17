@@ -43,12 +43,14 @@ export function SyncProvider({ children, tenantId }) {
     };
   }, []);
 
-  // Auto-sync on login/mount
+  // Auto-sync on login/mount - with debounce to prevent excessive calls
   useEffect(() => {
     if (tenantId && isOnline) {
-      triggerSync();
+      // Small delay to allow other hooks to settle
+      const timer = setTimeout(() => triggerSync(true), 500);
+      return () => clearTimeout(timer);
     }
-  }, [tenantId, isOnline]);
+  }, [tenantId]);
 
   // Set up real-time subscriptions for auto-sync
   useEffect(() => {

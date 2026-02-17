@@ -31,30 +31,45 @@ export function useServiceWorker() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
+    // Register service worker only in production environments with actual sw.js file
+    // Skip registration in preview/sandbox environments where sw.js doesn't exist
+    const isPreviewEnvironment = window.location.hostname.includes('preview-sandbox') || 
+                                  window.location.hostname.includes('localhost');
+    
+    if ('serviceWorker' in navigator && !isPreviewEnvironment) {
+      // Check if sw.js exists before attempting registration
+      fetch('/sw.js', { method: 'HEAD' })
+        .then(response => {
+          if (response.ok && response.headers.get('content-type')?.includes('javascript')) {
+            return navigator.serviceWorker.register('/sw.js');
+          }
+          return Promise.reject(new Error('Service worker file not available'));
+        })
         .then((reg) => {
-          setRegistration(reg);
-          
-          // Check for updates
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setUpdateAvailable(true);
-                toast.info('App update available!', {
-                  action: {
-                    label: 'Update',
-                    onClick: () => updateApp()
+          if (reg) {
+            setRegistration(reg);
+            
+            // Check for updates
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    setUpdateAvailable(true);
+                    toast.info('App update available!', {
+                      action: {
+                        label: 'Update',
+                        onClick: () => updateApp()
+                      }
+                    });
                   }
                 });
               }
             });
-          });
+          }
         })
-        .catch((error) => {
-          console.warn('Service worker registration failed:', error);
+        .catch(() => {
+          // Silently ignore - service worker not available in this environment
         });
 
       // Handle controller change (new SW activated)

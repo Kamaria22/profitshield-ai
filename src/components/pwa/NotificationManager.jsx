@@ -169,27 +169,33 @@ export function NotificationProvider({ children }) {
     // Send browser/system notification
     if (permission === 'granted' && 'Notification' in window) {
       try {
-        // Use service worker for persistent notifications if available
+        // Use service worker for persistent notifications if available and active
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          const registration = await navigator.serviceWorker.ready;
-          await registration.showNotification(title, {
-            body,
-            icon,
-            badge,
-            tag,
-            data,
-            requireInteraction,
-            silent: silent || !channelPrefs?.sound,
-            vibrate: channelPrefs?.sound ? [200, 100, 200] : undefined,
-            actions: [
-              { action: 'view', title: 'View' },
-              { action: 'dismiss', title: 'Dismiss' }
-            ]
-          });
-        } else {
-          // Fallback to regular notification
-          new Notification(title, { body, icon, tag, silent: silent || !channelPrefs?.sound });
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration.active) {
+              await registration.showNotification(title, {
+                body,
+                icon,
+                badge,
+                tag,
+                data,
+                requireInteraction,
+                silent: silent || !channelPrefs?.sound,
+                vibrate: channelPrefs?.sound ? [200, 100, 200] : undefined,
+                actions: [
+                  { action: 'view', title: 'View' },
+                  { action: 'dismiss', title: 'Dismiss' }
+                ]
+              });
+              return true;
+            }
+          } catch {
+            // Fall through to regular notification
+          }
         }
+        // Fallback to regular notification
+        new Notification(title, { body, icon, tag, silent: silent || !channelPrefs?.sound });
         return true;
       } catch (error) {
         console.error('Failed to send notification:', error);
