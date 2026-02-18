@@ -652,13 +652,16 @@ function LayoutWithErrorBoundary({ children, currentPageName }) {
     trace: resolver.trace
   }), [resolver.status, resolver.platform, resolver.storeKey, resolver.tenantId, resolver.integrationId, resolver.user?.email, resolver.trace]);
   
-  return (
-    <GlobalErrorBoundary resolverContext={resolverContext}>
-      <LayoutContent currentPageName={currentPageName}>
-        {children}
-      </LayoutContent>
-    </GlobalErrorBoundary>
-  );
+return (
+  <GlobalErrorBoundary resolverContext={resolverContext}>
+    <LayoutContent
+      currentPageName={currentPageName}
+      resolver={resolver}
+    >
+      {children}
+    </LayoutContent>
+  </GlobalErrorBoundary>
+);
 }
 
 export default function Layout({ children, currentPageName }) {
@@ -675,15 +678,21 @@ export default function Layout({ children, currentPageName }) {
 
 function LayoutWithProviders({ children, currentPageName }) {
   const resolver = usePlatformResolver() || {};
-  const resolverCheck = requireResolved(resolver);
-  const authTenantId = resolverCheck.tenantId;
+
+  let authTenantId = null;
+  try {
+    const resolverCheck = requireResolved(resolver);
+    authTenantId = resolverCheck?.tenantId || null;
+  } catch (e) {
+    authTenantId = null;
+  }
 
   return (
     <SyncProvider tenantId={authTenantId}>
       <LayoutWithErrorBoundary currentPageName={currentPageName}>
         {children}
       </LayoutWithErrorBoundary>
-      
+
       {/* PWA Install & Update Banners */}
       <InstallAppBanner />
       <UpdateAvailableBanner />
