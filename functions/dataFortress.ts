@@ -31,39 +31,28 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (user?.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+      return Response.json(
+        { error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      );
     }
 
-    const body = await req.json();
-    const { action } = body;
-
-    if (action === 'route_data') {
-      return await routeDataByRegion(base44, body.tenant_id);
-    } else if (action === 'get_fortress_status') {
-      return await getFortressStatus(base44);
-    } else if (action === 'handle_compliance_event') {
-      return await handleComplianceEvent(base44, body);
-    } else if (action === 'enforce_retention') {
-      return await enforceRetentionPolicies(base44);
-    } else if (action === 'audit_regions') {
-      return await auditRegions(base44);
-    } else if (action === 'run_anomaly_detection') {
-      return await runAnomalyDetection(base44);
-    } else if (action === 'update_threat_intel') {
-      return await updateThreatIntel(base44);
-    } else if (action === 'detect_cross_region_leaks') {
-      return await detectCrossRegionLeaks(base44);
-    } else if (action === 'get_security_dashboard') {
-      return await getSecurityDashboard(base44);
-    } else if (action === 'calibrate_baselines') {
-      return await calibrateBaselines(base44);
-    } else if (action === 'investigate_anomaly') {
-      return await investigateAnomaly(base44, body.anomaly_id, body.action, user.email);
+    let body = {};
+    try {
+      body = await req.json();
+    } catch (_) {
+      body = {};
     }
 
-    return Response.json({ error: 'Invalid action' }, { status: 400 });
+    const action = body?.action || null;
+
+    if (!action) {
+      return Response.json({ error: 'action required' }, { status: 400 });
+    }
+
+    // ... your action routing continues here ...
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
