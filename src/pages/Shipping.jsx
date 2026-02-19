@@ -46,11 +46,14 @@ export default function Shipping() {
   
   // SINGLE SOURCE OF TRUTH: Platform Resolver
   const resolver = usePlatformResolver();
-  const resolverCheck = requireResolved(resolver);
+  const resolverCheck = requireResolved(resolver || {});
   
   const canQuery = canQueryTenant(resolverCheck);
   const queryFilter = getTenantFilter(resolverCheck);
-  const shippingQueryKey = [...buildQueryKey('orders-shipping', resolverCheck), dateRange];
+  const shippingQueryKey = useMemo(() => 
+    [...buildQueryKey('orders-shipping', resolverCheck), dateRange],
+    [resolverCheck?.platform, resolverCheck?.storeKey, resolverCheck?.integrationId, resolverCheck?.tenantId, dateRange]
+  );
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: shippingQueryKey,
@@ -63,25 +66,18 @@ export default function Shipping() {
     enabled: canQuery,
     ...queryDefaults.standard
   });
-  
-  // Loading state
-  if (resolver?.status === RESOLVER_STATUS.RESOLVING) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
 
+  // ALL HOOKS MUST BE CALLED BEFORE EARLY RETURNS
   // Filter by date range
-  const filteredOrders = React.useMemo(() => {
-    const days = parseInt(dateRange);
+  const filteredOrders = useMemo(() => {
+    const safeOrders = Array.isArray(orders) ? orders : [];
+    const days = parseInt(dateRange) || 30;
     const startDate = subDays(new Date(), days);
-    return orders.filter(o => o.order_date && new Date(o.order_date) >= startDate);
+    return safeOrders.filter(o => o.order_date && new Date(o.order_date) >= startDate);
   }, [orders, dateRange]);
 
   // Calculate shipping metrics
-  const metrics = React.useMemo(() => {
+  const metrics = useMemo(() => {
     const ordersWithShipping = filteredOrders.filter(o => o.shipping_charged || o.shipping_cost);
     
     const totalShippingCharged = ordersWithShipping.reduce((sum, o) => sum + (o.shipping_charged || 0), 0);
@@ -111,7 +107,7 @@ export default function Shipping() {
   }, [filteredOrders]);
 
   // Generate chart data by week
-  const chartData = React.useMemo(() => {
+  const chartData = useMemo(() => {
     const weeks = {};
     
     filteredOrders.forEach(order => {
@@ -130,7 +126,7 @@ export default function Shipping() {
   }, [filteredOrders]);
 
   // Get orders with shipping loss
-  const shippingLossOrders = React.useMemo(() => {
+  const shippingLossOrders = useMemo(() => {
     return filteredOrders
       .filter(o => (o.shipping_cost || 0) > (o.shipping_charged || 0))
       .sort((a, b) => {
@@ -140,6 +136,15 @@ export default function Shipping() {
       })
       .slice(0, 10);
   }, [filteredOrders]);
+  
+  // Loading state - AFTER all hooks
+  if (resolver?.status === RESOLVER_STATUS.RESOLVING) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
