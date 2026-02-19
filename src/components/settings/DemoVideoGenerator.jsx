@@ -51,8 +51,57 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [isPolling, setIsPolling] = useState(false);
   const [pollWaitTime, setPollWaitTime] = useState(0);
   const [recentJobs, setRecentJobs] = useState([]);
+  const [isDownloading, setIsDownloading] = useState(false);
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
+
+  // Download video via backend function
+  const downloadVideo = useCallback(async (jid, format) => {
+    try {
+      setIsDownloading(true);
+      console.log(`[DemoVideoGenerator] Downloading ${format} for job ${jid}`);
+      
+      const { data } = await base44.functions.invoke('demoVideoProxyDownload', {
+        jobId: jid,
+        format: format
+      });
+
+      // Data is returned as ArrayBuffer from the function
+      if (data && typeof data === 'object') {
+        const blob = new Blob([data], { type: getMimeType(format) });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = getFileName(format);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success(`${format} downloaded!`);
+      } else {
+        toast.error('Failed to download video');
+      }
+    } catch (error) {
+      console.error('[DemoVideoGenerator] Download error:', error);
+      toast.error(`Download failed: ${error.message}`);
+    } finally {
+      setIsDownloading(false);
+    }
+  }, []);
+
+  const getFileName = (format) => {
+    const fileMap = {
+      '1080p': 'demo-video-1080p.mp4',
+      '720p': 'demo-video-720p.mp4',
+      'shopify': 'demo-video-shopify.mp4',
+      'thumb': 'demo-video-thumb.jpg'
+    };
+    return fileMap[format] || 'demo-video.mp4';
+  };
+
+  const getMimeType = (format) => {
+    return format === 'thumb' ? 'image/jpeg' : 'video/mp4';
+  };
 
   const versions = [
     {
