@@ -3,9 +3,9 @@ import { Shield, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function RiskCommandPanel({ metrics, loading }) {
-  const highRisk = metrics?.highRiskOrders || 0;
-  const negMargin = metrics?.negativeMarginOrders || 0;
+export default function RiskCommandPanel({ metrics = {}, loading = false }) {
+  const highRisk = typeof metrics?.highRiskOrders === 'number' ? metrics.highRiskOrders : 0;
+  const negMargin = typeof metrics?.negativeMarginOrders === 'number' ? metrics.negativeMarginOrders : 0;
   
   const fraudScore = highRisk > 10 ? 85 : highRisk > 5 ? 60 : highRisk > 0 ? 35 : 10;
   const chargebackRisk = highRisk > 5 ? 'High' : highRisk > 2 ? 'Medium' : 'Low';
