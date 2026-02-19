@@ -132,8 +132,17 @@ export default function Home() {
     ...queryDefaults.standard
   });
 
-  // Default to demo mode if no tenant or settings
-  const isDemoMode = !tenant || tenantSettings?.demo_mode !== false;
+  // Extract from summary for immediate display
+  const isDemoMode = dashboardSummary?.isDemoMode ?? true;
+  const metrics = dashboardSummary?.metrics || {
+    totalRevenue: 0,
+    totalProfit: 0,
+    avgMargin: 0,
+    highRiskOrders: 0,
+    totalOrders: 0,
+    pendingAlerts: 0
+  };
+  const profitScore = dashboardSummary?.profitScore || 0;
 
   // Sync mutation
   const syncMutation = useMutation({
@@ -145,35 +154,13 @@ export default function Home() {
     },
     onSuccess: (data) => {
       toast.success(`Synced: ${data.createdCount || 0} new orders`);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
       toast.error(error.message || 'Sync failed');
     }
   });
-
-  // Calculate metrics
-  const metrics = useMemo(() => {
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || 0), 0);
-    const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
-    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-    const orderCount = orders.length;
-    const highRiskOrders = orders.filter(o => o.risk_level === 'high').length;
-    const negativeMarginOrders = orders.filter(o => (o.net_profit || 0) < 0).length;
-    const totalRefunds = orders.reduce((sum, o) => sum + (o.refund_amount || 0), 0);
-    const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
-
-    return {
-      totalRevenue,
-      totalProfit,
-      avgMargin,
-      orderCount,
-      highRiskOrders,
-      negativeMarginOrders,
-      totalRefunds,
-      avgOrderValue
-    };
-  }, [orders]);
 
   const handleSync = useCallback(() => syncMutation.mutate(), [syncMutation]);
   const handleScan = useCallback(() => {
