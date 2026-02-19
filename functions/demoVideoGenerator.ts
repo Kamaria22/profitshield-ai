@@ -36,21 +36,11 @@ Deno.serve(async (req) => {
       return Response.json({ 
         error: 'VALIDATION_ERROR',
         message: 'Invalid request body - expected valid JSON',
-        details: 'Expected JSON payload with tenantId, version, includeVoiceover, includeMusic' 
+        details: 'Expected JSON payload with version, includeVoiceover, includeMusic' 
       }, { status: 400 });
     }
 
-    const { tenantId, version = '90s', includeVoiceover = true, includeMusic = true } = payload;
-
-    // Validate required fields
-    if (!tenantId) {
-      console.error('Missing tenantId in request:', payload);
-      return Response.json({ 
-        error: 'VALIDATION_ERROR',
-        message: 'tenantId is required',
-        fields: { tenantId: 'required' }
-      }, { status: 400 });
-    }
+    const { tenantId = null, version = '90s', includeVoiceover = true, includeMusic = true } = payload;
 
     // Validate version format
     const validVersions = ['60s', '90s', '2m'];
@@ -63,42 +53,82 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
+    const isDemoMode = !tenantId;
     console.log('✅ Video generation request validated:', { 
-      tenantId: tenantId.slice(0, 8) + '...', 
+      tenantId: tenantId ? tenantId.slice(0, 8) + '...' : 'null (demo mode)', 
       version, 
       includeVoiceover, 
-      includeMusic 
+      includeMusic,
+      isDemoMode
     });
 
-    // Log telemetry
-    await base44.asServiceRole.entities.ClientTelemetry.create({
-      tenant_id: tenantId,
-      event_type: 'demo_video_generation_started',
-      event_data: { version, includeVoiceover, includeMusic },
-      user_email: user.email
-    });
+    // Log telemetry (only if tenantId exists)
+    if (tenantId) {
+      await base44.asServiceRole.entities.ClientTelemetry.create({
+        tenant_id: tenantId,
+        event_type: 'demo_video_generation_started',
+        event_data: { version, includeVoiceover, includeMusic },
+        user_email: user.email
+      });
+    }
 
     // Step 1: Generate sanitized demo data
     console.log('Step 1: Generating demo data...');
-    let dataResult;
-    try {
-      dataResult = await base44.asServiceRole.functions.invoke('demoDataGenerator', {
-        tenantId,
-        daysBack: 30,
-        demoMode: true
-      });
-    } catch (error) {
-      console.error('Demo data generation failed:', error);
-      throw new Error(`Failed to generate demo data: ${error.message}`);
-    }
+    let dataset;
+    
+    if (isDemoMode) {
+      // Generate synthetic demo dataset without requiring tenantId
+      console.log('Using synthetic demo data (no tenant)...');
+      dataset = {
+        tenant: {
+          shop_name: 'Demo Store',
+          shop_domain: 'demo-store.myshopify.com',
+          platform: 'shopify',
+          profit_integrity_score: 87
+        },
+        metrics: {
+          totalRevenue: 245680,
+          totalProfit: 89340,
+          totalCost: 156340,
+          margin: 36.4,
+          orderCount: 1247,
+          avgOrderValue: 197,
+          avgFraudScore: 12,
+          avgReturnRisk: 8,
+          avgChargebackRisk: 3
+        },
+        leaks: [
+          { type: 'shipping', title: 'Shipping cost variance', monthlyImpact: -2340 },
+          { type: 'discount', title: 'Over-discounting patterns', monthlyImpact: -1890 }
+        ],
+        recommendations: [
+          'Optimize shipping carrier selection',
+          'Review discount strategy',
+          'Implement dynamic pricing'
+        ]
+      };
+    } else {
+      // Use real tenant data
+      let dataResult;
+      try {
+        dataResult = await base44.asServiceRole.functions.invoke('demoDataGenerator', {
+          tenantId,
+          daysBack: 30,
+          demoMode: true
+        });
+      } catch (error) {
+        console.error('Demo data generation failed:', error);
+        throw new Error(`Failed to generate demo data: ${error.message}`);
+      }
 
-    if (!dataResult?.data?.success) {
-      const errorMsg = dataResult?.data?.error || 'Unknown error';
-      console.error('Demo data generation returned error:', errorMsg);
-      throw new Error(`Failed to generate demo data: ${errorMsg}`);
-    }
+      if (!dataResult?.data?.success) {
+        const errorMsg = dataResult?.data?.error || 'Unknown error';
+        console.error('Demo data generation returned error:', errorMsg);
+        throw new Error(`Failed to generate demo data: ${errorMsg}`);
+      }
 
-    const dataset = dataResult.data.dataset;
+      dataset = dataResult.data.dataset;
+    }
 
     // Step 2: Generate AI script
     console.log('Step 2: Generating script...');
@@ -214,19 +244,21 @@ Deno.serve(async (req) => {
     console.log('Step 6: Generating thumbnail...');
     const thumbnailUrl = `https://demo.profitshield.ai/thumbnails/demo_${tenantId}_${version}_thumb.png`;
 
-    // Save generation record
-    await base44.asServiceRole.entities.ClientTelemetry.create({
-      tenant_id: tenantId,
-      event_type: 'demo_video_generation_completed',
-      event_data: {
-        version,
-        duration: script.totalDuration,
-        scenes: script.scenes.length,
-        videoUrl: mockVideoUrl,
-        thumbnailUrl
-      },
-      user_email: user.email
-    });
+    // Save generation record (only if tenantId exists)
+    if (tenantId) {
+      await base44.asServiceRole.entities.ClientTelemetry.create({
+        tenant_id: tenantId,
+        event_type: 'demo_video_generation_completed',
+        event_data: {
+          version,
+          duration: script.totalDuration,
+          scenes: script.scenes.length,
+          videoUrl: mockVideoUrl,
+          thumbnailUrl
+        },
+        user_email: user.email
+      });
+    }
 
     return Response.json({
       success: true,

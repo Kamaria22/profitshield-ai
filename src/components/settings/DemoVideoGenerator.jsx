@@ -24,7 +24,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function DemoVideoGenerator({ resolver = {} }) {
-  // Safe resolver check - might not be resolved yet
+  // Safe resolver check - works with or without store connection
   let tenantId = null;
   let isResolved = false;
   try {
@@ -32,7 +32,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     tenantId = resolverCheck.tenantId;
     isResolved = true;
   } catch (e) {
-    // Not resolved - show connection message
+    // Not resolved - will use demo data
     isResolved = false;
   }
 
@@ -70,13 +70,8 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      // Final validation before calling function
-      if (!tenantId) {
-        throw new Error('Store connection required. Please connect a store first.');
-      }
-
       const { data } = await base44.functions.invoke('demoVideoGenerator', {
-        tenantId,
+        tenantId: tenantId || null, // null = use demo data
         version: selectedVersion,
         includeVoiceover,
         includeMusic
@@ -89,13 +84,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   });
 
   const handleGenerate = () => {
-    // Pre-validation: don't send bad requests
-    if (!isResolved || !tenantId) {
-      // Show error inline - mutation will handle error display
-      generateMutation.mutate();
-      return;
-    }
-
     setGeneratedVideo(null);
     generateMutation.mutate();
   };
@@ -197,13 +185,13 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             </AlertDescription>
           </Alert>
 
-          {/* Store Connection Warning */}
+          {/* Demo Mode Info */}
           {!isResolved && (
-            <Alert variant="destructive">
-              <AlertCircle className="w-4 h-4" />
-              <AlertDescription>
-                <strong>Store connection required:</strong> Please connect a store before generating demo videos.
-                Go to <strong>Integrations</strong> to connect your store.
+            <Alert className="border-blue-200 bg-blue-50">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <AlertDescription className="text-blue-900">
+                <strong>Demo Mode:</strong> No store connected. Video will be generated using sanitized sample data.
+                Connect a store in <strong>Integrations</strong> to use your real metrics.
               </AlertDescription>
             </Alert>
           )}
@@ -211,7 +199,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           {/* Generate Button */}
           <Button
             onClick={handleGenerate}
-            disabled={generateMutation.isPending || !isResolved}
+            disabled={generateMutation.isPending}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
             size="lg"
           >
@@ -223,7 +211,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             ) : (
               <>
                 <Sparkles className="w-5 h-5 mr-2" />
-                {!isResolved ? 'Connect Store First' : 'Generate Demo Video'}
+                Generate Demo Video
               </>
             )}
           </Button>
