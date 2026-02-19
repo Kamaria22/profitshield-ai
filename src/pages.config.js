@@ -65,7 +65,6 @@ import Products from './pages/Products';
 import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
 import SelectStore from './pages/SelectStore';
-import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
@@ -91,7 +90,6 @@ export const PAGES = {
     "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
     "SelectStore": SelectStore,
-    "Settings": Settings,
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
