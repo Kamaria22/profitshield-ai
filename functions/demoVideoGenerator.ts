@@ -26,7 +26,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Owner access required' }, { status: 403 });
     }
 
-    const { tenantId, version = '90s', includeVoiceover = true, includeMusic = true } = await req.json();
+    // Parse request body safely
+    let payload;
+    try {
+      const body = await req.json();
+      payload = body;
+    } catch (parseError) {
+      return Response.json({ 
+        error: 'Invalid request body', 
+        details: 'Expected JSON payload with tenantId, version, includeVoiceover, includeMusic' 
+      }, { status: 400 });
+    }
+
+    const { tenantId, version = '90s', includeVoiceover = true, includeMusic = true } = payload;
 
     if (!tenantId) {
       return Response.json({ error: 'tenantId required' }, { status: 400 });
