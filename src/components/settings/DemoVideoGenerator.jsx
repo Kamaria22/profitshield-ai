@@ -525,7 +525,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </TabsList>
 
               <TabsContent value="video" className="space-y-4 mt-4">
-                {Object.keys(generatedVideo.outputs || {}).length === 0 || (!generatedVideo.outputs?.mp4_1080_url && !generatedVideo.outputs?.mp4_720_url) ? (
+                {!generatedVideo.outputs?.mp4_1080_url && !generatedVideo.outputs?.mp4_720_url ? (
                   <Alert className="border-amber-200 bg-amber-50">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
                     <AlertDescription className="text-amber-900">
@@ -533,81 +533,73 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     {generatedVideo.outputs?.mp4_1080_url && (
                       <Button 
                         variant="outline" 
-                        className="justify-start"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = generatedVideo.outputs.mp4_1080_url;
-                          link.download = 'demo-video-1080p.mp4';
-                          link.target = '_blank';
-                          link.rel = 'noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
+                        className="w-full justify-start"
+                        asChild
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download 1920x1080 (Full HD)
+                        <a 
+                          href={generatedVideo.outputs.mp4_1080_url} 
+                          download="demo-video-1080p.mp4"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download 1920x1080 (Full HD)
+                        </a>
                       </Button>
                     )}
                     {generatedVideo.outputs?.mp4_720_url && (
                       <Button 
                         variant="outline" 
-                        className="justify-start"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = generatedVideo.outputs.mp4_720_url;
-                          link.download = 'demo-video-720p.mp4';
-                          link.target = '_blank';
-                          link.rel = 'noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
+                        className="w-full justify-start"
+                        asChild
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download 1280x720 (HD)
+                        <a 
+                          href={generatedVideo.outputs.mp4_720_url} 
+                          download="demo-video-720p.mp4"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download 1280x720 (HD)
+                        </a>
                       </Button>
                     )}
                     {generatedVideo.outputs?.mp4_shopify_url && (
                       <Button 
                         variant="outline" 
-                        className="justify-start"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = generatedVideo.outputs.mp4_shopify_url;
-                          link.download = 'demo-video-shopify.mp4';
-                          link.target = '_blank';
-                          link.rel = 'noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
+                        className="w-full justify-start"
+                        asChild
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download 1600x900 (Shopify App Store)
+                        <a 
+                          href={generatedVideo.outputs.mp4_shopify_url} 
+                          download="demo-video-shopify.mp4"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download 1600x900 (Shopify App Store)
+                        </a>
                       </Button>
                     )}
                     {generatedVideo.outputs?.thumbnail_url && (
                       <Button 
                         variant="outline" 
-                        className="justify-start"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = generatedVideo.outputs.thumbnail_url;
-                          link.download = 'demo-video-thumb.jpg';
-                          link.target = '_blank';
-                          link.rel = 'noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
+                        className="w-full justify-start"
+                        asChild
                       >
-                        <ImageIcon className="w-4 h-4 mr-2" />
-                        Download Thumbnail
+                        <a 
+                          href={generatedVideo.outputs.thumbnail_url} 
+                          download="demo-video-thumb.jpg"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ImageIcon className="w-4 h-4 mr-2" />
+                          Download Thumbnail
+                        </a>
                       </Button>
                     )}
                   </div>
