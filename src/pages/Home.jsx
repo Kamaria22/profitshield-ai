@@ -322,11 +322,16 @@ export default function Home() {
               )}
             </div>
 
-            {/* CEO Insights Rail (Desktop Only) - Lazy loaded */}
-            <div className="hidden xl:block w-64 flex-shrink-0">
-              <Suspense fallback={<PanelSkeleton />}>
-                <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
-              </Suspense>
+            {/* Side Rail - CEO Insights + Custom Alerts (Desktop Only) */}
+            <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
+              <div className="sticky top-0 space-y-4">
+                <Suspense fallback={<PanelSkeleton />}>
+                  <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <CustomAlerts tenantId={authTenantId} userId={resolver?.user?.id} />
+                </Suspense>
+              </div>
             </div>
           </div>
         </div>
