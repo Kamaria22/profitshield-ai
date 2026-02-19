@@ -15,7 +15,6 @@ import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/Servic
 
 // PERFORMANCE: Defer non-critical components - loaded after idle
 const MerchantAIChat = lazy(() => import('@/components/merchant/MerchantAIChat'));
-const TechSupportChat = lazy(() => import('@/components/support/TechSupportChat'));
 const ResolverSelfTest = lazy(() => import('@/components/ResolverSelfTest'));
 import {
   LayoutDashboard,
