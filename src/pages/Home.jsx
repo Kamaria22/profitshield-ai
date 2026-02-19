@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
@@ -18,21 +18,25 @@ import { Button } from '@/components/ui/button';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
 
-// Executive Dashboard Components
+// Critical above-the-fold components - loaded immediately
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
 import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
-import RiskCommandPanel from '../components/dashboard/panels/RiskCommandPanel';
-import AlertsPanel from '../components/dashboard/panels/AlertsPanel';
-import MarginLeakPanel from '../components/dashboard/panels/MarginLeakPanel';
-import CashflowPanel from '../components/dashboard/panels/CashflowPanel';
-import SecurityPanel from '../components/dashboard/panels/SecurityPanel';
-import CEOInsightsPanel from '../components/dashboard/panels/CEOInsightsPanel';
-import AIAutomationsPanel from '../components/dashboard/panels/AIAutomationsPanel';
-import AdvancedAnalyticsPanel from '../components/dashboard/panels/AdvancedAnalyticsPanel';
-import IntegrationsPanel from '../components/dashboard/panels/IntegrationsPanel';
-import RiskMitigationPanel from '../components/dashboard/panels/RiskMitigationPanel';
-import FinancialReportingPanel from '../components/dashboard/panels/FinancialReportingPanel';
-import CustomizeLayoutPanel from '../components/dashboard/panels/CustomizeLayoutPanel';
+import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
+import LazyPanel, { PanelSkeleton } from '../components/dashboard/LazyPanel';
+
+// Heavy panels - lazy loaded with IntersectionObserver
+const RiskCommandPanel = lazy(() => import('../components/dashboard/panels/RiskCommandPanel'));
+const AlertsPanel = lazy(() => import('../components/dashboard/panels/AlertsPanel'));
+const MarginLeakPanel = lazy(() => import('../components/dashboard/panels/MarginLeakPanel'));
+const CashflowPanel = lazy(() => import('../components/dashboard/panels/CashflowPanel'));
+const SecurityPanel = lazy(() => import('../components/dashboard/panels/SecurityPanel'));
+const CEOInsightsPanel = lazy(() => import('../components/dashboard/panels/CEOInsightsPanel'));
+const AIAutomationsPanel = lazy(() => import('../components/dashboard/panels/AIAutomationsPanel'));
+const AdvancedAnalyticsPanel = lazy(() => import('../components/dashboard/panels/AdvancedAnalyticsPanel'));
+const IntegrationsPanel = lazy(() => import('../components/dashboard/panels/IntegrationsPanel'));
+const RiskMitigationPanel = lazy(() => import('../components/dashboard/panels/RiskMitigationPanel'));
+const FinancialReportingPanel = lazy(() => import('../components/dashboard/panels/FinancialReportingPanel'));
+const CustomizeLayoutPanel = lazy(() => import('../components/dashboard/panels/CustomizeLayoutPanel'));
 
 export default function Home() {
   const resolver = usePlatformResolver();
