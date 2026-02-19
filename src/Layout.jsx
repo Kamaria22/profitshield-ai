@@ -248,9 +248,11 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
         </div>
       )}
       
-      {/* Self-test section */}
+      {/* Self-test section - Lazy loaded */}
       <div className="border-t border-slate-700 pt-2 mt-2">
-        <ResolverSelfTest />
+        <React.Suspense fallback={<p className="text-xs text-slate-500">Loading test...</p>}>
+          <ResolverSelfTest />
+        </React.Suspense>
       </div>
     </div>
   );
