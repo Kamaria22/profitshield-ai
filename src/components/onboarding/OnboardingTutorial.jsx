@@ -184,14 +184,8 @@ export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTi
             >
               {/* Header */}
               <div className={`bg-gradient-to-r ${slide.color} p-6 text-white`}>
-                <div className="flex items-start justify-between mb-4">
+                <div className="mb-4">
                   <Icon className="w-12 h-12" />
-                  <button 
-                    onClick={onClose}
-                    className="p-1 hover:bg-white/20 rounded transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
                 <h2 className="text-3xl font-bold mb-2">{slide.title}</h2>
                 <p className="text-white/90 text-lg">{slide.description}</p>
@@ -219,10 +213,8 @@ export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTi
                       transition={{ delay: idx * 0.1 }}
                       className="flex items-start gap-3"
                     >
-                      <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${slide.color} flex items-center justify-center flex-shrink-0`}>
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                      <p className="text-slate-700">{feature}</p>
+                      <Check className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-slate-600">{feature}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -238,14 +230,12 @@ export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTi
                     Back
                   </Button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2">
                     {TUTORIAL_SLIDES.map((_, idx) => (
                       <div
                         key={idx}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          idx === currentSlide 
-                            ? 'bg-emerald-600 w-6' 
-                            : 'bg-slate-300'
+                        className={`h-2 rounded-full transition-all ${
+                          idx === currentSlide ? 'w-6 bg-emerald-600' : 'w-2 bg-slate-300'
                         }`}
                       />
                     ))}
@@ -253,10 +243,10 @@ export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTi
 
                   <Button
                     onClick={handleNext}
-                    className={`bg-gradient-to-r ${slide.color}`}
+                    className="bg-emerald-600 hover:bg-emerald-700"
                   >
-                    {isLastSlide ? 'See Pricing' : 'Next'}
-                    <ChevronRight className="w-4 h-4 ml-2" />
+                    {isLastSlide ? 'View Pricing' : 'Next'}
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </div>
@@ -267,65 +257,62 @@ export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTi
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="p-6"
             >
-              <DialogHeader className="mb-6">
-                <DialogTitle className="text-2xl flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-emerald-600" />
-                  Choose Your Plan
-                </DialogTitle>
-                <DialogDescription>
-                  Unlock more features as you grow. Cancel anytime.
-                </DialogDescription>
-              </DialogHeader>
+              {/* Pricing Section */}
+              <div className="p-6">
+                <h2 className="text-3xl font-bold mb-2 text-slate-900">Plans & Pricing</h2>
+                <p className="text-slate-600 mb-8">Choose the perfect plan for your business</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {Object.entries(TIER_FEATURES).filter(([key]) => key !== 'trial').map(([key, tier]) => (
-                  <Card 
-                    key={key}
-                    className={`relative ${tier.highlight ? 'ring-2 ring-emerald-500' : ''}`}
-                  >
-                    {tier.highlight && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <Badge className="bg-emerald-600 text-white">Most Popular</Badge>
-                      </div>
-                    )}
-                    <CardContent className="p-4">
-                      <div className="text-center mb-4">
-                        <h3 className={`text-xl font-bold ${tier.color}`}>{tier.name}</h3>
-                        <p className="text-3xl font-bold text-slate-900 mt-2">{tier.price}</p>
-                        <p className="text-xs text-slate-500 mt-1">{tier.limits}</p>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                  {Object.entries(TIER_FEATURES).map(([tier, features]) => (
+                    <Card
+                      key={tier}
+                      className={`relative transition-all ${
+                        features.highlight ? 'ring-2 ring-emerald-500 lg:scale-105' : ''
+                      } ${tier === currentTier ? 'ring-2 ring-blue-500' : ''}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="text-sm font-semibold text-slate-600 mb-1">{features.name}</div>
+                        <div className={`text-2xl font-bold mb-1 ${features.color}`}>{features.price}</div>
+                        <div className="text-xs text-slate-500 mb-4">{features.limits}</div>
+                        <ul className="space-y-2 mb-4">
+                          {features.features.map((f, idx) => (
+                            <li key={idx} className="text-xs text-slate-600 flex gap-2">
+                              <Check className="w-3 h-3 text-emerald-500 flex-shrink-0 mt-0.5" />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                        {tier !== currentTier && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpgrade(tier)}
+                            className="w-full text-xs"
+                            variant={features.highlight ? 'default' : 'outline'}
+                          >
+                            Upgrade
+                          </Button>
+                        )}
+                        {tier === currentTier && (
+                          <div className="text-xs text-emerald-600 font-semibold p-2 bg-emerald-50 rounded text-center">
+                            Current Plan
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
 
-                      <ul className="space-y-2 mb-4">
-                        {tier.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm">
-                            <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                            <span className="text-slate-600">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <Button
-                        onClick={() => handleUpgrade(key)}
-                        className={`w-full ${tier.highlight ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
-                        variant={tier.highlight ? 'default' : 'outline'}
-                      >
-                        {currentTier === key ? 'Current Plan' : 'Get Started'}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t">
-                <Button variant="ghost" onClick={handleBack}>
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Back to Tutorial
-                </Button>
-                <Button variant="outline" onClick={onClose}>
-                  Maybe Later
-                </Button>
+                {/* Navigation */}
+                <div className="flex justify-between pt-6 border-t">
+                  <Button variant="ghost" onClick={handleBack}>
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                  <Button onClick={onClose} variant="outline">
+                    Continue
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
