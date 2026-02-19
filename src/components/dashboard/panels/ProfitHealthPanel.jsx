@@ -2,10 +2,10 @@ import React from 'react';
 import { DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import CommandPanel from '../CommandPanel';
 
-export default function ProfitHealthPanel({ metrics, loading }) {
-  const margin = metrics?.avgMargin || 0;
-  const profit = metrics?.totalProfit || 0;
-  const revenue = metrics?.totalRevenue || 0;
+export default function ProfitHealthPanel({ metrics = {}, loading = false }) {
+  const margin = typeof metrics?.avgMargin === 'number' ? metrics.avgMargin : 0;
+  const profit = typeof metrics?.totalProfit === 'number' ? metrics.totalProfit : 0;
+  const revenue = typeof metrics?.totalRevenue === 'number' ? metrics.totalRevenue : 0;
 
   const formatMoney = (val) => {
     if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
