@@ -7,6 +7,7 @@ import { PermissionsProvider, usePermissions } from '@/components/usePermissions
 import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
+import TechSupportChat from '@/components/support/TechSupportChat';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import ResolverSelfTest from '@/components/ResolverSelfTest';
 import { maskEmail } from '@/components/utils/safeLog';
@@ -271,6 +272,7 @@ const useFilteredNavItems = (hasPermission, isAdmin) => {
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
+  const [supportChatOpen, setSupportChatOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -611,6 +613,14 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         resolver={resolver} 
         userEmail={activeUser?.email} 
         search={location.search}
+      />
+
+      {/* Tech Support Chat */}
+      <TechSupportChat
+        tenantId={authTenantId}
+        isOpen={supportChatOpen}
+        onClose={() => setSupportChatOpen(false)}
+        onOpen={() => setSupportChatOpen(true)}
       />
     </div>
   );

@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import ProfitIntegrityScore from '../components/dashboard/ProfitIntegrityScore';
 import ProfitLeakCard from '../components/dashboard/ProfitLeakCard';
 import EmailVerificationStep from '../components/onboarding/EmailVerificationStep';
+import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
 
 const steps = [
   { id: 'verify', title: 'Verify Account', icon: Shield },
@@ -82,6 +83,7 @@ export default function Onboarding() {
     push_notes: true,
     auto_hold_high_risk: false
   });
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -268,15 +270,27 @@ export default function Onboarding() {
       }
     }
 
-    // Wait a moment then redirect
+    // Show tutorial before redirecting
     await new Promise(resolve => setTimeout(resolve, 1500));
-    navigate(createPageUrl('Home'));
+    setShowTutorial(true);
   };
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    navigate(createPageUrl('Home'));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Tutorial Modal */}
+      {showTutorial && (
+        <OnboardingTutorial 
+          onComplete={handleTutorialComplete}
+          userTier={user?.subscription_tier || 'trial'}
+        />
+      )}
       {/* Header */}
       <header className="border-b border-slate-200 bg-white">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
