@@ -603,13 +603,15 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           {children}
         </main>
 
-        {/* MerchantAI Chat - only when resolved */}
+        {/* MerchantAI Chat - DEFERRED: only when resolved + lazy loaded */}
         {isResolved && authTenantId && activeUser && (
           <ErrorBoundary fallback={null}>
-            <MerchantAIChat 
-              tenantId={authTenantId} 
-              currentPage={currentPageName || 'Home'}
-            />
+            <React.Suspense fallback={null}>
+              <MerchantAIChat 
+                tenantId={authTenantId} 
+                currentPage={currentPageName || 'Home'}
+              />
+            </React.Suspense>
           </ErrorBoundary>
         )}
       </div>
@@ -621,13 +623,15 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         search={location.search}
       />
 
-      {/* Tech Support Chat */}
-      <TechSupportChat
-        tenantId={authTenantId}
-        isOpen={supportChatOpen}
-        onClose={() => setSupportChatOpen(false)}
-        onOpen={() => setSupportChatOpen(true)}
-      />
+      {/* Tech Support Chat - DEFERRED: lazy loaded */}
+      <React.Suspense fallback={null}>
+        <TechSupportChat
+          tenantId={authTenantId}
+          isOpen={supportChatOpen}
+          onClose={() => setSupportChatOpen(false)}
+          onOpen={() => setSupportChatOpen(true)}
+        />
+      </React.Suspense>
     </div>
   );
 }
