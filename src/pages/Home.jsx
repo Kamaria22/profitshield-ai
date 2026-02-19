@@ -50,6 +50,7 @@ import TierUpgradePrompt from '../components/billing/TierUpgradePrompt';
 import ProfitOptimizationPanel from '../components/ai/ProfitOptimizationPanel';
 import AIAnalyticsPanel from '../components/dashboard/AIAnalyticsPanel';
 import AIAutoActionsPanel from '../components/ai/AIAutoActionsPanel';
+import SubscriptionGate from '../components/subscription/SubscriptionGate';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -430,12 +431,13 @@ export default function Home() {
   }
 
   return (
-    <motion.div 
-      className="space-y-4 sm:space-y-6 lg:space-y-8 pb-6"
-      initial="initial"
-      animate="animate"
-      variants={staggerContainer}
-    >
+    <SubscriptionGate tenant={tenant}>
+      <motion.div 
+        className="space-y-4 sm:space-y-6 lg:space-y-8 pb-6"
+        initial="initial"
+        animate="animate"
+        variants={staggerContainer}
+      >
       {/* Review Request Modal */}
       <ReviewRequestModal
         isOpen={showReviewModal}
@@ -912,5 +914,6 @@ export default function Home() {
         </motion.div>
       </motion.div>
     </motion.div>
+    </SubscriptionGate>
   );
 }
