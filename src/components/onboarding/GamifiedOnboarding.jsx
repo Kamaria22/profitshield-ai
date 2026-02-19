@@ -246,3 +246,44 @@ export function useTriggerAchievement() {
     return false;
   };
 }
+
+// Hook to check if onboarding tutorial should be shown
+export function useShouldShowTutorial(tenantId) {
+  const [shouldShow, setShouldShow] = useState(false);
+  
+  useEffect(() => {
+    if (!tenantId) return;
+    
+    const checkTutorialStatus = async () => {
+      try {
+        const progress = await base44.entities.OnboardingProgress.filter({ tenant_id: tenantId });
+        if (progress.length > 0) {
+          const tutorialCompleted = progress[0].tutorial_completed || false;
+          setShouldShow(!tutorialCompleted);
+        } else {
+          setShouldShow(true);
+        }
+      } catch (e) {
+        console.error('Failed to check tutorial status:', e);
+      }
+    };
+    
+    checkTutorialStatus();
+  }, [tenantId]);
+  
+  return shouldShow;
+}
+
+// Mark tutorial as completed
+export async function markTutorialCompleted(tenantId) {
+  try {
+    const progress = await base44.entities.OnboardingProgress.filter({ tenant_id: tenantId });
+    if (progress.length > 0) {
+      await base44.entities.OnboardingProgress.update(progress[0].id, {
+        tutorial_completed: true
+      });
+    }
+  } catch (e) {
+    console.error('Failed to mark tutorial completed:', e);
+  }
+}

@@ -209,25 +209,38 @@ Deno.serve(async (req) => {
     // Step 5: Render video
     console.log('Step 5: Rendering video...');
     
-    // Note: This requires video rendering service integration
-    // Options:
-    // 1. Remotion (React-based video rendering) - https://remotion.dev
-    // 2. Shotstack (Cloud video editing API) - https://shotstack.io
-    // 3. Bannerbear (Video generation API) - https://bannerbear.com
-    // 4. FFmpeg via Deno subprocess (for server with FFmpeg installed)
+    const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
+    const shotstackEnv = Deno.env.get('SHOTSTACK_ENV') || 'stage';
     
-    // For production, integrate with a video rendering service:
-    // const renderResult = await fetch('https://api.shotstack.io/v1/render', {
-    //   method: 'POST',
-    //   headers: {
-    //     'x-api-key': Deno.env.get('SHOTSTACK_API_KEY'),
-    //     'Content-Type': 'application/json'
-    //   },
-    //   body: JSON.stringify(videoConfig)
-    // });
-
-    // Placeholder response - in production, this would poll rendering service
-    const videoMetadata = {
+    let videoMetadata;
+    
+    if (shotstackApiKey) {
+      // PRODUCTION: Real video rendering via Shotstack
+      console.log('🎬 Shotstack API key found - rendering real video...');
+      
+      try {
+        videoMetadata = await renderVideoWithShotstack({
+          videoConfig,
+          script,
+          apiKey: shotstackApiKey,
+          environment: shotstackEnv
+        });
+        
+        console.log('✅ Video rendered successfully:', videoMetadata.url);
+      } catch (renderError) {
+        console.error('Shotstack rendering failed:', renderError);
+        // Fallback to mock
+        videoMetadata = generateMockVideoMetadata(videoConfig, script);
+        videoMetadata.renderStatus = 'failed';
+        videoMetadata.renderError = renderError.message;
+      }
+    } else {
+      // DEVELOPMENT: Mock output
+      console.log('⚠️ No Shotstack API key - returning mock package');
+      videoMetadata = generateMockVideoMetadata(videoConfig, script);
+    }
+    
+    const videoMetadataFinal = videoMetadata || {
       status: 'rendering',
       estimatedTime: `${Math.ceil(script.totalDuration / 10)} minutes`,
       formats: [

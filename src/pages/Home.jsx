@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
+import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
+import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
 
 // Critical above-the-fold components - loaded immediately
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
@@ -52,6 +54,29 @@ export default function Home() {
   const canQuery = canQueryTenant(resolverCheck);
   const queryFilter = getTenantFilter(resolverCheck);
   const authTenantId = resolverCheck.tenantId;
+
+  // Tutorial state
+  const shouldShowTutorial = useShouldShowTutorial(authTenantId);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  useEffect(() => {
+    if (shouldShowTutorial && authTenantId) {
+      // Delay showing tutorial slightly for better UX
+      const timer = setTimeout(() => setTutorialOpen(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowTutorial, authTenantId]);
+
+  const handleTutorialClose = async () => {
+    setTutorialOpen(false);
+    if (authTenantId) {
+      await markTutorialCompleted(authTenantId);
+    }
+  };
+
+  const handleUpgrade = (tier) => {
+    navigate(createPageUrl('Pricing'));
+  };
   
   const tenant = resolver?.tenant || null;
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
@@ -225,6 +250,14 @@ export default function Home() {
 
   return (
     <SubscriptionGate tenant={tenant}>
+      {/* Onboarding Tutorial */}
+      <OnboardingTutorial
+        open={tutorialOpen}
+        onClose={handleTutorialClose}
+        onUpgrade={handleUpgrade}
+        currentTier={tenant?.subscription_tier || 'trial'}
+      />
+
       <div className="h-full flex flex-col -m-4 lg:-m-6">
         {/* Executive Summary Bar - Critical above-the-fold */}
         <ExecutiveSummaryBar 
