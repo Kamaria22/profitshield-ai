@@ -372,7 +372,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     );
   }
 
-  const showMissingContextBanner = status === RESOLVER_STATUS.ERROR;
+  // Only show banner on pages that actually require store data
+  const storeRequiredPages = ['Home', 'Orders', 'Products', 'Customers', 'Shipping', 'Intelligence', 'Alerts', 'Tasks', 'PnLAnalytics'];
+  const showMissingContextBanner = storeRequiredPages.includes(currentPageName) && !isResolved && 
+    (status === RESOLVER_STATUS.ERROR || status === RESOLVER_STATUS.NEEDS_SELECTION);
   
   // Store info - only display when resolved
   const storeDisplayName = isResolved && resolver.integration?.store_name 

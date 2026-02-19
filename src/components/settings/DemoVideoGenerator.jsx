@@ -39,6 +39,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [selectedVersion, setSelectedVersion] = useState('90s');
   const [includeVoiceover, setIncludeVoiceover] = useState(true);
   const [includeMusic, setIncludeMusic] = useState(true);
+  const [useDemoData, setUseDemoData] = useState(!isResolved);
   const [generatedVideo, setGeneratedVideo] = useState(null);
 
   const versions = [
@@ -71,15 +72,22 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const { data } = await base44.functions.invoke('demoVideoGenerator', {
-        tenantId: tenantId || null, // null = use demo data
+        tenantId: useDemoData ? null : tenantId,
         version: selectedVersion,
         includeVoiceover,
-        includeMusic
+        includeMusic,
+        useDemoData
       });
       return data;
     },
     onSuccess: (data) => {
+      if (!data.success) {
+        throw new Error(data.message || 'Generation failed');
+      }
       setGeneratedVideo(data);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to generate video');
     }
   });
 
@@ -185,13 +193,38 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             </AlertDescription>
           </Alert>
 
-          {/* Demo Mode Info */}
+          {/* Data Source Selector */}
+          {isResolved && (
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Store className="w-5 h-5 text-slate-600" />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Use real store metrics</p>
+                  <p className="text-xs text-slate-500">Generate video with your actual data</p>
+                </div>
+              </div>
+              <Switch checked={!useDemoData} onCheckedChange={(val) => setUseDemoData(!val)} />
+            </div>
+          )}
+
+          {/* Store Connection Warning */}
           {!isResolved && (
             <Alert className="border-blue-200 bg-blue-50">
               <Sparkles className="w-4 h-4 text-blue-600" />
               <AlertDescription className="text-blue-900">
-                <strong>Demo Mode:</strong> No store connected. Video will be generated using sanitized sample data.
-                Connect a store in <strong>Integrations</strong> to use your real metrics.
+                <strong>Demo Mode Active:</strong> No store connected. Video will use sanitized sample data.
+                <Link to={createPageUrl('Integrations')} className="ml-2 underline font-medium">
+                  Connect Store
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {useDemoData && isResolved && (
+            <Alert className="border-amber-200 bg-amber-50">
+              <Info className="w-4 h-4 text-amber-600" />
+              <AlertDescription className="text-amber-900">
+                Using demo data mode. Toggle above to use your real store metrics.
               </AlertDescription>
             </Alert>
           )}

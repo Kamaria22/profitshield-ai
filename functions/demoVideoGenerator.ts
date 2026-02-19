@@ -40,26 +40,30 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    const { tenantId = null, version = '90s', includeVoiceover = true, includeMusic = true } = payload;
+    const { tenantId = null, version = '90s', includeVoiceover = true, includeMusic = true, useDemoData = false } = payload;
 
     // Validate version format
     const validVersions = ['60s', '90s', '2m'];
     if (version && !validVersions.includes(version)) {
       console.error('Invalid version:', version);
       return Response.json({ 
+        success: false,
         error: 'VALIDATION_ERROR',
         message: `Invalid version. Must be one of: ${validVersions.join(', ')}`,
         fields: { version: 'invalid' }
       }, { status: 400 });
     }
 
-    const isDemoMode = !tenantId;
-    console.log('✅ Video generation request validated:', { 
-      tenantId: tenantId ? tenantId.slice(0, 8) + '...' : 'null (demo mode)', 
+    const isDemoMode = !tenantId || useDemoData;
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`[${requestId}] ✅ Video generation request validated:`, { 
+      tenantId: tenantId ? tenantId.slice(0, 8) + '...' : 'null', 
       version, 
       includeVoiceover, 
       includeMusic,
-      isDemoMode
+      isDemoMode,
+      useDemoData
     });
 
     // Log telemetry (only if tenantId exists)
@@ -73,12 +77,12 @@ Deno.serve(async (req) => {
     }
 
     // Step 1: Generate sanitized demo data
-    console.log('Step 1: Generating demo data...');
+    console.log(`[${requestId}] Step 1: Generating demo data...`);
     let dataset;
     
     if (isDemoMode) {
       // Generate synthetic demo dataset without requiring tenantId
-      console.log('Using synthetic demo data (no tenant)...');
+      console.log(`[${requestId}] Using synthetic demo data (no tenant or useDemoData=true)...`);
       dataset = {
         tenant: {
           shop_name: 'Demo Store',
