@@ -17,7 +17,8 @@ import {
   CheckCircle,
   XCircle,
   Shield,
-  Download
+  Download,
+  Film
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManage
 import RiskModelConfig from '../components/settings/RiskModelConfig';
 import RoleManagement from '../components/settings/RoleManagement';
 import DataExportPanel from '../components/settings/DataExportPanel';
+import DemoVideoGenerator from '../components/settings/DemoVideoGenerator';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
@@ -255,6 +257,12 @@ export default function Settings() {
             <Download className="w-4 h-4" />
             Data Export
           </TabsTrigger>
+          {(user?.role === 'admin' || user?.role === 'owner') && (
+            <TabsTrigger value="demo-video" className="gap-2">
+              <Film className="w-4 h-4" />
+              Demo Video
+            </TabsTrigger>
+          )}
           <TabsTrigger value="compliance" className="gap-2">
             <Shield className="w-4 h-4" />
             Compliance
