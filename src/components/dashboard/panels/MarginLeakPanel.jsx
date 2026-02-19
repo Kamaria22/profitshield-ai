@@ -2,9 +2,9 @@ import React from 'react';
 import { Zap, TrendingDown } from 'lucide-react';
 import CommandPanel from '../CommandPanel';
 
-export default function MarginLeakPanel({ leaks = [], loading }) {
-  const topLeaks = leaks.slice(0, 3);
-  const totalImpact = leaks.reduce((sum, l) => sum + (l.impact_amount || 0), 0);
+export default function MarginLeakPanel({ leaks = [], loading, isDemo = false }) {
+  const topLeaks = isDemo ? [] : leaks.slice(0, 3);
+  const totalImpact = isDemo ? 0 : leaks.reduce((sum, l) => sum + (l.impact_amount || 0), 0);
 
   const leakIcons = {
     shipping: '📦',

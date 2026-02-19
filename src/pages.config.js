@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AIInsights from './pages/AIInsights';
+import Achievements from './pages/Achievements';
 import Alerts from './pages/Alerts';
 import AuditLogs from './pages/AuditLogs';
 import Customers from './pages/Customers';
@@ -68,12 +69,12 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import Achievements from './pages/Achievements';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AIInsights": AIInsights,
+    "Achievements": Achievements,
     "Alerts": Alerts,
     "AuditLogs": AuditLogs,
     "Customers": Customers,
@@ -94,7 +95,6 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "Achievements": Achievements,
 }
 
 export const pagesConfig = {
