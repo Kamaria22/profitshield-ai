@@ -6,7 +6,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * CRITICAL: Always returns fresh DB state (no caching)
  */
 Deno.serve(async (req) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
@@ -14,8 +14,7 @@ Deno.serve(async (req) => {
 
   try {
     const base44 = createClientFromRequest(req);
-    const url = new URL(req.url);
-    const jobId = url.searchParams.get('jobId');
+    const { jobId } = await req.json();
 
     if (!jobId) {
       return Response.json({
