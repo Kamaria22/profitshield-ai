@@ -51,13 +51,14 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
+import { Suspense } from 'react';
 import CostMappingTable from '../components/settings/CostMappingTable';
 import CustomRiskRulesManager from '../components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManager';
 import RiskModelConfig from '../components/settings/RiskModelConfig';
 import RoleManagement from '../components/settings/RoleManagement';
 import DataExportPanel from '../components/settings/DataExportPanel';
-const DemoVideoGenerator = React.lazy(() => import('../components/settings/DemoVideoGenerator'));
+import DemoVideoGenerator from '../components/settings/DemoVideoGenerator';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
