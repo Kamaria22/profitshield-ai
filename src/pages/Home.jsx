@@ -210,10 +210,19 @@ export default function Home() {
     );
   }
 
+  // PERFORMANCE: Show skeleton while summary loading
+  if (summaryLoading) {
+    return (
+      <div className="h-full -m-4 lg:-m-6">
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+
   return (
     <SubscriptionGate tenant={tenant}>
       <div className="h-full flex flex-col -m-4 lg:-m-6">
-        {/* Executive Summary Bar */}
+        {/* Executive Summary Bar - Critical above-the-fold */}
         <ExecutiveSummaryBar 
           tenant={tenant}
           metrics={metrics}
@@ -229,25 +238,47 @@ export default function Home() {
             {/* Main Panels Grid */}
             <div className="flex-1 min-w-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr" style={{ gridTemplateRows: 'repeat(4, minmax(200px, 220px))' }}>
-                {/* Row 1 */}
-                <ProfitHealthPanel metrics={metrics} loading={ordersLoading} />
-                <RiskCommandPanel metrics={metrics} loading={ordersLoading} />
-                <AlertsPanel alerts={pendingAlerts} loading={false} />
+                {/* Row 1 - CRITICAL: Above-the-fold hero panel + lazy panels */}
+                <ProfitHealthPanel metrics={metrics} loading={false} />
+                <Suspense fallback={<PanelSkeleton />}>
+                  <RiskCommandPanel metrics={metrics} loading={false} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
+                </Suspense>
                 
-                {/* Row 2 */}
-                <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
-                <CashflowPanel metrics={metrics} loading={ordersLoading} />
-                <SecurityPanel loading={false} />
+                {/* Row 2 - Lazy loaded */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <CashflowPanel metrics={metrics} loading={false} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <SecurityPanel loading={false} />
+                </Suspense>
                 
-                {/* Row 3 */}
-                <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                <AdvancedAnalyticsPanel metrics={metrics} loading={ordersLoading} isDemo={isDemoMode} />
-                <IntegrationsPanel loading={false} isDemo={isDemoMode} />
+                {/* Row 3 - Lazy loaded */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <IntegrationsPanel loading={false} isDemo={isDemoMode} />
+                </Suspense>
                 
-                {/* Row 4 */}
-                <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
-                <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
-                <CustomizeLayoutPanel loading={false} />
+                {/* Row 4 - Lazy loaded */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
+                  <CustomizeLayoutPanel loading={false} />
+                </Suspense>
               </div>
 
               {/* Connect Store CTA for Demo Mode */}
