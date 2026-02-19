@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
+import { usePermissions } from '@/components/usePermissions';
 import { 
   Download, 
   Image as ImageIcon, 
@@ -14,7 +15,11 @@ import {
   Store,
   Info,
   X,
-  RefreshCw
+  RefreshCw,
+  Settings,
+  TrendingUp,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
