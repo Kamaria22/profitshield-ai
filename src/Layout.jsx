@@ -320,16 +320,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
   const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
 
-  // Load alerts ONLY when resolved and tenantId is valid
-  useEffect(() => {
-    if (isResolved && authTenantId) {
-      loadAlerts(authTenantId);
-    } else {
-      setPendingAlerts(0);
-    }
-  }, [isResolved, authTenantId]);
-
-  const loadAlerts = async (tid) => {
+  // Load alerts with useCallback to prevent recreation on every render
+  const loadAlerts = useCallback(async (tid) => {
     if (!tid) return;
     try {
       const alerts = await base44.entities.Alert.filter({ 
@@ -338,10 +330,19 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       });
       setPendingAlerts(Array.isArray(alerts) ? alerts.length : 0);
     } catch (e) {
-      console.warn('Error loading alerts:', e.message);
+      console.warn('[Layout] Error loading alerts:', e.message);
       setPendingAlerts(0);
     }
-  };
+  }, []);
+
+  // Load alerts ONLY when resolved and tenantId is valid
+  useEffect(() => {
+    if (isResolved && authTenantId) {
+      loadAlerts(authTenantId);
+    } else {
+      setPendingAlerts(0);
+    }
+  }, [isResolved, authTenantId, loadAlerts]);
 
   // Safe redirect to SelectStore
   useEffect(() => {
