@@ -57,7 +57,7 @@ import ProfitAlertRulesManager from '../components/alerts/ProfitAlertRulesManage
 import RiskModelConfig from '../components/settings/RiskModelConfig';
 import RoleManagement from '../components/settings/RoleManagement';
 import DataExportPanel from '../components/settings/DataExportPanel';
-import DemoVideoGenerator from '../components/settings/DemoVideoGenerator';
+const DemoVideoGenerator = React.lazy(() => import('../components/settings/DemoVideoGenerator'));
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
