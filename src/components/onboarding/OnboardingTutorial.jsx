@@ -1,362 +1,336 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Play, 
-  ChevronLeft, 
-  ChevronRight, 
-  CheckCircle2, 
-  Shield, 
-  Brain, 
-  TrendingUp,
-  Users,
-  ShoppingCart,
-  AlertTriangle,
-  Zap,
-  Crown,
-  Rocket,
-  Star,
-  X
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Shield,
+  TrendingUp,
+  AlertTriangle,
+  Brain,
+  Zap,
+  Crown,
+  Rocket,
+  ArrowRight,
+  Check,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const tutorialSlides = [
+const TUTORIAL_SLIDES = [
   {
     id: 'welcome',
-    title: 'Welcome to ProfitShield',
-    subtitle: 'Your AI-Powered Profit Protection Platform',
+    title: 'Welcome to ProfitShield AI 🎉',
+    description: 'Your AI-powered profit protection and growth platform',
     icon: Shield,
     color: 'from-emerald-500 to-teal-600',
-    content: `ProfitShield is the most advanced profit protection and optimization platform ever created. 
-    We use cutting-edge AI to analyze every aspect of your e-commerce business and protect your margins.`,
     features: [
       'Real-time profit monitoring',
       'AI-powered risk detection',
-      'Automated leak prevention',
-      'Intelligent recommendations'
+      'Automated margin protection',
+      'Executive-level insights'
     ]
   },
   {
     id: 'dashboard',
-    title: 'Your Command Center',
-    subtitle: 'Dashboard Overview',
+    title: 'Smart Dashboard',
+    description: 'Track your business health at a glance',
     icon: TrendingUp,
     color: 'from-blue-500 to-indigo-600',
-    content: `The Dashboard is your central hub for monitoring business health. See your Profit Integrity Score, 
-    key metrics, alerts, and AI insights all in one place.`,
     features: [
-      'Profit Integrity Score (0-100)',
-      'Revenue, profit & margin tracking',
-      'Real-time alerts & notifications',
-      'AI-generated insights'
+      'Live profit metrics',
+      'Customizable widgets',
+      'Trend analysis',
+      'Quick actions'
     ],
-    tier: 'all'
+    tierNote: 'Starter'
   },
   {
-    id: 'ai-insights',
-    title: 'AI Insights Hub',
-    subtitle: 'Advanced Intelligence',
-    icon: Brain,
-    color: 'from-violet-500 to-purple-600',
-    content: `Our AI Insights Hub provides deep analysis of your customers, marketing opportunities, 
-    and profit leaks using advanced machine learning algorithms.`,
-    features: [
-      'Customer Segmentation (RFM Analysis)',
-      'AI Marketing Campaigns',
-      'Profit Leak Forensics',
-      'Predictive Analytics'
-    ],
-    tier: 'growth'
-  },
-  {
-    id: 'orders',
-    title: 'Order Intelligence',
-    subtitle: 'Every Order Analyzed',
-    icon: ShoppingCart,
-    color: 'from-amber-500 to-orange-600',
-    content: `Every order is automatically analyzed for risk, profitability, and patterns. 
-    Our AI detects fraud, chargebacks, and margin erosion before they impact your bottom line.`,
-    features: [
-      'Real-time risk scoring',
-      'Fraud detection',
-      'Profitability analysis',
-      'Customer behavior tracking'
-    ],
-    tier: 'all'
-  },
-  {
-    id: 'alerts',
-    title: 'Smart Alerts',
-    subtitle: 'Never Miss a Threat',
+    id: 'risk',
+    title: 'Risk Intelligence',
+    description: 'Detect and prevent profit leaks before they happen',
     icon: AlertTriangle,
-    color: 'from-red-500 to-rose-600',
-    content: `Receive instant alerts when our AI detects potential issues. From suspicious orders to 
-    sudden margin drops, you'll always be the first to know.`,
+    color: 'from-amber-500 to-orange-600',
     features: [
-      'Critical threat notifications',
-      'Customizable alert rules',
-      'Multi-channel delivery',
-      'One-click actions'
+      'Fraud detection',
+      'Chargeback prevention',
+      'Shipping anomalies',
+      'Custom risk rules'
     ],
-    tier: 'all'
+    tierNote: 'Growth+'
   },
   {
-    id: 'automation',
-    title: 'AI Automation',
-    subtitle: 'Set It & Forget It',
-    icon: Zap,
-    color: 'from-cyan-500 to-blue-600',
-    content: `Let our AI handle routine tasks automatically. From price optimization to fraud blocking, 
-    ProfitShield works 24/7 to protect and grow your profits.`,
+    id: 'ai',
+    title: 'AI Insights & Automation',
+    description: 'Let AI optimize your business 24/7',
+    icon: Brain,
+    color: 'from-purple-500 to-pink-600',
     features: [
-      'Auto-hold high-risk orders',
-      'Dynamic pricing suggestions',
-      'Automated discount creation',
-      'Proactive leak prevention'
+      'Predictive analytics',
+      'Automated actions',
+      'Smart recommendations',
+      'Market intelligence'
     ],
-    tier: 'pro'
+    tierNote: 'Pro',
+    upgrade: true
+  },
+  {
+    id: 'autopilot',
+    title: 'Founder Autopilot Mode',
+    description: 'Strategic AI that runs while you sleep',
+    icon: Rocket,
+    color: 'from-rose-500 to-red-600',
+    features: [
+      'Autonomous decision-making',
+      'Strategic simulations',
+      'Competitive intelligence',
+      'Growth experiments'
+    ],
+    tierNote: 'Enterprise',
+    upgrade: true,
+    premium: true
   }
 ];
 
-const tierFeatures = {
+const TIER_FEATURES = {
   trial: {
     name: 'Trial',
-    icon: Star,
-    color: 'text-slate-600',
-    features: ['Dashboard', 'Basic Alerts', '100 Orders/month', 'Email Support']
+    price: 'Free',
+    limits: '100 orders/month',
+    features: ['Basic dashboard', 'Manual risk review', '7-day history'],
+    color: 'text-slate-600'
   },
   starter: {
     name: 'Starter',
-    icon: Rocket,
+    price: '$49/mo',
+    limits: '1,000 orders/month',
+    features: ['Full dashboard', 'Real-time alerts', 'Custom rules', '30-day history'],
     color: 'text-blue-600',
-    features: ['Everything in Trial', '500 Orders/month', 'Risk Scoring', 'Basic Reports']
+    highlight: true
   },
   growth: {
     name: 'Growth',
-    icon: TrendingUp,
-    color: 'text-emerald-600',
-    features: ['Everything in Starter', '2,000 Orders/month', 'AI Insights', 'Customer Segmentation', 'Marketing Campaigns']
+    price: '$149/mo',
+    limits: '5,000 orders/month',
+    features: ['AI insights', 'Automated actions', 'Benchmarking', '90-day history'],
+    color: 'text-purple-600'
   },
   pro: {
     name: 'Pro',
-    icon: Crown,
-    color: 'text-purple-600',
-    features: ['Everything in Growth', '10,000 Orders/month', 'Full Automation', 'Priority Support', 'Custom Rules']
+    price: '$399/mo',
+    limits: '25,000 orders/month',
+    features: ['Founder AI', 'Autopilot mode', 'Multi-store', 'Unlimited history'],
+    color: 'text-emerald-600'
   },
   enterprise: {
     name: 'Enterprise',
-    icon: Shield,
-    color: 'text-amber-600',
-    features: ['Unlimited Orders', 'Dedicated Support', 'Custom Integrations', 'SLA Guarantee', 'White-label Options']
+    price: 'Custom',
+    limits: 'Unlimited',
+    features: ['White-label', 'Dedicated support', 'Custom integrations', 'SLA'],
+    color: 'text-rose-600'
   }
 };
 
-export default function OnboardingTutorial({ onComplete, userTier = 'trial' }) {
+export default function OnboardingTutorial({ open, onClose, onUpgrade, currentTier = 'trial' }) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showTierInfo, setShowTierInfo] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+
+  const slide = TUTORIAL_SLIDES[currentSlide];
+  const Icon = slide.icon;
+  const isLastSlide = currentSlide === TUTORIAL_SLIDES.length - 1;
 
   const handleNext = () => {
-    if (currentSlide < tutorialSlides.length - 1) {
-      setCurrentSlide(currentSlide + 1);
-    } else if (!showTierInfo) {
-      setShowTierInfo(true);
+    if (isLastSlide) {
+      setShowPricing(true);
     } else {
-      onComplete?.();
+      setCurrentSlide(prev => prev + 1);
     }
   };
 
-  const handlePrev = () => {
-    if (showTierInfo) {
-      setShowTierInfo(false);
+  const handleBack = () => {
+    if (showPricing) {
+      setShowPricing(false);
     } else if (currentSlide > 0) {
-      setCurrentSlide(currentSlide - 1);
+      setCurrentSlide(prev => prev - 1);
     }
   };
 
-  const handleSkip = () => {
-    onComplete?.();
+  const handleUpgrade = (tier) => {
+    if (onUpgrade) {
+      onUpgrade(tier);
+    }
+    onClose();
   };
-
-  const progress = showTierInfo 
-    ? 100 
-    : ((currentSlide + 1) / (tutorialSlides.length + 1)) * 100;
-
-  const slide = tutorialSlides[currentSlide];
-  const Icon = slide?.icon || Shield;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-4xl"
-      >
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-white/70 text-sm">
-              {showTierInfo ? 'Plan Features' : `Step ${currentSlide + 1} of ${tutorialSlides.length}`}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSkip}
-              className="text-white/70 hover:text-white"
-            >
-              Skip Tutorial
-            </Button>
-          </div>
-          <Progress value={progress} className="h-2 bg-white/20" />
-        </div>
-
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
         <AnimatePresence mode="wait">
-          {!showTierInfo ? (
+          {!showPricing ? (
             <motion.div
-              key={currentSlide}
-              initial={{ opacity: 0, x: 50 }}
+              key="tutorial"
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, x: -20 }}
             >
-              <Card className="overflow-hidden border-0 shadow-2xl">
-                <div className={`bg-gradient-to-r ${slide.color} p-8 text-white`}>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-white/20 rounded-xl">
-                      <Icon className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">{slide.title}</h2>
-                      <p className="text-white/80">{slide.subtitle}</p>
-                    </div>
-                    {slide.tier && slide.tier !== 'all' && (
-                      <Badge className="ml-auto bg-white/20 text-white">
-                        {tierFeatures[slide.tier]?.name}+
-                      </Badge>
+              {/* Header */}
+              <div className={`bg-gradient-to-r ${slide.color} p-6 text-white`}>
+                <div className="flex items-start justify-between mb-4">
+                  <Icon className="w-12 h-12" />
+                  <button 
+                    onClick={onClose}
+                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <h2 className="text-3xl font-bold mb-2">{slide.title}</h2>
+                <p className="text-white/90 text-lg">{slide.description}</p>
+                
+                {slide.tierNote && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <Badge className="bg-white/20 text-white border-white/30">
+                      {slide.upgrade ? '🔒 ' : '✓ '} {slide.tierNote}
+                    </Badge>
+                    {slide.upgrade && (
+                      <span className="text-sm text-white/80">Available with upgrade</span>
                     )}
                   </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="space-y-4 mb-8">
+                  {slide.features.map((feature, idx) => (
+                    <motion.div
+                      key={feature}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="flex items-start gap-3"
+                    >
+                      <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${slide.color} flex items-center justify-center flex-shrink-0`}>
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                      <p className="text-slate-700">{feature}</p>
+                    </motion.div>
+                  ))}
                 </div>
 
-                <CardContent className="p-8">
-                  <p className="text-slate-600 text-lg mb-6 leading-relaxed">
-                    {slide.content}
-                  </p>
+                {/* Navigation */}
+                <div className="flex items-center justify-between pt-6 border-t">
+                  <Button
+                    variant="ghost"
+                    onClick={handleBack}
+                    disabled={currentSlide === 0}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {slide.features.map((feature, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg"
-                      >
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">{feature}</span>
-                      </motion.div>
+                  <div className="flex items-center gap-2">
+                    {TUTORIAL_SLIDES.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`w-2 h-2 rounded-full transition-all ${
+                          idx === currentSlide 
+                            ? 'bg-emerald-600 w-6' 
+                            : 'bg-slate-300'
+                        }`}
+                      />
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+
+                  <Button
+                    onClick={handleNext}
+                    className={`bg-gradient-to-r ${slide.color}`}
+                  >
+                    {isLastSlide ? 'See Pricing' : 'Next'}
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
-              key="tiers"
-              initial={{ opacity: 0, x: 50 }}
+              key="pricing"
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="p-6"
             >
-              <Card className="overflow-hidden border-0 shadow-2xl">
-                <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-8 text-white">
-                  <h2 className="text-2xl font-bold mb-2">Choose Your Power Level</h2>
-                  <p className="text-white/70">Features available at each tier</p>
-                </div>
+              <DialogHeader className="mb-6">
+                <DialogTitle className="text-2xl flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-emerald-600" />
+                  Choose Your Plan
+                </DialogTitle>
+                <DialogDescription>
+                  Unlock more features as you grow. Cancel anytime.
+                </DialogDescription>
+              </DialogHeader>
 
-                <CardContent className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {Object.entries(tierFeatures).map(([key, tier], i) => {
-                      const TierIcon = tier.icon;
-                      const isCurrentTier = key === userTier;
-                      
-                      return (
-                        <motion.div
-                          key={key}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.1 }}
-                          className={`p-4 rounded-xl border-2 ${
-                            isCurrentTier 
-                              ? 'border-emerald-500 bg-emerald-50' 
-                              : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-3">
-                            <TierIcon className={`w-5 h-5 ${tier.color}`} />
-                            <span className="font-semibold">{tier.name}</span>
-                            {isCurrentTier && (
-                              <Badge className="ml-auto bg-emerald-500 text-white text-xs">
-                                Current
-                              </Badge>
-                            )}
-                          </div>
-                          <ul className="space-y-2">
-                            {tier.features.map((f, j) => (
-                              <li key={j} className="flex items-start gap-2 text-xs text-slate-600">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 flex-shrink-0" />
-                                {f}
-                              </li>
-                            ))}
-                          </ul>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {Object.entries(TIER_FEATURES).filter(([key]) => key !== 'trial').map(([key, tier]) => (
+                  <Card 
+                    key={key}
+                    className={`relative ${tier.highlight ? 'ring-2 ring-emerald-500' : ''}`}
+                  >
+                    {tier.highlight && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge className="bg-emerald-600 text-white">Most Popular</Badge>
+                      </div>
+                    )}
+                    <CardContent className="p-4">
+                      <div className="text-center mb-4">
+                        <h3 className={`text-xl font-bold ${tier.color}`}>{tier.name}</h3>
+                        <p className="text-3xl font-bold text-slate-900 mt-2">{tier.price}</p>
+                        <p className="text-xs text-slate-500 mt-1">{tier.limits}</p>
+                      </div>
+
+                      <ul className="space-y-2 mb-4">
+                        {tier.features.map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-slate-600">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <Button
+                        onClick={() => handleUpgrade(key)}
+                        className={`w-full ${tier.highlight ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                        variant={tier.highlight ? 'default' : 'outline'}
+                      >
+                        {currentTier === key ? 'Current Plan' : 'Get Started'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <Button variant="ghost" onClick={handleBack}>
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Back to Tutorial
+                </Button>
+                <Button variant="outline" onClick={onClose}>
+                  Maybe Later
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-6">
-          <Button
-            variant="outline"
-            onClick={handlePrev}
-            disabled={currentSlide === 0 && !showTierInfo}
-            className="bg-white/10 text-white border-white/20 hover:bg-white/20"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Previous
-          </Button>
-
-          <div className="flex gap-2">
-            {tutorialSlides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => { setShowTierInfo(false); setCurrentSlide(i); }}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  i === currentSlide && !showTierInfo ? 'bg-white' : 'bg-white/30'
-                }`}
-              />
-            ))}
-            <button
-              onClick={() => setShowTierInfo(true)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                showTierInfo ? 'bg-white' : 'bg-white/30'
-              }`}
-            />
-          </div>
-
-          <Button
-            onClick={handleNext}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white"
-          >
-            {showTierInfo ? 'Get Started' : 'Next'}
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
