@@ -70,43 +70,26 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       setIsDownloading(true);
       console.log(`[DemoVideoGenerator] Downloading ${variant} for job ${jid}`);
       
-      // Try direct download endpoint
-      try {
-        const { data } = await base44.functions.invoke('demoVideoDownload', {
-          jobId: jid,
-          variant: variant
-        });
-
-        if (data?.method === 'redirect' && data?.downloadUrl) {
-          window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
-          toast.success(`Opening ${variant} download...`);
-          return;
-        }
-      } catch (e) {
-        console.warn('[DemoVideoGenerator] Direct download failed, trying proxy:', e.message);
-      }
-
-      // Fallback: proxy download
-      const { data: proxyData } = await base44.functions.invoke('demoVideoProxyDownload', {
+      // Use proxy download - returns binary data directly
+      const response = await base44.functions.invoke('demoVideoProxyDownload', {
         jobId: jid,
         format: variant
       });
 
-      if (proxyData && typeof proxyData === 'object' && proxyData.byteLength > 100) {
-        const blob = new Blob([proxyData], { type: getMimeType(variant) });
+      // The response is the binary data
+      if (response && response.data) {
+        const blob = new Blob([response.data], { type: getMimeType(variant) });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = getFileName(variant);
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 100);
         toast.success(`${variant} downloaded!`);
       } else {
-        throw new Error('No valid video data');
+        throw new Error('No valid video data received');
       }
     } catch (error) {
       console.error('[DemoVideoGenerator] Download error:', error);
