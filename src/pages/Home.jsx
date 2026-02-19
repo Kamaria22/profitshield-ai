@@ -36,7 +36,11 @@ import CustomizeLayoutPanel from '../components/dashboard/panels/CustomizeLayout
 
 export default function Home() {
   const resolver = usePlatformResolver();
-  const resolverCheck = requireResolved(resolver);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  
+  // Derive resolver values safely
+  const resolverCheck = requireResolved(resolver || {});
   const canQuery = canQueryTenant(resolverCheck);
   const queryFilter = getTenantFilter(resolverCheck);
   const authTenantId = resolverCheck.tenantId;
@@ -44,9 +48,6 @@ export default function Home() {
   const tenant = resolver?.tenant || null;
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
-  
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
 
   // Queries
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
