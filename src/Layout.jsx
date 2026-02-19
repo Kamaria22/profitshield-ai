@@ -8,6 +8,7 @@ import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import MerchantAIChat from '@/components/merchant/MerchantAIChat';
 import TechSupportChat from '@/components/support/TechSupportChat';
+import SecurityHardeningLayer from '@/components/security/SecurityHardeningLayer';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import ResolverSelfTest from '@/components/ResolverSelfTest';
 import { maskEmail } from '@/components/utils/safeLog';
@@ -676,13 +677,15 @@ return (
 
 export default function Layout({ children, currentPageName }) {
   return (
-    <PermissionsProvider>
-      <NotificationProvider>
-        <LayoutWithProviders currentPageName={currentPageName}>
-          {children}
-        </LayoutWithProviders>
-      </NotificationProvider>
-    </PermissionsProvider>
+    <SecurityHardeningLayer>
+      <PermissionsProvider>
+        <NotificationProvider>
+          <LayoutWithProviders currentPageName={currentPageName}>
+            {children}
+          </LayoutWithProviders>
+        </NotificationProvider>
+      </PermissionsProvider>
+    </SecurityHardeningLayer>
   );
 }
 

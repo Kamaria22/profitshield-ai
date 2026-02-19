@@ -51,6 +51,7 @@ import ProfitOptimizationPanel from '../components/ai/ProfitOptimizationPanel';
 import AIAnalyticsPanel from '../components/dashboard/AIAnalyticsPanel';
 import AIAutoActionsPanel from '../components/ai/AIAutoActionsPanel';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
+import GamifiedOnboarding from '../components/onboarding/GamifiedOnboarding';
 
 // Micro-animation variants
 const fadeInUp = {
@@ -466,6 +467,13 @@ export default function Home() {
       {tenant && (
         <motion.div variants={fadeInUp}>
           <OnboardingProgressBar tenantId={authTenantId} compact />
+        </motion.div>
+      )}
+
+      {/* Gamified Progress */}
+      {tenant && (
+        <motion.div variants={fadeInUp}>
+          <GamifiedOnboarding tenantId={authTenantId} currentTier={tenant.subscription_tier} />
         </motion.div>
       )}
 
