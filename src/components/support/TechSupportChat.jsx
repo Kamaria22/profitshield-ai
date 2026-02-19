@@ -12,13 +12,17 @@ import {
   Wrench,
   Sparkles,
   HelpCircle,
-  Shield
+  Shield,
+  Mail
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+// Owner escalation email for critical issues
+const OWNER_ESCALATION_EMAIL = 'owner@profitshieldAI.com';
 
 const SYSTEM_CONTEXT = `You are ProfitShield's expert AI Support Assistant - the most knowledgeable and helpful support agent ever created.
 
@@ -103,7 +107,7 @@ How can I help you today?`,
     return 'general';
   };
 
-  const triggerAutonomousFix = async (issueDescription) => {
+  const triggerAutonomousFix = async (issueDescription, isCritical = false) => {
     setIsFixing(true);
     
     // Log the issue for the autonomous system
@@ -112,7 +116,7 @@ How can I help you today?`,
         tenant_id: tenantId,
         title: `[AUTO-FIX] ${issueDescription.slice(0, 50)}...`,
         description: `**Autonomous Fix Request**\n\nIssue: ${issueDescription}\n\nSource: Tech Support Chat\nPriority: Auto-escalated`,
-        priority: 'high',
+        priority: isCritical ? 'critical' : 'high',
         status: 'pending',
         category: 'auto_fix',
         source: 'support_chat',
@@ -122,19 +126,55 @@ How can I help you today?`,
       await base44.entities.Alert.create({
         tenant_id: tenantId,
         alert_type: 'system_fix_requested',
-        severity: 'medium',
+        severity: isCritical ? 'critical' : 'medium',
         title: 'Autonomous Fix Initiated',
         message: issueDescription,
         status: 'pending',
         source: 'support_chat',
         is_auto_generated: true
       });
+
+      // For critical issues, also escalate to owner via email
+      if (isCritical) {
+        await escalateToOwner(issueDescription, tenantId);
+      }
     } catch (e) {
       console.error('Failed to create fix task:', e);
     }
     
     setIsFixing(false);
     return true;
+  };
+
+  const escalateToOwner = async (issueDescription, tid) => {
+    try {
+      await base44.integrations.Core.SendEmail({
+        to: OWNER_ESCALATION_EMAIL,
+        subject: `🚨 CRITICAL: ProfitShield Support Escalation - Tenant ${tid}`,
+        body: `CRITICAL ISSUE ESCALATION
+
+A critical issue has been reported that requires your personal attention.
+
+TENANT ID: ${tid}
+TIMESTAMP: ${new Date().toISOString()}
+
+ISSUE DESCRIPTION:
+${issueDescription}
+
+This has been auto-escalated by the autonomous support system because:
+- The issue is marked as critical
+- Automatic fixes may not be sufficient
+- User may require direct intervention
+
+Please review and take appropriate action.
+
+---
+ProfitShield AI Autonomous Support System`
+      });
+      console.log('Owner escalation email sent to:', OWNER_ESCALATION_EMAIL);
+    } catch (e) {
+      console.error('Failed to send owner escalation:', e);
+    }
   };
 
   const handleSend = async () => {
@@ -173,6 +213,7 @@ IMPORTANT: This appears to be a technical issue.
 3. If the issue is confirmed, indicate that you're initiating an automatic fix
 4. Provide immediate workarounds if possible
 5. Include "[AUTO_FIX_NEEDED]" in your response if automatic fixing is required
+6. For CRITICAL issues (data loss, security, payments broken), add "[ESCALATE_OWNER]" to alert the founder
 ` : ''}
 
 Respond helpfully and professionally. Be concise but thorough.`;
@@ -192,17 +233,22 @@ Respond helpfully and professionally. Be concise but thorough.`;
 
       let aiResponse = response.response || response;
       let needsFix = response.needs_auto_fix || aiResponse.includes('[AUTO_FIX_NEEDED]');
+      let needsOwnerEscalation = aiResponse.includes('[ESCALATE_OWNER]');
       
       // Clean up response
       if (typeof aiResponse === 'object') {
         aiResponse = aiResponse.response || JSON.stringify(aiResponse);
       }
-      aiResponse = aiResponse.replace('[AUTO_FIX_NEEDED]', '').trim();
+      aiResponse = aiResponse.replace('[AUTO_FIX_NEEDED]', '').replace('[ESCALATE_OWNER]', '').trim();
 
       // If technical issue detected, trigger autonomous fix
       if (needsFix && issueType === 'technical') {
-        await triggerAutonomousFix(response.issue_summary || userMessage);
+        await triggerAutonomousFix(response.issue_summary || userMessage, needsOwnerEscalation);
         aiResponse += `\n\n🔧 **Automatic Fix Initiated**\nI've escalated this to our autonomous repair system. The issue will be analyzed and fixed automatically. You'll receive a notification when complete.`;
+        
+        if (needsOwnerEscalation) {
+          aiResponse += `\n\n📧 **Owner Notified**\nDue to the critical nature of this issue, the ProfitShield founder has been personally notified and will review your case.`;
+        }
       }
 
       setMessages(prev => [...prev, {
