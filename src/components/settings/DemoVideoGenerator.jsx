@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { 
-  Video, 
   Download, 
-  Play, 
-  FileText, 
   Image as ImageIcon, 
   Loader2,
   CheckCircle,
@@ -15,7 +12,9 @@ import {
   Clock,
   Film,
   Store,
-  Info
+  Info,
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,9 +23,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { toast } from 'sonner';
+
+const POLLING_INTERVAL = 2000; // 2s initial
+const MAX_WAIT_TIME = 120000; // 120s max wait
+const POLLING_TIMEOUT = 180000; // 3m hard timeout
 
 export default function DemoVideoGenerator({ resolver = {} }) {
   let tenantId = null;
@@ -47,6 +49,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [jobStatus, setJobStatus] = useState(null);
   const [generatedVideo, setGeneratedVideo] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [pollWaitTime, setPollWaitTime] = useState(0);
+  const [recentJobs, setRecentJobs] = useState([]);
+  const pollIntervalRef = useRef(null);
+  const startTimeRef = useRef(null);
 
   const versions = [
     {
