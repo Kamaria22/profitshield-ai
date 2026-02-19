@@ -448,6 +448,25 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             </div>
           )}
 
+          {/* Rendering Progress */}
+          {isPolling && jobStatus && jobStatus !== 'completed' && jobStatus !== 'failed' && (
+            <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Rendering in progress... ({jobStatus})
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.max(10, (generatedVideo?.progress || 0))}%` }}
+                />
+              </div>
+              <p className="text-xs text-blue-700">
+                {pollWaitTime > 0 && `Elapsed: ${Math.round(pollWaitTime / 1000)}s`}
+              </p>
+            </div>
+          )}
+
           {/* Completion Alert */}
           {generatedVideo?.errorMessage && (
             <Alert className="border-amber-200 bg-amber-50">
