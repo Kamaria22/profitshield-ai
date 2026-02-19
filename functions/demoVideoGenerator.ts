@@ -250,13 +250,6 @@ Deno.serve(async (req) => {
       ]
     };
 
-    // For demo purposes, generate a mock video URL
-    const mockVideoUrl = `https://demo.profitshield.ai/videos/demo_${tenantId}_${version}_${Date.now()}.mp4`;
-    
-    // Step 6: Generate thumbnail
-    console.log('Step 6: Generating thumbnail...');
-    const thumbnailUrl = `https://demo.profitshield.ai/thumbnails/demo_${tenantId}_${version}_thumb.png`;
-
     // Save generation record (only if tenantId exists)
     if (tenantId) {
       await base44.asServiceRole.entities.ClientTelemetry.create({
@@ -266,8 +259,8 @@ Deno.serve(async (req) => {
           version,
           duration: script.totalDuration,
           scenes: script.scenes.length,
-          videoUrl: mockVideoUrl,
-          thumbnailUrl
+          videoUrl: videoMetadata.url,
+          thumbnailUrl: videoMetadata.thumbnailUrl
         },
         user_email: user.email
       });
@@ -275,9 +268,9 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
-      message: 'Demo video generation initiated',
+      message: 'Demo video generation completed',
       video: {
-        url: mockVideoUrl, // In production, this would be the actual rendered video
+        url: videoMetadata.url,
         status: 'ready', // In production, poll for 'rendering' -> 'ready'
         thumbnail: thumbnailUrl,
         formats: videoMetadata.formats,
