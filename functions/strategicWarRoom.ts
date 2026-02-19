@@ -9,14 +9,14 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const { action } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { action, plan_id } = body;
 
     if (action === 'run_scan') {
       return await runWarRoomScan(base44);
     } else if (action === 'get_dashboard') {
       return await getWarRoomDashboard(base44);
-    } else if (action === 'approve_response') {
-      const { plan_id } = await req.json();
+    } else if (action === 'approve_response' && plan_id) {
       return await approveResponsePlan(base44, plan_id, user.email);
     }
 
