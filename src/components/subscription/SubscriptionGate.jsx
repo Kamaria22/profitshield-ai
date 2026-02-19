@@ -23,28 +23,37 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let mounted = true;
+    
+    const checkAccess = async () => {
+      if (!tenant?.id) {
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await base44.functions.invoke('subscriptionGating', {
+          tenant_id: tenant.id,
+          action: feature ? 'check_access' : 'get_status',
+          feature
+        });
+        if (mounted) setStatus(response.data);
+      } catch (e) {
+        console.error('Subscription check failed:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
     checkAccess();
+    
+    return () => { mounted = false; };
   }, [tenant?.id, feature]);
 
-  const checkAccess = async () => {
-    if (!tenant?.id) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await base44.functions.invoke('subscriptionGating', {
-        tenant_id: tenant.id,
-        action: feature ? 'check_access' : 'get_status',
-        feature
-      });
-      setStatus(response.data);
-    } catch (e) {
-      console.error('Subscription check failed:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Always render children if no tenant (allow demo mode)
+  if (!tenant?.id) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
