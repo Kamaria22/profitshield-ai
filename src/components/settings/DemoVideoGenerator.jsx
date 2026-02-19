@@ -309,15 +309,20 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
           {/* Generate Button */}
           <Button
-            onClick={handleGenerate}
-            disabled={generateMutation.isPending}
+            onClick={() => {
+              setGeneratedVideo(null);
+              setJobId(null);
+              setJobStatus(null);
+              createJobMutation.mutate();
+            }}
+            disabled={createJobMutation.isPending}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
             size="lg"
           >
-            {generateMutation.isPending ? (
+            {createJobMutation.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Generating Demo Video...
+                Creating Job...
               </>
             ) : (
               <>
@@ -327,12 +332,44 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             )}
           </Button>
 
+          {/* Job Status Display */}
+          {jobId && (
+            <div className="space-y-3">
+              {jobStatus === 'queued' && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <AlertDescription className="text-blue-900">
+                    Job created. Generating script and data... (usually &lt;2s)
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {jobStatus === 'rendering' && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                  <AlertDescription className="text-amber-900">
+                    Video rendering in progress. Polling for completion...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {generatedVideo?.errorMessage && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <AlertDescription className="text-amber-900">
+                    {generatedVideo.errorMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
           {/* Error Display */}
-          {generateMutation.isError && (
+          {createJobMutation.isError && (
             <Alert variant="destructive">
               <AlertCircle className="w-4 h-4" />
               <AlertDescription>
-                {generateMutation.error?.message || 'Failed to generate video. Please try again.'}
+                {createJobMutation.error?.message || 'Failed to create job. Please try again.'}
               </AlertDescription>
             </Alert>
           )}
