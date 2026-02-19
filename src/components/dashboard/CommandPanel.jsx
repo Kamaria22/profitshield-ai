@@ -62,13 +62,13 @@ export default function CommandPanel({
             )}
           </div>
 
-          {/* CTA */}
+          {/* CTA - Always visible */}
           {ctaPage && (
             <Link to={createPageUrl(ctaPage)} className="mt-3 block">
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
-                className="w-full justify-between text-xs text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 h-8"
+                className="w-full justify-between text-xs text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border-slate-200 h-8"
               >
                 {ctaLabel}
                 <ArrowRight className="w-3.5 h-3.5" />
