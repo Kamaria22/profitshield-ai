@@ -32,17 +32,43 @@ Deno.serve(async (req) => {
       const body = await req.json();
       payload = body;
     } catch (parseError) {
+      console.error('JSON parse error:', parseError);
       return Response.json({ 
-        error: 'Invalid request body', 
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid request body - expected valid JSON',
         details: 'Expected JSON payload with tenantId, version, includeVoiceover, includeMusic' 
       }, { status: 400 });
     }
 
     const { tenantId, version = '90s', includeVoiceover = true, includeMusic = true } = payload;
 
+    // Validate required fields
     if (!tenantId) {
-      return Response.json({ error: 'tenantId required' }, { status: 400 });
+      console.error('Missing tenantId in request:', payload);
+      return Response.json({ 
+        error: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        fields: { tenantId: 'required' }
+      }, { status: 400 });
     }
+
+    // Validate version format
+    const validVersions = ['60s', '90s', '2m'];
+    if (version && !validVersions.includes(version)) {
+      console.error('Invalid version:', version);
+      return Response.json({ 
+        error: 'VALIDATION_ERROR',
+        message: `Invalid version. Must be one of: ${validVersions.join(', ')}`,
+        fields: { version: 'invalid' }
+      }, { status: 400 });
+    }
+
+    console.log('✅ Video generation request validated:', { 
+      tenantId: tenantId.slice(0, 8) + '...', 
+      version, 
+      includeVoiceover, 
+      includeMusic 
+    });
 
     // Log telemetry
     await base44.asServiceRole.entities.ClientTelemetry.create({
@@ -54,14 +80,22 @@ Deno.serve(async (req) => {
 
     // Step 1: Generate sanitized demo data
     console.log('Step 1: Generating demo data...');
-    const dataResult = await base44.asServiceRole.functions.invoke('demoDataGenerator', {
-      tenantId,
-      daysBack: 30,
-      demoMode: true
-    });
+    let dataResult;
+    try {
+      dataResult = await base44.asServiceRole.functions.invoke('demoDataGenerator', {
+        tenantId,
+        daysBack: 30,
+        demoMode: true
+      });
+    } catch (error) {
+      console.error('Demo data generation failed:', error);
+      throw new Error(`Failed to generate demo data: ${error.message}`);
+    }
 
-    if (!dataResult.data.success) {
-      throw new Error('Failed to generate demo data');
+    if (!dataResult?.data?.success) {
+      const errorMsg = dataResult?.data?.error || 'Unknown error';
+      console.error('Demo data generation returned error:', errorMsg);
+      throw new Error(`Failed to generate demo data: ${errorMsg}`);
     }
 
     const dataset = dataResult.data.dataset;
