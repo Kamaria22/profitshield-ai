@@ -38,6 +38,10 @@ const RiskMitigationPanel = lazy(() => import('../components/dashboard/panels/Ri
 const FinancialReportingPanel = lazy(() => import('../components/dashboard/panels/FinancialReportingPanel'));
 const CustomizeLayoutPanel = lazy(() => import('../components/dashboard/panels/CustomizeLayoutPanel'));
 
+// Dashboard personalization
+const DashboardCustomizer = lazy(() => import('../components/dashboard/DashboardCustomizer'));
+const CustomAlerts = lazy(() => import('../components/dashboard/CustomAlerts'));
+
 export default function Home() {
   const resolver = usePlatformResolver();
   const queryClient = useQueryClient();
