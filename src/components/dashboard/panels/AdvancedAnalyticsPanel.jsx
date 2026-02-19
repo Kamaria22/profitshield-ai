@@ -1,9 +1,8 @@
 import React from 'react';
 import { BarChart3, TrendingUp } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function AdvancedAnalyticsPanel({ metrics, loading, isDemo = false }) {
+export default function AdvancedAnalyticsPanel({ metrics, loading = false, isDemo = false }) {
   const insights = isDemo ? 0 : 12;
   const trends = isDemo ? 0 : 5;
 

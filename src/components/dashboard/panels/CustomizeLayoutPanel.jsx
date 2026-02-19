@@ -1,9 +1,8 @@
 import React from 'react';
 import { LayoutGrid, Settings, Sparkles } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function CustomizeLayoutPanel({ loading }) {
+export default function CustomizeLayoutPanel({ loading = false }) {
   return (
     <CommandPanel
       title="Customize Dashboard"

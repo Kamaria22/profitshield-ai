@@ -1,16 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function RiskMitigationPanel({ loading, isDemo = false }) {
-  const mitigations = isDemo ? [] : [
+export default function RiskMitigationPanel({ loading = false, isDemo = false }) {
+  const mitigations = useMemo(() => isDemo ? [] : [
     { name: 'Auto-hold high risk', status: 'active' },
     { name: 'Fraud alerts', status: 'active' },
     { name: 'Chargeback prevention', status: 'active' }
-  ];
+  ], [isDemo]);
   
-  const activeCount = isDemo ? 0 : mitigations.filter(m => m.status === 'active').length;
+  const activeCount = mitigations.filter(m => m.status === 'active').length;
 
   return (
     <CommandPanel

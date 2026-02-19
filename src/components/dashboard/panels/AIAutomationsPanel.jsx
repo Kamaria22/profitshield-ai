@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Bot, Zap, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function AIAutomationsPanel({ loading, isDemo = false }) {
-  const automations = isDemo ? [] : [
+export default function AIAutomationsPanel({ loading = false, isDemo = false }) {
+  const automations = useMemo(() => isDemo ? [] : [
     { name: 'Fraud Detection', status: 'active', runs: 142 },
     { name: 'Price Optimization', status: 'active', runs: 87 },
     { name: 'Inventory Alerts', status: 'paused', runs: 23 }
-  ];
+  ], [isDemo]);
   
   const activeCount = automations.filter(a => a.status === 'active').length;
 

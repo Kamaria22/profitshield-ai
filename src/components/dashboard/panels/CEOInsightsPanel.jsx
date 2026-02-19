@@ -17,7 +17,7 @@ export default function CEOInsightsPanel({ tenantId, metrics }) {
 
   useEffect(() => {
     generateInsights();
-  }, [tenantId, metrics?.totalProfit]);
+  }, [tenantId, metrics]);
 
   const generateInsights = async () => {
     setLoading(true);

@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link2, CheckCircle2, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function IntegrationsPanel({ loading, isDemo = false }) {
-  const integrations = isDemo ? [] : [
+export default function IntegrationsPanel({ loading = false, isDemo = false }) {
+  const integrations = useMemo(() => isDemo ? [] : [
     { name: 'Shopify', status: 'connected', icon: '🛒' },
     { name: 'Stripe', status: 'available', icon: '💳' },
     { name: 'QuickBooks', status: 'available', icon: '📊' }
-  ];
+  ], [isDemo]);
   
   const connectedCount = integrations.filter(i => i.status === 'connected').length;
 
