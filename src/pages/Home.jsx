@@ -133,18 +133,11 @@ export default function Home() {
     queryKey: buildQueryKey('orders-detailed', resolverCheck),
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
-      // Deferred - wait for requestIdleCallback
-      await new Promise(resolve => {
-        if ('requestIdleCallback' in window) {
-          requestIdleCallback(() => resolve(true));
-        } else {
-          setTimeout(resolve, 2000);
-        }
-      });
       return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 500);
     },
-    enabled: canQuery && !!dashboardSummary, // Only load after summary
-    ...queryDefaults.heavyList
+    enabled: canQuery && !!dashboardSummary,
+    staleTime: 60000,
+    gcTime: 120000
   });
 
   const { data: profitLeaks = [] } = useQuery({
