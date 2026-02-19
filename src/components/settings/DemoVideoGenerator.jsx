@@ -197,9 +197,11 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     const doPoll = async () => {
       pollCount++;
       const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
+      console.log(`[DemoVideoGenerator] Poll #${pollCount} @ ${Math.round(elapsed / 1000)}s`);
       
       // Hard timeout at 3 min
       if (elapsed > POLLING_TIMEOUT) {
+        console.error('[DemoVideoGenerator] Hard timeout (3min) reached');
         setIsPolling(false);
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         toast.error('Rendering timed out after 3 minutes. Please check back later.');
@@ -209,6 +211,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       // Exponential backoff: increase interval after 60s
       if (elapsed > 60000 && pollCount > 15) {
         currentInterval = Math.min(10000, currentInterval + 2000);
+        console.log(`[DemoVideoGenerator] Backoff increased to ${currentInterval}ms`);
       }
       
       statusMutation.mutate(jobId);
