@@ -97,7 +97,8 @@ export default function Home() {
     ...queryDefaults.config
   });
 
-  const isDemoMode = tenantSettings?.demo_mode !== false;
+  // Default to demo mode if no tenant or settings
+  const isDemoMode = !tenant || tenantSettings?.demo_mode !== false;
 
   // Sync mutation
   const syncMutation = useMutation({
