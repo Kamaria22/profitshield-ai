@@ -10,16 +10,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-export default function CEOInsightsPanel({ tenantId, metrics }) {
+export default function CEOInsightsPanel({ tenantId, metrics = {} }) {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInsight, setSelectedInsight] = useState(null);
 
   // Extract primitive values from metrics to use as stable dependencies
-  const totalProfit = metrics?.totalProfit || 0;
-  const avgMargin = metrics?.avgMargin || 0;
-  const highRiskOrders = metrics?.highRiskOrders || 0;
-  const negativeMarginOrders = metrics?.negativeMarginOrders || 0;
+  const totalProfit = typeof metrics?.totalProfit === 'number' ? metrics.totalProfit : 0;
+  const avgMargin = typeof metrics?.avgMargin === 'number' ? metrics.avgMargin : 0;
+  const highRiskOrders = typeof metrics?.highRiskOrders === 'number' ? metrics.highRiskOrders : 0;
+  const negativeMarginOrders = typeof metrics?.negativeMarginOrders === 'number' ? metrics.negativeMarginOrders : 0;
 
   useEffect(() => {
     setLoading(true);
