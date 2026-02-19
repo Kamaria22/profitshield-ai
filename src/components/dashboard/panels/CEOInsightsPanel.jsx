@@ -31,8 +31,8 @@ export default function CEOInsightsPanel({ tenantId, metrics }) {
       quickInsights.push({
         type: 'driver',
         label: 'Profit driver this week',
-        summary: `Strong margins at ${metrics.avgMargin?.toFixed(1)}%`,
-        detail: `Your average margin of ${metrics.avgMargin?.toFixed(1)}% is driving healthy profits. Top performing products are contributing most to this success.`
+        summary: `Strong margins at ${avgMargin.toFixed(1)}%`,
+        detail: `Your average margin of ${avgMargin.toFixed(1)}% is driving healthy profits. Top performing products are contributing most to this success.`
       });
     } else {
       quickInsights.push({
@@ -43,12 +43,12 @@ export default function CEOInsightsPanel({ tenantId, metrics }) {
       });
     }
 
-    if (metrics?.highRiskOrders > 0) {
+    if (highRiskOrders > 0) {
       quickInsights.push({
         type: 'risk',
         label: 'Largest risk exposure',
-        summary: `${metrics.highRiskOrders} high-risk orders flagged`,
-        detail: `We've detected ${metrics.highRiskOrders} orders with elevated risk scores. These may need manual review before fulfillment.`
+        summary: `${highRiskOrders} high-risk orders flagged`,
+        detail: `We've detected ${highRiskOrders} orders with elevated risk scores. These may need manual review before fulfillment.`
       });
     } else {
       quickInsights.push({
@@ -62,17 +62,17 @@ export default function CEOInsightsPanel({ tenantId, metrics }) {
     quickInsights.push({
       type: 'action',
       label: 'Recommended action',
-      summary: metrics?.negativeMarginOrders > 0 
-        ? `Review ${metrics.negativeMarginOrders} negative-margin orders`
+      summary: negativeMarginOrders > 0 
+        ? `Review ${negativeMarginOrders} negative-margin orders`
         : 'Continue monitoring — operations healthy',
-      detail: metrics?.negativeMarginOrders > 0
-        ? `There are ${metrics.negativeMarginOrders} orders with negative margins. Review pricing and shipping costs for these products.`
+      detail: negativeMarginOrders > 0
+        ? `There are ${negativeMarginOrders} orders with negative margins. Review pricing and shipping costs for these products.`
         : 'Your store is operating efficiently. Consider expanding marketing spend while margins are healthy.'
     });
 
     setInsights(quickInsights);
     setLoading(false);
-  };
+  }, [tenantId, totalProfit, avgMargin, highRiskOrders, negativeMarginOrders]);
 
   const insightIcons = {
     driver: '📈',
