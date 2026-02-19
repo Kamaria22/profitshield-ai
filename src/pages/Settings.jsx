@@ -675,6 +675,13 @@ export default function Settings() {
           <DataExportPanel tenantId={tenantId} />
         </TabsContent>
 
+        {/* Demo Video Tab */}
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+          <TabsContent value="demo-video" className="mt-6">
+            <DemoVideoGenerator resolver={resolver} />
+          </TabsContent>
+        )}
+
         {/* Compliance Tab */}
         <TabsContent value="compliance" className="mt-6 space-y-6">
           <Card>
