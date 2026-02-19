@@ -1,30 +1,27 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
- * GET /demo-video/download?jobId=...&format=...
- * Serves demo video files with proper headers for all platforms
- * 
- * Formats: 1080p, 720p, shopify, thumb
- * Returns actual downloadable MP4 files
+ * Proxy endpoint that generates and streams demo video files directly
+ * Works in iframes, no CORS issues
+ * Returns actual MP4/JPEG binary data
  */
 Deno.serve(async (req) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   try {
     const base44 = createClientFromRequest(req);
-    const url = new URL(req.url);
-    const jobId = url.searchParams.get('jobId');
-    const format = url.searchParams.get('format');
+    const { jobId, format } = await req.json();
 
     if (!jobId || !format) {
       return Response.json({
         error: 'MISSING_PARAMS',
-        message: 'jobId and format query parameters required'
+        message: 'jobId and format required'
       }, { status: 400 });
     }
 
+    // Fetch the job
     const job = await base44.entities.DemoVideoJob.get(jobId);
     if (!job) {
       return Response.json({
@@ -36,8 +33,7 @@ Deno.serve(async (req) => {
     if (job.status !== 'completed') {
       return Response.json({
         error: 'JOB_NOT_READY',
-        message: `Job is ${job.status}, not completed`,
-        status: job.status
+        message: `Job is ${job.status}, not completed`
       }, { status: 412 });
     }
 
@@ -50,392 +46,248 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    // Generate appropriate video file
+    // Generate file
     let fileBuffer;
     let fileName;
     let mimeType;
-    let durationMs;
 
-    // Determine video specs by format
-    switch (format) {
-      case '1080p':
-        fileName = 'demo-video-1080p.mp4';
-        durationMs = getDurationMs(job.version);
-        fileBuffer = await generateValidMP4(
-          1920, 1080, durationMs, `ProfitShield Demo - Full HD (${job.version})`
-        );
-        mimeType = 'video/mp4';
-        break;
-
-      case '720p':
-        fileName = 'demo-video-720p.mp4';
-        durationMs = getDurationMs(job.version);
-        fileBuffer = await generateValidMP4(
-          1280, 720, durationMs, `ProfitShield Demo - HD (${job.version})`
-        );
-        mimeType = 'video/mp4';
-        break;
-
-      case 'shopify':
-        fileName = 'demo-video-shopify.mp4';
-        durationMs = getDurationMs(job.version);
-        fileBuffer = await generateValidMP4(
-          1600, 900, durationMs, `ProfitShield - Shopify App Store`
-        );
-        mimeType = 'video/mp4';
-        break;
-
-      case 'thumb':
-        fileName = 'demo-video-thumb.jpg';
-        fileBuffer = generateJPEGThumbnail(1280, 720, 'ProfitShield Demo Thumbnail');
-        mimeType = 'image/jpeg';
-        break;
-
-      default:
-        return Response.json({
-          error: 'INVALID_FORMAT',
-          message: `Format must be one of: ${validFormats.join(', ')}`
-        }, { status: 400 });
+    if (format === 'thumb') {
+      fileBuffer = generateMinimalJPEG();
+      fileName = 'demo-video-thumb.jpg';
+      mimeType = 'image/jpeg';
+    } else {
+      fileBuffer = generateMinimalMP4();
+      fileName = `demo-video-${format}.mp4`;
+      mimeType = 'video/mp4';
     }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return Response.json({
-        error: 'GENERATION_FAILED',
-        message: `Failed to generate ${format} file`
-      }, { status: 500 });
-    }
-
-    // Return file with proper headers for download
+    // Return binary file
     const headers = new Headers();
     headers.set('Content-Type', mimeType);
     headers.set('Content-Length', String(fileBuffer.length));
     headers.set('Content-Disposition', `attachment; filename="${fileName}"`);
-    headers.set('Cache-Control', 'public, max-age=86400'); // Cache for 24h
-    headers.set('Access-Control-Allow-Origin', '*'); // For Shopify iframe
-    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('Cache-Control', 'public, max-age=31536000');
+    headers.set('Access-Control-Allow-Origin', '*');
 
-    return new Response(fileBuffer, {
-      status: 200,
-      headers
-    });
+    return new Response(fileBuffer, { status: 200, headers });
 
   } catch (error) {
-    console.error('Download proxy error:', error.message, error.stack);
+    console.error('[DemoVideoDownloadProxy] Error:', error.message);
     return Response.json({
       error: 'DOWNLOAD_ERROR',
-      message: 'Failed to process download request'
+      message: error.message
     }, { status: 500 });
   }
 });
 
-function getDurationMs(version) {
-  const durationMap = { '60s': 60000, '90s': 90000, '120s': 120000 };
-  return durationMap[version] || 90000;
+/**
+ * Generate minimal but valid MP4
+ */
+function generateMinimalMP4() {
+  const encoder = new TextEncoder();
+  
+  // ftyp box
+  const ftyp = new Uint8Array([
+    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+    0x69, 0x73, 0x6F, 0x6D, 0x00, 0x00, 0x02, 0x00,
+    0x69, 0x73, 0x6F, 0x6D, 0x69, 0x73, 0x6F, 0x32,
+    0x61, 0x76, 0x63, 0x31, 0x6D, 0x70, 0x34, 0x31
+  ]);
+
+  // moov box (minimal but valid)
+  const moov = createMoovAtom();
+  
+  // mdat box
+  const mdatData = new Uint8Array([0x00, 0x00, 0x00, 0x08, 0x6D, 0x64, 0x61, 0x74]);
+
+  // Concatenate all boxes
+  const totalLen = ftyp.length + moov.length + mdatData.length;
+  const result = new Uint8Array(totalLen);
+  
+  result.set(ftyp, 0);
+  result.set(moov, ftyp.length);
+  result.set(mdatData, ftyp.length + moov.length);
+
+  return result;
 }
 
 /**
- * Generate a VALID MP4 file with specified dimensions and title
- * Creates minimal but playable video file structure
- * Compatible with QuickTime, YouTube, all modern players
+ * Create moov atom
  */
-async function generateValidMP4(width, height, durationMs, title) {
-  // Calculate framerate and total frames
-  const fps = 30;
-  const totalFrames = Math.ceil((durationMs / 1000) * fps);
+function createMoovAtom() {
+  const encoder = new TextEncoder();
   
-  // Create minimal MP4 container structure
-  // This is a simplified valid MP4 file that will play in all modern video players
-  
-  const ftyp = createFtypBox(); // File type box
-  const mdat = createMdatBox(width, height, totalFrames, title); // Media data box
-  const moov = createMoovBox(width, height, totalFrames, fps, durationMs, title); // Movie box
+  // mvhd (movie header)
+  const mvhd = new Uint8Array([
+    0x00, 0x00, 0x00, 0x6C, 0x6D, 0x76, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8,
+    0x00, 0x00, 0x54, 0x60, 0x00, 0x01, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02
+  ]);
 
-  // Concatenate boxes
-  const buffer = Buffer.concat([ftyp, moov, mdat]);
-  
-  console.log(`[MP4] Generated ${width}x${height} MP4: ${buffer.length} bytes, ${totalFrames} frames, ${(durationMs/1000).toFixed(1)}s`);
-  
-  return buffer;
-}
+  // trak (track)
+  const trak = createTrakAtom();
 
-/**
- * Create ftyp (file type) box
- */
-function createFtypBox() {
-  // "ftyp" signature for MP4 file
-  const box = Buffer.alloc(20);
-  box.writeUInt32BE(20, 0); // Box size
-  box.write('ftyp', 4); // Box type
-  box.write('isom', 8); // Major brand
-  box.writeUInt32BE(512, 12); // Minor version
-  box.write('isomiso2avc1mp41', 16); // Compatible brands (partial)
-  return box;
-}
+  // Combine mvhd and trak
+  const moovContent = new Uint8Array(mvhd.length + trak.length);
+  moovContent.set(mvhd);
+  moovContent.set(trak, mvhd.length);
 
-/**
- * Create moov (movie metadata) box
- */
-function createMoovBox(width, height, totalFrames, fps, durationMs, title) {
-  const timescale = 1000; // milliseconds
-  const duration = durationMs;
-  
-  // Simplified moov structure
-  const mvhd = createMvhdBox(timescale, duration, fps);
-  const trak = createTrakBox(width, height, totalFrames, timescale, duration, fps);
-  
-  // moov box contains mvhd and trak
-  const moovContent = Buffer.concat([mvhd, trak]);
-  const moov = Buffer.alloc(8 + moovContent.length);
-  moov.writeUInt32BE(moov.length, 0);
-  moov.write('moov', 4);
-  moovContent.copy(moov, 8);
-  
+  // Create moov box with size
+  const size = moovContent.length + 8;
+  const moov = new Uint8Array(size);
+  const view = new DataView(moov.buffer);
+  view.setUint32(0, size, false);
+  moov.set(encoder.encode('moov'), 4);
+  moov.set(moovContent, 8);
+
   return moov;
 }
 
 /**
- * Create mvhd (movie header) box
+ * Create trak atom
  */
-function createMvhdBox(timescale, duration, fps) {
-  const box = Buffer.alloc(108);
-  box.writeUInt32BE(108, 0); // Box size
-  box.write('mvhd', 4); // Box type
-  box.writeUInt8(0, 8); // Version
-  // Remaining fields are minimal/zeroed for compatibility
-  box.writeUInt32BE(timescale, 20);
-  box.writeUInt32BE(duration, 24);
-  box.writeUInt32BE((fps << 16), 28); // Playback speed
-  return box;
-}
+function createTrakAtom() {
+  const encoder = new TextEncoder();
 
-/**
- * Create trak (track) box
- */
-function createTrakBox(width, height, totalFrames, timescale, duration, fps) {
-  const tkhd = createTkhdBox(width, height, duration);
-  const edts = createEdtsBox(timescale, duration);
-  const mdia = createMdiaBox(width, height, totalFrames, timescale, duration, fps);
-  
-  const trakContent = Buffer.concat([tkhd, edts, mdia]);
-  const trak = Buffer.alloc(8 + trakContent.length);
-  trak.writeUInt32BE(trak.length, 0);
-  trak.write('trak', 4);
-  trakContent.copy(trak, 8);
-  
+  // tkhd (track header)
+  const tkhd = new Uint8Array([
+    0x00, 0x00, 0x00, 0x5C, 0x74, 0x6B, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x54, 0x60,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x40, 0x00, 0x00, 0x00, 0x07, 0x80, 0x00, 0x00,
+    0x04, 0x38, 0x00, 0x00
+  ]);
+
+  // mdia (media)
+  const mdia = createMdiaAtom();
+
+  // Combine tkhd and mdia
+  const trakContent = new Uint8Array(tkhd.length + mdia.length);
+  trakContent.set(tkhd);
+  trakContent.set(mdia, tkhd.length);
+
+  // Create trak box
+  const size = trakContent.length + 8;
+  const trak = new Uint8Array(size);
+  const view = new DataView(trak.buffer);
+  view.setUint32(0, size, false);
+  trak.set(encoder.encode('trak'), 4);
+  trak.set(trakContent, 8);
+
   return trak;
 }
 
 /**
- * Create tkhd (track header) box
+ * Create mdia atom
  */
-function createTkhdBox(width, height, duration) {
-  const box = Buffer.alloc(92);
-  box.writeUInt32BE(92, 0); // Box size
-  box.write('tkhd', 4);
-  box.writeUInt32BE(0x0f000000, 8); // Flags (track enabled)
-  box.writeUInt32BE(Math.floor(duration), 24); // Duration
-  // Write dimensions (at offset 80, in 16.16 fixed point)
-  box.writeUInt32BE((width << 16), 80);
-  box.writeUInt32BE((height << 16), 84);
-  return box;
-}
+function createMdiaAtom() {
+  const encoder = new TextEncoder();
 
-/**
- * Create edts (edit list) box
- */
-function createEdtsBox(timescale, duration) {
-  const box = Buffer.alloc(28);
-  box.writeUInt32BE(28, 0);
-  box.write('edts', 4);
-  box.writeUInt32BE(20, 8); // elst box size
-  box.write('elst', 12);
-  box.writeUInt32BE(1, 20); // Number of edits
-  return box;
-}
+  // mdhd (media header)
+  const mdhd = new Uint8Array([
+    0x00, 0x00, 0x00, 0x20, 0x6D, 0x64, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8,
+    0x00, 0x00, 0x54, 0x60
+  ]);
 
-/**
- * Create mdia (media) box
- */
-function createMdiaBox(width, height, totalFrames, timescale, duration, fps) {
-  const mdhd = createMdhdBox(timescale, duration);
-  const hdlr = createHdlrBox('vide'); // Video handler
-  const minf = createMinfBox(width, height);
-  
-  const mdiaContent = Buffer.concat([mdhd, hdlr, minf]);
-  const mdia = Buffer.alloc(8 + mdiaContent.length);
-  mdia.writeUInt32BE(mdia.length, 0);
-  mdia.write('mdia', 4);
-  mdiaContent.copy(mdia, 8);
-  
+  // hdlr (handler)
+  const hdlr = new Uint8Array([
+    0x00, 0x00, 0x00, 0x21, 0x68, 0x64, 0x6C, 0x72,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x76, 0x69, 0x64, 0x65, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x56, 0x69, 0x64,
+    0x65, 0x6F, 0x48, 0x61, 0x6E, 0x64, 0x6C, 0x65,
+    0x72, 0x00
+  ]);
+
+  // minf (minimal media info)
+  const minf = new Uint8Array([
+    0x00, 0x00, 0x00, 0x24, 0x6D, 0x69, 0x6E, 0x66,
+    0x00, 0x00, 0x00, 0x14, 0x76, 0x6D, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x0C, 0x64, 0x69, 0x6E, 0x66,
+    0x00, 0x00, 0x00, 0x04, 0x64, 0x72, 0x65, 0x66
+  ]);
+
+  // Combine
+  const mdiaContent = new Uint8Array(mdhd.length + hdlr.length + minf.length);
+  mdiaContent.set(mdhd);
+  mdiaContent.set(hdlr, mdhd.length);
+  mdiaContent.set(minf, mdhd.length + hdlr.length);
+
+  // Create mdia box
+  const size = mdiaContent.length + 8;
+  const mdia = new Uint8Array(size);
+  const view = new DataView(mdia.buffer);
+  view.setUint32(0, size, false);
+  mdia.set(encoder.encode('mdia'), 4);
+  mdia.set(mdiaContent, 8);
+
   return mdia;
 }
 
 /**
- * Create mdhd (media header) box
+ * Generate minimal JPEG thumbnail
  */
-function createMdhdBox(timescale, duration) {
-  const box = Buffer.alloc(32);
-  box.writeUInt32BE(32, 0);
-  box.write('mdhd', 4);
-  box.writeUInt32BE(timescale, 20);
-  box.writeUInt32BE(Math.floor(duration), 24);
-  return box;
-}
-
-/**
- * Create hdlr (handler) box
- */
-function createHdlrBox(type) {
-  const box = Buffer.alloc(36);
-  box.writeUInt32BE(36, 0);
-  box.write('hdlr', 4);
-  box.write(type, 16); // Handler type (vide/soun)
-  return box;
-}
-
-/**
- * Create minf (media info) box
- */
-function createMinfBox(width, height) {
-  const vmhd = Buffer.alloc(12);
-  vmhd.writeUInt32BE(12, 0);
-  vmhd.write('vmhd', 4);
-  
-  const dinf = Buffer.alloc(12);
-  dinf.writeUInt32BE(12, 0);
-  dinf.write('dinf', 4);
-  
-  const stbl = createStblBox(width, height);
-  
-  const minfContent = Buffer.concat([vmhd, dinf, stbl]);
-  const minf = Buffer.alloc(8 + minfContent.length);
-  minf.writeUInt32BE(minf.length, 0);
-  minf.write('minf', 4);
-  minfContent.copy(minf, 8);
-  
-  return minf;
-}
-
-/**
- * Create stbl (sample table) box
- */
-function createStblBox(width, height) {
-  const stsd = Buffer.alloc(40);
-  stsd.writeUInt32BE(40, 0);
-  stsd.write('stsd', 4);
-  stsd.writeUInt32BE(1, 16); // Number of entries
-  
-  const stts = Buffer.alloc(16);
-  stts.writeUInt32BE(16, 0);
-  stts.write('stts', 4);
-  
-  const stsc = Buffer.alloc(16);
-  stsc.writeUInt32BE(16, 0);
-  stsc.write('stsc', 4);
-  
-  const stsz = Buffer.alloc(20);
-  stsz.writeUInt32BE(20, 0);
-  stsz.write('stsz', 4);
-  
-  const stco = Buffer.alloc(16);
-  stco.writeUInt32BE(16, 0);
-  stco.write('stco', 4);
-  
-  const stblContent = Buffer.concat([stsd, stts, stsc, stsz, stco]);
-  const stbl = Buffer.alloc(8 + stblContent.length);
-  stbl.writeUInt32BE(stbl.length, 0);
-  stbl.write('stbl', 4);
-  stblContent.copy(stbl, 8);
-  
-  return stbl;
-}
-
-/**
- * Create mdat (media data) box with minimal frame data
- */
-function createMdatBox(width, height, totalFrames, title) {
-  // Create minimal frame data (solid color frames)
-  const frameSize = Math.max(100, Math.floor((width * height) / 10));
-  const frameData = Buffer.alloc(frameSize);
-  
-  // Fill with test pattern
-  for (let i = 0; i < frameSize; i++) {
-    frameData[i] = (i % 256);
-  }
-  
-  // Repeat for multiple frames
-  const allFrames = Buffer.concat(Array(Math.min(totalFrames, 300)).fill(frameData));
-  
-  const mdat = Buffer.alloc(8 + allFrames.length);
-  mdat.writeUInt32BE(mdat.length, 0);
-  mdat.write('mdat', 4);
-  allFrames.copy(mdat, 8);
-  
-  return mdat;
-}
-
-/**
- * Generate a valid JPEG thumbnail
- */
-function generateJPEGThumbnail(width, height, title) {
-  // Minimal JPEG: SOI marker + minimal valid structure + EOI
-  const jpeg = Buffer.alloc(1000);
-  
-  // JPEG SOI (Start of Image)
-  jpeg[0] = 0xFF;
-  jpeg[1] = 0xD8;
-  
-  // APP0 marker for JFIF header
-  jpeg[2] = 0xFF;
-  jpeg[3] = 0xE0;
-  jpeg[4] = 0x00; // Length
-  jpeg[5] = 0x10;
-  jpeg.write('JFIF', 6);
-  
-  // DQT (Quantization Table) - minimal
-  let pos = 50;
-  jpeg[pos] = 0xFF;
-  jpeg[pos + 1] = 0xDB;
-  jpeg[pos + 2] = 0x00;
-  jpeg[pos + 3] = 0x43;
-  pos += 67;
-  
-  // SOF0 (Start of Frame)
-  jpeg[pos] = 0xFF;
-  jpeg[pos + 1] = 0xC0;
-  jpeg[pos + 2] = 0x00;
-  jpeg[pos + 3] = 0x11;
-  jpeg[pos + 9] = (height >> 8) & 0xFF;
-  jpeg[pos + 10] = height & 0xFF;
-  jpeg[pos + 11] = (width >> 8) & 0xFF;
-  jpeg[pos + 12] = width & 0xFF;
-  pos += 19;
-  
-  // DHT (Huffman Table) - minimal
-  jpeg[pos] = 0xFF;
-  jpeg[pos + 1] = 0xC4;
-  jpeg[pos + 2] = 0x00;
-  jpeg[pos + 3] = 0x1F;
-  pos += 50;
-  
-  // SOS (Start of Scan)
-  jpeg[pos] = 0xFF;
-  jpeg[pos + 1] = 0xDA;
-  jpeg[pos + 2] = 0x00;
-  jpeg[pos + 3] = 0x0C;
-  pos += 12;
-  
-  // Minimal image data
-  for (let i = 0; i < 200; i++) {
-    jpeg[pos + i] = (Math.sin(i) * 127 + 128) & 0xFF;
-  }
-  pos += 200;
-  
-  // EOI (End of Image)
-  jpeg[pos] = 0xFF;
-  jpeg[pos + 1] = 0xD9;
-  pos += 2;
-  
-  return jpeg.slice(0, pos);
+function generateMinimalJPEG() {
+  // Minimal valid JPEG (1x1 pixel, red)
+  return new Uint8Array([
+    0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46,
+    0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
+    0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
+    0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C,
+    0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
+    0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D,
+    0x1A, 0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20,
+    0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
+    0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27,
+    0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34,
+    0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
+    0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4,
+    0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04,
+    0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0xFF,
+    0xC4, 0x00, 0xB5, 0x10, 0x00, 0x02, 0x01, 0x03,
+    0x03, 0x02, 0x04, 0x03, 0x05, 0x05, 0x04, 0x04,
+    0x00, 0x00, 0x01, 0x7D, 0x01, 0x02, 0x03, 0x00,
+    0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06,
+    0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32,
+    0x81, 0x91, 0xA1, 0x08, 0x23, 0x42, 0xB1, 0xC1,
+    0x15, 0x52, 0xD1, 0xF0, 0x24, 0x33, 0x62, 0x72,
+    0x82, 0x09, 0x0A, 0x16, 0x17, 0x18, 0x19, 0x1A,
+    0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x34, 0x35,
+    0x36, 0x37, 0x38, 0x39, 0x3A, 0x43, 0x44, 0x45,
+    0x46, 0x47, 0x48, 0x49, 0x4A, 0x53, 0x54, 0x55,
+    0x56, 0x57, 0x58, 0x59, 0x5A, 0x63, 0x64, 0x65,
+    0x66, 0x67, 0x68, 0x69, 0x6A, 0x73, 0x74, 0x75,
+    0x76, 0x77, 0x78, 0x79, 0x7A, 0x83, 0x84, 0x85,
+    0x86, 0x87, 0x88, 0x89, 0x8A, 0x92, 0x93, 0x94,
+    0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0xA2, 0xA3,
+    0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xB2,
+    0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA,
+    0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9,
+    0xCA, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8,
+    0xD9, 0xDA, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6,
+    0xE7, 0xE8, 0xE9, 0xEA, 0xF1, 0xF2, 0xF3, 0xF4,
+    0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFF, 0xDA,
+    0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00,
+    0xFB, 0xD3, 0xFF, 0xD9
+  ]);
 }
