@@ -45,7 +45,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [includeVoiceover, setIncludeVoiceover] = useState(true);
   const [includeMusic, setIncludeMusic] = useState(true);
   const [useDemoData, setUseDemoData] = useState(!isResolved);
+  const [jobId, setJobId] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
   const [generatedVideo, setGeneratedVideo] = useState(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   const versions = [
     {
@@ -65,7 +68,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       icon: '🚀'
     },
     {
-      id: '2m',
+      id: '120s',
       name: '2-Minute Investor Pitch',
       duration: '2:00',
       description: 'Market opportunity and growth metrics for investors',
@@ -74,9 +77,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     }
   ];
 
-  const generateMutation = useMutation({
+  // Phase 1: Create job (fast, returns immediately with script+data)
+  const createJobMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await base44.functions.invoke('demoVideoGenerator', {
+      const { data } = await base44.functions.invoke('demoVideoGeneratePhase1', {
         tenantId: useDemoData ? null : tenantId,
         version: selectedVersion,
         includeVoiceover,
@@ -86,15 +90,84 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       return data;
     },
     onSuccess: (data) => {
-      if (!data.success) {
-        throw new Error(data.message || 'Generation failed');
+      if (!data.ok) {
+        throw new Error(data.message || 'Job creation failed');
       }
-      setGeneratedVideo(data);
+      setJobId(data.jobId);
+      setJobStatus('queued');
+      setGeneratedVideo(data.phase1Data);
+      
+      // Auto-start Phase 2 rendering
+      startRenderingMutation.mutate({ jobId: data.jobId });
+      
+      // Start polling for render completion
+      setIsPolling(true);
+      toast.success('Script generated! Video rendering...');
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to generate video');
+      toast.error(error.message || 'Failed to create generation job');
     }
   });
+
+  // Phase 2: Start rendering (async, returns immediately)
+  const startRenderingMutation = useMutation({
+    mutationFn: async ({ jobId: jid }) => {
+      const { data } = await base44.functions.invoke('demoVideoRenderPhase2', {
+        jobId: jid
+      });
+      return data;
+    },
+    onSuccess: () => {
+      // Rendering started, polling will track progress
+    },
+    onError: (error) => {
+      console.warn('Rendering start error:', error.message);
+    }
+  });
+
+  // Poll status
+  const statusMutation = useMutation({
+    mutationFn: async (jid) => {
+      const { data } = await base44.functions.invoke('demoVideoGetStatus', {
+        jobId: jid
+      });
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.ok) {
+        setJobStatus(data.status);
+        if (data.status === 'completed') {
+          setGeneratedVideo(prev => ({
+            ...prev,
+            status: 'completed',
+            progress: 100,
+            outputs: data.outputs,
+            errorMessage: data.errorMessage
+          }));
+          setIsPolling(false);
+          if (data.outputs?.mp4_1080_url) {
+            toast.success('Video rendering complete!');
+          } else {
+            toast.info('Job complete. (MP4 rendering requires Shotstack config)');
+          }
+        } else if (data.status === 'failed') {
+          toast.error(data.errorMessage || 'Rendering failed');
+          setIsPolling(false);
+        }
+      }
+    }
+  });
+
+  // Auto-poll when isPolling is true
+  React.useEffect(() => {
+    if (!isPolling || !jobId) return;
+    
+    const interval = setInterval(() => {
+      statusMutation.mutate(jobId);
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [isPolling, jobId]);
 
   const handleGenerate = () => {
     setGeneratedVideo(null);
