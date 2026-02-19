@@ -100,16 +100,19 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       setJobId(data.jobId);
       setJobStatus('queued');
       setGeneratedVideo(data.phase1Data);
+      startTimeRef.current = Date.now();
+      setPollWaitTime(0);
       
       // Auto-start Phase 2 rendering
       startRenderingMutation.mutate({ jobId: data.jobId });
       
       // Start polling for render completion
       setIsPolling(true);
-      toast.success('Script generated! Video rendering...');
+      toast.success('Script generated! Video rendering started...');
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to create generation job');
+      console.warn('[DemoVideoGenerator] Job creation error:', error);
     }
   });
 
@@ -125,11 +128,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       // Rendering started, polling will track progress
     },
     onError: (error) => {
-      console.warn('Rendering start error:', error.message);
+      console.warn('[DemoVideoGenerator] Render start error:', error.message);
+      toast.error('Failed to start rendering');
     }
   });
 
-  // Poll status
+  // Poll status with resilient exponential backoff
   const statusMutation = useMutation({
     mutationFn: async (jid) => {
       const { data } = await base44.functions.invoke('demoVideoGetStatus', {
@@ -140,6 +144,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     onSuccess: (data) => {
       if (data.ok) {
         setJobStatus(data.status);
+        const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
+        setPollWaitTime(elapsed);
+
         if (data.status === 'completed') {
           setGeneratedVideo(prev => ({
             ...prev,
@@ -149,29 +156,69 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             errorMessage: data.errorMessage
           }));
           setIsPolling(false);
-          if (data.outputs?.mp4_1080_url) {
-            toast.success('Video rendering complete!');
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          
+          if (data.outputs?.mp4_1080_url || data.outputs?.mp4_720_url) {
+            toast.success('Video rendering complete! Ready to download.');
           } else {
-            toast.info('Job complete. (MP4 rendering requires Shotstack config)');
+            toast.info('Job complete. MP4 rendering requires Shotstack API key.');
           }
+          
+          // Add to recent jobs
+          setRecentJobs(prev => [
+            { jobId: data.jobId, version: data.version, status: 'completed', createdAt: new Date() },
+            ...prev.slice(0, 4)
+          ]);
         } else if (data.status === 'failed') {
-          toast.error(data.errorMessage || 'Rendering failed');
           setIsPolling(false);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          toast.error(data.errorMessage || 'Rendering failed');
+          console.warn('[DemoVideoGenerator] Job failed:', data.errorMessage);
         }
       }
+    },
+    onError: (error) => {
+      console.error('[DemoVideoGenerator] Status poll error:', error.message);
     }
   });
 
-  // Auto-poll when isPolling is true
-  React.useEffect(() => {
+  // Smart polling with exponential backoff + hard timeout
+  useEffect(() => {
     if (!isPolling || !jobId) return;
     
-    const interval = setInterval(() => {
-      statusMutation.mutate(jobId);
-    }, 2000);
+    let currentInterval = POLLING_INTERVAL;
+    let pollCount = 0;
     
-    return () => clearInterval(interval);
-  }, [isPolling, jobId]);
+    const doPoll = async () => {
+      pollCount++;
+      const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
+      
+      // Hard timeout at 3 min
+      if (elapsed > POLLING_TIMEOUT) {
+        setIsPolling(false);
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        toast.error('Rendering timed out after 3 minutes. Please check back later.');
+        return;
+      }
+      
+      // Exponential backoff: increase interval after 60s
+      if (elapsed > 60000 && pollCount > 15) {
+        currentInterval = Math.min(10000, currentInterval + 2000);
+      }
+      
+      statusMutation.mutate(jobId);
+    };
+    
+    // Initial poll immediately
+    doPoll();
+    
+    // Then set interval
+    pollIntervalRef.current = setInterval(doPoll, currentInterval);
+    
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [isPolling, jobId, statusMutation]);
 
   return (
     <div className="space-y-6">
