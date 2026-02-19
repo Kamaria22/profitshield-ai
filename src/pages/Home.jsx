@@ -30,6 +30,9 @@ import CEOInsightsPanel from '../components/dashboard/panels/CEOInsightsPanel';
 import AIAutomationsPanel from '../components/dashboard/panels/AIAutomationsPanel';
 import AdvancedAnalyticsPanel from '../components/dashboard/panels/AdvancedAnalyticsPanel';
 import IntegrationsPanel from '../components/dashboard/panels/IntegrationsPanel';
+import RiskMitigationPanel from '../components/dashboard/panels/RiskMitigationPanel';
+import FinancialReportingPanel from '../components/dashboard/panels/FinancialReportingPanel';
+import CustomizeLayoutPanel from '../components/dashboard/panels/CustomizeLayoutPanel';
 
 export default function Home() {
   const resolver = usePlatformResolver();
@@ -201,7 +204,7 @@ export default function Home() {
           <div className="flex gap-6 h-full">
             {/* Main Panels Grid */}
             <div className="flex-1 min-w-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr" style={{ gridTemplateRows: 'repeat(3, minmax(200px, 220px))' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr" style={{ gridTemplateRows: 'repeat(4, minmax(200px, 220px))' }}>
                 {/* Row 1 */}
                 <ProfitHealthPanel metrics={metrics} loading={ordersLoading} />
                 <RiskCommandPanel metrics={metrics} loading={ordersLoading} />
@@ -216,6 +219,11 @@ export default function Home() {
                 <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
                 <AdvancedAnalyticsPanel metrics={metrics} loading={ordersLoading} isDemo={isDemoMode} />
                 <IntegrationsPanel loading={false} isDemo={isDemoMode} />
+                
+                {/* Row 4 */}
+                <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
+                <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
+                <CustomizeLayoutPanel loading={false} />
               </div>
 
               {/* Connect Store CTA for Demo Mode */}
