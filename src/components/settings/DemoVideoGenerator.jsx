@@ -136,18 +136,22 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   // Poll status with resilient exponential backoff
   const statusMutation = useMutation({
     mutationFn: async (jid) => {
+      console.log('[DemoVideoGenerator] Polling job:', jid);
       const { data } = await base44.functions.invoke('demoVideoGetStatus', {
         jobId: jid
       });
+      console.log('[DemoVideoGenerator] Poll response - status:', data.status, 'outputs:', data.outputs);
       return data;
     },
     onSuccess: (data) => {
       if (data.ok) {
+        console.log('[DemoVideoGenerator] Status update:', data.status);
         setJobStatus(data.status);
         const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
         setPollWaitTime(elapsed);
 
         if (data.status === 'completed') {
+          console.log('[DemoVideoGenerator] ✓ Job completed with outputs:', data.outputs);
           // Keep outputs nested in generatedVideo object
           setGeneratedVideo(prev => ({
             ...(prev || {}),
@@ -171,10 +175,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             ...prev.slice(0, 4)
           ]);
         } else if (data.status === 'failed') {
+          console.error('[DemoVideoGenerator] ✗ Job failed:', data.errorMessage);
           setIsPolling(false);
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           toast.error(data.errorMessage || 'Rendering failed');
-          console.warn('[DemoVideoGenerator] Job failed:', data.errorMessage);
         }
       }
     },
