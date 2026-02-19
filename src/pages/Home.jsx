@@ -307,9 +307,11 @@ export default function Home() {
               )}
             </div>
 
-            {/* CEO Insights Rail (Desktop Only) */}
+            {/* CEO Insights Rail (Desktop Only) - Lazy loaded */}
             <div className="hidden xl:block w-64 flex-shrink-0">
-              <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
+              <Suspense fallback={<PanelSkeleton />}>
+                <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
+              </Suspense>
             </div>
           </div>
         </div>
