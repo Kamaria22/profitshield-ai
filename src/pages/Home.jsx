@@ -144,13 +144,14 @@ export default function Home() {
     queryKey: buildQueryKey('profitLeaks', resolverCheck),
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Defer
       return base44.entities.ProfitLeak.filter({ 
         tenant_id: queryFilter.tenant_id,
         is_resolved: false 
       }, '-impact_amount', 10);
     },
     enabled: canQuery && !!dashboardSummary,
+    staleTime: 60000,
+    gcTime: 120000,
     ...queryDefaults.standard
   });
 
