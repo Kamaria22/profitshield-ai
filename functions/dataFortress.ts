@@ -52,7 +52,33 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'action required' }, { status: 400 });
     }
 
-    // ... your action routing continues here ...
+    // Route actions
+    switch (action) {
+      case 'route_data':
+        return await routeDataByRegion(base44, body.tenant_id);
+      case 'get_status':
+        return await getFortressStatus(base44);
+      case 'handle_compliance':
+        return await handleComplianceEvent(base44, body);
+      case 'enforce_retention':
+        return await enforceRetentionPolicies(base44);
+      case 'audit_regions':
+        return await auditRegions(base44);
+      case 'run_anomaly_detection':
+        return await runAnomalyDetection(base44);
+      case 'detect_cross_region_leaks':
+        return await detectCrossRegionLeaks(base44);
+      case 'update_threat_intel':
+        return await updateThreatIntel(base44);
+      case 'calibrate_baselines':
+        return await calibrateBaselines(base44);
+      case 'get_security_dashboard':
+        return await getSecurityDashboard(base44);
+      case 'investigate_anomaly':
+        return await investigateAnomaly(base44, body.anomaly_id, body.investigation_action, user.email);
+      default:
+        return Response.json({ error: 'Unknown action' }, { status: 400 });
+    }
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
