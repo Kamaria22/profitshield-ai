@@ -626,15 +626,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         search={location.search}
       />
 
-      {/* Tech Support Chat - DEFERRED: lazy loaded */}
-      <React.Suspense fallback={null}>
-        <TechSupportChat
-          tenantId={authTenantId}
-          isOpen={supportChatOpen}
-          onClose={() => setSupportChatOpen(false)}
-          onOpen={() => setSupportChatOpen(true)}
-        />
-      </React.Suspense>
+
     </div>
   );
 }
