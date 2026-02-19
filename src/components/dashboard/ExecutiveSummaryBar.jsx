@@ -68,9 +68,9 @@ export default function ExecutiveSummaryBar({
         <div className="flex items-center gap-6">
           <MetricChip 
             label="Net Profit" 
-            value={`$${(metrics?.totalProfit || 0) >= 1000 ? `${((metrics?.totalProfit || 0) / 1000).toFixed(1)}k` : (metrics?.totalProfit || 0).toFixed(0)}`}
-            trend={metrics?.totalProfit >= 0 ? 'up' : 'down'}
-            color={metrics?.totalProfit >= 0 ? 'emerald' : 'red'}
+            value={`$${totalProfit >= 1000 ? `${(totalProfit / 1000).toFixed(1)}k` : totalProfit.toFixed(0)}`}
+            trend={totalProfit >= 0 ? 'up' : 'down'}
+            color={totalProfit >= 0 ? 'emerald' : 'red'}
           />
           <MetricChip 
             label="Integrity" 
