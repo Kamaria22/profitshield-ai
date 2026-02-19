@@ -110,7 +110,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   };
 
   const getMimeType = (format) => {
-    return format === 'thumb' ? 'image/jpeg' : 'video/mp4';
+    return format === 'thumbnail' ? 'image/jpeg' : 'video/mp4';
   };
 
   const versions = [
