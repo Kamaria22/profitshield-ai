@@ -238,6 +238,17 @@ export default function Home() {
 
         {/* Main Grid */}
         <div className="flex-1 p-4 lg:p-6 overflow-auto">
+          {/* Dashboard Customization Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+              <p className="text-sm text-slate-500">Monitor your business performance at a glance</p>
+            </div>
+            <Suspense fallback={null}>
+              <DashboardCustomizer userId={resolver?.user?.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
+            </Suspense>
+          </div>
+
           <div className="flex gap-6 h-full">
             {/* Main Panels Grid */}
             <div className="flex-1 min-w-0">
