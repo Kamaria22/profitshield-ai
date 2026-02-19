@@ -148,11 +148,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         setPollWaitTime(elapsed);
 
         if (data.status === 'completed') {
+          // Keep outputs nested in generatedVideo object
           setGeneratedVideo(prev => ({
-            ...prev,
+            ...(prev || {}),
             status: 'completed',
             progress: 100,
-            outputs: data.outputs,
+            outputs: data.outputs || {},
             errorMessage: data.errorMessage
           }));
           setIsPolling(false);
