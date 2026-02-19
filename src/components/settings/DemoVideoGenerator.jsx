@@ -342,9 +342,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               setGeneratedVideo(null);
               setJobId(null);
               setJobStatus(null);
+              setPollWaitTime(0);
               createJobMutation.mutate();
             }}
-            disabled={createJobMutation.isPending}
+            disabled={createJobMutation.isPending || isPolling}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
             size="lg"
           >
@@ -352,6 +353,11 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Creating Job...
+              </>
+            ) : isPolling ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Rendering... ({Math.round(pollWaitTime / 1000)}s)
               </>
             ) : (
               <>
@@ -361,36 +367,87 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             )}
           </Button>
 
-          {/* Job Status Display */}
-          {jobId && (
-            <div className="space-y-3">
-              {jobStatus === 'queued' && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <AlertDescription className="text-blue-900">
-                    Job created. Generating script and data... (usually &lt;2s)
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {jobStatus === 'rendering' && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
-                  <AlertDescription className="text-amber-900">
-                    Video rendering in progress. Polling for completion...
-                  </AlertDescription>
-                </Alert>
-              )}
+          {/* Job Status Display with Progress */}
+          {jobId && isPolling && (
+            <div className="space-y-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-medium text-slate-900">Video Generation Progress</p>
+                  <p className="text-xs text-slate-600">{Math.round(pollWaitTime / 1000)}s elapsed</p>
+                </div>
+                
+                {/* Progress Timeline */}
+                <div className="flex gap-2 text-xs">
+                  <div className={`flex-1 text-center py-2 rounded ${jobStatus ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'}`}>
+                    <p className="font-medium">1. Script</p>
+                    <p className="text-xs">&lt;1s</p>
+                  </div>
+                  <div className={`flex-1 text-center py-2 rounded ${jobStatus && jobStatus !== 'queued' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'}`}>
+                    <p className="font-medium">2. Data</p>
+                    <p className="text-xs">&lt;1s</p>
+                  </div>
+                  <div className={`flex-1 text-center py-2 rounded ${jobStatus === 'rendering' || jobStatus === 'completed' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'}`}>
+                    <p className="font-medium">3. Render</p>
+                    <p className="text-xs">1-10s</p>
+                  </div>
+                  <div className={`flex-1 text-center py-2 rounded ${jobStatus === 'completed' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'}`}>
+                    <p className="font-medium">4. Ready</p>
+                    <p className="text-xs">Download</p>
+                  </div>
+                </div>
 
-              {generatedVideo?.errorMessage && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                  <AlertDescription className="text-amber-900">
-                    {generatedVideo.errorMessage}
-                  </AlertDescription>
-                </Alert>
+                {jobStatus === 'queued' && (
+                  <Alert className="border-blue-200 bg-blue-50 mt-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <AlertDescription className="text-blue-900">
+                      Generating script and demo data...
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {jobStatus === 'rendering' && (
+                  <Alert className="border-amber-200 bg-amber-50 mt-2">
+                    <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                    <AlertDescription className="text-amber-900">
+                      Video rendering in progress. You can leave and check back later.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              {pollWaitTime > MAX_WAIT_TIME && jobStatus !== 'completed' && (
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsPolling(false)}
+                    className="flex-1"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Stop waiting
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => statusMutation.mutate(jobId)}
+                    className="flex-1"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Check status
+                  </Button>
+                </div>
               )}
             </div>
+          )}
+
+          {/* Completion Alert */}
+          {generatedVideo?.errorMessage && (
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <AlertDescription className="text-amber-900">
+                {generatedVideo.errorMessage}
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Error Display */}
@@ -404,6 +461,39 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Recent Jobs */}
+      {recentJobs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-slate-600" />
+              Recent Renders
+            </CardTitle>
+            <CardDescription>Check status of previous jobs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {recentJobs.map((job, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Film className="w-5 h-5 text-slate-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {job.version} - {new Date(job.createdAt).toLocaleTimeString()}
+                      </p>
+                      <Badge variant="outline" className="text-xs capitalize">{job.status}</Badge>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => statusMutation.mutate(job.jobId)}>
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Generated Video Results */}
       {generatedVideo && (
