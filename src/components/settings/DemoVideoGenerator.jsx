@@ -557,68 +557,40 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"
-                        asChild
+                        onClick={() => downloadVideo(jobId, '1080p')}
                       >
-                        <a 
-                          href={generatedVideo.outputs.mp4_1080_url} 
-                          download="demo-video-1080p.mp4"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download 1920x1080 (Full HD)
-                        </a>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1920x1080 (Full HD)
                       </Button>
                     )}
                     {generatedVideo.outputs?.mp4_720_url && (
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"
-                        asChild
+                        onClick={() => downloadVideo(jobId, '720p')}
                       >
-                        <a 
-                          href={generatedVideo.outputs.mp4_720_url} 
-                          download="demo-video-720p.mp4"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download 1280x720 (HD)
-                        </a>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1280x720 (HD)
                       </Button>
                     )}
                     {generatedVideo.outputs?.mp4_shopify_url && (
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"
-                        asChild
+                        onClick={() => downloadVideo(jobId, 'shopify')}
                       >
-                        <a 
-                          href={generatedVideo.outputs.mp4_shopify_url} 
-                          download="demo-video-shopify.mp4"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download 1600x900 (Shopify App Store)
-                        </a>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1600x900 (Shopify App Store)
                       </Button>
                     )}
                     {generatedVideo.outputs?.thumbnail_url && (
                       <Button 
                         variant="outline" 
                         className="w-full justify-start"
-                        asChild
+                        onClick={() => downloadVideo(jobId, 'thumb')}
                       >
-                        <a 
-                          href={generatedVideo.outputs.thumbnail_url} 
-                          download="demo-video-thumb.jpg"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ImageIcon className="w-4 h-4 mr-2" />
-                          Download Thumbnail
-                        </a>
+                        <ImageIcon className="w-4 h-4 mr-2" />
+                        Download Thumbnail
                       </Button>
                     )}
                   </div>
