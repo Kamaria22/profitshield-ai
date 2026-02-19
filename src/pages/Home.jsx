@@ -53,14 +53,68 @@ export default function Home() {
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // Queries
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: buildQueryKey('orders-home', resolverCheck),
+  // PERFORMANCE: Lightweight summary query for immediate first paint
+  const { data: dashboardSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: buildQueryKey('dashboard-summary', resolverCheck),
     queryFn: async () => {
-      if (!queryFilter?.tenant_id) return [];
-      return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 500);
+      if (!queryFilter?.tenant_id) return null;
+      
+      const startTime = performance.now();
+      
+      // Single lightweight query for KPIs only
+      const [orders, alerts, tenant, settings] = await Promise.all([
+        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 50), // Just top 50 for KPIs
+        base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 10),
+        Promise.resolve(resolver?.tenant || null),
+        base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id }).then(s => s[0] || null)
+      ]);
+
+      const fetchTime = performance.now() - startTime;
+      console.log(`✅ Dashboard summary loaded in ${fetchTime.toFixed(0)}ms`);
+
+      // Calculate basic metrics
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+      const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
+      const highRiskOrders = orders.filter(o => (o.risk_score || 0) > 70).length;
+      const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+      return {
+        metrics: {
+          totalRevenue,
+          totalProfit,
+          avgMargin,
+          highRiskOrders,
+          totalOrders: orders.length,
+          pendingAlerts: alerts.length
+        },
+        profitScore: tenant?.profit_integrity_score || 0,
+        alertsCount: alerts.length,
+        isDemoMode: settings?.demo_mode !== false,
+        orders: orders.slice(0, 10), // Only top 10 for initial display
+        alerts
+      };
     },
     enabled: canQuery,
+    staleTime: 30000, // 30s - quick refresh for dashboard
+    gcTime: 60000
+  });
+
+  // PERFORMANCE: Defer heavy data loads until after idle
+  const { data: detailedOrders = [] } = useQuery({
+    queryKey: buildQueryKey('orders-detailed', resolverCheck),
+    queryFn: async () => {
+      if (!queryFilter?.tenant_id) return [];
+      // Deferred - wait for requestIdleCallback
+      await new Promise(resolve => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => resolve(true));
+        } else {
+          setTimeout(resolve, 2000);
+        }
+      });
+      return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 500);
+    },
+    enabled: canQuery && !!dashboardSummary, // Only load after summary
     ...queryDefaults.heavyList
   });
 
@@ -68,37 +122,14 @@ export default function Home() {
     queryKey: buildQueryKey('profitLeaks', resolverCheck),
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Defer
       return base44.entities.ProfitLeak.filter({ 
         tenant_id: queryFilter.tenant_id,
         is_resolved: false 
       }, '-impact_amount', 10);
     },
-    enabled: canQuery,
+    enabled: canQuery && !!dashboardSummary,
     ...queryDefaults.standard
-  });
-
-  const { data: pendingAlerts = [] } = useQuery({
-    queryKey: buildQueryKey('pendingAlerts', resolverCheck),
-    queryFn: async () => {
-      if (!queryFilter?.tenant_id) return [];
-      return base44.entities.Alert.filter({ 
-        tenant_id: queryFilter.tenant_id,
-        status: 'pending' 
-      }, '-created_date', 10);
-    },
-    enabled: canQuery,
-    ...queryDefaults.realtime
-  });
-
-  const { data: tenantSettings } = useQuery({
-    queryKey: buildQueryKey('tenantSettings', resolverCheck),
-    queryFn: async () => {
-      if (!queryFilter?.tenant_id) return null;
-      const settings = await base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id });
-      return settings[0] || null;
-    },
-    enabled: canQuery,
-    ...queryDefaults.config
   });
 
   // Default to demo mode if no tenant or settings
