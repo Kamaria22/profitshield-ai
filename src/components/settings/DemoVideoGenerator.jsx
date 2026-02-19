@@ -254,10 +254,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   }, [isPolling, jobId, statusMutation]);
 
   const renderVariants = [
-    { id: '1080p', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials' },
-    { id: '720p', label: 'HD (1280x720)', description: 'Web, social media' },
-    { id: 'shopify', label: 'Shopify App Store (1600x900)', description: 'App marketplace' },
-    { id: 'thumb', label: 'Thumbnail (JPEG)', description: 'Preview image' }
+    { id: 'mp4_1080', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials' },
+    { id: 'mp4_720', label: 'HD (1280x720)', description: 'Web, social media' },
+    { id: 'mp4_shopify', label: 'Shopify App Store (1600x900)', description: 'App marketplace' },
+    { id: 'thumbnail', label: 'Thumbnail (JPEG)', description: 'Preview image' }
   ];
 
   const isReady = jobStatus === 'completed' && downloadLinks && Object.keys(downloadLinks).length > 0;
