@@ -412,37 +412,35 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
                 {/* Download Options */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => downloadFile(generatedVideo.downloads?.video_1080p, 'demo_1080p.mp4')}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download 1920x1080 (Full HD)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => downloadFile(generatedVideo.downloads?.video_720p, 'demo_720p.mp4')}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download 1280x720 (HD)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => downloadFile(generatedVideo.downloads?.video_shopify, 'demo_shopify.mp4')}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download 1600x900 (Shopify App Store)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => downloadFile(generatedVideo.downloads?.thumbnail_png, 'thumbnail.png')}
-                  >
-                    <ImageIcon className="w-4 h-4 mr-2" />
-                    Download Thumbnail
+                  {generatedVideo.outputs?.mp4_1080_url && (
+                    <Button variant="outline" className="justify-start" asChild>
+                      <a href={generatedVideo.outputs.mp4_1080_url} download>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1920x1080 (Full HD)
+                      </a>
+                    </Button>
+                  )}
+                  {generatedVideo.outputs?.mp4_720_url && (
+                    <Button variant="outline" className="justify-start" asChild>
+                      <a href={generatedVideo.outputs.mp4_720_url} download>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1280x720 (HD)
+                      </a>
+                    </Button>
+                  )}
+                  {generatedVideo.outputs?.mp4_shopify_url && (
+                    <Button variant="outline" className="justify-start" asChild>
+                      <a href={generatedVideo.outputs.mp4_shopify_url} download>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download 1600x900 (Shopify App Store)
+                      </a>
+                    </Button>
+                  )}
+                  {generatedVideo.outputs?.thumbnail_url && (
+                    <Button variant="outline" className="justify-start" asChild>
+                      <a href={generatedVideo.outputs.thumbnail_url} download>
+                        <ImageIcon className="w-4 h-4 mr-2" />
+                        Download Thumbnail
                   </Button>
                 </div>
 
