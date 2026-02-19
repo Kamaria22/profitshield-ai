@@ -106,10 +106,11 @@ Deno.serve(async (req) => {
     return new Response(fileBuffer, { status: 200, headers });
 
   } catch (error) {
-    console.error('Download error:', error.message);
+    console.error('Download error:', error.message, error.stack);
     return Response.json({
       error: 'DOWNLOAD_ERROR',
-      message: 'Failed to process download'
+      message: 'Failed to process download',
+      details: error.message
     }, { status: 500 });
   }
 });
