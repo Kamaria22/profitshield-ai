@@ -21,7 +21,7 @@ import {
 
 export default function ExecutiveSummaryBar({ 
   tenant, 
-  metrics, 
+  metrics = {}, 
   onSync, 
   onScan,
   syncing = false,
@@ -33,8 +33,12 @@ export default function ExecutiveSummaryBar({
     ? Math.max(0, Math.ceil((new Date(tenant.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  const riskLevel = metrics?.highRiskOrders > 5 ? 'High' : 
-                    metrics?.highRiskOrders > 0 ? 'Medium' : 'Low';
+  // Safe number extraction
+  const totalProfit = typeof metrics?.totalProfit === 'number' ? metrics.totalProfit : 0;
+  const highRiskOrders = typeof metrics?.highRiskOrders === 'number' ? metrics.highRiskOrders : 0;
+
+  const riskLevel = highRiskOrders > 5 ? 'High' : 
+                    highRiskOrders > 0 ? 'Medium' : 'Low';
   const riskColor = riskLevel === 'High' ? 'bg-red-500' : 
                     riskLevel === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500';
 
