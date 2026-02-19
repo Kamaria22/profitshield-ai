@@ -44,8 +44,9 @@ function verifyIntegrity() {
 }
 
 function injectCopyrightNotice() {
-  // Add copyright to console
-  if (typeof console !== 'undefined') {
+  // Add copyright to console - only once on first load
+  if (typeof console !== 'undefined' && !window.__profitshield_logged) {
+    window.__profitshield_logged = true;
     const style = 'color: #10b981; font-size: 16px; font-weight: bold;';
     const style2 = 'color: #64748b; font-size: 12px;';
     
