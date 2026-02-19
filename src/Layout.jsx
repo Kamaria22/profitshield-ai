@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, parseQuery, getPersistedContext } from '@/components/platformContext';
@@ -6,15 +6,17 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/compone
 import { PermissionsProvider, usePermissions } from '@/components/usePermissions';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
-import MerchantAIChat from '@/components/merchant/MerchantAIChat';
-import TechSupportChat from '@/components/support/TechSupportChat';
 import SecurityHardeningLayer from '@/components/security/SecurityHardeningLayer';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
-import ResolverSelfTest from '@/components/ResolverSelfTest';
 import { maskEmail } from '@/components/utils/safeLog';
 import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
 import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
 import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
+
+// PERFORMANCE: Defer non-critical components - loaded after idle
+const MerchantAIChat = lazy(() => import('@/components/merchant/MerchantAIChat'));
+const TechSupportChat = lazy(() => import('@/components/support/TechSupportChat'));
+const ResolverSelfTest = lazy(() => import('@/components/ResolverSelfTest'));
 import {
   LayoutDashboard,
   ShoppingCart,
