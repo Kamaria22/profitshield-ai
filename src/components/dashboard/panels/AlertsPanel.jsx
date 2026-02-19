@@ -3,8 +3,9 @@ import { Bell, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
-export default function AlertsPanel({ alerts = [], loading }) {
-  const pendingAlerts = alerts.filter(a => a.status === 'pending');
+export default function AlertsPanel({ alerts = [], loading = false }) {
+  const safeAlerts = Array.isArray(alerts) ? alerts : [];
+  const pendingAlerts = safeAlerts.filter(a => a.status === 'pending');
   const criticalCount = pendingAlerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
   const topAlerts = pendingAlerts.slice(0, 3);
 
