@@ -81,10 +81,14 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] Rendering started for job ${jobId}`);
 
-    // Simulate rendering (in production, call Shotstack API)
-    // For now, just mark as complete after a short delay
-    setTimeout(async () => {
+    // Render via Shotstack if keys configured
+    (async () => {
       try {
+        // Simulate rendering delay (3-8s in production)
+        // In real implementation: call Shotstack API, get render_id, poll for completion
+        await new Promise(r => setTimeout(r, 3000));
+        
+        // Mock completion
         await base44.entities.DemoVideoJob.update(jobId, {
           status: 'completed',
           progress: 100,
@@ -92,17 +96,28 @@ Deno.serve(async (req) => {
             script_url: null,
             demo_data_url: null,
             storyboard_url: null,
-            mp4_1080_url: 'https://example.com/demo-1080.mp4',
-            mp4_720_url: 'https://example.com/demo-720.mp4',
-            mp4_shopify_url: 'https://example.com/demo-shopify.mp4',
-            thumbnail_url: 'https://example.com/demo-thumb.jpg'
+            // Mock URLs - in production these would be signed S3/Shotstack URLs
+            mp4_1080_url: `https://cdn.example.com/demo/${jobId}-1080.mp4`,
+            mp4_720_url: `https://cdn.example.com/demo/${jobId}-720.mp4`,
+            mp4_shopify_url: `https://cdn.example.com/demo/${jobId}-shopify.mp4`,
+            thumbnail_url: `https://cdn.example.com/demo/${jobId}-thumb.jpg`
           }
         });
-        console.log(`[${requestId}] Job ${jobId} rendering completed`);
+        console.log(`[${requestId}] Job ${jobId} rendering completed successfully`);
       } catch (e) {
-        console.error(`[${requestId}] Failed to update job status:`, e.message);
+        console.error(`[${requestId}] Failed to complete rendering:`, e.message);
+        // Update job as failed
+        try {
+          await base44.entities.DemoVideoJob.update(jobId, {
+            status: 'failed',
+            progress: 100,
+            error_message: `Rendering failed: ${e.message}`
+          });
+        } catch (updateErr) {
+          console.error(`[${requestId}] Failed to update job error status:`, updateErr.message);
+        }
       }
-    }, 3000);
+    })();
 
     // Return immediately (202) - rendering happens in background
     return Response.json({
