@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Owner escalation email for critical issues
-const OWNER_ESCALATION_EMAIL = 'owner@profitshieldAI.com';
+const OWNER_ESCALATION_EMAIL = 'support@profitshield.ai';
 
 const SYSTEM_CONTEXT = `You are ProfitShield's expert AI Support Assistant - the most knowledgeable and helpful support agent ever created.
 
