@@ -15,17 +15,19 @@ export default function CEOInsightsPanel({ tenantId, metrics }) {
   const [loading, setLoading] = useState(true);
   const [selectedInsight, setSelectedInsight] = useState(null);
 
-  useEffect(() => {
-    generateInsights();
-  }, [tenantId, metrics]);
+  // Extract primitive values from metrics to use as stable dependencies
+  const totalProfit = metrics?.totalProfit || 0;
+  const avgMargin = metrics?.avgMargin || 0;
+  const highRiskOrders = metrics?.highRiskOrders || 0;
+  const negativeMarginOrders = metrics?.negativeMarginOrders || 0;
 
-  const generateInsights = async () => {
+  useEffect(() => {
     setLoading(true);
     
     // Generate quick executive insights
     const quickInsights = [];
     
-    if (metrics?.totalProfit > 0) {
+    if (totalProfit > 0) {
       quickInsights.push({
         type: 'driver',
         label: 'Profit driver this week',
