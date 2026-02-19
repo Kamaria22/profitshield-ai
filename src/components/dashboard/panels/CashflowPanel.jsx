@@ -2,12 +2,16 @@ import React from 'react';
 import { Wallet, TrendingUp, AlertTriangle } from 'lucide-react';
 import CommandPanel from '../CommandPanel';
 
-export default function CashflowPanel({ metrics, loading }) {
+export default function CashflowPanel({ metrics = {}, loading = false }) {
+  // Safe extraction of metric values
+  const totalRevenue = typeof metrics?.totalRevenue === 'number' ? metrics.totalRevenue : 0;
+  const totalProfit = typeof metrics?.totalProfit === 'number' ? metrics.totalProfit : 0;
+  
   // Simulated forecast based on current metrics
-  const avgDaily = (metrics?.totalRevenue || 0) / 30;
+  const avgDaily = totalRevenue / 30;
   const projected7d = avgDaily * 7;
-  const projected30d = metrics?.totalRevenue || 0;
-  const projectedProfit30d = metrics?.totalProfit || 0;
+  const projected30d = totalRevenue;
+  const projectedProfit30d = totalProfit;
   
   const isHealthy = projectedProfit30d > 0;
 
