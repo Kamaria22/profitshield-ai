@@ -278,7 +278,6 @@ const useFilteredNavItems = (hasPermission, isAdmin) => {
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
-  const [supportChatOpen, setSupportChatOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
