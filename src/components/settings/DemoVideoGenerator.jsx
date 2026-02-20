@@ -307,15 +307,26 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     console.info('[DV-TEST] ===== SELF TEST START =====');
     setTestResults({ running: true, tests: [] });
     
+    // Get Shopify session token for embedded iframe auth
+    const sessionToken = await getShopifySessionToken();
+    
     const results = [];
     
     for (const variant of VARIANTS) {
       console.info(`[DV-TEST] Testing ${variant.id}...`);
       
       try {
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (sessionToken) {
+          headers['Authorization'] = `Bearer ${sessionToken}`;
+        }
+        
         const res = await fetch('/api/functions/demoVideoProxyDownload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           credentials: 'include',
           body: JSON.stringify({ jobId, format: variant.id })
         });
