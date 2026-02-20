@@ -631,35 +631,35 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </Button>
             </div>
 
-            {/* Download Buttons - REAL CLICKABLE */}
+            {/* Download Buttons — CLICK-SAFE (forced above overlays) */}
             {isReady && (
-              <div className="space-y-3">
+              <div className="space-y-3 relative z-[9999]">
                 <Label>Download Formats</Label>
-                <div className="space-y-3">
-                  {VARIANTS.map(variant => {
+                <div className="space-y-3 relative z-[9999]">
+                  {VARIANTS.map((variant) => {
                     const isDownloading = downloadingVariant === variant.id;
 
                     return (
-                      <button
+                      <Button
                         key={variant.id}
                         type="button"
-                        onClick={() => downloadVariant(variant.id)}
+                        variant="outline"
+                        className="w-full justify-between h-auto py-4 text-left relative z-[9999] pointer-events-auto"
                         disabled={isDownloading}
-                        style={{ pointerEvents: 'auto' }}
-                        className="w-full text-left border rounded-lg p-4 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        onPointerDownCapture={() => console.info('[DV][BTN] pointerdown', variant.id)}
+                        onClick={() => downloadVariant(variant.id)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-semibold">{variant.label}</div>
-                            <div className="text-sm text-slate-500">{variant.description}</div>
-                          </div>
-                          {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-green-600 ml-3" />
-                          ) : (
-                            <Download className="w-4 h-4 text-green-600 ml-3" />
-                          )}
+                        <div className="flex-1">
+                          <div className="font-semibold">{variant.label}</div>
+                          <div className="text-sm text-slate-500">{variant.description}</div>
                         </div>
-                      </button>
+
+                        {isDownloading ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-600 ml-3" />
+                        ) : (
+                          <Download className="w-4 h-4 text-emerald-600 ml-3" />
+                        )}
+                      </Button>
                     );
                   })}
                 </div>
