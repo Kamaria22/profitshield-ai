@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     
     const base44 = createClientFromRequest(req);
     
-    // Try Base44 session first (works outside iframe)
+    // DUAL AUTH MODE: Try Base44 session first, then Shopify token (OR logic, not AND)
     let user = await base44.auth.me().catch(() => null);
     let shopDomain = null;
     let authMethod = null;
@@ -25,50 +25,47 @@ Deno.serve(async (req) => {
     let extractedShop = null;
     
     if (user) {
-      authMethod = 'base44_session';
+      // ✅ AUTH MODE 1: Base44 cookie session
+      authMethod = 'base44_cookie';
       jwtVerifyOk = true;
-      console.log(`[DLPROXY] jwtVerifyOk=true, Auth via Base44 session: ${user.email}`);
+      console.log(`[DLPROXY] ✓ Auth via Base44 session: ${user.email}`);
     } else if (hasAuthHeader && authHeaderPrefix === 'Bearer') {
-      // Shopify App Bridge session token (works in embedded iframe)
+      // ✅ AUTH MODE 2: Shopify App Bridge session token
       const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
       
       if (!apiSecret) {
-        console.error(`[DLPROXY] jwtVerifyOk=false, reason: SHOPIFY_API_SECRET not configured`);
+        console.error(`[DLPROXY] ✗ SHOPIFY_API_SECRET not configured`);
         return Response.json({ error: 'Server configuration error' }, { status: 500 });
       }
       
       try {
-        // Verify Shopify session token (JWT)
         const secret = new TextEncoder().encode(apiSecret);
         const { payload } = await jose.jwtVerify(token, secret);
         
         jwtVerifyOk = true;
-        
-        // Extract shop domain from dest or iss claim
         shopDomain = payload.dest?.replace(/^https?:\/\//, '') || 
                      payload.iss?.replace(/^https?:\/\//, '') ||
                      payload.sub?.split('/')[0];
         
         extractedShop = shopDomain;
-        authMethod = 'shopify_session_token';
-        console.log(`[DLPROXY] jwtVerifyOk=true, extractedShop=`, extractedShop);
+        authMethod = 'shopify_bearer';
+        console.log(`[DLPROXY] ✓ Auth via Shopify bearer token, shop=${extractedShop}`);
       } catch (e) {
         jwtVerifyOk = false;
-        console.log(`[DLPROXY] jwtVerifyOk=false, reason: JWT verification failed: ${e.message}`);
-        return Response.json({ error: `Invalid JWT: ${e.message}` }, { status: 401 });
+        console.log(`[DLPROXY] ✗ Shopify JWT verification failed: ${e.message}`);
+        return Response.json({ error: `Invalid Shopify token: ${e.message}` }, { status: 401 });
       }
     } else {
+      // ❌ AUTH FAIL: No Base44 user AND no Bearer token
       jwtVerifyOk = false;
-      console.log(`[DLPROXY] jwtVerifyOk=false, reason: no Bearer token`);
-      return Response.json({ error: 'Authentication required. Include Authorization: Bearer <token>' }, { status: 401 });
+      console.log(`[DLPROXY] ✗ No authentication: no Base44 user, no Authorization header`);
+      return Response.json({ 
+        error: 'Unauthorized (no cookie user and no bearer token)' 
+      }, { status: 401 });
     }
     
-    if (!user && !shopDomain) {
-      console.log(`[DLPROXY] jwtVerifyOk=false, reason: could not extract user or shop`);
-      return Response.json({ error: 'Could not authenticate request' }, { status: 401 });
-    }
-    
-    console.log(`[DLPROXY] jwtVerifyOk=`, jwtVerifyOk, `extractedShop=`, extractedShop);
+    // Log auth summary
+    console.log(`[DLPROXY] chosenAuthMode=${authMethod}, jwtVerifyOk=${jwtVerifyOk}`);
 
     const { jobId, format } = await req.json();
     
