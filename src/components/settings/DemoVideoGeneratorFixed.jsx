@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
-import { requireResolved } from '@/components/usePlatformResolver';
+import { requireResolved, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 import { useAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import AIScriptingAssistant from './AIScriptingAssistant';
