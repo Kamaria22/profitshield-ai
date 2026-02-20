@@ -6,6 +6,7 @@ import { usePermissions } from '@/components/usePermissions';
 import { healthAgent } from '@/components/health/HealthAgent';
 import { downloadViaProxy } from '@/components/health/download';
 import { refreshRemoteConfig } from '@/components/health/remoteConfig';
+import DownloadSelfTest from '@/components/health/DownloadSelfTest';
 import { 
   Download, 
   Loader2,
