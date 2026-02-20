@@ -277,33 +277,33 @@ export default function Home() {
                 </Suspense>
                 
                 {/* Lazy panels */}
-                <LazyPanel>
+                <Suspense fallback={<PanelSkeleton />}>
                   <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <CashflowPanel metrics={metrics} loading={false} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <SecurityPanel loading={false} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <IntegrationsPanel loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
-                </LazyPanel>
-                <LazyPanel>
+                </Suspense>
+                <Suspense fallback={<PanelSkeleton />}>
                   <CustomizeLayoutPanel loading={false} />
-                </LazyPanel>
+                </Suspense>
               </div>
 
               {/* Connect Store CTA */}
