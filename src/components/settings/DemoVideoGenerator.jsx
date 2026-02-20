@@ -64,6 +64,18 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(true);
+  const [debugInfo, setDebugInfo] = useState({});
+
+  // Log helper
+  const addDebugLog = useCallback((message, data = {}) => {
+    const timestamp = new Date().toISOString();
+    console.info(`[DemoVideo] ${message}`, data);
+    setDebugInfo(prev => ({
+      ...prev,
+      lastLog: { timestamp, message, data }
+    }));
+  }, []);
 
   // Robust URL resolver - handles multiple payload shapes from Shotstack/job outputs
   const getDownloadUrl = useCallback((variant) => {
