@@ -191,20 +191,11 @@ export default function Home() {
     toast.info('Running profit scan...');
   }, []);
 
-  // Loading state
+  // Minimal blocking state
   if (tenantLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <motion.div 
-          className="text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <p className="text-slate-500">Loading your command center...</p>
-        </motion.div>
+        <div className="w-12 h-12 rounded-lg bg-emerald-500 animate-pulse" />
       </div>
     );
   }
