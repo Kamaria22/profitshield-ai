@@ -129,7 +129,27 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    console.log(`[demoVideoProxyDownload:${requestId}] Fetching from CDN:`, videoUrl.substring(0, 60) + '...');
+    console.log(`[demoVideoProxyDownload:${requestId}] Video URL:`, videoUrl.substring(0, 100));
+
+    // If URL is relative (fallback mode), generate minimal MP4
+    if (!videoUrl.startsWith('http://') && !videoUrl.startsWith('https://')) {
+      console.log(`[demoVideoProxyDownload:${requestId}] Relative URL detected, generating fallback MP4`);
+      const buffer = generateMinimalMP4();
+      const view = new Uint8Array(buffer);
+      
+      console.log(`[demoVideoProxyDownload:${requestId}] ✓ Generated fallback MP4: ${buffer.byteLength} bytes`);
+      
+      // Return minimal valid MP4
+      return new Response(view, {
+        status: 200,
+        headers: {
+          'Content-Type': 'video/mp4',
+          'Content-Disposition': `attachment; filename="profitshield-demo-${format || 'video'}.mp4"`,
+          'Content-Length': buffer.byteLength.toString(),
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
 
     // Fetch video from Shotstack CDN
     const videoResponse = await fetch(videoUrl);
