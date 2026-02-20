@@ -660,19 +660,34 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 </Button>
               </div>
 
-              {/* PROOF: Each button has data-testid, proper onClick, cursor-pointer */}
+              {/* INSTRUMENTED DOWNLOAD BUTTONS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="list">
                 {renderVariants.map(variant => {
-                  // Validate URL exists using urlKey
-                  const hasUrl = downloadLinks && downloadLinks[variant.urlKey];
+                  // Multi-strategy URL validation
+                  const directUrl = getDownloadUrl(variant.id);
+                  const fallbackUrl = downloadLinks && downloadLinks[variant.urlKey];
+                  const hasUrl = !!(directUrl || fallbackUrl);
+                  
+                  const handleClick = () => {
+                    addDebugLog('🖱️ Button clicked', { 
+                      variant: variant.id,
+                      hasUrl,
+                      directUrl: directUrl ? 'YES' : 'NO',
+                      fallbackUrl: fallbackUrl ? 'YES' : 'NO',
+                      jobId
+                    });
+                    downloadVideo(jobId, variant.id);
+                  };
                   
                   return (
                     <button
                       key={variant.id}
                       type="button"
-                      onClick={() => downloadVideo(jobId, variant.id)}
+                      onClick={handleClick}
                       disabled={isDownloading || !hasUrl}
                       data-testid={`download-${variant.id}`}
+                      data-has-url={hasUrl}
+                      data-direct-url={!!directUrl}
                       aria-label={`Download ${variant.label}`}
                       className={`
                         flex items-center justify-between w-full
@@ -681,11 +696,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2
                         ${hasUrl 
                           ? 'border-green-300 bg-white hover:bg-green-50 hover:border-green-400 cursor-pointer' 
-                          : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
+                          : 'border-red-200 bg-red-50 cursor-not-allowed opacity-75'
                         }
                         ${isDownloading ? 'opacity-50 cursor-wait' : ''}
                       `}
                       role="listitem"
+                      style={{ pointerEvents: hasUrl && !isDownloading ? 'auto' : 'none' }}
                     >
                       <div className="flex-1">
                         <div className="font-semibold text-sm text-slate-900">
@@ -695,8 +711,13 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                           {variant.description}
                         </div>
                         {!hasUrl && (
-                          <div className="text-xs text-red-600 mt-1">
-                            URL not available - try refreshing
+                          <div className="text-xs text-red-700 mt-1 font-medium">
+                            ❌ URL missing - click Refresh Status above
+                          </div>
+                        )}
+                        {hasUrl && (
+                          <div className="text-xs text-green-700 mt-1">
+                            ✓ {directUrl ? 'Direct CDN' : 'Proxy available'}
                           </div>
                         )}
                       </div>
