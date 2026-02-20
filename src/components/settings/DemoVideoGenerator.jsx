@@ -183,7 +183,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     try {
       const headers = { 'Content-Type': 'application/json' };
       const embedded = isEmbedded();
+      console.log('[DV] embedded=', embedded);
+      
       const token = embedded ? await getShopifySessionToken({ timeoutMs: 5000 }) : null;
+      console.log('[DV] token_retrieved=', !!token, 'len=', token?.length || 0);
       
       if (embedded) {
         if (!token) {
@@ -192,7 +195,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           return;
         }
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('[DV] auth_header_set=true');
       }
+      
+      console.log('[DV] request_headers=', Object.keys(headers), 'auth_present=', !!headers['Authorization']);
       
       const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
