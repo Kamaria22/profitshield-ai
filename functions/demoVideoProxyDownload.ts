@@ -5,9 +5,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * - Validates MP4 format
  * - Streams binary data with proper headers
  * - Handles multiple video formats
+ * - Works in Shopify embedded iframes (GET request + query params)
  */
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') {
+  // Support both GET and POST for iframe compatibility
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
@@ -18,7 +20,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { jobId, format = 'mp4_1080' } = await req.json();
+    // Parse params from query string (GET) or body (POST)
+    let jobId, format;
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      jobId = url.searchParams.get('jobId');
+      format = url.searchParams.get('format') || 'mp4_1080';
+    } else {
+      const body = await req.json();
+      jobId = body.jobId;
+      format = body.format || 'mp4_1080';
+    }
+    
     if (!jobId) {
       return Response.json({ error: 'Missing jobId' }, { status: 400 });
     }
