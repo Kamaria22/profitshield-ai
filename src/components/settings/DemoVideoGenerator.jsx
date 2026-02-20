@@ -666,12 +666,15 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </div>
             )}
             
-            {/* Self-Test Panel */}
+            {/* Self-Test Panel — also forced above overlays */}
             {isReady && (
-              <div className="pt-4 border-t space-y-3">
+              <div className="pt-4 border-t space-y-3 relative z-[9999] pointer-events-auto">
                 <Button
                   variant="outline"
                   size="sm"
+                  type="button"
+                  className="relative z-[9999] pointer-events-auto"
+                  onPointerDownCapture={() => console.info('[DV][BTN] pointerdown', 'self-test')}
                   onClick={() => runSelfTest()}
                   disabled={downloadingVariant || testResults?.running}
                 >
@@ -684,7 +687,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                     'Run Download Test'
                   )}
                 </Button>
-                
+
                 {testResults && !testResults.running && (
                   <div className="text-xs space-y-1 bg-slate-50 p-3 rounded">
                     {testResults.tests.map((t, i) => (
