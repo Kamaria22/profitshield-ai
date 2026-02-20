@@ -4,6 +4,8 @@ import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 import { getShopifySessionToken, isEmbedded } from '@/components/utils/shopifyAuth';
+import AIScriptingAssistant from './AIScriptingAssistant';
+import AdvancedDownloadOptions from './AdvancedDownloadOptions';
 import { 
   Download, 
   Loader2,
@@ -158,7 +160,20 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
-  // Download handler - Shopify iframe safe, QuickTime compatible
+  // Fetch with timeout + abort controller
+  const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
+    
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(id);
+    }
+  };
+
+  // Download handler - Shopify iframe safe, QuickTime compatible, timeout-protected
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
     
@@ -180,19 +195,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
-      } else if (embedded) {
-        // In embedded context but no token - fail fast with clear message
-        toast.error('Authentication unavailable in embedded mode. Please reload the app.');
-        setDownloadingVariant(null);
-        return;
       }
       
-      const res = await fetch('/api/functions/demoVideoProxyDownload', {
+      const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
         headers,
         credentials: 'include',
         body: JSON.stringify({ jobId, format })
-      });
+      }, 30000);
 
       console.info('[DV] proxy-response', { 
         status: res.status,
@@ -320,16 +330,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         
         if (sessionToken) {
           headers['Authorization'] = `Bearer ${sessionToken}`;
-        } else {
-          console.warn('[DV-TEST] ⚠️ No session token for', variant.id);
         }
         
-        const res = await fetch('/api/functions/demoVideoProxyDownload', {
+        const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
           method: 'POST',
           headers,
           credentials: 'include',
           body: JSON.stringify({ jobId, format: variant.id })
-        });
+        }, 15000);
 
         const status = res.status;
         const contentType = res.headers.get('content-type');
