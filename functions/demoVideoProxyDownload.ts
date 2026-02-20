@@ -3,19 +3,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 function pickUrl(job, format) {
   const outputs = job?.outputs || {};
   
-  const map = {
-    '1080p': ['mp4_1080_url', 'url_1080', 'mp4_1080', 'download_1080', 'fullhd'],
-    '720p': ['mp4_720_url', 'url_720', 'mp4_720', 'download_720', 'hd'],
-    '1600x900': ['mp4_shopify_url', 'url_shopify', 'mp4_shopify', 'appstore'],
-    'thumbnail': ['thumbnail_url', 'thumb_url', 'jpeg_url', 'thumbnail'],
+  // Standardized format mapping - EXACT key names only
+  const mapping = {
+    '1080p': outputs.mp4_1080_url,
+    '720p': outputs.mp4_720_url,
+    'shopify': outputs.mp4_shopify_url,
+    '1600x900': outputs.mp4_shopify_url, // legacy alias
+    'thumbnail': outputs.thumbnail_url,
+    'thumb': outputs.thumbnail_url
   };
-
-  const keys = map[format] || [];
-  for (const k of keys) {
-    const v = outputs?.[k];
-    if (typeof v === 'string' && v.startsWith('http')) return v;
-  }
-  return null;
+  
+  const url = mapping[format];
+  // Only return if it's a real HTTP(S) URL
+  return (url && typeof url === 'string' && url.startsWith('http')) ? url : null;
 }
 
 Deno.serve(async (req) => {
