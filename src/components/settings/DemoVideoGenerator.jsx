@@ -219,23 +219,25 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       a.download = filename;
       a.style.display = 'none';
       document.body.appendChild(a);
+      
+      addDebugLog('💾 Triggering browser download', { filename, blobSize: blob.size });
       a.click();
       
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        console.info('[DemoVideo] ✓ Download complete:', variant);
+        addDebugLog('✅ Download complete', { variant });
       }, 500);
       
       toast.success(`Download started: ${filename}`);
       setIsDownloading(false);
       
     } catch (error) {
-      console.error('[DemoVideo] Download error:', { variant, jobId: jid, error: error.message });
-      toast.error(error.message || 'Download failed');
+      addDebugLog('❌ Download error', { variant, jobId: jid, error: error.message, stack: error.stack });
+      toast.error(error.message || 'Download failed', { duration: 5000 });
       setIsDownloading(false);
     }
-  }, [downloadLinks, getDownloadUrl]);
+  }, [downloadLinks, getDownloadUrl, addDebugLog]);
 
   const getFileName = (format) => {
     const fileMap = {
