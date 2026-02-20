@@ -81,7 +81,7 @@ export default function Home() {
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
 
-  // PERFORMANCE: Lightweight summary query for immediate first paint
+  // PERFORMANCE: Ultra-fast summary query - minimal data for instant render
   const { data: dashboardSummary, isLoading: summaryLoading } = useQuery({
     queryKey: buildQueryKey('dashboard-summary', resolverCheck),
     queryFn: async () => {
@@ -89,42 +89,41 @@ export default function Home() {
       
       const startTime = performance.now();
       
-      // Single lightweight query for KPIs only
-      const [orders, alerts, tenant, settings] = await Promise.all([
-        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 50), // Just top 50 for KPIs
-        base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 10),
-        Promise.resolve(resolver?.tenant || null),
-        base44.entities.TenantSettings.filter({ tenant_id: queryFilter.tenant_id }).then(s => s[0] || null)
+      // Absolute minimum for first paint - fetch in parallel, smallest datasets
+      const [orders, alerts] = await Promise.all([
+        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 20),
+        base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 5)
       ]);
 
       const fetchTime = performance.now() - startTime;
-      console.log(`✅ Dashboard summary loaded in ${fetchTime.toFixed(0)}ms`);
+      console.log(`⚡ Dashboard rendered in ${fetchTime.toFixed(0)}ms`);
 
-      // Calculate basic metrics
+      // Quick calculations
       const totalRevenue = orders.reduce((sum, o) => sum + (o.total_price || 0), 0);
       const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
       const highRiskOrders = orders.filter(o => (o.risk_score || 0) > 70).length;
-      const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
       return {
         metrics: {
           totalRevenue,
           totalProfit,
-          avgMargin,
+          avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
           highRiskOrders,
           totalOrders: orders.length,
           pendingAlerts: alerts.length
         },
-        profitScore: tenant?.profit_integrity_score || 0,
+        profitScore: resolver?.tenant?.profit_integrity_score || 0,
         alertsCount: alerts.length,
-        isDemoMode: settings?.demo_mode !== false,
-        orders: orders.slice(0, 10), // Only top 10 for initial display
+        isDemoMode: false,
+        orders: orders.slice(0, 5),
         alerts
       };
     },
     enabled: canQuery,
-    staleTime: 30000, // 30s - quick refresh for dashboard
-    gcTime: 60000
+    staleTime: 60000,
+    gcTime: 120000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
   });
 
   // PERFORMANCE: Defer heavy data loads until after idle
