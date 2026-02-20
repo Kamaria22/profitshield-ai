@@ -63,6 +63,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [downloadLinks, setDownloadLinks] = useState({});
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
   // AUTHENTICATED DOWNLOAD: Proof-based implementation with logging
   const downloadVideo = useCallback(async (jid, variant) => {
