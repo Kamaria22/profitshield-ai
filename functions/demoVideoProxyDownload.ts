@@ -27,13 +27,13 @@ Deno.serve(async (req) => {
     if (user) {
       authMethod = 'base44_session';
       jwtVerifyOk = true;
-      console.log(`[DLPROXY] Auth via Base44 session: ${user.email}`);
-    } else if (token && authHeaderPrefix === 'Bearer') {
+      console.log(`[DLPROXY] jwtVerifyOk=true, Auth via Base44 session: ${user.email}`);
+    } else if (hasAuthHeader && authHeaderPrefix === 'Bearer') {
       // Shopify App Bridge session token (works in embedded iframe)
       const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
       
       if (!apiSecret) {
-        console.error(`[DLPROXY] ❌ SHOPIFY_API_SECRET not configured`);
+        console.error(`[DLPROXY] jwtVerifyOk=false, reason: SHOPIFY_API_SECRET not configured`);
         return Response.json({ error: 'Server configuration error' }, { status: 500 });
       }
       
@@ -54,17 +54,17 @@ Deno.serve(async (req) => {
         console.log(`[DLPROXY] jwtVerifyOk=true, extractedShop=`, extractedShop);
       } catch (e) {
         jwtVerifyOk = false;
-        console.error(`[DLPROXY] jwtVerifyOk=false, reason: ${e.message}`);
-        return Response.json({ error: `Invalid JWT signature or claim: ${e.message}` }, { status: 401 });
+        console.log(`[DLPROXY] jwtVerifyOk=false, reason: JWT verification failed: ${e.message}`);
+        return Response.json({ error: `Invalid JWT: ${e.message}` }, { status: 401 });
       }
     } else {
       jwtVerifyOk = false;
-      console.log(`[DLPROXY] jwtVerifyOk=false, reason: no Bearer token in Authorization header`);
-      return Response.json({ error: 'Missing Authorization: Bearer header with valid Shopify session token' }, { status: 401 });
+      console.log(`[DLPROXY] jwtVerifyOk=false, reason: no Bearer token`);
+      return Response.json({ error: 'Authentication required. Include Authorization: Bearer <token>' }, { status: 401 });
     }
     
     if (!user && !shopDomain) {
-      console.log(`[DLPROXY] ❌ AUTH FAIL after verification`);
+      console.log(`[DLPROXY] jwtVerifyOk=false, reason: could not extract user or shop`);
       return Response.json({ error: 'Could not authenticate request' }, { status: 401 });
     }
     
