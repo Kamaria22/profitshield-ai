@@ -123,6 +123,3 @@ return () => {
     </>
   );
 }
-
-// Export signature for backend verification
-export { PROFITSHIELD_SIGNATURE };
