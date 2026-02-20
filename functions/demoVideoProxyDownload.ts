@@ -18,7 +18,16 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     
     // DUAL AUTH MODE: Try Base44 session first, then Shopify token (OR logic, not AND)
-    let user = await base44.auth.me().catch(() => null);
+    let user = null;
+    try {
+      user = await base44.auth.me();
+      console.log(`[DLPROXY] ✓ Base44 user: ${user.email}`);
+    } catch (e) {
+      // Expected in embedded iframe: app restricted to workspace
+      console.log(`[DLPROXY] No Base44 session (expected in embedded): ${e.message}`);
+      user = null;
+    }
+    
     let shopDomain = null;
     let authMethod = null;
     let jwtVerifyOk = false;
