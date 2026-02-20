@@ -3,6 +3,9 @@ import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
+import { healthAgent } from '@/components/health/HealthAgent';
+import { downloadViaProxy } from '@/components/health/download';
+import { refreshRemoteConfig } from '@/components/health/remoteConfig';
 import { 
   Download, 
   Loader2,
@@ -192,32 +195,42 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   const handleDownload = async (variantId) => {
     if (downloadingVariant || !jobId) return;
-    
-    const url = getDownloadUrl(variantId);
-    if (!url) {
-      toast.error('Download URL not available');
-      return;
-    }
 
     setDownloadingVariant(variantId);
 
     try {
-      const variant = RENDER_VARIANTS.find(v => v.id === variantId);
-      const filename = `profitshield-demo-${variantId}-${Date.now()}.${variantId === 'thumbnail' ? 'jpg' : 'mp4'}`;
+      const cfg = await refreshRemoteConfig();
+      const filename =
+        variantId === '1080p'
+          ? 'ProfitShieldAI-demo-1080p.mp4'
+          : variantId === '720p'
+          ? 'ProfitShieldAI-demo-720p.mp4'
+          : variantId === '1600x900'
+          ? 'ProfitShieldAI-app-store.mp4'
+          : 'ProfitShieldAI-thumb.jpg';
 
-      // Direct download via anchor
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      console.info(`[DemoVideo] Download started: ${variantId}`);
 
-      toast.success(`Downloading ${variant.label}`);
+      const proof = await downloadViaProxy({ jobId, variant: variantId, filename });
+
+      if (!proof.ok || (proof.bytes || 0) < cfg.minValidDownloadBytes) {
+        await healthAgent.report('error', 'Download proof failed', undefined, {
+          feature: 'demo_video',
+          variant: variantId,
+          reason: proof.error || 'unknown',
+        });
+        toast.error('Download failed', { description: proof.error || 'Unknown error' });
+        return;
+      }
+
+      console.info(`[DemoVideo] Download success: ${variantId} (${proof.bytes} bytes)`);
+      toast.success('Download started', { description: `${variantId} • ${proof.bytes} bytes` });
     } catch (err) {
       console.error('Download error:', err);
+      await healthAgent.report('error', 'Download exception', err?.stack, {
+        feature: 'demo_video',
+        variant: variantId,
+      });
       toast.error('Download failed: ' + err.message);
     } finally {
       setDownloadingVariant(null);

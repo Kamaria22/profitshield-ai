@@ -12,6 +12,8 @@ import { maskEmail } from '@/components/utils/safeLog';
 import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
 import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
 import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
+import { healthAgent } from '@/components/health/HealthAgent';
+import { HealthErrorBoundary } from '@/components/health/HealthErrorBoundary';
 
 // PERFORMANCE: Defer non-critical components - loaded after idle
 const MerchantAIChat = lazy(() => import('@/components/merchant/MerchantAIChat'));
@@ -696,18 +698,40 @@ function LayoutWithProviders({ children, currentPageName }) {
   const resolver = usePlatformResolver() || {};
 
   let authTenantId = null;
+  let resolverContext = null;
   try {
     const resolverCheck = requireResolved(resolver);
     authTenantId = resolverCheck?.tenantId || null;
+    resolverContext = {
+      status: resolver.status,
+      platform: resolver.platform,
+      storeKey: resolver.storeKey,
+      tenantId: resolver.tenantId,
+      integrationId: resolver.integrationId,
+      userEmail: resolver.user?.email,
+    };
   } catch (e) {
     authTenantId = null;
   }
 
+  // Initialize HealthAgent on mount
+  useEffect(() => {
+    healthAgent.init().catch(() => {});
+  }, []);
+
+  // Update HealthAgent context when resolver changes
+  useEffect(() => {
+    healthAgent.setResolverContext(resolverContext);
+    healthAgent.setUserEmail(resolver?.user?.email || null);
+  }, [resolverContext, resolver?.user?.email]);
+
   return (
     <SyncProvider tenantId={authTenantId}>
-      <LayoutWithErrorBoundary currentPageName={currentPageName}>
-        {children}
-      </LayoutWithErrorBoundary>
+      <HealthErrorBoundary fallback={null}>
+        <LayoutWithErrorBoundary currentPageName={currentPageName}>
+          {children}
+        </LayoutWithErrorBoundary>
+      </HealthErrorBoundary>
 
       {/* PWA Install & Update Banners */}
       <InstallAppBanner />
