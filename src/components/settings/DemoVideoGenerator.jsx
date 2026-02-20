@@ -64,52 +64,97 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // AUTHENTICATED DOWNLOAD: Fetch with credentials, then trigger blob download
+  // AUTHENTICATED DOWNLOAD: Proof-based implementation with logging
   const downloadVideo = useCallback(async (jid, variant) => {
     if (!jid || !variant) {
-      toast.error('Invalid download request');
+      console.error('[DemoVideo] Invalid download request:', { jid, variant });
+      toast.error('Invalid download request - missing jobId or variant');
       return;
     }
     
     try {
       setIsDownloading(true);
-      console.log(`[DemoVideoGenerator] Downloading ${variant} for job ${jid}`);
+      
+      // PROOF A: Log download click
+      console.info('[DemoVideo] download-click', { 
+        variant, 
+        jobId: jid,
+        timestamp: new Date().toISOString()
+      });
       
       // Call backend function with credentials (uses SDK authentication)
+      console.info('[DemoVideo] Calling demoVideoProxyDownload endpoint...');
       const response = await base44.functions.invoke('demoVideoProxyDownload', {
         jobId: jid,
         format: variant
       });
       
-      if (!response.data) {
+      // PROOF B: Validate response
+      if (!response || !response.data) {
+        console.error('[DemoVideo] No data in response:', response);
         throw new Error('No data received from download endpoint');
       }
       
-      // Response.data is already the blob/arraybuffer from the function
-      const blob = new Blob([response.data], { type: 'video/mp4' });
+      console.info('[DemoVideo] Received response:', {
+        dataType: typeof response.data,
+        dataSize: response.data instanceof ArrayBuffer ? response.data.byteLength : 
+                  response.data instanceof Blob ? response.data.size : 
+                  'unknown',
+        status: response.status
+      });
+      
+      // Handle response - could be ArrayBuffer or Blob
+      let blob;
+      if (response.data instanceof Blob) {
+        blob = response.data;
+      } else if (response.data instanceof ArrayBuffer) {
+        const mimeType = variant === 'thumbnail' ? 'image/jpeg' : 'video/mp4';
+        blob = new Blob([response.data], { type: mimeType });
+      } else {
+        throw new Error('Invalid response data type');
+      }
+      
       const url = window.URL.createObjectURL(blob);
+      const filename = getFileName(variant);
+      
+      console.info('[DemoVideo] download-url', { 
+        variant, 
+        url: url.slice(0, 60) + '...',
+        filename,
+        blobSize: blob.size
+      });
       
       // Create temporary download link
       const a = document.createElement('a');
       a.href = url;
-      a.download = getFileName(variant);
+      a.download = filename;
       a.style.display = 'none';
       document.body.appendChild(a);
       
-      // Trigger download
+      // PROOF C: Trigger download
+      console.info('[DemoVideo] Triggering download for:', filename);
       a.click();
       
       // Cleanup
       setTimeout(() => {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        toast.success(`${variant} downloaded!`);
+        console.info('[DemoVideo] ✓ Download complete:', variant);
+        toast.success(`${variant.replace('mp4_', '').toUpperCase()} download started!`);
         setIsDownloading(false);
       }, 100);
       
     } catch (error) {
-      console.error('[DemoVideoGenerator] Download error:', error);
-      toast.error(`Download failed: ${error.message || 'Unknown error'}`);
+      console.error('[DemoVideo] Download error:', {
+        variant,
+        jobId: jid,
+        error: error.message,
+        stack: error.stack
+      });
+      
+      toast.error(`Download failed: ${error.message || 'Unknown error'}`, {
+        description: `Variant: ${variant}, Job: ${jid.slice(0, 8)}...`
+      });
       setIsDownloading(false);
     }
   }, []);
