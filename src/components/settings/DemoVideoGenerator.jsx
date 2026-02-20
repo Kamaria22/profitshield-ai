@@ -65,124 +65,151 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const startTimeRef = useRef(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
 
-  // AUTHENTICATED DOWNLOAD: Proof-based implementation with logging
+  // Robust URL resolver - handles multiple payload shapes from Shotstack/job outputs
+  const getDownloadUrl = useCallback((variant) => {
+    if (!downloadLinks) return null;
+
+    const root = downloadLinks;
+    const files = root.files || root.output || root.assets || root;
+
+    const pick = (arr) => arr.find((u) => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))) || null;
+
+    const candidates = {
+      '1080p': [
+        files?.['1080p']?.url,
+        files?.mp4_1080_url,
+        files?.mp4_1080,
+        files?.full_hd_url,
+        files?.mp4FullHD,
+        root?.renders?.find?.((r) => r?.label === '1080p')?.url,
+        root?.renders?.find?.((r) => r?.resolution === '1920x1080')?.url,
+        root?.render?.url,
+      ],
+      '720p': [
+        files?.['720p']?.url,
+        files?.mp4_720_url,
+        files?.mp4_720,
+        files?.hd_url,
+        files?.mp4HD,
+        root?.renders?.find?.((r) => r?.label === '720p')?.url,
+        root?.renders?.find?.((r) => r?.resolution === '1280x720')?.url,
+      ],
+      '1600x900': [
+        files?.['1600x900']?.url,
+        files?.shopify?.url,
+        files?.mp4_shopify_url,
+        files?.mp4_1600x900_url,
+        files?.app_store_url,
+        root?.renders?.find?.((r) => r?.label?.includes?.('shopify'))?.url,
+        root?.renders?.find?.((r) => r?.resolution === '1600x900')?.url,
+      ],
+      'thumbnail': [
+        files?.thumbnail?.url,
+        files?.thumbnail_url,
+        files?.jpeg_url,
+        root?.thumbnail?.url,
+        root?.renders?.find?.((r) => r?.type === 'image')?.url,
+      ],
+    };
+
+    return pick(candidates[variant] || []);
+  }, [downloadLinks]);
+
   const downloadVideo = useCallback(async (jid, variant) => {
     if (!jid || !variant) {
       console.error('[DemoVideo] Invalid download request:', { jid, variant });
-      toast.error('Invalid download request - missing jobId or variant');
+      toast.error('Invalid download request');
       return;
     }
     
     try {
       setIsDownloading(true);
-      
-      // PROOF A: Log download click
-      console.info('[DemoVideo] download-click', { 
-        variant, 
-        jobId: jid,
-        timestamp: new Date().toISOString()
-      });
+      console.info('[DemoVideo] download-click', { variant, jobId: jid, timestamp: new Date().toISOString() });
 
-      // Get the URL from downloadLinks state
-      const urlKey = {
-        '1080p': 'mp4_1080_url',
-        '720p': 'mp4_720_url',
-        '1600x900': 'mp4_shopify_url',
-        'thumbnail': 'thumbnail_url'
-      }[variant];
-
-      const directUrl = downloadLinks?.[urlKey];
+      const filename = getFileName(variant);
+      const directUrl = getDownloadUrl(variant);
       
-      // If URL is external (Shotstack), use top-level navigation for iframe compatibility
-      if (directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://'))) {
-        console.info('[DemoVideo] download-external-url', { variant, url: directUrl });
-        const targetWindow = window.top ?? window;
-        targetWindow.location.href = directUrl;
-        toast.success(`${variant.toUpperCase()} download started!`);
+      // Try direct URL first (Shotstack CDN)
+      if (directUrl) {
+        console.info('[DemoVideo] direct-url', { variant, directUrl });
+        const a = document.createElement('a');
+        a.href = directUrl;
+        a.target = '_top'; // iframe-safe
+        a.rel = 'noopener';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success(`Download started: ${filename}`);
         setIsDownloading(false);
         return;
       }
       
-      // Otherwise use proxy endpoint - MUST use fetch directly for binary data
-      console.info('[DemoVideo] download-via-proxy', { variant, jobId: jid });
-      
-      // Get function URL
-      const functionUrl = `/api/functions/demoVideoProxyDownload`;
-      
-      // Make direct fetch request with binary response type
-      const response = await fetch(functionUrl, {
+      // Fallback: proxy download with validation
+      console.info('[DemoVideo] proxy-download', { variant, jobId: jid });
+      const res = await fetch('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Include auth cookie automatically
-        },
-        credentials: 'include', // Send cookies for auth
-        body: JSON.stringify({
-          jobId: jid,
-          format: variant
-        })
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ jobId: jid, format: variant })
       });
       
-      // PROOF B: Validate response
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
-        console.error('[DemoVideo] Download failed:', response.status, errorData);
-        throw new Error(errorData.error || `Download failed with status ${response.status}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('[DemoVideo] proxy failed', res.status, text.slice(0, 300));
+        throw new Error(
+          text.includes('restricted to workspace members')
+            ? 'Proxy auth error - update demoVideoProxyDownload to authorize Shopify sessions'
+            : `Proxy download failed (${res.status})`
+        );
       }
       
-      // Get binary data as blob
-      const blob = await response.blob();
+      const blob = await res.blob();
+      const contentType = res.headers.get('content-type') || '';
       
-      console.info('[DemoVideo] Received binary data:', {
+      console.info('[DemoVideo] proxy response', {
+        contentType,
         blobSize: blob.size,
-        blobType: blob.type,
-        status: response.status
+        blobType: blob.type
       });
       
-      const url = window.URL.createObjectURL(blob);
-      const filename = getFileName(variant);
+      // Validate we got real media (prevents QuickTime errors)
+      const isMedia = contentType.includes('video') || contentType.includes('image') || 
+                      blob.type.includes('video') || blob.type.includes('image');
+      if (!isMedia) {
+        const text = await blob.text().catch(() => '');
+        console.error('[DemoVideo] non-media blob', { contentType, blobType: blob.type, preview: text.slice(0, 200) });
+        throw new Error(`Server returned non-media content (${contentType || blob.type})`);
+      }
       
-      console.info('[DemoVideo] download-url', { 
-        variant, 
-        url: url.slice(0, 60) + '...',
-        filename,
-        blobSize: blob.size
-      });
+      if (blob.size < 50000 && variant !== 'thumbnail') {
+        throw new Error(`Downloaded file too small (${blob.size} bytes) - likely auth error`);
+      }
       
-      // Create temporary download link
+      // Trigger download
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
       a.style.display = 'none';
       document.body.appendChild(a);
-      
-      // PROOF C: Trigger download
-      console.info('[DemoVideo] Triggering download for:', filename);
       a.click();
       
-      // Cleanup
       setTimeout(() => {
         document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        URL.revokeObjectURL(url);
         console.info('[DemoVideo] ✓ Download complete:', variant);
-        toast.success(`Download started: ${filename}`);
-        setIsDownloading(false);
-      }, 100);
+      }, 500);
+      
+      toast.success(`Download started: ${filename}`);
+      setIsDownloading(false);
       
     } catch (error) {
-      console.error('[DemoVideo] Download error:', {
-        variant,
-        jobId: jid,
-        error: error.message,
-        stack: error.stack
-      });
-      
-      toast.error(`Download failed: ${error.message || 'Unknown error'}`, {
-        description: `Variant: ${variant}, Job: ${jid.slice(0, 8)}...`
-      });
+      console.error('[DemoVideo] Download error:', { variant, jobId: jid, error: error.message });
+      toast.error(error.message || 'Download failed');
       setIsDownloading(false);
     }
-  }, []);
+  }, [downloadLinks, getDownloadUrl]);
 
   const getFileName = (format) => {
     const fileMap = {
