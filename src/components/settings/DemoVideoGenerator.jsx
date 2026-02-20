@@ -182,9 +182,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   const getFileName = (format) => {
     const fileMap = {
-      'mp4_1080': 'ProfitShieldAI-demo-1080p.mp4',
-      'mp4_720': 'ProfitShieldAI-demo-720p.mp4',
-      'mp4_shopify': 'ProfitShieldAI-app-store.mp4',
+      '1080p': 'ProfitShieldAI-demo-1080p.mp4',
+      '720p': 'ProfitShieldAI-demo-720p.mp4',
+      '1600x900': 'ProfitShieldAI-app-store.mp4',
       'thumbnail': 'ProfitShieldAI-thumb.jpg'
     };
     return fileMap[format] || 'demo-video.mp4';
