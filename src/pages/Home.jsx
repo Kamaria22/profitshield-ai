@@ -211,13 +211,13 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-slate-900 mb-3">Welcome to ProfitShield AI</h2>
           <p className="text-slate-500 mb-6">Connect your store to unlock intelligent profit protection</p>
           <Link to={createPageUrl('Onboarding')}>
-            <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg px-8 py-6 text-lg rounded-xl">
+            <Button className="bg-emerald-600 hover:bg-emerald-700 px-8 py-6 text-lg rounded-xl">
               <Store className="w-5 h-5 mr-2" />
               Connect Store
             </Button>
           </Link>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
