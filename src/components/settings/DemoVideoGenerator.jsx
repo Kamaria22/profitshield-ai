@@ -438,30 +438,43 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 ))}
               </div>
 
-              {/* Fallback: Show links if available */}
+              {/* Debug: Show all available outputs */}
               {downloadLinks && Object.keys(downloadLinks).length > 0 && (
                 <div className="pt-3 border-t border-green-200">
-                  <Label className="text-xs text-slate-600">Direct Links</Label>
+                  <Label className="text-xs text-slate-600">Available Formats</Label>
                   <div className="space-y-1 mt-2">
-                    {Object.entries(downloadLinks).map(([key, url]) => (
-                      url && (
+                    {Object.entries(downloadLinks).map(([key, url]) => {
+                      if (!url || typeof url !== 'string') return null;
+                      
+                      // Check if URL is valid
+                      const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
+                      
+                      return (
                         <div key={key} className="flex items-center gap-2 text-xs">
-                          <span className="text-slate-600 capitalize">{key}:</span>
-                          {url.startsWith('http') ? (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-600 hover:underline break-all"
+                          <CheckCircle className="w-3 h-3 text-green-600" />
+                          <span className="text-slate-600 font-medium capitalize">{key.replace(/_url$/, '').replace(/_/g, ' ')}:</span>
+                          {isValidUrl ? (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto py-0 px-1 text-xs text-emerald-600 hover:text-emerald-700 hover:underline"
                             >
-                              {url.substring(0, 50)}...
-                            </a>
+                              <a
+                                href={url}
+                                target="_top"
+                                rel="noopener noreferrer"
+                                className="break-all"
+                              >
+                                Open external link
+                              </a>
+                            </Button>
                           ) : (
-                            <span className="text-slate-600 break-all">{url.substring(0, 50)}...</span>
+                            <span className="text-slate-500 italic">Processing...</span>
                           )}
                         </div>
-                      )
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
