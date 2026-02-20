@@ -211,29 +211,38 @@ async function generateWithShotstack(jobId, apiKey, env, requestId) {
     const { data } = await renderResp.json();
     const renderId = data.id;
     
-    console.log(`[${requestId}] Shotstack render ${renderId} queued, polling...`);
+    console.log(`[${requestId}] Shotstack render ${renderId} queued, polling until done (max 3 min)...`);
 
-    // Poll for completion (max 30s)
+    // Poll for completion (max 3 minutes = 180 iterations)
     let renderUrl = null;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 180; i++) {
       await new Promise(r => setTimeout(r, 1000));
 
       const statusResp = await fetch(`${baseUrl}/render/${renderId}`, {
         headers: { 'x-api-key': apiKey }
       });
 
-      if (!statusResp.ok) continue;
+      if (!statusResp.ok) {
+        console.warn(`[${requestId}] Status check ${i+1} failed`);
+        continue;
+      }
 
       const { data: statusData } = await statusResp.json();
-      if (statusData.status === 'done' && statusData.output?.url) {
-        renderUrl = statusData.output.url;
-        console.log(`[${requestId}] Shotstack render complete: ${renderUrl}`);
+      console.log(`[${requestId}] Poll ${i+1}: status=${statusData.status}`);
+      
+      if (statusData.status === 'done' && statusData.url) {
+        renderUrl = statusData.url;
+        console.log(`[${requestId}] ✓ Shotstack render complete after ${i+1}s: ${renderUrl}`);
         break;
+      }
+
+      if (statusData.status === 'failed') {
+        throw new Error('Shotstack render failed');
       }
     }
 
     if (!renderUrl) {
-      throw new Error('Shotstack render timed out');
+      throw new Error('Shotstack render timed out after 3 minutes');
     }
 
     // Return URLs pointing to the Shotstack output
