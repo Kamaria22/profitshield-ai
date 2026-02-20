@@ -29,11 +29,12 @@ import { toast } from 'sonner';
 const POLLING_INTERVAL = 2000;
 const MAX_POLL_TIME = 180000;
 
+// STANDARDIZED FORMATS - must match backend exactly (no more 1600x900)
 const RENDER_VARIANTS = [
-  { id: '1080p', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials', urlKey: 'mp4_1080_url' },
-  { id: '720p', label: 'HD (1280x720)', description: 'Web, social media', urlKey: 'mp4_720_url' },
-  { id: '1600x900', label: 'Shopify App Store (1600x900)', description: 'App marketplace', urlKey: 'mp4_shopify_url' },
-  { id: 'thumbnail', label: 'Thumbnail (JPEG)', description: 'Preview image', urlKey: 'thumbnail_url' }
+  { id: '1080p', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials' },
+  { id: '720p', label: 'HD (1280x720)', description: 'Web, social media' },
+  { id: 'shopify', label: 'Shopify App Store', description: 'App marketplace preview' },
+  { id: 'thumb', label: 'Thumbnail (JPEG)', description: 'Preview image' }
 ];
 
 export default function DemoVideoGenerator({ resolver = {} }) {
