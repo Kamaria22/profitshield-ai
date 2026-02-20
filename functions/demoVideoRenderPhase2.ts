@@ -212,7 +212,12 @@ async function generateWithShotstack(jobId, apiKey, env, requestId, base44) {
     const { data } = await renderResp.json();
     const renderId = data.id;
     
-    console.log(`[${requestId}] Shotstack render ${renderId} queued, polling until done (max 3 min)...`);
+    console.log(`[${requestId}] Shotstack render ${renderId} queued`);
+    
+    // Save the Shotstack render ID to the job record for tracking
+    await base44.entities.DemoVideoJob.update(jobId, {
+      request_id: renderId
+    });
 
     // Poll for completion (max 3 minutes = 180 iterations)
     let renderUrl = null;
@@ -224,21 +229,33 @@ async function generateWithShotstack(jobId, apiKey, env, requestId, base44) {
       });
 
       if (!statusResp.ok) {
-        console.warn(`[${requestId}] Status check ${i+1} failed`);
+        console.warn(`[${requestId}] Status check ${i+1} failed: ${statusResp.status}`);
         continue;
       }
 
-      const { data: statusData } = await statusResp.json();
-      console.log(`[${requestId}] Poll ${i+1}: status=${statusData.status}`);
+      const statusJson = await statusResp.json();
+      const statusData = statusJson.response || statusJson.data;
       
-      if (statusData.status === 'done' && statusData.url) {
+      console.log(`[${requestId}] Poll ${i+1}: status=${statusData?.status || 'unknown'}`);
+      
+      // Update progress in DB
+      if (statusData?.status === 'rendering' && i % 5 === 0) {
+        const progress = Math.min(10 + ((i / 180) * 80), 90);
+        await base44.entities.DemoVideoJob.update(jobId, { progress });
+      }
+      
+      if (statusData?.status === 'done') {
         renderUrl = statusData.url;
-        console.log(`[${requestId}] ✓ Shotstack render complete after ${i+1}s: ${renderUrl}`);
-        break;
+        if (renderUrl) {
+          console.log(`[${requestId}] ✓ Shotstack render complete after ${i+1}s: ${renderUrl}`);
+          break;
+        } else {
+          console.warn(`[${requestId}] Status=done but no URL, retrying...`);
+        }
       }
 
-      if (statusData.status === 'failed') {
-        throw new Error('Shotstack render failed');
+      if (statusData?.status === 'failed') {
+        throw new Error(`Shotstack render failed: ${statusData.error || 'Unknown error'}`);
       }
     }
 
@@ -247,15 +264,18 @@ async function generateWithShotstack(jobId, apiKey, env, requestId, base44) {
     }
 
     // Return URLs pointing to the Shotstack output
-    return {
+    const outputs = {
       script_url: null,
       demo_data_url: null,
       storyboard_url: null,
       mp4_1080_url: renderUrl,
-      mp4_720_url: renderUrl, // Same source, different format via proxy
+      mp4_720_url: renderUrl,
       mp4_shopify_url: renderUrl,
-      thumbnail_url: null
+      thumbnail_url: renderUrl.replace('.mp4', '_thumb.jpg')
     };
+    
+    console.log(`[${requestId}] ✓ Returning Shotstack outputs:`, outputs);
+    return outputs;
 
   } catch (err) {
     console.error(`[${requestId}] Shotstack error:`, err.message);
