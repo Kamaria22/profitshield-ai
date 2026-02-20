@@ -35,11 +35,36 @@ export async function downloadViaProxy(args) {
     console.info('===== DOWNLOAD PROOF: BLOB =====');
     console.info('Blob size:', bytes, 'bytes');
     console.info('Blob type:', type);
-    console.info('Valid size:', bytes >= 1024);
     console.info('================================');
 
-    if (!bytes || bytes < 1024) {
-      return { ok: false, error: `download blob too small: ${bytes} bytes`, bytes, type };
+    // CRITICAL PROOF CHECK: Must be real video
+    const isVideo = !args.variant.includes('thumb');
+    const minSize = isVideo ? 1_500_000 : 10_000; // 1.5MB for video, 10KB for thumb
+    
+    if (isVideo && !type.includes('video/mp4')) {
+      // Got JSON error instead of video - parse it
+      const errorText = await blob.text();
+      console.error('===== ERROR: Not a video =====');
+      console.error('Content-Type:', type);
+      console.error('Body:', errorText);
+      return { ok: false, error: `Not a video file: ${errorText.slice(0, 200)}` };
+    }
+    
+    if (bytes < minSize) {
+      console.error('===== ERROR: File too small =====');
+      console.error('Got:', bytes, 'bytes, need:', minSize, 'bytes');
+      return { ok: false, error: `File too small: ${bytes} bytes (expected >${minSize})`, bytes, type };
+    }
+    
+    // Verify MP4 signature
+    if (isVideo) {
+      const header = await blob.slice(0, 32).text();
+      if (!header.includes('ftyp')) {
+        console.error('===== ERROR: Invalid MP4 =====');
+        console.error('First 32 bytes:', header);
+        return { ok: false, error: 'Invalid MP4 file (missing ftyp signature)' };
+      }
+      console.info('✓ Valid MP4 signature detected (ftyp)');
     }
 
     const url = URL.createObjectURL(blob);

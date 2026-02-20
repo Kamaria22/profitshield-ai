@@ -23,17 +23,18 @@ Deno.serve(async (req) => {
   
   console.log(`[${requestId}] ===== PROXY DOWNLOAD REQUEST =====`);
   console.log(`[${requestId}] Method:`, req.method);
-  console.log(`[${requestId}] Headers:`, Object.fromEntries(req.headers.entries()));
   
   try {
+    // CRITICAL FIX: Auth by tenant/session, NOT workspace membership
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me().catch(() => null);
     
-    console.log(`[${requestId}] Auth check: user=${user?.email || 'NULL'}`);
+    console.log(`[${requestId}] User auth: ${user?.email || 'NULL'}`);
     
+    // Allow ANY authenticated user (embedded Shopify session counts)
     if (!user) {
-      console.warn(`[${requestId}] ✗ Unauthorized - no user session`);
-      return Response.json({ error: 'unauthorized' }, { status: 401 });
+      console.warn(`[${requestId}] ✗ No user session`);
+      return Response.json({ error: 'unauthorized', note: 'Please login first' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -77,12 +78,12 @@ Deno.serve(async (req) => {
 
     const upstream = await fetch(url, { method: 'GET' });
     
-    console.log(`[${requestId}] Upstream response: status=${upstream.status} ok=${upstream.ok}`);
+    console.log(`[${requestId}] Upstream: status=${upstream.status} ok=${upstream.ok}`);
     
     if (!upstream.ok) {
       const txt = await upstream.text().catch(() => '');
-      console.error(`[${requestId}] ✗ Upstream fetch failed: ${upstream.status}`);
-      console.error(`[${requestId}] Response body:`, txt.slice(0, 500));
+      console.error(`[${requestId}] ✗ Upstream failed: ${upstream.status}`);
+      console.error(`[${requestId}] Body:`, txt.slice(0, 500));
       return Response.json({ 
         error: 'upstream_fetch_failed', 
         status: upstream.status, 
@@ -91,14 +92,47 @@ Deno.serve(async (req) => {
       }, { status: 502 });
     }
 
-    const contentType = upstream.headers.get('content-type') || (format === 'thumbnail' ? 'image/jpeg' : 'video/mp4');
+    const contentType = upstream.headers.get('content-type') || '';
     const buf = new Uint8Array(await upstream.arrayBuffer());
 
-    console.log(`[${requestId}] Upstream content: type=${contentType} bytes=${buf.length}`);
+    console.log(`[${requestId}] Content: type=${contentType} bytes=${buf.length}`);
 
-    if (!buf || buf.length < 1024) {
-      console.error(`[${requestId}] ✗ Upstream returned empty/tiny file: ${buf?.length || 0} bytes`);
-      return Response.json({ error: 'upstream_empty', bytes: buf?.length || 0, requestId }, { status: 502 });
+    // CRITICAL PROOF CHECK: Must be real video/mp4 with minimum size
+    const isVideo = format !== 'thumb';
+    const minSize = isVideo ? 1_500_000 : 10_000; // 1.5MB for video, 10KB for thumb
+    
+    if (isVideo && !contentType.includes('video/mp4')) {
+      console.error(`[${requestId}] ✗ WRONG CONTENT TYPE: ${contentType} (expected video/mp4)`);
+      return Response.json({ 
+        error: 'invalid_content_type', 
+        contentType,
+        expected: 'video/mp4',
+        requestId 
+      }, { status: 422 });
+    }
+    
+    if (buf.length < minSize) {
+      console.error(`[${requestId}] ✗ FILE TOO SMALL: ${buf.length} bytes (min: ${minSize})`);
+      return Response.json({ 
+        error: 'file_too_small', 
+        bytes: buf.length, 
+        minRequired: minSize,
+        requestId 
+      }, { status: 422 });
+    }
+    
+    // Verify MP4 signature (first 4-12 bytes should contain 'ftyp')
+    if (isVideo && buf.length > 12) {
+      const header = new TextDecoder().decode(buf.slice(0, 32));
+      if (!header.includes('ftyp')) {
+        console.error(`[${requestId}] ✗ INVALID MP4: Missing ftyp header`);
+        console.error(`[${requestId}] First 32 bytes:`, header);
+        return Response.json({ 
+          error: 'invalid_mp4_signature', 
+          firstBytes: header,
+          requestId 
+        }, { status: 422 });
+      }
     }
 
     const filename =

@@ -211,7 +211,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           ? 'ProfitShieldAI-demo-1080p.mp4'
           : variantId === '720p'
           ? 'ProfitShieldAI-demo-720p.mp4'
-          : variantId === '1600x900'
+          : variantId === 'shopify'
           ? 'ProfitShieldAI-app-store.mp4'
           : 'ProfitShieldAI-thumb.jpg';
 
