@@ -221,14 +221,8 @@ export default function Home() {
     );
   }
 
-  // PERFORMANCE: Show skeleton while summary loading
-  if (summaryLoading) {
-    return (
-      <div className="h-full -m-4 lg:-m-6">
-        <DashboardSkeleton />
-      </div>
-    );
-  }
+  // Skip skeleton - render immediately with empty state
+  const showDashboard = !summaryLoading || dashboardSummary;
 
   return (
     <SubscriptionGate tenant={tenant}>
