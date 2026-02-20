@@ -577,8 +577,8 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               {/* PROOF: Each button has data-testid, proper onClick, cursor-pointer */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="list">
                 {renderVariants.map(variant => {
-                  // Validate URL exists
-                  const hasUrl = downloadLinks && downloadLinks[variant.id];
+                  // Validate URL exists using urlKey
+                  const hasUrl = downloadLinks && downloadLinks[variant.urlKey];
                   
                   return (
                     <button
@@ -586,7 +586,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                       type="button"
                       onClick={() => downloadVideo(jobId, variant.id)}
                       disabled={isDownloading || !hasUrl}
-                      data-testid={`download-${variant.id.replace('mp4_', '').replace('_', '-')}`}
+                      data-testid={`download-${variant.id}`}
                       aria-label={`Download ${variant.label}`}
                       className={`
                         flex items-center justify-between w-full
