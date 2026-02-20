@@ -200,14 +200,10 @@ export default function Home() {
     );
   }
 
-  // No tenant state
+  // No tenant state - instant
   if (!tenant && !tenantLoading) {
     return (
-      <motion.div 
-        className="flex items-center justify-center min-h-[60vh]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center max-w-md">
           <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
             <Sparkles className="w-10 h-10 text-white" />
