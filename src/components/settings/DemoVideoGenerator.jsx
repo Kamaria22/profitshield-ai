@@ -438,32 +438,28 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 ))}
               </div>
 
-              {/* Debug: Show all available outputs */}
+              {/* Fallback: Show links if available */}
               {downloadLinks && Object.keys(downloadLinks).length > 0 && (
                 <div className="pt-3 border-t border-green-200">
-                  <Label className="text-xs text-slate-600">Available Formats</Label>
+                  <Label className="text-xs text-slate-600">Direct Links</Label>
                   <div className="space-y-1 mt-2">
                     {Object.entries(downloadLinks).map(([key, url]) => {
                       if (!url || typeof url !== 'string') return null;
-                      
-                      // Check if URL is valid
                       const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
-                      
                       return (
                         <div key={key} className="flex items-center gap-2 text-xs">
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                          <span className="text-slate-600 font-medium capitalize">{key.replace(/_url$/, '').replace(/_/g, ' ')}:</span>
+                          <span className="text-slate-600 capitalize">{key.replace(/_url$/, '').replace(/_/g, ' ')}:</span>
                           {isValidUrl ? (
                             <a
                               href={url}
-                              target="_top"
+                              target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs text-emerald-600 hover:text-emerald-700 hover:underline break-all"
+                              className="text-emerald-600 hover:underline break-all"
                             >
-                              Open external link
+                              {url.substring(0, 50)}...
                             </a>
                           ) : (
-                            <span className="text-slate-500 italic">Processing...</span>
+                            <span className="text-slate-600 break-all">{url.substring(0, 50)}...</span>
                           )}
                         </div>
                       );
