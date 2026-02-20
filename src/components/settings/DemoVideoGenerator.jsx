@@ -164,7 +164,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       }
       
       // Fallback: proxy download with validation
-      console.info('[DemoVideo] proxy-download', { variant, jobId: jid });
+      addDebugLog('🔄 Using proxy download', { variant, jobId: jid });
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,12 +172,19 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         body: JSON.stringify({ jobId: jid, format: variant })
       });
       
+      addDebugLog('📡 Proxy response received', { 
+        status: res.status, 
+        ok: res.ok,
+        contentType: res.headers.get('content-type'),
+        contentLength: res.headers.get('content-length')
+      });
+      
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        console.error('[DemoVideo] proxy failed', res.status, text.slice(0, 300));
+        addDebugLog('❌ Proxy failed', { status: res.status, preview: text.slice(0, 300) });
         throw new Error(
           text.includes('restricted to workspace members')
-            ? 'Proxy auth error - update demoVideoProxyDownload to authorize Shopify sessions'
+            ? 'AUTH ERROR: Proxy requires workspace membership. Fix: Update demoVideoProxyDownload to authorize Shopify sessions.'
             : `Proxy download failed (${res.status})`
         );
       }
@@ -185,7 +192,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       const blob = await res.blob();
       const contentType = res.headers.get('content-type') || '';
       
-      console.info('[DemoVideo] proxy response', {
+      addDebugLog('📦 Blob received', {
         contentType,
         blobSize: blob.size,
         blobType: blob.type
@@ -196,12 +203,13 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                       blob.type.includes('video') || blob.type.includes('image');
       if (!isMedia) {
         const text = await blob.text().catch(() => '');
-        console.error('[DemoVideo] non-media blob', { contentType, blobType: blob.type, preview: text.slice(0, 200) });
-        throw new Error(`Server returned non-media content (${contentType || blob.type})`);
+        addDebugLog('❌ Non-media blob', { contentType, blobType: blob.type, preview: text.slice(0, 200) });
+        throw new Error(`INVALID FILE: Server returned non-media content (${contentType || blob.type}). Expected video/mp4 or image/jpeg.`);
       }
       
       if (blob.size < 50000 && variant !== 'thumbnail') {
-        throw new Error(`Downloaded file too small (${blob.size} bytes) - likely auth error`);
+        addDebugLog('❌ File too small', { blobSize: blob.size, variant });
+        throw new Error(`FILE TOO SMALL: ${blob.size} bytes (expected >50KB for video). Likely auth/error response.`);
       }
       
       // Trigger download
