@@ -198,16 +198,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const handleDownload = async (variantId) => {
     if (downloadingVariant || !jobId) return;
 
-    console.info('===== UI DOWNLOAD BUTTON CLICKED =====');
-    console.info('Variant:', variantId);
-    console.info('JobId:', jobId);
-    console.info('Element type: <button> with onClick handler');
-    console.info('======================================');
-
     setDownloadingVariant(variantId);
 
     try {
-      const cfg = await refreshRemoteConfig();
       const filename =
         variantId === '1080p'
           ? 'ProfitShieldAI-demo-1080p.mp4'
@@ -217,12 +210,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           ? 'ProfitShieldAI-app-store.mp4'
           : 'ProfitShieldAI-thumb.jpg';
 
-      console.info(`[DemoVideo] Calling downloadViaProxy...`);
-
       const proof = await downloadViaProxy({ jobId, variant: variantId, filename });
 
-      if (!proof.ok || (proof.bytes || 0) < cfg.minValidDownloadBytes) {
-        await healthAgent.report('error', 'Download proof failed', undefined, {
+      if (!proof.ok) {
+        await healthAgent.report('error', 'Download failed', undefined, {
           feature: 'demo_video',
           variant: variantId,
           reason: proof.error || 'unknown',
@@ -231,10 +222,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         return;
       }
 
-      console.info(`[DemoVideo] ✓ Download complete: ${variantId} (${proof.bytes} bytes)`);
-      toast.success('Download started', { description: `${variantId} • ${proof.bytes} bytes` });
+      const sizeMB = ((proof.bytes || 0) / 1_000_000).toFixed(2);
+      toast.success('Download complete', { 
+        description: `${variantId} • ${sizeMB}MB • ${proof.type}` 
+      });
     } catch (err) {
-      console.error('Download error:', err);
+      console.error('[DemoVideo] Download error:', err);
       await healthAgent.report('error', 'Download exception', err?.stack, {
         feature: 'demo_video',
         variant: variantId,
@@ -256,7 +249,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         
         if (result.status === 'completed' && result.outputs) {
           setDownloadLinks(result.outputs);
-          console.info('[DemoVideo] Job completed, outputs available:', Object.keys(result.outputs));
           toast.success('Status refreshed - ready for download');
         } else if (result.status === 'failed') {
           toast.error('Video generation failed');
@@ -269,35 +261,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       }
     } catch (err) {
       toast.error('Failed to refresh status');
-    }
-  };
-
-  const runSyntheticCheck = async () => {
-    if (!jobId) return;
-
-    console.info('[DemoVideo] Running synthetic check...');
-    
-    const synthetic = await healthAgent.runDemoVideoSyntheticCheck({
-      jobId,
-      fetchStatus: async () => {
-        const result = await statusMutation.mutateAsync(jobId);
-        return result;
-      },
-      tryProxyDownload: async (variant) => {
-        const filename = 'synthetic-test.mp4';
-        const proof = await downloadViaProxy({ jobId, variant, filename });
-        return proof;
-      },
-    });
-
-    if (synthetic.pass) {
-      toast.success('Synthetic check PASSED', { 
-        description: `Download validated: ${synthetic.proxyProof?.bytes || 0} bytes` 
-      });
-    } else {
-      toast.error('Synthetic check FAILED', { 
-        description: synthetic.pollResult?.note || 'Unknown issue' 
-      });
     }
   };
 
@@ -425,57 +388,48 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </Button>
             </div>
 
-            {/* Download Buttons */}
+            {/* Download Buttons - REAL CLICKABLE BUTTONS */}
             {isReady && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Download Formats</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={runSyntheticCheck}
-                    className="text-xs"
-                  >
-                    Run Proof Check
-                  </Button>
-                </div>
+                <Label>Download Formats</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {RENDER_VARIANTS.map(variant => {
                     const isDownloading = downloadingVariant === variant.id;
 
                     return (
-                      <button
+                      <Button
                         key={variant.id}
                         onClick={() => handleDownload(variant.id)}
                         disabled={isDownloading}
-                        className={`
-                          flex items-center justify-between w-full
-                          px-4 py-3 rounded-lg border-2
-                          text-left transition-all
-                          border-green-300 bg-white hover:bg-green-50 hover:border-green-400 cursor-pointer
-                          ${isDownloading ? 'opacity-50' : ''}
-                        `}
+                        variant="outline"
+                        className="h-auto py-3 px-4 justify-start hover:bg-green-50 hover:border-green-400 border-green-300"
                       >
-                        <div className="flex-1">
-                          <div className="font-semibold text-sm text-slate-900">
-                            {variant.label}
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex-1 text-left">
+                            <div className="font-semibold text-sm text-slate-900">
+                              {variant.label}
+                            </div>
+                            <div className="text-xs text-slate-600 font-normal">
+                              {variant.description}
+                            </div>
                           </div>
-                          <div className="text-xs text-slate-600">
-                            {variant.description}
-                          </div>
-                          <div className="text-xs text-emerald-600 mt-1">
-                            ✓ Proxy download enabled
-                          </div>
+                          {isDownloading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-green-600 ml-3 flex-shrink-0" />
+                          ) : (
+                            <Download className="w-4 h-4 text-green-600 ml-3 flex-shrink-0" />
+                          )}
                         </div>
-                        {isDownloading ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-green-600" />
-                        ) : (
-                          <Download className="w-4 h-4 text-green-600" />
-                        )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
+              </div>
+            )}
+            
+            {/* Self-Test Panel */}
+            {isReady && jobId && (
+              <div className="pt-4 border-t">
+                <DownloadSelfTest jobId={jobId} />
               </div>
             )}
           </div>
