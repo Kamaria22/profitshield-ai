@@ -627,6 +627,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         )}
       </CardContent>
     </Card>
-    </div>
+  </div>
   );
 }
