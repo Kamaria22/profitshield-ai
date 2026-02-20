@@ -358,6 +358,32 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   const isReady = jobStatus === 'completed' && downloadLinks && Object.keys(downloadLinks).length > 0;
 
+  // PHASE 4: Load recent job on mount (if any)
+  useEffect(() => {
+    if (!loadedFromCache && !jobId) {
+      console.log('[DemoVideo] Loading recent job from cache...');
+      base44.functions.invoke('demoVideoLoadRecent', {})
+        .then(({ data }) => {
+          if (data.ok && data.job) {
+            console.log('[DemoVideo] ✓ Loaded cached job:', data.job.id, 'status:', data.job.status);
+            setJobId(data.job.id);
+            setJobStatus(data.job.status);
+            if (data.job.outputs) {
+              setDownloadLinks(data.job.outputs);
+            }
+            if (data.job.status === 'rendering' || data.job.status === 'queued') {
+              setIsPolling(true);
+            }
+          }
+          setLoadedFromCache(true);
+        })
+        .catch(err => {
+          console.warn('[DemoVideo] Failed to load cached job:', err.message);
+          setLoadedFromCache(true);
+        });
+    }
+  }, [loadedFromCache, jobId]);
+
   return (
     <div className="space-y-6">
       {/* Main Generation Card */}
