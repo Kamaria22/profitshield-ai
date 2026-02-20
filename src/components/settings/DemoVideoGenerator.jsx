@@ -175,7 +175,17 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   // Download handler - Shopify iframe safe, QuickTime compatible, timeout-protected
   const downloadVariant = async (format) => {
-    if (downloadingVariant || !jobId) return;
+    if (downloadingVariant) return;
+    
+    if (!jobId) {
+      toast.error('No video generated', { description: 'Click "Generate Demo Video" first.' });
+      return;
+    }
+    
+    if (jobStatus !== 'completed') {
+      toast.error('Video not ready', { description: `Current status: ${jobStatus || 'unknown'}` });
+      return;
+    }
     
     console.info('[DV] click', { jobId, format });
     setDownloadingVariant(format);
