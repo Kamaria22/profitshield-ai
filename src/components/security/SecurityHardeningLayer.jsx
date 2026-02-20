@@ -104,25 +104,12 @@ export default function SecurityHardeningLayer({ children }) {
       // Prevent dev tools shortcuts
       document.addEventListener('keydown', preventDevTools);
 
-      // Detect dev tools opening (basic)
-      const devtoolsCheck = setInterval(() => {
-        const widthThreshold = window.outerWidth - window.innerWidth > 160;
-        const heightThreshold = window.outerHeight - window.innerHeight > 160;
-        
-        if (widthThreshold || heightThreshold) {
-          console.clear();
-          console.log('%c⚠️ Developer Tools Detected', 'color: #dc2626; font-size: 20px; font-weight: bold;');
-          console.log('%cThis application is protected by copyright and trade secret laws.', 'color: #64748b;');
-        }
-      }, 1000);
 
-      return () => {
-        document.removeEventListener('contextmenu', preventRightClick);
-        document.removeEventListener('keydown', preventDevTools);
-        clearInterval(devtoolsCheck);
-      };
-    }
-  }, []);
+// DevTools detection disabled during development/debugging
+return () => {
+  document.removeEventListener('contextmenu', preventRightClick);
+  document.removeEventListener('keydown', preventDevTools);
+};
 
   return (
     <>
