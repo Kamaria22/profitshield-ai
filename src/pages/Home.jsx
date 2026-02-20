@@ -256,27 +256,27 @@ export default function Home() {
 
         {/* Main Grid */}
         <div className="flex-1 p-4 lg:p-6 overflow-auto">
-          {/* Dashboard Customization Header */}
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-              <p className="text-sm text-slate-500">Monitor your business performance at a glance</p>
+              <p className="text-sm text-slate-500">Monitor your business performance</p>
             </div>
-            <Suspense fallback={null}>
-              <DashboardCustomizer userId={resolver?.user?.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
-            </Suspense>
+            {resolver?.user?.id && (
+              <Suspense fallback={null}>
+                <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
+              </Suspense>
+            )}
           </div>
 
           <div className="flex gap-6 h-full">
-            {/* Main Panels Grid */}
             <div className="flex-1 min-w-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr" style={{ gridTemplateRows: 'repeat(4, minmax(200px, 220px))' }}>
-                {/* Row 1 - CRITICAL: Above-the-fold hero panel + lazy panels */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Critical render - no suspense */}
                 <ProfitHealthPanel metrics={metrics} loading={false} />
-                <Suspense fallback={<PanelSkeleton />}>
+                <Suspense fallback={<div className="h-48 bg-slate-50 rounded-lg animate-pulse" />}>
                   <RiskCommandPanel metrics={metrics} loading={false} />
                 </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                <Suspense fallback={<div className="h-48 bg-slate-50 rounded-lg animate-pulse" />}>
                   <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
                 </Suspense>
                 
