@@ -40,7 +40,16 @@ Deno.serve(async (req) => {
     const outputs = job.outputs || {};
     const hasUrls = !!(outputs.mp4_1080_url || outputs.mp4_720_url);
     
-    console.log(`[${requestId}] Job ${jobId} status=${job.status} hasUrls=${hasUrls}`);
+    // PROOF: Log exact DB state
+    console.log(`[${requestId}] ===== DB RECORD PROOF =====`);
+    console.log(`[${requestId}] Job ${jobId} status=${job.status}`);
+    console.log(`[${requestId}] outputs object keys:`, Object.keys(outputs));
+    console.log(`[${requestId}] mp4_1080_url:`, outputs.mp4_1080_url || 'NULL');
+    console.log(`[${requestId}] mp4_720_url:`, outputs.mp4_720_url || 'NULL');
+    console.log(`[${requestId}] mp4_shopify_url:`, outputs.mp4_shopify_url || 'NULL');
+    console.log(`[${requestId}] thumbnail_url:`, outputs.thumbnail_url || 'NULL');
+    console.log(`[${requestId}] Full outputs object:`, JSON.stringify(outputs, null, 2));
+    console.log(`[${requestId}] ===========================`);
 
     // If job stuck in "rendering" for > 2 min, mark as timed out
     if (job.status === 'rendering' && job.created_date) {
@@ -65,7 +74,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({
+    const response = {
       ok: true,
       jobId: job.id,
       status: job.status,
@@ -75,7 +84,14 @@ Deno.serve(async (req) => {
       outputs: outputs,
       errorMessage: job.error_message,
       createdAt: job.created_date
-    }, { status: 200 });
+    };
+
+    // PROOF: Log exact response being sent to UI
+    console.log(`[${requestId}] ===== RESPONSE PROOF =====`);
+    console.log(`[${requestId}] Returning to UI:`, JSON.stringify(response, null, 2));
+    console.log(`[${requestId}] ===========================`);
+
+    return Response.json(response, { status: 200 });
 
   } catch (error) {
     console.error(`[${requestId}] Status check error:`, error.message);

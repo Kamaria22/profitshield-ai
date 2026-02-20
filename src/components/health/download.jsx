@@ -1,4 +1,10 @@
 export async function downloadViaProxy(args) {
+  console.info('===== DOWNLOAD PROOF: REQUEST =====');
+  console.info('Request URL: /api/functions/demoVideoProxyDownload');
+  console.info('Method: POST');
+  console.info('Credentials: include');
+  console.info('Body:', JSON.stringify({ jobId: args.jobId, format: args.variant }));
+  
   try {
     const res = await fetch('/api/functions/demoVideoProxyDownload', {
       method: 'POST',
@@ -7,14 +13,30 @@ export async function downloadViaProxy(args) {
       body: JSON.stringify({ jobId: args.jobId, format: args.variant }),
     });
 
+    console.info('===== DOWNLOAD PROOF: RESPONSE =====');
+    console.info('Status:', res.status, res.statusText);
+    console.info('OK:', res.ok);
+    console.info('Content-Type:', res.headers.get('content-type'));
+    console.info('Content-Length:', res.headers.get('content-length'));
+    console.info('Content-Disposition:', res.headers.get('content-disposition'));
+
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
+      console.error('===== DOWNLOAD PROOF: ERROR BODY =====');
+      console.error('Response body:', txt);
+      console.error('======================================');
       return { ok: false, error: `proxyDownload failed: ${res.status} ${txt}` };
     }
 
     const blob = await res.blob();
     const bytes = blob.size;
     const type = blob.type || res.headers.get('content-type') || '';
+
+    console.info('===== DOWNLOAD PROOF: BLOB =====');
+    console.info('Blob size:', bytes, 'bytes');
+    console.info('Blob type:', type);
+    console.info('Valid size:', bytes >= 1024);
+    console.info('================================');
 
     if (!bytes || bytes < 1024) {
       return { ok: false, error: `download blob too small: ${bytes} bytes`, bytes, type };
@@ -29,6 +51,11 @@ export async function downloadViaProxy(args) {
     document.body.appendChild(a);
     a.click();
 
+    console.info('===== DOWNLOAD PROOF: SUCCESS =====');
+    console.info('File triggered for download:', args.filename);
+    console.info('Size:', bytes, 'bytes');
+    console.info('====================================');
+
     setTimeout(() => {
       try {
         document.body.removeChild(a);
@@ -38,6 +65,10 @@ export async function downloadViaProxy(args) {
 
     return { ok: true, bytes, type };
   } catch (e) {
+    console.error('===== DOWNLOAD PROOF: EXCEPTION =====');
+    console.error('Error:', e?.message || String(e));
+    console.error('Stack:', e?.stack);
+    console.error('=====================================');
     return { ok: false, error: e?.message || String(e) };
   }
 }

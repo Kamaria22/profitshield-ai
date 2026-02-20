@@ -196,6 +196,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const handleDownload = async (variantId) => {
     if (downloadingVariant || !jobId) return;
 
+    console.info('===== UI DOWNLOAD BUTTON CLICKED =====');
+    console.info('Variant:', variantId);
+    console.info('JobId:', jobId);
+    console.info('Element type: <button> with onClick handler');
+    console.info('======================================');
+
     setDownloadingVariant(variantId);
 
     try {
@@ -209,7 +215,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           ? 'ProfitShieldAI-app-store.mp4'
           : 'ProfitShieldAI-thumb.jpg';
 
-      console.info(`[DemoVideo] Download started: ${variantId}`);
+      console.info(`[DemoVideo] Calling downloadViaProxy...`);
 
       const proof = await downloadViaProxy({ jobId, variant: variantId, filename });
 
@@ -223,7 +229,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         return;
       }
 
-      console.info(`[DemoVideo] Download success: ${variantId} (${proof.bytes} bytes)`);
+      console.info(`[DemoVideo] ✓ Download complete: ${variantId} (${proof.bytes} bytes)`);
       toast.success('Download started', { description: `${variantId} • ${proof.bytes} bytes` });
     } catch (err) {
       console.error('Download error:', err);
