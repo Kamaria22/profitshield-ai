@@ -430,7 +430,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     }
   };
 
-  // Self-test function
+  // Self-test function with detailed proof output
   const runSelfTest = async () => {
     if (!jobId) return;
     
@@ -438,13 +438,20 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     setTestResults({ running: true, tests: [] });
     
     const embedded = isEmbedded();
-    const token = embedded ? await getShopifySessionToken({ timeoutMs: 5000 }) : null;
+    let token = null;
+    let tokenRetrievalFailed = false;
     
-    if (embedded && !token) {
-      toast.error('No Shopify session token available for test');
-      setTestResults({ running: false, tests: [] });
-      return;
+    // Try to get token (non-blocking failure)
+    if (embedded) {
+      try {
+        token = await getShopifySessionToken({ timeoutMs: 3000 });
+      } catch (e) {
+        console.warn('[DV-TEST] Token retrieval failed:', e.message);
+        tokenRetrievalFailed = true;
+      }
     }
+    
+    console.info('[DV-TEST] Environment:', { embedded, tokenLen: token?.length || 0, tokenRetrievalFailed });
     
     const results = [];
     
@@ -453,7 +460,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       
       try {
         const headers = { 'Content-Type': 'application/json' };
-        if (embedded) {
+        if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
         
@@ -466,30 +473,40 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
         const status = res.status;
         const contentType = res.headers.get('content-type');
-        const contentLength = res.headers.get('content-length');
-        
         const blob = res.ok ? await res.blob() : null;
+        const blobSize = blob?.size || 0;
         
-        const pass = res.ok && blob && blob.size > 10000;
+        // Pass criteria: 200 OK + proper content-type + min size
+        const minSize = variant.id === 'thumb' ? 5_000 : 200_000;
+        const pass = res.ok && blob && blobSize > minSize && 
+                     (variant.id === 'thumb' ? contentType?.includes('image') : contentType?.includes('video'));
         
         results.push({
           variant: variant.id,
           pass,
           status,
           contentType,
-          contentLength: blob ? blob.size : parseInt(contentLength || '0'),
-          error: res.ok ? null : await res.text()
+          blobSize,
+          minSize,
+          error: res.ok ? null : await res.text().catch(() => '(failed to read)')
         });
         
-        console.info(`[DV-TEST] ${variant.id}: ${pass ? '✓ PASS' : '✗ FAIL'}`);
+        console.info(`[DV-TEST] ${variant.id}:`, {
+          status,
+          pass,
+          contentType,
+          blobSize,
+          expected: `${minSize}+ bytes`
+        });
         
       } catch (err) {
         results.push({
           variant: variant.id,
           pass: false,
+          status: 'ERROR',
           error: err.message
         });
-        console.error(`[DV-TEST] ${variant.id}: ✗ FAIL -`, err.message);
+        console.error(`[DV-TEST] ${variant.id}: ERROR -`, err.message);
       }
     }
     
@@ -499,9 +516,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     console.info(`[DV-TEST] ===== RESULT: ${allPass ? 'ALL PASS ✓' : 'SOME FAILED ✗'} =====`);
     
     if (allPass) {
-      toast.success('All tests passed ✓');
+      toast.success('All tests passed ✓', { 
+        description: 'Download works in all formats' 
+      });
     } else {
-      toast.error('Some tests failed - check console');
+      const failCount = results.filter(r => !r.pass).length;
+      toast.error(`${failCount} test(s) failed`, { 
+        description: 'Check browser console for details' 
+      });
     }
   };
 
