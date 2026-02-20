@@ -332,15 +332,17 @@ export default function Home() {
               )}
             </div>
 
-            {/* Side Rail - CEO Insights + Custom Alerts (Desktop Only) */}
+            {/* Side Rail - Lazy loaded */}
             <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
               <div className="sticky top-0 space-y-4">
-                <Suspense fallback={<PanelSkeleton />}>
+                <LazyPanel>
                   <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CustomAlerts tenantId={authTenantId} userId={resolver?.user?.id} />
-                </Suspense>
+                </LazyPanel>
+                {resolver?.user?.id && (
+                  <LazyPanel>
+                    <CustomAlerts tenantId={authTenantId} userId={resolver.user.id} />
+                  </LazyPanel>
+                )}
               </div>
             </div>
           </div>
