@@ -157,6 +157,21 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
+  // Get Shopify session token (for embedded iframe auth)
+  const getShopifySessionToken = async () => {
+    try {
+      // Check if we're in Shopify embedded context
+      if (!window.shopify?.idToken) return null;
+      
+      // Get fresh session token from App Bridge
+      const token = await window.shopify.idToken();
+      return token;
+    } catch (e) {
+      console.warn('[DV] Could not get Shopify session token:', e.message);
+      return null;
+    }
+  };
+
   // Download handler - Shopify iframe safe, QuickTime compatible
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
@@ -165,9 +180,21 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     setDownloadingVariant(format);
 
     try {
+      // Get Shopify session token for embedded iframe auth
+      const sessionToken = await getShopifySessionToken();
+      
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+        console.info('[DV] Using Shopify session token for auth');
+      }
+      
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({ jobId, format })
       });

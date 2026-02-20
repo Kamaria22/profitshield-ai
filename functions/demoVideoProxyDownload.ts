@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import * as jose from 'npm:jose@5.2.0';
 
 Deno.serve(async (req) => {
   const requestId = `proxy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -7,17 +8,42 @@ Deno.serve(async (req) => {
     console.log(`[DV-SERVER][${requestId}] ===== PROXY DOWNLOAD REQUEST =====`);
     
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me().catch(() => null);
     
-    console.log(`[DV-SERVER][${requestId}] Auth check: user=${user ? user.email : 'NULL'}`);
+    // Try Base44 session first (works outside iframe)
+    let user = await base44.auth.me().catch(() => null);
+    let shopDomain = null;
+    let authMethod = null;
     
-    // Auth: allow ANY authenticated user (embedded Shopify session counts)
-    if (!user) {
-      console.log(`[DV-SERVER][${requestId}] ❌ AUTH FAIL - no user`);
+    if (user) {
+      authMethod = 'base44_session';
+      console.log(`[DV-SERVER][${requestId}] Auth via Base44 session: ${user.email}`);
+    } else {
+      // Fallback: Shopify App Bridge session token (works in embedded iframe)
+      const authHeader = req.headers.get('authorization') || '';
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      
+      if (token) {
+        try {
+          // Verify Shopify session token (JWT)
+          const secret = new TextEncoder().encode(Deno.env.get('SHOPIFY_API_SECRET'));
+          const { payload } = await jose.jwtVerify(token, secret);
+          
+          shopDomain = payload.dest?.replace(/^https?:\/\//, '') || payload.iss?.replace(/^https?:\/\//, '');
+          authMethod = 'shopify_session_token';
+          
+          console.log(`[DV-SERVER][${requestId}] Auth via Shopify token: shop=${shopDomain}`);
+        } catch (e) {
+          console.log(`[DV-SERVER][${requestId}] Token verification failed:`, e.message);
+        }
+      }
+    }
+    
+    if (!user && !shopDomain) {
+      console.log(`[DV-SERVER][${requestId}] ❌ AUTH FAIL - no session or valid token`);
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    console.log(`[DV-SERVER][${requestId}] ✓ AUTH OK - ${user.email}`);
+    console.log(`[DV-SERVER][${requestId}] ✓ AUTH OK via ${authMethod}`);
 
     const { jobId, format } = await req.json();
     
@@ -37,6 +63,15 @@ Deno.serve(async (req) => {
     if (!job || !job.outputs) {
       console.log(`[DV-SERVER][${requestId}] ❌ Job not found or no outputs`);
       return Response.json({ error: 'Job not found or outputs missing' }, { status: 404 });
+    }
+    
+    // If authenticated via Shopify token, verify job belongs to this shop
+    if (shopDomain && job.tenant_id) {
+      const tenant = await base44.asServiceRole.entities.Tenant.get(job.tenant_id);
+      if (tenant?.shop_domain !== shopDomain) {
+        console.log(`[DV-SERVER][${requestId}] ❌ Tenant mismatch: job.tenant=${tenant?.shop_domain}, token.shop=${shopDomain}`);
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     // Map format to URL key
