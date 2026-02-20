@@ -280,38 +280,34 @@ export default function Home() {
                   <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
                 </Suspense>
                 
-                {/* Row 2 - Lazy loaded */}
-                <Suspense fallback={<PanelSkeleton />}>
+                {/* Lazy panels */}
+                <LazyPanel>
                   <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <CashflowPanel metrics={metrics} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <SecurityPanel loading={false} />
-                </Suspense>
-                
-                {/* Row 3 - Lazy loaded */}
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <IntegrationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                
-                {/* Row 4 - Lazy loaded */}
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
+                </LazyPanel>
+                <LazyPanel>
                   <CustomizeLayoutPanel loading={false} />
-                </Suspense>
+                </LazyPanel>
               </div>
 
               {/* Connect Store CTA for Demo Mode */}
