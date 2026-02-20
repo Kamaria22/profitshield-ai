@@ -47,6 +47,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [downloadingVariant, setDownloadingVariant] = useState(null);
+  const [testResults, setTestResults] = useState(null);
   
   const pollIntervalRef = useRef(null);
   const pollStartRef = useRef(null);
@@ -160,9 +161,16 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
     
+    console.info(`[DV] ===== DOWNLOAD CLICK =====`);
+    console.info(`[DV] Format: ${format}`);
+    console.info(`[DV] JobId: ${jobId}`);
+    console.info(`[DV] Button handler fired ✓`);
+    
     setDownloadingVariant(format);
 
     try {
+      console.info(`[DV] Sending POST to /api/functions/demoVideoProxyDownload`);
+      
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -170,12 +178,25 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         body: JSON.stringify({ jobId, format })
       });
 
+      console.info(`[DV] Response status: ${res.status} ${res.statusText}`);
+      console.info(`[DV] Response Content-Type: ${res.headers.get('content-type')}`);
+      console.info(`[DV] Response Content-Length: ${res.headers.get('content-length')}`);
+
       if (!res.ok) {
         const errorText = await res.text();
+        console.error(`[DV] ❌ Response error:`, errorText);
         throw new Error(errorText || `HTTP ${res.status}`);
       }
 
       const blob = await res.blob();
+      console.info(`[DV] Blob size: ${blob.size} bytes`);
+      console.info(`[DV] Blob type: ${blob.type}`);
+      
+      // Validate blob
+      if (blob.size < 10000) {
+        throw new Error(`File too small: ${blob.size} bytes`);
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -187,13 +208,19 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       document.body.appendChild(a);
       a.click();
       
+      console.info(`[DV] ✓ Download triggered: ${a.download}`);
+      
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
 
-      toast.success(`Downloaded ${format}`);
+      const sizeMB = (blob.size / 1_000_000).toFixed(2);
+      toast.success(`Downloaded ${format}`, { description: `${sizeMB}MB • ${blob.type}` });
+      
+      console.info(`[DV] ===========================`);
     } catch (err) {
+      console.error(`[DV] ❌ Download failed:`, err.message);
       toast.error('Download failed: ' + err.message);
     } finally {
       setDownloadingVariant(null);
@@ -233,6 +260,67 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       }
     } catch (err) {
       toast.error('Failed to refresh status');
+    }
+  };
+
+  // Self-test function
+  const runSelfTest = async () => {
+    if (!jobId) return;
+    
+    console.info('[DV-TEST] ===== SELF TEST START =====');
+    setTestResults({ running: true, tests: [] });
+    
+    const results = [];
+    
+    for (const variant of VARIANTS) {
+      console.info(`[DV-TEST] Testing ${variant.id}...`);
+      
+      try {
+        const res = await fetch('/api/functions/demoVideoProxyDownload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ jobId, format: variant.id })
+        });
+
+        const status = res.status;
+        const contentType = res.headers.get('content-type');
+        const contentLength = res.headers.get('content-length');
+        
+        const blob = res.ok ? await res.blob() : null;
+        
+        const pass = res.ok && blob && blob.size > 10000;
+        
+        results.push({
+          variant: variant.id,
+          pass,
+          status,
+          contentType,
+          contentLength: blob ? blob.size : parseInt(contentLength || '0'),
+          error: res.ok ? null : await res.text()
+        });
+        
+        console.info(`[DV-TEST] ${variant.id}: ${pass ? '✓ PASS' : '✗ FAIL'}`);
+        
+      } catch (err) {
+        results.push({
+          variant: variant.id,
+          pass: false,
+          error: err.message
+        });
+        console.error(`[DV-TEST] ${variant.id}: ✗ FAIL -`, err.message);
+      }
+    }
+    
+    setTestResults({ running: false, tests: results });
+    
+    const allPass = results.every(r => r.pass);
+    console.info(`[DV-TEST] ===== RESULT: ${allPass ? 'ALL PASS ✓' : 'SOME FAILED ✗'} =====`);
+    
+    if (allPass) {
+      toast.success('All tests passed ✓');
+    } else {
+      toast.error('Some tests failed - check console');
     }
   };
 
@@ -351,7 +439,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </Button>
             </div>
 
-            {/* Download Buttons */}
+            {/* Download Buttons - REAL CLICKABLE */}
             {isReady && (
               <div className="space-y-3">
                 <Label>Download Formats</Label>
@@ -363,10 +451,13 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                       <Button
                         key={variant.id}
                         type="button"
-                        onClick={() => downloadVariant(variant.id)}
+                        onClick={() => {
+                          console.info(`[DV-UI] Button clicked: ${variant.id}`);
+                          downloadVariant(variant.id);
+                        }}
                         disabled={isDownloading}
                         variant="outline"
-                        className="h-auto py-3 px-4 justify-start"
+                        className="h-auto py-3 px-4 justify-start cursor-pointer hover:bg-green-50 hover:border-green-400"
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex-1 text-left">
@@ -378,15 +469,46 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                             </div>
                           </div>
                           {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin ml-3" />
+                            <Loader2 className="w-4 h-4 animate-spin ml-3 text-green-600" />
                           ) : (
-                            <Download className="w-4 h-4 ml-3" />
+                            <Download className="w-4 h-4 ml-3 text-green-600" />
                           )}
                         </div>
                       </Button>
                     );
                   })}
                 </div>
+              </div>
+            )}
+            
+            {/* Self-Test Panel */}
+            {isReady && (
+              <div className="pt-4 border-t space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runSelfTest()}
+                  disabled={downloadingVariant || testResults?.running}
+                >
+                  {testResults?.running ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin mr-2" />
+                      Running Test...
+                    </>
+                  ) : (
+                    'Run Download Test'
+                  )}
+                </Button>
+                
+                {testResults && !testResults.running && (
+                  <div className="text-xs space-y-1 bg-slate-50 p-3 rounded">
+                    {testResults.tests.map((t, i) => (
+                      <div key={i} className={t.pass ? 'text-green-700' : 'text-red-700'}>
+                        {t.pass ? '✓' : '✗'} {t.variant}: {t.pass ? `${(t.contentLength / 1_000_000).toFixed(2)}MB` : t.error}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
