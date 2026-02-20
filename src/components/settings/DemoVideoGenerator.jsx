@@ -448,32 +448,12 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 ))}
               </div>
 
-              {/* Fallback: Alternative download links */}
-              {downloadLinks && Object.keys(downloadLinks).length > 0 && (
-                <div className="pt-3 border-t border-green-200">
-                  <Label className="text-xs text-slate-600">Alternative Download Methods</Label>
-                  <div className="space-y-1 mt-2">
-                    {renderVariants.map(variant => {
-                      const url = downloadLinks[variant.id];
-                      if (!url) return null;
-                      const baseUrl = window.location.origin;
-                      const proxyUrl = `${baseUrl}/api/functions/demoVideoProxyDownload?jobId=${encodeURIComponent(jobId)}&format=${encodeURIComponent(variant.id)}`;
-                      return (
-                        <div key={variant.id} className="flex items-center gap-2 text-xs">
-                          <span className="text-slate-600">{variant.label}:</span>
-                          <a
-                            href={proxyUrl}
-                            target="_top"
-                            className="text-emerald-600 hover:underline"
-                          >
-                            Open in new tab
-                          </a>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Tip: Download location */}
+              <div className="pt-3 border-t border-green-200">
+                <p className="text-xs text-slate-600">
+                  Files are downloaded directly to your device. Check your browser's downloads folder.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
