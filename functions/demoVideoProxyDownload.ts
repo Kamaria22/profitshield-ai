@@ -79,15 +79,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid video format' }, { status: 400 });
     }
 
-    // Stream video with proper headers for universal playback
+    // Stream video with proper headers for universal playback + QuickTime compatibility
+    const filename = getFileName(format);
     return new Response(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'video/mp4',
         'Content-Length': buffer.byteLength.toString(),
-        'Content-Disposition': `attachment; filename="demo-video-${jobId}.mp4"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=31536000',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'X-Content-Type-Options': 'nosniff'
       }
     });
   } catch (error) {
