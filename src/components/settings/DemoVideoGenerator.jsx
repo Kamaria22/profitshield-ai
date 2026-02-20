@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
+import { getShopifySessionToken, isEmbedded } from '@/components/utils/shopifyAuth';
 import { 
   Download, 
   Loader2,
@@ -157,34 +158,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
-  // Get Shopify session token (for embedded iframe auth)
-  const getShopifySessionToken = async () => {
-    const embedded = window.top !== window.self;
-    console.log('[DLTEST] embedded=', embedded);
-    
-    try {
-      // Check if we're in Shopify embedded context
-      if (window.shopify?.idToken) {
-        const token = await window.shopify.idToken();
-        console.log('[DLTEST] Got token from window.shopify.idToken, length=', token?.length || 0);
-        return token;
-      }
-      
-      // Try window.shopify.sessionToken (alternative API)
-      if (window.shopify?.sessionToken) {
-        const token = await window.shopify.sessionToken.get();
-        console.log('[DLTEST] Got token from window.shopify.sessionToken, length=', token?.length || 0);
-        return token;
-      }
-      
-      console.warn('[DLTEST] No Shopify App Bridge token API available');
-      return null;
-    } catch (e) {
-      console.error('[DLTEST] Failed to get Shopify session token:', e);
-      return null;
-    }
-  };
-
   // Download handler - Shopify iframe safe, QuickTime compatible
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
@@ -195,7 +168,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     try {
       // Get Shopify session token for embedded iframe auth
       const sessionToken = await getShopifySessionToken();
+      const embedded = isEmbedded();
       
+      console.log('[DLTEST] embedded=', embedded);
       console.log('[DLTEST] authHeaderPresent=', !!sessionToken);
       console.log('[DLTEST] tokenLength=', sessionToken?.length || 0);
       
@@ -205,8 +180,11 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
-      } else {
-        console.warn('[DLTEST] ⚠️ No session token available - download may fail');
+      } else if (embedded) {
+        // In embedded context but no token - fail fast with clear message
+        toast.error('Authentication unavailable in embedded mode. Please reload the app.');
+        setDownloadingVariant(null);
+        return;
       }
       
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
