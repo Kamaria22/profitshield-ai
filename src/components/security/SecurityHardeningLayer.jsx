@@ -46,18 +46,7 @@ function verifyIntegrity() {
 }
 
 function injectCopyrightNotice() {
-  // Add copyright to console - only once on first load
-  if (typeof console !== 'undefined' && !window.__profitshield_logged) {
-    window.__profitshield_logged = true;
-    const style = 'color: #10b981; font-size: 16px; font-weight: bold;';
-    const style2 = 'color: #64748b; font-size: 12px;';
-    
-    console.log('%c⚡ ProfitShield AI', style);
-    console.log('%c' + PROFITSHIELD_SIGNATURE.copyright, style2);
-    console.log('%c' + PROFITSHIELD_SIGNATURE.license, style2);
-    console.log('%cUnauthorized access or reverse engineering is strictly prohibited and may result in legal action.', 'color: #dc2626; font-weight: bold;');
-  }
-}
+ if (typeof console !== 'undefined' && !window.__profitshield_logged)
 
 function preventRightClick(e) {
   e.preventDefault();
@@ -84,39 +73,51 @@ export default function SecurityHardeningLayer({ children }) {
       console.error('Security integrity check failed');
     }
 
-    // Inject copyright notice
+    // Inject copyright notice (safe window guard is inside injectCopyrightNotice)
     injectCopyrightNotice();
 
-    // Add ownership watermark to DOM
-    const watermark = document.createElement('meta');
-    watermark.name = 'copyright';
-    watermark.content = PROFITSHIELD_SIGNATURE.copyright;
-    document.head.appendChild(watermark);
+    // Add ownership watermark to DOM (avoid duplicates)
+    const upsertMeta = (name, content) => {
+      let el = document.querySelector(`meta[name="${name}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.name = name;
+        document.head.appendChild(el);
+      }
+      el.content = content;
+      return el;
+    };
 
-    const owner = document.createElement('meta');
-    owner.name = 'author';
-    owner.content = PROFITSHIELD_SIGNATURE.owner;
-    document.head.appendChild(owner);
+    const watermark = upsertMeta('copyright', PROFITSHIELD_SIGNATURE.copyright);
+    const owner = upsertMeta('author', PROFITSHIELD_SIGNATURE.owner);
 
     // Production hardening (disabled in development)
     if (import.meta.env.PROD) {
-      // Prevent right-click
       document.addEventListener('contextmenu', preventRightClick);
-      
-      // Prevent dev tools shortcuts
       document.addEventListener('keydown', preventDevTools);
+    }
 
-      return () => {
+    // Cleanup ALWAYS runs (dev + prod)
+    return () => {
+      if (import.meta.env.PROD) {
         document.removeEventListener('contextmenu', preventRightClick);
         document.removeEventListener('keydown', preventDevTools);
-      };
-    }
+      }
+
+      // Remove the meta tags we touched (optional)
+      watermark?.remove?.();
+      owner?.remove?.();
+    };
   }, []);
 
   return (
     <>
       {/* Hidden ownership verification markers */}
-      <div style={{ display: 'none' }} data-owner={PROFITSHIELD_SIGNATURE.owner} data-signature={PROFITSHIELD_SIGNATURE.build_signature}>
+      <div
+        style={{ display: 'none' }}
+        data-owner={PROFITSHIELD_SIGNATURE.owner}
+        data-signature={PROFITSHIELD_SIGNATURE.build_signature}
+      >
         {PROFITSHIELD_SIGNATURE.copyright}
       </div>
       {children}
