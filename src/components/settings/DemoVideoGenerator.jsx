@@ -64,37 +64,42 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // Download video with iframe-safe handling
+  // IFRAME-SAFE: Download using direct endpoint URL + top-level navigation
   const downloadVideo = useCallback(async (jid, variant) => {
+    if (!jid || !variant) {
+      toast.error('Invalid download request');
+      return;
+    }
+    
     try {
       setIsDownloading(true);
       console.log(`[DemoVideoGenerator] Downloading ${variant} for job ${jid}`);
       
-      // Use proxy download - returns binary data directly
-      const response = await base44.functions.invoke('demoVideoProxyDownload', {
-        jobId: jid,
-        format: variant
-      });
-
-      // The response is the binary data
-      if (response && response.data) {
-        const blob = new Blob([response.data], { type: getMimeType(variant) });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = getFileName(variant);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        toast.success(`${variant} downloaded!`);
+      // Build direct download URL (same-origin endpoint)
+      const baseUrl = window.location.origin;
+      const downloadUrl = `${baseUrl}/api/functions/demoVideoProxyDownload?jobId=${encodeURIComponent(jid)}&format=${encodeURIComponent(variant)}`;
+      
+      console.log('[DemoVideoGenerator] Download URL:', downloadUrl);
+      
+      // CRITICAL: For Shopify embedded iframe, use top-level navigation
+      // This bypasses iframe restrictions and opens download in parent window
+      if (window.top && window.top !== window.self) {
+        // We're in an iframe - use parent window navigation
+        window.top.location.href = downloadUrl;
       } else {
-        throw new Error('No valid video data received');
+        // Normal browser - use standard download
+        window.location.href = downloadUrl;
       }
+      
+      // Success feedback
+      setTimeout(() => {
+        toast.success(`${variant} download started!`);
+        setIsDownloading(false);
+      }, 500);
+      
     } catch (error) {
       console.error('[DemoVideoGenerator] Download error:', error);
       toast.error(`Download failed: ${error.message}`);
-    } finally {
       setIsDownloading(false);
     }
   }, []);
