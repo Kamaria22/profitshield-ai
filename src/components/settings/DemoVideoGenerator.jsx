@@ -82,9 +82,29 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         jobId: jid,
         timestamp: new Date().toISOString()
       });
+
+      // Get the URL from downloadLinks state
+      const urlKey = {
+        '1080p': 'mp4_1080_url',
+        '720p': 'mp4_720_url',
+        '1600x900': 'mp4_shopify_url',
+        'thumbnail': 'thumbnail_url'
+      }[variant];
+
+      const directUrl = downloadLinks?.[urlKey];
       
-      // Call backend function with credentials (uses SDK authentication)
-      console.info('[DemoVideo] Calling demoVideoProxyDownload endpoint...');
+      // If URL is external (Shotstack), use top-level navigation for iframe compatibility
+      if (directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://'))) {
+        console.info('[DemoVideo] download-external-url', { variant, url: directUrl });
+        const targetWindow = window.top ?? window;
+        targetWindow.location.href = directUrl;
+        toast.success(`${variant.toUpperCase()} download started!`);
+        setIsDownloading(false);
+        return;
+      }
+      
+      // Otherwise use proxy endpoint
+      console.info('[DemoVideo] download-via-proxy', { variant, jobId: jid });
       const response = await base44.functions.invoke('demoVideoProxyDownload', {
         jobId: jid,
         format: variant
