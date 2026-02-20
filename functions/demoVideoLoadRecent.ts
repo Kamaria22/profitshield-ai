@@ -1,61 +1,55 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
- * Load recent demo video jobs for a tenant
- * Useful for "resume previous render" functionality
+ * Load most recent demo video job for current user
+ * - Helps restore state after page refresh
+ * - Returns job with outputs if available
  */
 Deno.serve(async (req) => {
-  if (req.method !== 'GET') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 });
-  }
-
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json({ 
+        ok: false, 
+        message: 'Not authenticated' 
+      });
     }
 
-    const url = new URL(req.url);
-    const tenantId = url.searchParams.get('tenantId');
-    const limit = parseInt(url.searchParams.get('limit') || '5');
+    console.log('[demoVideoLoadRecent] Loading recent job for user:', user.email);
 
-    if (!tenantId) {
-      return Response.json({
-        ok: false,
-        error: 'MISSING_TENANT_ID',
-        message: 'tenantId query parameter required'
-      }, { status: 400 });
+    // Query recent jobs, sorted by creation date
+    const jobs = await base44.entities.DemoVideoJob.list('-created_date', 1);
+
+    if (!jobs || jobs.length === 0) {
+      console.log('[demoVideoLoadRecent] No recent jobs found');
+      return Response.json({ 
+        ok: true,
+        job: null
+      });
     }
 
-    // Fetch recent jobs (owner/admin only)
-    const jobs = await base44.entities.DemoVideoJob.filter(
-      { tenant_id: tenantId },
-      '-created_date',
-      limit
-    );
+    const job = jobs[0];
+    console.log('[demoVideoLoadRecent] Found job:', job.id, 'status:', job.status);
 
     return Response.json({
       ok: true,
-      jobs: jobs.map(job => ({
-        jobId: job.id,
+      job: {
+        id: job.id,
         status: job.status,
-        version: job.version,
-        mode: job.mode,
-        progress: job.progress,
-        createdAt: job.created_date,
+        progress: job.progress || 0,
         outputs: job.outputs || {},
-        errorMessage: job.error_message
-      }))
-    }, { status: 200 });
+        version: job.version,
+        created_date: job.created_date
+      }
+    });
 
   } catch (error) {
-    console.error('Load recent jobs error:', error.message);
-    return Response.json({
-      ok: false,
-      error: 'LOAD_ERROR',
-      message: 'Failed to load recent jobs'
-    }, { status: 500 });
+    console.error('[demoVideoLoadRecent] Error:', error.message);
+    return Response.json({ 
+      ok: false, 
+      message: error.message 
+    });
   }
 });
