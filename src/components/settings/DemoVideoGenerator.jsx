@@ -129,21 +129,27 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   const downloadVideo = useCallback(async (jid, variant) => {
     if (!jid || !variant) {
-      console.error('[DemoVideo] Invalid download request:', { jid, variant });
+      addDebugLog('❌ Invalid download request', { jid, variant });
       toast.error('Invalid download request');
       return;
     }
     
     try {
       setIsDownloading(true);
-      console.info('[DemoVideo] download-click', { variant, jobId: jid, timestamp: new Date().toISOString() });
+      addDebugLog('🔽 Download clicked', { variant, jobId: jid, timestamp: new Date().toISOString() });
 
       const filename = getFileName(variant);
       const directUrl = getDownloadUrl(variant);
       
+      addDebugLog('🔍 URL resolution', { 
+        variant, 
+        directUrl: directUrl ? directUrl.slice(0, 60) + '...' : 'NULL',
+        downloadLinks: downloadLinks ? Object.keys(downloadLinks) : []
+      });
+      
       // Try direct URL first (Shotstack CDN)
       if (directUrl) {
-        console.info('[DemoVideo] direct-url', { variant, directUrl });
+        addDebugLog('✅ Using direct URL', { variant, directUrl: directUrl.slice(0, 100) });
         const a = document.createElement('a');
         a.href = directUrl;
         a.target = '_top'; // iframe-safe
