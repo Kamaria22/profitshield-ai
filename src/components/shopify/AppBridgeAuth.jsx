@@ -163,5 +163,4 @@ export function useAppBridgeToken() {
   return { token, loading, error };
 }
 
-// Direct export for imperative use
-export { getAppBridgeToken };
+export { getAppBridgeToken, useAppBridgeToken };
