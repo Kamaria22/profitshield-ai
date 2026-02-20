@@ -310,19 +310,15 @@ export default function Home() {
                 </LazyPanel>
               </div>
 
-              {/* Connect Store CTA for Demo Mode */}
+              {/* Connect Store CTA */}
               {isDemoMode && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl"
-                >
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
                       <Sparkles className="w-5 h-5 text-blue-600" />
                       <div>
                         <p className="font-medium text-blue-800">Demo Mode Active</p>
-                        <p className="text-sm text-blue-600">Connect your Shopify store for real data</p>
+                        <p className="text-sm text-blue-600">Connect your store for real data</p>
                       </div>
                     </div>
                     <Link to={createPageUrl('Integrations')}>
@@ -332,7 +328,7 @@ export default function Home() {
                       </Button>
                     </Link>
                   </div>
-                </motion.div>
+                </div>
               )}
             </div>
 
