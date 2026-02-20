@@ -157,7 +157,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
-  // Download handler - Shopify iframe safe
+  // Download handler - Shopify iframe safe, QuickTime compatible
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
     
@@ -172,23 +172,40 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         body: JSON.stringify({ jobId, format })
       });
 
-      console.info('[DV] proxy-response', { status: res.status });
+      console.info('[DV] proxy-response', { 
+        status: res.status,
+        contentType: res.headers.get('content-type'),
+        contentLength: res.headers.get('content-length')
+      });
 
       if (!res.ok) {
-        let err = {};
-        try { err = await res.json(); } catch {}
-        throw new Error(err?.error || `Download failed (${res.status})`);
+        const text = await res.text().catch(() => '');
+        throw new Error(text.slice(0, 200) || `Download failed (${res.status})`);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      
+      // CRITICAL: Must not be JSON (common error case)
+      if (contentType.includes('application/json')) {
+        const text = await res.text();
+        throw new Error(`Server returned JSON instead of file: ${text.slice(0, 200)}`);
       }
 
       const blob = await res.blob();
       console.info('[DV] blob', { size: blob.size, type: blob.type });
 
-      // Quick sanity check (prevents "mp4 that is actually JSON")
+      // Sanity check (prevents "mp4 that is actually JSON or error page")
+      if (blob.size < 200_000) {
+        throw new Error(`File too small (${blob.size} bytes). Likely an error page, not a video.`);
+      }
+
+      // MP4 signature validation
       if (format !== 'thumb') {
-        if (blob.size < 1_500_000) throw new Error('Downloaded file too small to be a real MP4.');
         const head = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
         const headText = Array.from(head).map(b => String.fromCharCode(b)).join('');
-        if (!headText.includes('ftyp')) throw new Error('Downloaded file is not a valid MP4 (missing ftyp).');
+        if (!headText.includes('ftyp')) {
+          throw new Error('Downloaded file is not a valid MP4 (missing ftyp signature).');
+        }
       }
 
       const url = URL.createObjectURL(blob);
@@ -202,13 +219,19 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 100);
 
-      toast.success(`Downloaded ${format}`);
+      const sizeMB = (blob.size / 1_000_000).toFixed(2);
+      toast.success('Download complete', { 
+        description: `${filename} • ${sizeMB}MB` 
+      });
     } catch (err) {
-      console.error('[DV] Download failed:', err.message);
-      toast.error(err.message);
+      console.error('[DV] Download failed:', err);
+      toast.error(err.message || 'Download failed');
     } finally {
       setDownloadingVariant(null);
     }

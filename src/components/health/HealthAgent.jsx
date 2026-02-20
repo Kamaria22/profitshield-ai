@@ -64,9 +64,11 @@ export class HealthAgent {
   }
 
   instrumentFetch() {
-    const originalFetch = window.fetch.bind(window);
+    const originalFetch = window.fetch;
+    const self = this;
 
-    window.fetch = async (input, init) => {
+    // CRITICAL: DO NOT touch function.name (read-only in strict mode)
+    const wrappedFetch = async function(input, init) {
       const start = performance.now();
       const method = (init?.method || 'GET').toUpperCase();
 
@@ -78,10 +80,10 @@ export class HealthAgent {
           : input.url;
 
       try {
-        const res = await originalFetch(input, init);
+        const res = await originalFetch.call(window, input, init);
         const dur = Math.round(performance.now() - start);
 
-        this.pushNetwork({
+        self.pushNetwork({
           url,
           method,
           status: res.status,
@@ -92,14 +94,14 @@ export class HealthAgent {
         return res;
       } catch (e) {
         const dur = Math.round(performance.now() - start);
-        this.pushNetwork({
+        self.pushNetwork({
           url,
           method,
           durationMs: dur,
           error: e?.message || String(e),
         });
 
-        this.report('warn', `fetch failed: ${method} ${url}`, e?.stack, {
+        self.report('warn', `fetch failed: ${method} ${url}`, e?.stack, {
           source: 'fetch',
           url,
         });
@@ -107,6 +109,10 @@ export class HealthAgent {
         throw e;
       }
     };
+    
+    // Use displayName instead of .name to avoid read-only error
+    wrappedFetch.displayName = 'instrumentedFetch';
+    window.fetch = wrappedFetch;
   }
 
   pushNetwork(entry) {
