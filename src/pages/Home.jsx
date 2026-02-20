@@ -126,16 +126,18 @@ export default function Home() {
     refetchOnWindowFocus: false
   });
 
-  // PERFORMANCE: Defer heavy data loads until after idle
+  // PERFORMANCE: Background data loads - never block UI
   const { data: detailedOrders = [] } = useQuery({
     queryKey: buildQueryKey('orders-detailed', resolverCheck),
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
-      return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 500);
+      return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 100);
     },
     enabled: canQuery && !!dashboardSummary,
-    staleTime: 60000,
-    gcTime: 120000
+    staleTime: 120000,
+    gcTime: 300000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
   });
 
   const { data: profitLeaks = [] } = useQuery({
@@ -145,12 +147,13 @@ export default function Home() {
       return base44.entities.ProfitLeak.filter({ 
         tenant_id: queryFilter.tenant_id,
         is_resolved: false 
-      }, '-impact_amount', 10);
+      }, '-impact_amount', 5);
     },
     enabled: canQuery && !!dashboardSummary,
-    staleTime: 60000,
-    gcTime: 120000,
-    ...queryDefaults.standard
+    staleTime: 120000,
+    gcTime: 300000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
   });
 
   // Extract from summary for immediate display
