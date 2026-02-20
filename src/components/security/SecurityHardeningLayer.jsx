@@ -106,12 +106,12 @@ export default function SecurityHardeningLayer({ children }) {
       // Prevent dev tools shortcuts
       document.addEventListener('keydown', preventDevTools);
 
-
-// DevTools detection disabled during development/debugging
-return () => {
-  document.removeEventListener('contextmenu', preventRightClick);
-  document.removeEventListener('keydown', preventDevTools);
-};
+      return () => {
+        document.removeEventListener('contextmenu', preventRightClick);
+        document.removeEventListener('keydown', preventDevTools);
+      };
+    }
+  }, []);
 
   return (
     <>
