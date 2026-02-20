@@ -248,7 +248,8 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         
         if (result.status === 'completed' && result.outputs) {
           setDownloadLinks(result.outputs);
-          toast.success('Status refreshed');
+          console.info('[DemoVideo] Job completed, outputs available:', Object.keys(result.outputs));
+          toast.success('Status refreshed - ready for download');
         } else if (result.status === 'failed') {
           toast.error('Video generation failed');
         } else {
@@ -260,6 +261,35 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       }
     } catch (err) {
       toast.error('Failed to refresh status');
+    }
+  };
+
+  const runSyntheticCheck = async () => {
+    if (!jobId) return;
+
+    console.info('[DemoVideo] Running synthetic check...');
+    
+    const synthetic = await healthAgent.runDemoVideoSyntheticCheck({
+      jobId,
+      fetchStatus: async () => {
+        const result = await statusMutation.mutateAsync(jobId);
+        return result;
+      },
+      tryProxyDownload: async (variant) => {
+        const filename = 'synthetic-test.mp4';
+        const proof = await downloadViaProxy({ jobId, variant, filename });
+        return proof;
+      },
+    });
+
+    if (synthetic.pass) {
+      toast.success('Synthetic check PASSED', { 
+        description: `Download validated: ${synthetic.proxyProof?.bytes || 0} bytes` 
+      });
+    } else {
+      toast.error('Synthetic check FAILED', { 
+        description: synthetic.pollResult?.note || 'Unknown issue' 
+      });
     }
   };
 
@@ -390,26 +420,31 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             {/* Download Buttons */}
             {isReady && (
               <div className="space-y-3">
-                <Label>Download Formats</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Download Formats</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={runSyntheticCheck}
+                    className="text-xs"
+                  >
+                    Run Proof Check
+                  </Button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {RENDER_VARIANTS.map(variant => {
-                    const url = getDownloadUrl(variant.id);
                     const isDownloading = downloadingVariant === variant.id;
-                    const hasUrl = !!url;
 
                     return (
                       <button
                         key={variant.id}
                         onClick={() => handleDownload(variant.id)}
-                        disabled={!hasUrl || isDownloading}
+                        disabled={isDownloading}
                         className={`
                           flex items-center justify-between w-full
                           px-4 py-3 rounded-lg border-2
                           text-left transition-all
-                          ${hasUrl
-                            ? 'border-green-300 bg-white hover:bg-green-50 hover:border-green-400 cursor-pointer'
-                            : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
-                          }
+                          border-green-300 bg-white hover:bg-green-50 hover:border-green-400 cursor-pointer
                           ${isDownloading ? 'opacity-50' : ''}
                         `}
                       >
@@ -420,18 +455,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                           <div className="text-xs text-slate-600">
                             {variant.description}
                           </div>
-                          {!hasUrl && (
-                            <div className="text-xs text-red-600 mt-1">
-                              Not available
-                            </div>
-                          )}
+                          <div className="text-xs text-emerald-600 mt-1">
+                            ✓ Proxy download enabled
+                          </div>
                         </div>
                         {isDownloading ? (
                           <Loader2 className="w-4 h-4 animate-spin text-green-600" />
-                        ) : hasUrl ? (
-                          <Download className="w-4 h-4 text-green-600" />
                         ) : (
-                          <AlertCircle className="w-4 h-4 text-red-500" />
+                          <Download className="w-4 h-4 text-green-600" />
                         )}
                       </button>
                     );
