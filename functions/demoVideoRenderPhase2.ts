@@ -144,10 +144,8 @@ Deno.serve(async (req) => {
  * Generate MP4s using Shotstack API
  * Returns object with download URLs or null if fails
  */
-async function generateWithShotstack(jobId, apiKey, env, requestId) {
-  const baseUrl = env === 'production' 
-    ? 'https://api.shotstack.io/v1'
-    : 'https://api.shotstack.io/v1';
+async function generateWithShotstack(jobId, apiKey, env, requestId, base44) {
+  const baseUrl = 'https://api.shotstack.io/v1';
   
   // Minimal Shotstack render definition (1920x1080)
   const renderPayload = {
