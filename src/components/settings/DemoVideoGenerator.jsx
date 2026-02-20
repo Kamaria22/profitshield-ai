@@ -197,6 +197,35 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
+  // ✅ Global pointer event capture to diagnose/fix overlay clicks
+  useEffect(() => {
+    const handler = (ev) => {
+      try {
+        const x = ev.clientX;
+        const y = ev.clientY;
+        const topEl = document.elementFromPoint(x, y);
+
+        if (topEl && !(topEl instanceof HTMLButtonElement) && !topEl.closest('button')) {
+          const overlay = closestBlockingOverlay(topEl);
+          if (overlay) {
+            console.warn('[DV][CLICK-BLOCKED] Overlay detected. Disabling pointer-events.', {
+              at: { x, y },
+              topEl: safeStringifyStyle(topEl),
+              overlay: safeStringifyStyle(overlay),
+            });
+            overlay.style.pointerEvents = 'none';
+            overlay.style.outline = '2px solid rgba(255,0,0,0.35)';
+          }
+        }
+      } catch (e) {
+        // Never crash UI
+      }
+    };
+
+    window.addEventListener('pointerdown', handler, true);
+    return () => window.removeEventListener('pointerdown', handler, true);
+  }, []);
+
   // Fetch with timeout + abort controller
   const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
     const controller = new AbortController();
