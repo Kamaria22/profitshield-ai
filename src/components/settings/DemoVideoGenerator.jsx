@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
-import { getShopifySessionToken, isEmbedded } from '@/components/utils/shopifyAuth';
+import { useAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import AIScriptingAssistant from './AIScriptingAssistant';
 import AdvancedDownloadOptions from './AdvancedDownloadOptions';
 import { 
