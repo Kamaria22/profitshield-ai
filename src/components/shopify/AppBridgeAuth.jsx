@@ -1,35 +1,26 @@
 /**
- * Real Shopify App Bridge Authentication
- * Handles session token retrieval for embedded Shopify apps
+ * Shopify App Bridge Authentication (CDN version for Base44)
  */
 
 import { useEffect, useState } from 'react';
-import { createApp } from '@shopify/app-bridge';
-import { getSessionToken } from '@shopify/app-bridge-utils';
 
-// Get apiKey from environment/config
+// Get apiKey from runtime injection
 function getApiKey() {
-  // If Base44 injects a runtime global
   if (typeof window !== 'undefined' && window.__SHOPIFY_API_KEY__) {
     return window.__SHOPIFY_API_KEY__;
   }
 
-  // If injected via meta tag
-  const metaTag =
+  const meta =
     typeof window !== 'undefined'
       ? document.querySelector('meta[name="shopify-api-key"]')
       : null;
 
-  if (metaTag?.content) return metaTag.content;
-
-  // Otherwise must be provided via Base44 env/config injection
-  return null;
+  return meta?.content || null;
 }
 
-function getHostFromUrl() {
+function getHost() {
   if (typeof window === 'undefined') return null;
-  const params = new URLSearchParams(window.location.search);
-  return params.get('host');
+  return new URLSearchParams(window.location.search).get('host');
 }
 
 function isEmbedded() {
@@ -37,67 +28,68 @@ function isEmbedded() {
   try {
     return window.top !== window.self;
   } catch {
-    // Cross-origin access can throw; if so, assume embedded
     return true;
   }
 }
 
-// Get session token using App Bridge (official)
+async function loadAppBridgeScript() {
+  if (window.appBridge) return;
+
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.shopify.com/s/app-bridge/3.7.1/app-bridge.min.js';
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
 async function getAppBridgeToken() {
   try {
     if (typeof window === 'undefined') return null;
 
-    const host = getHostFromUrl();
-    const apiKey = getApiKey();
     const embedded = isEmbedded();
+    const host = getHost();
+    const apiKey = getApiKey();
 
-    // PROOF LOG (must show hostPresent/apiKeyPresent)
     console.info('[AB-PROOF]', {
       embedded,
       hostPresent: !!host,
-      hostLen: host?.length || 0,
       apiKeyPresent: !!apiKey,
-      apiKeyLen: apiKey?.length || 0,
     });
 
-    // Hard-fail if missing host: means not opened inside Shopify Admin
     if (!host) {
-      console.error('[AppBridge] Missing host param. Open inside Shopify Admin.');
+      console.error('Missing host param. Must open inside Shopify Admin.');
       return null;
     }
 
-    // Hard-fail if missing apiKey: must come from env/config
     if (!apiKey) {
-      console.error('[AppBridge] Missing apiKey. Provide SHOPIFY_API_KEY via env/config injection.');
+      console.error('Missing SHOPIFY_API_KEY injection.');
       return null;
     }
 
-    // Create App Bridge instance (official)
+    await loadAppBridgeScript();
+
+    if (!window.appBridge) {
+      console.error('App Bridge not available after script load.');
+      return null;
+    }
+
+    const { createApp } = window.appBridge;
     const app = createApp({ apiKey, host, forceRedirect: true });
-    if (!app) {
-      console.error('[AppBridge] createApp returned null');
-      return null;
-    }
 
-    // Get session token (official)
-    const token = await getSessionToken(app);
+    const token = await app.getSessionToken();
 
     console.info('[AB-PROOF] tokenLen=', token?.length || 0);
 
-    if (!token) {
-      console.error('[AppBridge] getSessionToken returned empty/null');
-      return null;
-    }
-
-    return token;
+    return token || null;
   } catch (err) {
-    console.error('[AppBridge] Token error:', err?.message || err);
-    if (err?.stack) console.error('[AppBridge] Stack:', err.stack);
+    console.error('App Bridge error:', err);
     return null;
   }
 }
 
-// Hook to get App Bridge token
 export function useAppBridgeToken() {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,32 +99,19 @@ export function useAppBridgeToken() {
     let mounted = true;
 
     (async () => {
-      try {
-        setLoading(true);
+      const tok = await getAppBridgeToken();
+
+      if (!mounted) return;
+
+      if (tok && tok.length > 50) {
+        setToken(tok);
         setError(null);
-
-        console.log('[AppBridge-Hook] Starting token retrieval...');
-        const tok = await getAppBridgeToken();
-
-        if (!mounted) return;
-
-        if (tok && tok.length >= 100) {
-          setToken(tok);
-          setError(null);
-          console.log('[AppBridge-Hook] ✓ Token set');
-        } else {
-          setToken(null);
-          setError('Failed to retrieve Shopify session token');
-          console.error('[AppBridge-Hook] ✗ Token retrieval failed');
-        }
-      } catch (e) {
-        if (!mounted) return;
+      } else {
         setToken(null);
-        setError(e?.message || 'Unknown error');
-        console.error('[AppBridge-Hook] Exception:', e);
-      } finally {
-        if (mounted) setLoading(false);
+        setError('Failed to retrieve Shopify session token');
       }
+
+      setLoading(false);
     })();
 
     return () => {
@@ -143,5 +122,4 @@ export function useAppBridgeToken() {
   return { token, loading, error };
 }
 
-// Optional: export for direct use elsewhere
 export { getAppBridgeToken };
