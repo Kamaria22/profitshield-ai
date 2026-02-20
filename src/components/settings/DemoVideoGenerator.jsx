@@ -93,6 +93,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const pollStartRef = useRef(null);
   const pollCountRef = useRef(0);
 
+  // Shopify App Bridge authentication
+  const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useAppBridgeToken();
+
   // Load recent job on mount
   useEffect(() => {
     const loadRecent = async () => {
