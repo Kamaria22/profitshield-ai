@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 function parseEmbeddedParams() {
   const params = new URLSearchParams(window.location.search);
   const host = params.get('host');
-  const apiKey = params.get('apiKey') || Deno.env?.get?.('SHOPIFY_API_KEY') || '';
+  const apiKey = params.get('apiKey') || '';
   
   return { host, apiKey };
 }
