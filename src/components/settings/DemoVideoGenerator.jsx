@@ -454,21 +454,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                           <CheckCircle className="w-3 h-3 text-green-600" />
                           <span className="text-slate-600 font-medium capitalize">{key.replace(/_url$/, '').replace(/_/g, ' ')}:</span>
                           {isValidUrl ? (
-                            <Button
-                              asChild
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto py-0 px-1 text-xs text-emerald-600 hover:text-emerald-700 hover:underline"
+                            <a
+                              href={url}
+                              target="_top"
+                              rel="noopener noreferrer"
+                              className="text-xs text-emerald-600 hover:text-emerald-700 hover:underline break-all"
                             >
-                              <a
-                                href={url}
-                                target="_top"
-                                rel="noopener noreferrer"
-                                className="break-all"
-                              >
-                                Open external link
-                              </a>
-                            </Button>
+                              Open external link
+                            </a>
                           ) : (
                             <span className="text-slate-500 italic">Processing...</span>
                           )}
