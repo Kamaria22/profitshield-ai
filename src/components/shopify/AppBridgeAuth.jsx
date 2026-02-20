@@ -30,39 +30,53 @@ async function getAppBridgeToken() {
       return null;
     }
 
-    if (!apiKey) {
-      console.error('[AppBridge] ✗ No apiKey - cannot initialize App Bridge');
-      return null;
-    }
+    console.log('[AppBridge] host=', host, 'apiKey=', apiKey ? apiKey.slice(0, 10) + '...' : 'MISSING');
 
-    console.log('[AppBridge] Initializing: host=', host, 'apiKey=', apiKey.slice(0, 10) + '...');
-
-    // Dynamically load Shopify App Bridge
+    // Dynamically load Shopify App Bridge if not already loaded
     if (!window.shopifyApp) {
+      console.log('[AppBridge] Loading App Bridge script...');
       const script = document.createElement('script');
       script.src = 'https://cdn.shopify.com/s/app-bridge/3.7.1/app-bridge.min.js';
       script.async = true;
       
       await new Promise((resolve, reject) => {
-        script.onload = resolve;
-        script.onerror = reject;
+        script.onload = () => {
+          console.log('[AppBridge] Script loaded');
+          resolve();
+        };
+        script.onerror = () => {
+          console.error('[AppBridge] ✗ Script load failed');
+          reject(new Error('Failed to load App Bridge script'));
+        };
         document.head.appendChild(script);
       });
     }
 
-    // Initialize App Bridge
+    // Initialize App Bridge - can work with or without explicit apiKey
     if (!window.shopifyApp?.AppBridge) {
-      console.error('[AppBridge] ✗ App Bridge not loaded');
+      console.error('[AppBridge] ✗ window.shopifyApp.AppBridge not available');
       return null;
     }
 
-    const app = window.shopifyApp.AppBridge.createApp({
-      apiKey,
+    const config = {
       host,
       forceRedirect: true
-    });
+    };
+    
+    // Only add apiKey if provided
+    if (apiKey) {
+      config.apiKey = apiKey;
+    }
 
-    console.log('[AppBridge] App instance created');
+    console.log('[AppBridge] Creating app with config:', Object.keys(config));
+    const app = window.shopifyApp.AppBridge.createApp(config);
+
+    if (!app) {
+      console.error('[AppBridge] ✗ createApp returned null');
+      return null;
+    }
+
+    console.log('[AppBridge] App instance created, calling getSessionToken()...');
 
     // Get session token - this is the key call
     const token = await app.getSessionToken();
@@ -75,7 +89,7 @@ async function getAppBridgeToken() {
     console.log('[AppBridge] ✓ Token obtained, length=', token.length);
     return token;
   } catch (err) {
-    console.error('[AppBridge] ✗ Error:', err.message);
+    console.error('[AppBridge] ✗ Error:', err.message, err.stack);
     return null;
   }
 }
