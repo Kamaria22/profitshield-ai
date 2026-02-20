@@ -243,7 +243,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     }
   });
 
-  // Poll status
+  // Poll status - PROOF-BASED with validation
   const statusMutation = useMutation({
     mutationFn: async (jid) => {
       console.log('[DemoVideoGenerator] Polling job:', jid);
@@ -253,15 +253,46 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       return data;
     },
     onSuccess: (data) => {
-      if (!data.ok) return;
+      if (!data.ok) {
+        console.warn('[DemoVideoGenerator] Status check returned not ok:', data);
+        return;
+      }
       
       console.log('[DemoVideoGenerator] Status:', data.status, 'outputs:', Object.keys(data.outputs || {}));
       setJobStatus(data.status);
       const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
       setPollWaitTime(elapsed);
 
-      if (data.status === 'completed' && data.outputs) {
-        console.log('[DemoVideoGenerator] ✓ Completed with outputs');
+      if (data.status === 'completed') {
+        // VALIDATION: Ensure outputs exist and are non-empty
+        if (!data.outputs || Object.keys(data.outputs).length === 0) {
+          console.error('[DemoVideoGenerator] ✗ Completed but no outputs!', {
+            status: data.status,
+            hasOutputs: !!data.outputs,
+            outputKeys: data.outputs ? Object.keys(data.outputs) : []
+          });
+          toast.error('Video completed but download links missing - please refresh');
+          setIsPolling(false);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          return;
+        }
+
+        // Validate each output URL is non-empty
+        const outputEntries = Object.entries(data.outputs);
+        const validOutputs = outputEntries.filter(([key, url]) => url && typeof url === 'string' && url.length > 0);
+        
+        console.log('[DemoVideoGenerator] ✓ Completed with outputs:', {
+          total: outputEntries.length,
+          valid: validOutputs.length,
+          keys: validOutputs.map(([k]) => k)
+        });
+
+        if (validOutputs.length === 0) {
+          console.error('[DemoVideoGenerator] ✗ All output URLs are empty!');
+          toast.error('Download links are invalid - please regenerate');
+          return;
+        }
+
         setGeneratedVideo(prev => ({
           ...(prev || {}),
           status: 'completed',
@@ -271,7 +302,10 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         setDownloadLinks(data.outputs);
         setIsPolling(false);
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        toast.success('Video rendering complete!');
+        
+        toast.success(`Video rendering complete! ${validOutputs.length} formats available`, {
+          description: 'Click download buttons below'
+        });
       } else if (data.status === 'failed') {
         console.error('[DemoVideoGenerator] ✗ Failed:', data.errorMessage);
         setIsPolling(false);
@@ -281,6 +315,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     },
     onError: (error) => {
       console.error('[DemoVideoGenerator] Poll error:', error.message);
+      toast.error(`Status check failed: ${error.message}`);
     }
   });
 
