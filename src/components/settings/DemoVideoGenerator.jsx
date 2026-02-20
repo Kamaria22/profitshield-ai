@@ -455,13 +455,6 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     };
   }, [isPolling, jobId, statusMutation]);
 
-  const renderVariants = [
-    { id: '1080p', urlKey: 'mp4_1080_url', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials' },
-    { id: '720p', urlKey: 'mp4_720_url', label: 'HD (1280x720)', description: 'Web, social media' },
-    { id: '1600x900', urlKey: 'mp4_shopify_url', label: 'Shopify App Store (1600x900)', description: 'App marketplace' },
-    { id: 'thumbnail', urlKey: 'thumbnail_url', label: 'Thumbnail (JPEG)', description: 'Preview image' }
-  ];
-
   const isReady = jobStatus === 'completed' && downloadLinks && Object.keys(downloadLinks).length > 0;
 
   // PHASE 4: Load recent job on mount (if any)
