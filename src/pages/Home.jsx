@@ -55,14 +55,13 @@ export default function Home() {
   const queryFilter = getTenantFilter(resolverCheck);
   const authTenantId = resolverCheck.tenantId;
 
-  // Tutorial state
+  // Tutorial state - deferred to not block render
   const shouldShowTutorial = useShouldShowTutorial(authTenantId);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
   useEffect(() => {
     if (shouldShowTutorial && authTenantId) {
-      // Delay showing tutorial slightly for better UX
-      const timer = setTimeout(() => setTutorialOpen(true), 1000);
+      const timer = setTimeout(() => setTutorialOpen(true), 3000);
       return () => clearTimeout(timer);
     }
   }, [shouldShowTutorial, authTenantId]);
@@ -70,7 +69,7 @@ export default function Home() {
   const handleTutorialClose = async () => {
     setTutorialOpen(false);
     if (authTenantId) {
-      await markTutorialCompleted(authTenantId);
+      markTutorialCompleted(authTenantId).catch(e => console.error('Tutorial mark failed:', e));
     }
   };
 
