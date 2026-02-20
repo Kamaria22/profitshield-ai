@@ -135,9 +135,11 @@ export function useAppBridgeToken() {
           if (tok) {
             setToken(tok);
             setError(null);
+            console.log('[AppBridge-Hook] ✓ Token set');
           } else {
             setToken(null);
             setError('Failed to retrieve Shopify session token');
+            console.error('[AppBridge-Hook] ✗ Token retrieval failed');
           }
           setLoading(false);
         }
@@ -162,4 +164,4 @@ export function useAppBridgeToken() {
 }
 
 // Direct export for imperative use
-export { getAppBridgeToken, parseEmbeddedParams };
+export { getAppBridgeToken };
