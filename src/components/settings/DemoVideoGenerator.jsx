@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
-import { healthAgent } from '@/components/health/HealthAgent';
-import { downloadViaProxy } from '@/components/health/download';
-import { refreshRemoteConfig } from '@/components/health/remoteConfig';
-import DownloadSelfTest from '@/components/health/DownloadSelfTest';
 import { 
   Download, 
   Loader2,
@@ -14,24 +10,16 @@ import {
   AlertCircle,
   Sparkles,
   Clock,
-  Film,
-  RefreshCw,
-  Settings,
-  TrendingUp
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 
-const POLLING_INTERVAL = 2000;
-const MAX_POLL_TIME = 180000;
-
-// STANDARDIZED FORMATS - must match backend exactly (no more 1600x900)
-const RENDER_VARIANTS = [
+const VARIANTS = [
   { id: '1080p', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials' },
   { id: '720p', label: 'HD (1280x720)', description: 'Web, social media' },
   { id: 'shopify', label: 'Shopify App Store', description: 'App marketplace preview' },
@@ -58,16 +46,15 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const [useDemoData, setUseDemoData] = useState(!isResolved);
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
-  const [downloadLinks, setDownloadLinks] = useState(null);
-  const [isPolling, setIsPolling] = useState(false);
   const [downloadingVariant, setDownloadingVariant] = useState(null);
   
   const pollIntervalRef = useRef(null);
-  const pollStartTimeRef = useRef(null);
+  const pollStartRef = useRef(null);
+  const pollCountRef = useRef(0);
 
-  // Load cached job on mount
+  // Load recent job on mount
   useEffect(() => {
-    const loadCached = async () => {
+    const loadRecent = async () => {
       if (!isResolved || !tenantId) return;
       
       try {
@@ -75,16 +62,13 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         if (data?.job) {
           setJobId(data.job.id);
           setJobStatus(data.job.status);
-          if (data.job.status === 'completed' && data.job.outputs) {
-            setDownloadLinks(data.job.outputs);
-          }
         }
       } catch (err) {
-        console.warn('Failed to load cached job:', err.message);
+        console.warn('Failed to load recent job:', err.message);
       }
     };
     
-    loadCached();
+    loadRecent();
   }, [isResolved, tenantId]);
 
   // Generate mutation
@@ -97,17 +81,16 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       if (data?.jobId) {
         setJobId(data.jobId);
         setJobStatus('queued');
-        setDownloadLinks(null);
         startPolling(data.jobId);
-        toast.success('Video generation started!');
+        toast.success('Video generation started');
       }
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to start generation');
+      toast.error('Generation failed: ' + err.message);
     }
   });
 
-  // Status polling mutation
+  // Status mutation
   const statusMutation = useMutation({
     mutationFn: async (jid) => {
       const { data } = await base44.functions.invoke('demoVideoGetStatus', { jobId: jid });
@@ -115,54 +98,113 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     }
   });
 
-  const startPolling = useCallback((jid) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+  // Polling logic with backoff
+  const startPolling = (jid) => {
+    stopPolling();
+    pollStartRef.current = Date.now();
+    pollCountRef.current = 0;
     
-    setIsPolling(true);
-    pollStartTimeRef.current = Date.now();
-
     const poll = async () => {
-      if (Date.now() - pollStartTimeRef.current > MAX_POLL_TIME) {
-        clearInterval(pollIntervalRef.current);
-        setIsPolling(false);
-        toast.error('Polling timeout - refresh to check status');
+      if (Date.now() - pollStartRef.current > 120000) {
+        stopPolling();
+        toast.error('Polling timeout - click Refresh to check status');
         return;
       }
 
       try {
         const result = await statusMutation.mutateAsync(jid);
+        setJobStatus(result.status);
         
-        if (result?.status) {
-          setJobStatus(result.status);
-          
-          if (result.status === 'completed' && result.outputs) {
-            setDownloadLinks(result.outputs);
-            clearInterval(pollIntervalRef.current);
-            setIsPolling(false);
-            toast.success('Video ready for download!');
-          } else if (result.status === 'failed') {
-            clearInterval(pollIntervalRef.current);
-            setIsPolling(false);
-            toast.error('Video generation failed');
-          }
+        if (result.status === 'completed') {
+          stopPolling();
+          toast.success('Video ready for download');
+        } else if (result.status === 'failed') {
+          stopPolling();
+          toast.error('Video generation failed');
         }
       } catch (err) {
-        console.warn('Poll error:', err.message);
+        console.warn('Poll error:', err);
       }
+
+      pollCountRef.current++;
     };
 
-    pollIntervalRef.current = setInterval(poll, POLLING_INTERVAL);
-    poll();
-  }, [statusMutation]);
+    // Backoff: 2s → 3s → 5s
+    const getInterval = () => {
+      if (pollCountRef.current < 5) return 2000;
+      if (pollCountRef.current < 15) return 3000;
+      return 5000;
+    };
+
+    const scheduleNext = () => {
+      pollIntervalRef.current = setTimeout(() => {
+        poll().then(scheduleNext);
+      }, getInterval());
+    };
+
+    poll().then(scheduleNext);
+  };
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearTimeout(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
+    return () => stopPolling();
   }, []);
 
+  // Download handler
+  const downloadVariant = async (format) => {
+    if (downloadingVariant || !jobId) return;
+    
+    setDownloadingVariant(format);
+
+    try {
+      const res = await fetch('/api/functions/demoVideoProxyDownload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ jobId, format })
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = format === '1080p' ? 'ProfitShieldAI-demo-1080p.mp4'
+                 : format === '720p' ? 'ProfitShieldAI-demo-720p.mp4'
+                 : format === 'shopify' ? 'ProfitShieldAI-app-store.mp4'
+                 : 'ProfitShieldAI-thumb.jpg';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+
+      toast.success(`Downloaded ${format}`);
+    } catch (err) {
+      toast.error('Download failed: ' + err.message);
+    } finally {
+      setDownloadingVariant(null);
+    }
+  };
+
+  // Generate handler
   const handleGenerate = () => {
     const payload = {
+      tenant_id: useDemoData ? null : tenantId,
+      mode: useDemoData ? 'demo' : 'real',
       version: selectedVersion,
       options: {
         voiceover: includeVoiceover,
@@ -170,136 +212,57 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       }
     };
 
-    if (useDemoData || !isResolved) {
-      payload.mode = 'demo';
-    } else {
-      payload.mode = 'real';
-      payload.tenant_id = tenantId;
-    }
-
     generateMutation.mutate(payload);
   };
 
-  const getDownloadUrl = useCallback((variantId) => {
-    if (!downloadLinks) return null;
-    
-    const variant = RENDER_VARIANTS.find(v => v.id === variantId);
-    if (!variant) return null;
-
-    // Check urlKey in outputs
-    const url = downloadLinks[variant.urlKey];
-    if (url && typeof url === 'string' && url.startsWith('http')) {
-      return url;
-    }
-
-    return null;
-  }, [downloadLinks]);
-
-  const handleDownload = async (variantId) => {
-    if (downloadingVariant || !jobId) return;
-
-    setDownloadingVariant(variantId);
-
-    try {
-      const filename =
-        variantId === '1080p'
-          ? 'ProfitShieldAI-demo-1080p.mp4'
-          : variantId === '720p'
-          ? 'ProfitShieldAI-demo-720p.mp4'
-          : variantId === 'shopify'
-          ? 'ProfitShieldAI-app-store.mp4'
-          : 'ProfitShieldAI-thumb.jpg';
-
-      const proof = await downloadViaProxy({ jobId, variant: variantId, filename });
-
-      if (!proof.ok) {
-        await healthAgent.report('error', 'Download failed', undefined, {
-          feature: 'demo_video',
-          variant: variantId,
-          reason: proof.error || 'unknown',
-        });
-        toast.error('Download failed', { description: proof.error || 'Unknown error' });
-        return;
-      }
-
-      const sizeMB = ((proof.bytes || 0) / 1_000_000).toFixed(2);
-      toast.success('Download complete', { 
-        description: `${variantId} • ${sizeMB}MB • ${proof.type}` 
-      });
-    } catch (err) {
-      console.error('[DemoVideo] Download error:', err);
-      await healthAgent.report('error', 'Download exception', err?.stack, {
-        feature: 'demo_video',
-        variant: variantId,
-      });
-      toast.error('Download failed: ' + err.message);
-    } finally {
-      setDownloadingVariant(null);
-    }
-  };
-
+  // Refresh status
   const handleRefreshStatus = async () => {
     if (!jobId) return;
     
     try {
       const result = await statusMutation.mutateAsync(jobId);
+      setJobStatus(result.status);
       
-      if (result?.status) {
-        setJobStatus(result.status);
-        
-        if (result.status === 'completed' && result.outputs) {
-          setDownloadLinks(result.outputs);
-          toast.success('Status refreshed - ready for download');
-        } else if (result.status === 'failed') {
-          toast.error('Video generation failed');
-        } else {
-          toast.info(`Status: ${result.status}`);
-          if (!isPolling && result.status !== 'completed' && result.status !== 'failed') {
-            startPolling(jobId);
-          }
-        }
+      if (result.status === 'completed') {
+        toast.success('Video ready');
+      } else if (result.status === 'failed') {
+        toast.error('Generation failed');
+      } else if (result.status === 'rendering') {
+        startPolling(jobId);
+        toast.info('Still rendering...');
       }
     } catch (err) {
       toast.error('Failed to refresh status');
     }
   };
 
-  const isGenerating = generateMutation.isPending || (isPolling && (jobStatus === 'queued' || jobStatus === 'rendering'));
-  const isReady = jobStatus === 'completed' && downloadLinks;
+  const isGenerating = generateMutation.isPending;
+  const isReady = jobStatus === 'completed';
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Film className="w-5 h-5" />
-          Demo Video Generator
-        </CardTitle>
+        <CardTitle>Demo Video Generator</CardTitle>
         <CardDescription>
-          Generate a professional demo video showcasing your store's performance
+          Generate marketing videos for your ProfitShield AI app
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
         {/* Version Selection */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Label>Video Length</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {['60s', '90s', '120s'].map((ver) => (
-              <button
-                key={ver}
-                onClick={() => setSelectedVersion(ver)}
+          <div className="flex gap-2">
+            {['60s', '90s', '120s'].map(v => (
+              <Button
+                key={v}
+                variant={selectedVersion === v ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedVersion(v)}
                 disabled={isGenerating}
-                className={`
-                  px-4 py-2 rounded-lg border-2 transition-all
-                  ${selectedVersion === ver 
-                    ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                    : 'border-slate-200 hover:border-slate-300'
-                  }
-                  ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                `}
               >
-                {ver}
-              </button>
+                {v}
+              </Button>
             ))}
           </div>
         </div>
@@ -307,20 +270,20 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         {/* Options */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="voiceover">Include AI Voiceover</Label>
-            <Switch 
+            <Label htmlFor="voiceover">Include Voiceover</Label>
+            <Switch
               id="voiceover"
-              checked={includeVoiceover} 
+              checked={includeVoiceover}
               onCheckedChange={setIncludeVoiceover}
               disabled={isGenerating}
             />
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="music">Include Background Music</Label>
-            <Switch 
+            <Label htmlFor="music">Include Music</Label>
+            <Switch
               id="music"
-              checked={includeMusic} 
+              checked={includeMusic}
               onCheckedChange={setIncludeMusic}
               disabled={isGenerating}
             />
@@ -329,9 +292,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           {isResolved && (
             <div className="flex items-center justify-between">
               <Label htmlFor="demo">Use Demo Data</Label>
-              <Switch 
+              <Switch
                 id="demo"
-                checked={useDemoData} 
+                checked={useDemoData}
                 onCheckedChange={setUseDemoData}
                 disabled={isGenerating}
               />
@@ -359,7 +322,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           )}
         </Button>
 
-        {/* Status Display */}
+        {/* Status */}
         {jobId && (
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center justify-between">
@@ -388,25 +351,26 @@ export default function DemoVideoGenerator({ resolver = {} }) {
               </Button>
             </div>
 
-            {/* Download Buttons - REAL CLICKABLE BUTTONS */}
+            {/* Download Buttons */}
             {isReady && (
               <div className="space-y-3">
                 <Label>Download Formats</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {RENDER_VARIANTS.map(variant => {
+                  {VARIANTS.map(variant => {
                     const isDownloading = downloadingVariant === variant.id;
 
                     return (
                       <Button
                         key={variant.id}
-                        onClick={() => handleDownload(variant.id)}
+                        type="button"
+                        onClick={() => downloadVariant(variant.id)}
                         disabled={isDownloading}
                         variant="outline"
-                        className="h-auto py-3 px-4 justify-start hover:bg-green-50 hover:border-green-400 border-green-300"
+                        className="h-auto py-3 px-4 justify-start"
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex-1 text-left">
-                            <div className="font-semibold text-sm text-slate-900">
+                            <div className="font-semibold text-sm">
                               {variant.label}
                             </div>
                             <div className="text-xs text-slate-600 font-normal">
@@ -414,9 +378,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                             </div>
                           </div>
                           {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-green-600 ml-3 flex-shrink-0" />
+                            <Loader2 className="w-4 h-4 animate-spin ml-3" />
                           ) : (
-                            <Download className="w-4 h-4 text-green-600 ml-3 flex-shrink-0" />
+                            <Download className="w-4 h-4 ml-3" />
                           )}
                         </div>
                       </Button>
@@ -425,24 +389,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 </div>
               </div>
             )}
-            
-            {/* Self-Test Panel */}
-            {isReady && jobId && (
-              <div className="pt-4 border-t">
-                <DownloadSelfTest jobId={jobId} />
-              </div>
-            )}
           </div>
-        )}
-
-        {/* Info Alert */}
-        {!isOwner && (
-          <Alert>
-            <Settings className="w-4 h-4" />
-            <AlertDescription>
-              Demo video generation is available for store owners
-            </AlertDescription>
-          </Alert>
         )}
       </CardContent>
     </Card>
