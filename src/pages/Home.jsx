@@ -3,12 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryDefaults } from '@/components/utils/queryDefaults';
 import { toast } from 'sonner';
-import { format, subDays } from 'date-fns';
-import { motion } from 'framer-motion';
 import { 
-  Shield, 
   Sparkles,
   ArrowRight,
   Store
