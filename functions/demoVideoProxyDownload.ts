@@ -7,6 +7,17 @@ Deno.serve(async (req) => {
   try {
     console.log(`[DV-SERVER][${requestId}] ===== PROXY DOWNLOAD REQUEST =====`);
     
+    const authHeader = req.headers.get('authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    
+    console.log(`[DLPROXY] hasAuthHeader`, !!authHeader);
+    console.log(`[DLPROXY] tokenLen`, token?.length || 0);
+    
+    if (!authHeader) {
+      console.log(`[DLPROXY] ❌ Missing Authorization header`);
+      return Response.json({ error: 'Missing Authorization header' }, { status: 401 });
+    }
+    
     const base44 = createClientFromRequest(req);
     
     // Try Base44 session first (works outside iframe)
@@ -16,34 +27,46 @@ Deno.serve(async (req) => {
     
     if (user) {
       authMethod = 'base44_session';
-      console.log(`[DV-SERVER][${requestId}] Auth via Base44 session: ${user.email}`);
-    } else {
+      console.log(`[DLPROXY] Auth via Base44 session: ${user.email}`);
+    } else if (token) {
       // Fallback: Shopify App Bridge session token (works in embedded iframe)
-      const authHeader = req.headers.get('authorization') || '';
-      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
       
-      if (token) {
-        try {
-          // Verify Shopify session token (JWT)
-          const secret = new TextEncoder().encode(Deno.env.get('SHOPIFY_API_SECRET'));
-          const { payload } = await jose.jwtVerify(token, secret);
-          
-          shopDomain = payload.dest?.replace(/^https?:\/\//, '') || payload.iss?.replace(/^https?:\/\//, '');
-          authMethod = 'shopify_session_token';
-          
-          console.log(`[DV-SERVER][${requestId}] Auth via Shopify token: shop=${shopDomain}`);
-        } catch (e) {
-          console.log(`[DV-SERVER][${requestId}] Token verification failed:`, e.message);
+      if (!apiSecret) {
+        console.error(`[DLPROXY] ❌ SHOPIFY_API_SECRET not set in environment`);
+        return Response.json({ error: 'Missing SHOPIFY_API_SECRET' }, { status: 500 });
+      }
+      
+      try {
+        // Verify Shopify session token (JWT)
+        const secret = new TextEncoder().encode(apiSecret);
+        const { payload } = await jose.jwtVerify(token, secret);
+        
+        console.log(`[DLPROXY] jwtVerified=true`);
+        console.log(`[DLPROXY] JWT payload dest=`, payload.dest);
+        console.log(`[DLPROXY] JWT payload iss=`, payload.iss);
+        
+        // Extract shop domain from dest or iss claim
+        if (payload.dest) {
+          shopDomain = payload.dest.replace(/^https?:\/\//, '');
+        } else if (payload.iss) {
+          shopDomain = payload.iss.replace(/^https?:\/\//, '');
         }
+        
+        authMethod = 'shopify_session_token';
+        console.log(`[DLPROXY] shop=`, shopDomain);
+      } catch (e) {
+        console.error(`[DLPROXY] ❌ JWT verification failed:`, e.message);
+        return Response.json({ error: `JWT verification failed: ${e.message}` }, { status: 401 });
       }
     }
     
     if (!user && !shopDomain) {
-      console.log(`[DV-SERVER][${requestId}] ❌ AUTH FAIL - no session or valid token`);
+      console.log(`[DLPROXY] ❌ AUTH FAIL - no valid session or token`);
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    console.log(`[DV-SERVER][${requestId}] ✓ AUTH OK via ${authMethod}`);
+    console.log(`[DLPROXY] ✓ AUTH OK via ${authMethod}`);
 
     const { jobId, format } = await req.json();
     

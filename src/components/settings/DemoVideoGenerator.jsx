@@ -159,15 +159,28 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
   // Get Shopify session token (for embedded iframe auth)
   const getShopifySessionToken = async () => {
+    const embedded = window.top !== window.self;
+    console.log('[DLTEST] embedded=', embedded);
+    
     try {
       // Check if we're in Shopify embedded context
-      if (!window.shopify?.idToken) return null;
+      if (window.shopify?.idToken) {
+        const token = await window.shopify.idToken();
+        console.log('[DLTEST] Got token from window.shopify.idToken, length=', token?.length || 0);
+        return token;
+      }
       
-      // Get fresh session token from App Bridge
-      const token = await window.shopify.idToken();
-      return token;
+      // Try window.shopify.sessionToken (alternative API)
+      if (window.shopify?.sessionToken) {
+        const token = await window.shopify.sessionToken.get();
+        console.log('[DLTEST] Got token from window.shopify.sessionToken, length=', token?.length || 0);
+        return token;
+      }
+      
+      console.warn('[DLTEST] No Shopify App Bridge token API available');
+      return null;
     } catch (e) {
-      console.warn('[DV] Could not get Shopify session token:', e.message);
+      console.error('[DLTEST] Failed to get Shopify session token:', e);
       return null;
     }
   };
@@ -183,13 +196,17 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       // Get Shopify session token for embedded iframe auth
       const sessionToken = await getShopifySessionToken();
       
+      console.log('[DLTEST] authHeaderPresent=', !!sessionToken);
+      console.log('[DLTEST] tokenLength=', sessionToken?.length || 0);
+      
       const headers = {
         'Content-Type': 'application/json'
       };
       
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
-        console.info('[DV] Using Shopify session token for auth');
+      } else {
+        console.warn('[DLTEST] ⚠️ No session token available - download may fail');
       }
       
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
@@ -310,6 +327,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     // Get Shopify session token for embedded iframe auth
     const sessionToken = await getShopifySessionToken();
     
+    console.log('[DLTEST] Self-test authHeaderPresent=', !!sessionToken);
+    console.log('[DLTEST] Self-test tokenLength=', sessionToken?.length || 0);
+    
     const results = [];
     
     for (const variant of VARIANTS) {
@@ -322,6 +342,8 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         
         if (sessionToken) {
           headers['Authorization'] = `Bearer ${sessionToken}`;
+        } else {
+          console.warn('[DV-TEST] ⚠️ No session token for', variant.id);
         }
         
         const res = await fetch('/api/functions/demoVideoProxyDownload', {
