@@ -100,3 +100,13 @@ Deno.serve(async (req) => {
     }, { status: 500 });
   }
 });
+
+function getFileName(format) {
+  const fileMap = {
+    'mp4_1080': 'ProfitShieldAI-demo-1080p.mp4',
+    'mp4_720': 'ProfitShieldAI-demo-720p.mp4',
+    'mp4_shopify': 'ProfitShieldAI-app-store.mp4',
+    'thumbnail': 'ProfitShieldAI-thumb.jpg'
+  };
+  return fileMap[format] || `demo-video-${format}.mp4`;
+}
