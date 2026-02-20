@@ -807,6 +807,60 @@ export default function DemoVideoGenerator({ resolver = {} }) {
           </CardContent>
         </Card>
       )}
+
+      {/* DEBUG PANEL - Proof of execution */}
+      {showDebugPanel && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Info className="w-4 h-4" />
+                Debug Panel (Owner View)
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDebugPanel(false)}
+                className="h-6"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="text-xs font-mono space-y-2">
+            <div><strong>JobID:</strong> {jobId || 'null'}</div>
+            <div><strong>Status:</strong> {jobStatus || 'null'}</div>
+            <div><strong>IsReady:</strong> {String(isReady)}</div>
+            <div><strong>IsPolling:</strong> {String(isPolling)}</div>
+            <div><strong>DownloadLinks Keys:</strong> {downloadLinks ? JSON.stringify(Object.keys(downloadLinks)) : 'null'}</div>
+            
+            {downloadLinks && (
+              <div className="space-y-1 bg-white p-2 rounded border">
+                <div className="font-bold">Download URLs:</div>
+                {renderVariants.map(v => {
+                  const url = getDownloadUrl(v.id);
+                  return (
+                    <div key={v.id} className="text-[10px]">
+                      <strong>{v.urlKey}:</strong> {url ? url.slice(0, 80) + '...' : '❌ NULL'}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {debugInfo.lastLog && (
+              <div className="bg-slate-900 text-green-400 p-2 rounded">
+                <div className="font-bold">Last Log:</div>
+                <div>{debugInfo.lastLog.timestamp}</div>
+                <div>{debugInfo.lastLog.message}</div>
+                <pre className="text-[9px] mt-1 overflow-auto max-h-32">
+                  {JSON.stringify(debugInfo.lastLog.data, null, 2)}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
