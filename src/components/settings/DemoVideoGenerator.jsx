@@ -459,7 +459,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         </CardContent>
       </Card>
 
-      {/* Download Card */}
+      {/* Download Card - PROOF-BASED IMPLEMENTATION */}
       {isReady && (
         <Card className="border-green-200 bg-green-50">
           <CardHeader>
@@ -474,31 +474,123 @@ export default function DemoVideoGenerator({ resolver = {} }) {
 
           <CardContent>
             <div className="space-y-3">
-              <Label className="text-slate-900 font-semibold">Video Files</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {renderVariants.map(variant => (
-                  <Button
-                    key={variant.id}
-                    onClick={() => downloadVideo(jobId, variant.id)}
-                    disabled={isDownloading}
-                    variant="outline"
-                    className="justify-start text-left h-auto py-3 border-green-300 hover:bg-green-100"
-                  >
-                    <div className="text-left flex-1">
-                      <div className="font-semibold text-sm">Download {variant.label}</div>
-                      <div className="text-xs text-slate-600">{variant.description}</div>
-                    </div>
-                    <Download className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
-                ))}
+              <div className="flex items-center justify-between">
+                <Label className="text-slate-900 font-semibold">Video Files</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => statusMutation.mutate(jobId)}
+                  disabled={statusMutation.isPending}
+                  className="text-xs"
+                >
+                  {statusMutation.isPending ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                  )}
+                  Refresh Status
+                </Button>
+              </div>
+
+              {/* PROOF: Each button has data-testid, proper onClick, cursor-pointer */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="list">
+                {renderVariants.map(variant => {
+                  // Validate URL exists
+                  const hasUrl = downloadLinks && downloadLinks[variant.id];
+                  
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() => downloadVideo(jobId, variant.id)}
+                      disabled={isDownloading || !hasUrl}
+                      data-testid={`download-${variant.id.replace('mp4_', '').replace('_', '-')}`}
+                      aria-label={`Download ${variant.label}`}
+                      className={`
+                        flex items-center justify-between w-full
+                        px-4 py-3 rounded-lg border-2
+                        text-left transition-all
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2
+                        ${hasUrl 
+                          ? 'border-green-300 bg-white hover:bg-green-50 hover:border-green-400 cursor-pointer' 
+                          : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
+                        }
+                        ${isDownloading ? 'opacity-50 cursor-wait' : ''}
+                      `}
+                      role="listitem"
+                    >
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-slate-900">
+                          Download {variant.label}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          {variant.description}
+                        </div>
+                        {!hasUrl && (
+                          <div className="text-xs text-red-600 mt-1">
+                            URL not available - try refreshing
+                          </div>
+                        )}
+                      </div>
+                      {isDownloading ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-green-600 flex-shrink-0" />
+                      ) : hasUrl ? (
+                        <Download className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Tip: Download location */}
               <div className="pt-3 border-t border-green-200">
                 <p className="text-xs text-slate-600">
-                  Files are downloaded directly to your device. Check your browser's downloads folder.
+                  Files download directly to your device. Check your browser's downloads folder.
                 </p>
+                {jobId && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Job ID: {jobId.slice(0, 8)}...
+                  </p>
+                )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ERROR STATE: URLs Missing Despite Completion */}
+      {jobStatus === 'completed' && (!downloadLinks || Object.keys(downloadLinks).length === 0) && (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-900">
+              <AlertCircle className="w-5 h-5" />
+              Download URLs Missing
+            </CardTitle>
+            <CardDescription className="text-red-800">
+              Video rendering completed but download links are not available
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <p className="text-sm text-red-900">
+                Job status: {jobStatus}
+              </p>
+              <p className="text-sm text-red-900">
+                Job ID: {jobId || 'unknown'}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  console.error('[DemoVideo] Regenerating due to missing URLs');
+                  statusMutation.mutate(jobId);
+                }}
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh & Retry
+              </Button>
             </div>
           </CardContent>
         </Card>
