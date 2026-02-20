@@ -60,24 +60,20 @@ Deno.serve(async (req) => {
         const shotstackKey = Deno.env.get('SHOTSTACK_API_KEY');
         const shotstackEnv = Deno.env.get('SHOTSTACK_ENV') || 'sandbox';
         
-        let outputs = {
-          script_url: null,
-          demo_data_url: null,
-          storyboard_url: null,
-          mp4_1080_url: null,
-          mp4_720_url: null,
-          mp4_shopify_url: null,
-          thumbnail_url: null
-        };
+        let outputs = null;
 
         // Try Shotstack if available
         if (shotstackKey) {
           console.log(`[${requestId}] Attempting Shotstack render (env: ${shotstackEnv})`);
           try {
             // Generate minimal valid MP4 using Shotstack
-            const videoUrls = await generateWithShotstack(jobId, shotstackKey, shotstackEnv, requestId);
-            if (videoUrls) {
+            const videoUrls = await generateWithShotstack(jobId, shotstackKey, shotstackEnv, requestId, base44);
+            if (videoUrls && videoUrls.mp4_1080_url) {
               outputs = videoUrls;
+              console.log(`[${requestId}] ✓ Shotstack returned valid URLs:`, videoUrls);
+            } else {
+              console.warn(`[${requestId}] Shotstack returned null/empty URLs, using fallback`);
+              outputs = await generateFallbackMP4s(jobId, requestId);
             }
           } catch (shotstackErr) {
             console.warn(`[${requestId}] Shotstack failed, using fallback:`, shotstackErr.message);
@@ -88,7 +84,12 @@ Deno.serve(async (req) => {
           outputs = await generateFallbackMP4s(jobId, requestId);
         }
 
-        console.log(`[${requestId}] Updating job to completed with outputs`);
+        // CRITICAL: Validate outputs before marking completed
+        if (!outputs || !outputs.mp4_1080_url) {
+          throw new Error('No valid video URLs generated');
+        }
+
+        console.log(`[${requestId}] Updating job to completed with outputs:`, outputs);
         
         // Update job with real video URLs
         const updated = await base44.entities.DemoVideoJob.update(jobId, {
@@ -98,7 +99,9 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString()
         });
         
-        console.log(`[${requestId}] ✓ Job ${jobId} marked COMPLETED`, { outputs });
+        // Verify it was actually saved
+        const verified = await base44.entities.DemoVideoJob.get(jobId);
+        console.log(`[${requestId}] ✓ Job ${jobId} marked COMPLETED. Verified outputs:`, verified.outputs);
         
       } catch (e) {
         console.error(`[${requestId}] ✗ Render failed:`, e.message);
