@@ -350,11 +350,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     console.info('[DV-TEST] ===== SELF TEST START =====');
     setTestResults({ running: true, tests: [] });
     
-    // Get Shopify session token for embedded iframe auth
-    const sessionToken = await getShopifySessionToken();
+    const embedded = isEmbedded();
+    const token = embedded ? await getShopifySessionToken({ timeoutMs: 5000 }) : null;
     
-    console.log('[DLTEST] Self-test authHeaderPresent=', !!sessionToken);
-    console.log('[DLTEST] Self-test tokenLength=', sessionToken?.length || 0);
+    if (embedded && !token) {
+      toast.error('No Shopify session token available for test');
+      setTestResults({ running: false, tests: [] });
+      return;
+    }
     
     const results = [];
     
@@ -362,12 +365,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       console.info(`[DV-TEST] Testing ${variant.id}...`);
       
       try {
-        const headers = {
-          'Content-Type': 'application/json'
-        };
-        
-        if (sessionToken) {
-          headers['Authorization'] = `Bearer ${sessionToken}`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (embedded) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
         
         const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
