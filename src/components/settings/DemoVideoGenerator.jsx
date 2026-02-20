@@ -157,20 +157,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
-  // Download handler
+  // Download handler - Shopify iframe safe
   const downloadVariant = async (format) => {
     if (downloadingVariant || !jobId) return;
     
-    console.info(`[DV] ===== DOWNLOAD CLICK =====`);
-    console.info(`[DV] Format: ${format}`);
-    console.info(`[DV] JobId: ${jobId}`);
-    console.info(`[DV] Button handler fired ✓`);
-    
+    console.info('[DV] click', { jobId, format });
     setDownloadingVariant(format);
 
     try {
-      console.info(`[DV] Sending POST to /api/functions/demoVideoProxyDownload`);
-      
       const res = await fetch('/api/functions/demoVideoProxyDownload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,50 +172,43 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         body: JSON.stringify({ jobId, format })
       });
 
-      console.info(`[DV] Response status: ${res.status} ${res.statusText}`);
-      console.info(`[DV] Response Content-Type: ${res.headers.get('content-type')}`);
-      console.info(`[DV] Response Content-Length: ${res.headers.get('content-length')}`);
+      console.info('[DV] proxy-response', { status: res.status });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[DV] ❌ Response error:`, errorText);
-        throw new Error(errorText || `HTTP ${res.status}`);
+        let err = {};
+        try { err = await res.json(); } catch {}
+        throw new Error(err?.error || `Download failed (${res.status})`);
       }
 
       const blob = await res.blob();
-      console.info(`[DV] Blob size: ${blob.size} bytes`);
-      console.info(`[DV] Blob type: ${blob.type}`);
-      
-      // Validate blob
-      if (blob.size < 10000) {
-        throw new Error(`File too small: ${blob.size} bytes`);
+      console.info('[DV] blob', { size: blob.size, type: blob.type });
+
+      // Quick sanity check (prevents "mp4 that is actually JSON")
+      if (format !== 'thumb') {
+        if (blob.size < 1_500_000) throw new Error('Downloaded file too small to be a real MP4.');
+        const head = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
+        const headText = Array.from(head).map(b => String.fromCharCode(b)).join('');
+        if (!headText.includes('ftyp')) throw new Error('Downloaded file is not a valid MP4 (missing ftyp).');
       }
 
       const url = URL.createObjectURL(blob);
+      const filename = format === '1080p' ? 'ProfitShieldAI-demo-1080p.mp4'
+                     : format === '720p' ? 'ProfitShieldAI-demo-720p.mp4'
+                     : format === 'shopify' ? 'ProfitShieldAI-app-store-1600x900.mp4'
+                     : 'ProfitShieldAI-thumb.jpg';
+
       const a = document.createElement('a');
       a.href = url;
-      a.download = format === '1080p' ? 'ProfitShieldAI-demo-1080p.mp4'
-                 : format === '720p' ? 'ProfitShieldAI-demo-720p.mp4'
-                 : format === 'shopify' ? 'ProfitShieldAI-app-store.mp4'
-                 : 'ProfitShieldAI-thumb.jpg';
-      a.style.display = 'none';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
-      
-      console.info(`[DV] ✓ Download triggered: ${a.download}`);
-      
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
+      a.remove();
+      URL.revokeObjectURL(url);
 
-      const sizeMB = (blob.size / 1_000_000).toFixed(2);
-      toast.success(`Downloaded ${format}`, { description: `${sizeMB}MB • ${blob.type}` });
-      
-      console.info(`[DV] ===========================`);
+      toast.success(`Downloaded ${format}`);
     } catch (err) {
-      console.error(`[DV] ❌ Download failed:`, err.message);
-      toast.error('Download failed: ' + err.message);
+      console.error('[DV] Download failed:', err.message);
+      toast.error(err.message);
     } finally {
       setDownloadingVariant(null);
     }
@@ -443,38 +430,31 @@ export default function DemoVideoGenerator({ resolver = {} }) {
             {isReady && (
               <div className="space-y-3">
                 <Label>Download Formats</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-3">
                   {VARIANTS.map(variant => {
                     const isDownloading = downloadingVariant === variant.id;
 
                     return (
-                      <Button
+                      <button
                         key={variant.id}
                         type="button"
-                        onClick={() => {
-                          console.info(`[DV-UI] Button clicked: ${variant.id}`);
-                          downloadVariant(variant.id);
-                        }}
+                        onClick={() => downloadVariant(variant.id)}
                         disabled={isDownloading}
-                        variant="outline"
-                        className="h-auto py-3 px-4 justify-start cursor-pointer hover:bg-green-50 hover:border-green-400"
+                        style={{ pointerEvents: 'auto' }}
+                        className="w-full text-left border rounded-lg p-4 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex-1 text-left">
-                            <div className="font-semibold text-sm">
-                              {variant.label}
-                            </div>
-                            <div className="text-xs text-slate-600 font-normal">
-                              {variant.description}
-                            </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-semibold">{variant.label}</div>
+                            <div className="text-sm text-slate-500">{variant.description}</div>
                           </div>
                           {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin ml-3 text-green-600" />
+                            <Loader2 className="w-4 h-4 animate-spin text-green-600 ml-3" />
                           ) : (
-                            <Download className="w-4 h-4 ml-3 text-green-600" />
+                            <Download className="w-4 h-4 text-green-600 ml-3" />
                           )}
                         </div>
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
