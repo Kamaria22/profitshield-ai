@@ -30,8 +30,19 @@ const VARIANTS = [
 ];
 
 function DemoVideoGenerator({ resolver = {} }) {
-  const isResolved = resolver?.ok ?? false;
-  const tenantId = resolver?.tenantId;
+  let resolverCheck = null;
+  let isResolved = false;
+  let tenantId = null;
+  
+  try {
+    resolverCheck = requireResolved(resolver);
+    isResolved = resolverCheck?.ok === true;
+    tenantId = resolverCheck?.tenantId;
+  } catch (e) {
+    isResolved = false;
+    tenantId = null;
+  }
+  
   const { hasPermission } = usePermissions() || {};
 
   const [jobId, setJobId] = useState(null);
