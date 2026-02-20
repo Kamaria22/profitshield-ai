@@ -29,6 +29,43 @@ const VARIANTS = [
   { id: 'thumb', label: 'Thumbnail (JPEG)', description: 'Preview image' }
 ];
 
+// ✅ Overlay diagnostic helper
+function closestBlockingOverlay(el) {
+  let cur = el;
+  while (cur && cur !== document.documentElement) {
+    const cs = window.getComputedStyle(cur);
+    const isFixedFull =
+      cs.position === 'fixed' &&
+      (cs.inset === '0px' || (cs.top === '0px' && cs.left === '0px')) &&
+      (cs.width === '100%' || cs.right === '0px') &&
+      (cs.height === '100%' || cs.bottom === '0px');
+    const blocksClicks = cs.pointerEvents !== 'none' && cs.visibility !== 'hidden' && cs.display !== 'none';
+    const z = Number(cs.zIndex || 0);
+
+    if (isFixedFull && blocksClicks && z >= 20) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+function safeStringifyStyle(el) {
+  const cs = window.getComputedStyle(el);
+  return {
+    tag: el.tagName.toLowerCase(),
+    id: el.id || null,
+    className: el.className || null,
+    position: cs.position,
+    pointerEvents: cs.pointerEvents,
+    zIndex: cs.zIndex,
+    inset: cs.inset,
+    top: cs.top,
+    left: cs.left,
+    width: cs.width,
+    height: cs.height,
+    opacity: cs.opacity,
+  };
+}
+
 export default function DemoVideoGenerator({ resolver = {} }) {
   let tenantId = null;
   let isResolved = false;
