@@ -17,64 +17,75 @@ Deno.serve(async (req) => {
     
     const base44 = createClientFromRequest(req);
     
-    // DUAL AUTH MODE: Try Base44 session first, then Shopify token (OR logic, not AND)
     let user = null;
+    let authMethod = null;
+    let shopDomain = null;
+    
+    // ============= AUTH ATTEMPT 1: Base44 cookie session =============
     try {
       user = await base44.auth.me();
-      console.log(`[DLPROXY] ✓ Base44 user: ${user.email}`);
+      authMethod = 'base44_cookie';
+      console.log(`[DLPROXY-AUTH] ✓ Base44 session user: ${user.email}`);
     } catch (e) {
-      // Expected in embedded iframe: app restricted to workspace
-      console.log(`[DLPROXY] No Base44 session (expected in embedded): ${e.message}`);
+      console.log(`[DLPROXY-AUTH] No Base44 session: ${e.message}`);
       user = null;
     }
-    
-    let shopDomain = null;
-    let authMethod = null;
-    let jwtVerifyOk = false;
-    let extractedShop = null;
-    
-    if (user) {
-      // ✅ AUTH MODE 1: Base44 cookie session
-      authMethod = 'base44_cookie';
-      jwtVerifyOk = true;
-      console.log(`[DLPROXY] ✓ Auth via Base44 session: ${user.email}`);
-    } else if (hasAuthHeader && authHeaderPrefix === 'Bearer') {
-      // ✅ AUTH MODE 2: Shopify App Bridge session token
+
+    // ============= AUTH ATTEMPT 2: Shopify bearer token (if no Base44 user) =============
+    if (!user && hasAuthHeader && authHeaderPrefix === 'Bearer') {
+      console.log(`[DLPROXY-AUTH] Attempting Shopify JWT verification...`);
+      
       const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
-      
       if (!apiSecret) {
-        console.error(`[DLPROXY] ✗ SHOPIFY_API_SECRET not configured`);
-        return Response.json({ error: 'Server configuration error' }, { status: 500 });
+        console.error(`[DLPROXY-AUTH] ✗ SHOPIFY_API_SECRET not set`);
+        return Response.json({ error: 'Server misconfigured: no SHOPIFY_API_SECRET' }, { status: 500 });
       }
-      
+
       try {
+        console.log(`[DLPROXY-AUTH] JWT token length: ${token.length}`);
         const secret = new TextEncoder().encode(apiSecret);
         const { payload } = await jose.jwtVerify(token, secret);
         
-        jwtVerifyOk = true;
+        console.log(`[DLPROXY-AUTH] ✓ JWT verified successfully`);
+        console.log(`[DLPROXY-AUTH] JWT payload keys:`, Object.keys(payload).join(', '));
+        
+        // Extract shop domain from JWT
         shopDomain = payload.dest?.replace(/^https?:\/\//, '') || 
                      payload.iss?.replace(/^https?:\/\//, '') ||
                      payload.sub?.split('/')[0];
         
-        extractedShop = shopDomain;
         authMethod = 'shopify_bearer';
-        console.log(`[DLPROXY] ✓ Auth via Shopify bearer token, shop=${extractedShop}`);
+        console.log(`[DLPROXY-AUTH] ✓ Auth via Shopify bearer, shop=${shopDomain}`);
       } catch (e) {
-        jwtVerifyOk = false;
-        console.log(`[DLPROXY] ✗ Shopify JWT verification failed: ${e.message}`);
-        return Response.json({ error: `Invalid Shopify token: ${e.message}` }, { status: 401 });
+        console.error(`[DLPROXY-AUTH] ✗ JWT verification FAILED:`);
+        console.error(`  - Error: ${e.message}`);
+        console.error(`  - Type: ${e.name}`);
+        if (e.message.includes('signature')) {
+          console.error(`  - Reason: Invalid signature (SHOPIFY_API_SECRET mismatch?)`);
+        } else if (e.message.includes('exp')) {
+          console.error(`  - Reason: Token expired (clock skew?)`);
+        }
+        return Response.json({ 
+          error: `JWT verification failed: ${e.message}`,
+          details: `Token: ${token.slice(0, 20)}... | Secret: ${apiSecret.slice(0, 10)}...`
+        }, { status: 401 });
       }
-    } else {
-      // ❌ AUTH FAIL: No Base44 user AND no Bearer token
-      jwtVerifyOk = false;
-      console.log(`[DLPROXY] ✗ No authentication: no Base44 user, no Authorization header`);
-      return Response.json({ 
-        error: 'Unauthorized (no cookie user and no bearer token)' 
-      }, { status: 401 });
+    } else if (!user && hasAuthHeader && authHeaderPrefix !== 'Bearer') {
+      console.error(`[DLPROXY-AUTH] ✗ Wrong auth header format: ${authHeaderPrefix} (expected Bearer)`);
+      return Response.json({ error: `Invalid auth header format: ${authHeaderPrefix}` }, { status: 401 });
+    } else if (!user && !hasAuthHeader) {
+      console.error(`[DLPROXY-AUTH] ✗ No authorization: no cookie AND no Bearer token`);
+      return Response.json({ error: 'Unauthorized: missing authentication' }, { status: 401 });
     }
+
+    // ============= FINAL AUTH STATE =============
+    const isAuthenticated = !!user || (authMethod === 'shopify_bearer' && !!shopDomain);
+    console.log(`[DLPROXY-AUTH] Summary: method=${authMethod}, authenticated=${isAuthenticated}, user=${user?.email || 'none'}, shop=${shopDomain || 'none'}`);
     
-    // Log auth summary
-    console.log(`[DLPROXY] chosenAuthMode=${authMethod}, jwtVerifyOk=${jwtVerifyOk}`);
+    if (!isAuthenticated) {
+      console.error(`[DLPROXY-AUTH] ✗ FINAL: Not authenticated after all attempts`);
+      return Response.json({ error: 'Authentication failed' }, { status: 401 });
+    }
 
     const { jobId, format } = await req.json();
     
