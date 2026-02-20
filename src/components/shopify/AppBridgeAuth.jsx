@@ -5,13 +5,21 @@
 
 import { useEffect, useState } from 'react';
 
-// Parse embedded params from URL
-function parseEmbeddedParams() {
-  const params = new URLSearchParams(window.location.search);
-  const host = params.get('host');
-  const apiKey = params.get('apiKey') || '';
+// Get apiKey from environment/config
+function getApiKey() {
+  // Try from environment variable (build-time or runtime)
+  if (typeof window !== 'undefined' && window.__SHOPIFY_API_KEY__) {
+    return window.__SHOPIFY_API_KEY__;
+  }
   
-  return { host, apiKey };
+  // Try from meta tag if injected by server
+  const metaTag = typeof window !== 'undefined' ? document.querySelector('meta[name="shopify-api-key"]') : null;
+  if (metaTag?.content) {
+    return metaTag.content;
+  }
+  
+  // Fallback - this will need to be provided
+  return null;
 }
 
 // Get session token using App Bridge
@@ -23,14 +31,31 @@ async function getAppBridgeToken() {
       return null;
     }
 
-    const { host, apiKey } = parseEmbeddedParams();
-    
+    const params = new URLSearchParams(window.location.search);
+    const host = params.get('host');
+    const apiKey = getApiKey();
+
+    // PROOF LOG 1: Context check
+    console.info('[AB-PROOF]', {
+      embedded: window.top !== window.self,
+      hostPresent: !!host,
+      hostLen: host?.length || 0,
+      apiKeyPresent: !!apiKey,
+      apiKeyLen: apiKey?.length || 0
+    });
+
+    // Hard-fail if not embedded or missing host
     if (!host) {
-      console.log('[AppBridge] Not embedded (no host param)');
+      console.error('[AppBridge] ✗ NOT EMBEDDED: Missing host param. Must open inside Shopify Admin.');
       return null;
     }
 
-    console.log('[AppBridge] host=', host, 'apiKey=', apiKey ? apiKey.slice(0, 10) + '...' : 'MISSING');
+    if (!apiKey) {
+      console.error('[AppBridge] ✗ FATAL: apiKey not found in env/config. Cannot initialize App Bridge.');
+      return null;
+    }
+
+    console.log('[AppBridge] Initializing with host=', host.slice(0, 20) + '...');
 
     // Dynamically load Shopify App Bridge if not already loaded
     if (!window.shopifyApp) {
@@ -52,24 +77,18 @@ async function getAppBridgeToken() {
       });
     }
 
-    // Initialize App Bridge - can work with or without explicit apiKey
+    // Check App Bridge is available
     if (!window.shopifyApp?.AppBridge) {
-      console.error('[AppBridge] ✗ window.shopifyApp.AppBridge not available');
+      console.error('[AppBridge] ✗ window.shopifyApp.AppBridge not available after script load');
       return null;
     }
 
-    const config = {
+    console.log('[AppBridge] Creating app instance...');
+    const app = window.shopifyApp.AppBridge.createApp({
+      apiKey,
       host,
       forceRedirect: true
-    };
-    
-    // Only add apiKey if provided
-    if (apiKey) {
-      config.apiKey = apiKey;
-    }
-
-    console.log('[AppBridge] Creating app with config:', Object.keys(config));
-    const app = window.shopifyApp.AppBridge.createApp(config);
+    });
 
     if (!app) {
       console.error('[AppBridge] ✗ createApp returned null');
@@ -78,18 +97,22 @@ async function getAppBridgeToken() {
 
     console.log('[AppBridge] App instance created, calling getSessionToken()...');
 
-    // Get session token - this is the key call
+    // Get session token
     const token = await app.getSessionToken();
     
+    // PROOF LOG 2: Token retrieval result
+    console.info('[AB-PROOF] tokenLen=', token?.length || 0);
+
     if (!token) {
       console.error('[AppBridge] ✗ getSessionToken returned empty/null');
       return null;
     }
 
-    console.log('[AppBridge] ✓ Token obtained, length=', token.length);
+    console.log('[AppBridge] ✓ Token obtained successfully, length=', token.length);
     return token;
   } catch (err) {
-    console.error('[AppBridge] ✗ Error:', err.message, err.stack);
+    console.error('[AppBridge] ✗ Error:', err.message);
+    if (err.stack) console.error('[AppBridge] Stack:', err.stack);
     return null;
   }
 }
