@@ -64,7 +64,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // IFRAME-SAFE: Download using direct endpoint URL + top-level navigation
+  // AUTHENTICATED DOWNLOAD: Fetch with credentials, then trigger blob download
   const downloadVideo = useCallback(async (jid, variant) => {
     if (!jid || !variant) {
       toast.error('Invalid download request');
@@ -75,31 +75,41 @@ export default function DemoVideoGenerator({ resolver = {} }) {
       setIsDownloading(true);
       console.log(`[DemoVideoGenerator] Downloading ${variant} for job ${jid}`);
       
-      // Build direct download URL (same-origin endpoint)
-      const baseUrl = window.location.origin;
-      const downloadUrl = `${baseUrl}/api/functions/demoVideoProxyDownload?jobId=${encodeURIComponent(jid)}&format=${encodeURIComponent(variant)}`;
+      // Call backend function with credentials (uses SDK authentication)
+      const response = await base44.functions.invoke('demoVideoProxyDownload', {
+        jobId: jid,
+        format: variant
+      });
       
-      console.log('[DemoVideoGenerator] Download URL:', downloadUrl);
-      
-      // CRITICAL: For Shopify embedded iframe, use top-level navigation
-      // This bypasses iframe restrictions and opens download in parent window
-      if (window.top && window.top !== window.self) {
-        // We're in an iframe - use parent window navigation
-        window.top.location.href = downloadUrl;
-      } else {
-        // Normal browser - use standard download
-        window.location.href = downloadUrl;
+      if (!response.data) {
+        throw new Error('No data received from download endpoint');
       }
       
-      // Success feedback
+      // Response.data is already the blob/arraybuffer from the function
+      const blob = new Blob([response.data], { type: 'video/mp4' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create temporary download link
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getFileName(variant);
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      
+      // Trigger download
+      a.click();
+      
+      // Cleanup
       setTimeout(() => {
-        toast.success(`${variant} download started!`);
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success(`${variant} downloaded!`);
         setIsDownloading(false);
-      }, 500);
+      }, 100);
       
     } catch (error) {
       console.error('[DemoVideoGenerator] Download error:', error);
-      toast.error(`Download failed: ${error.message}`);
+      toast.error(`Download failed: ${error.message || 'Unknown error'}`);
       setIsDownloading(false);
     }
   }, []);
