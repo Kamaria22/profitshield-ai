@@ -181,34 +181,17 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     setDownloadingVariant(format);
 
     try {
-      // Get Shopify session token for embedded iframe auth (with 3s timeout)
+      const headers = { 'Content-Type': 'application/json' };
       const embedded = isEmbedded();
-      let sessionToken = null;
+      const token = embedded ? await getShopifySessionToken({ timeoutMs: 5000 }) : null;
       
       if (embedded) {
-        try {
-          sessionToken = await Promise.race([
-            getShopifySessionToken(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Token timeout')), 3000)
-            )
-          ]);
-        } catch (tokenErr) {
-          console.warn('[DV] Token retrieval failed:', tokenErr.message);
-          toast.warning('Session token unavailable, using fallback auth');
+        if (!token) {
+          toast.error('No Shopify session token available');
+          setDownloadingVariant(null);
+          return;
         }
-      }
-      
-      console.log('[DLTEST] embedded=', embedded);
-      console.log('[DLTEST] authHeaderPresent=', !!sessionToken);
-      console.log('[DLTEST] tokenLength=', sessionToken?.length || 0);
-      
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (sessionToken) {
-        headers['Authorization'] = `Bearer ${sessionToken}`;
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
       const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
