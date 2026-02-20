@@ -224,15 +224,24 @@ export default function Home() {
   // Skip skeleton - render immediately with empty state
   const showDashboard = !summaryLoading || dashboardSummary;
 
+  if (!showDashboard) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-12 h-12 rounded-lg bg-emerald-500 animate-pulse" />
+      </div>
+    );
+  }
+
   return (
     <SubscriptionGate tenant={tenant}>
-      {/* Onboarding Tutorial */}
-      <OnboardingTutorial
-        open={tutorialOpen}
-        onClose={handleTutorialClose}
-        onUpgrade={handleUpgrade}
-        currentTier={tenant?.subscription_tier || 'trial'}
-      />
+      {tutorialOpen && (
+        <OnboardingTutorial
+          open={tutorialOpen}
+          onClose={handleTutorialClose}
+          onUpgrade={handleUpgrade}
+          currentTier={tenant?.subscription_tier || 'trial'}
+        />
+      )}
 
       <div className="h-full flex flex-col -m-4 lg:-m-6">
         {/* Executive Summary Bar - Critical above-the-fold */}
