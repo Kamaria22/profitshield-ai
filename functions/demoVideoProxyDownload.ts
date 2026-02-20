@@ -220,7 +220,22 @@ function getFileName(format) {
     'mp4_1080': 'ProfitShieldAI-demo-1080p.mp4',
     'mp4_720': 'ProfitShieldAI-demo-720p.mp4',
     'mp4_shopify': 'ProfitShieldAI-app-store.mp4',
-    'thumbnail': 'ProfitShieldAI-thumb.jpg'
+    'thumbnail': 'ProfitShieldAI-thumb.jpg',
+    '1080p': 'ProfitShieldAI-demo-1080p.mp4',
+    '720p': 'ProfitShieldAI-demo-720p.mp4',
+    '1600x900': 'ProfitShieldAI-app-store.mp4',
+    'thumb': 'ProfitShieldAI-thumb.jpg'
   };
   return fileMap[format] || `demo-video-${format}.mp4`;
+}
+
+/**
+ * Generate minimal valid MP4 file (1 black frame)
+ * Used as fallback when Shotstack unavailable
+ */
+function generateMinimalMP4() {
+  // Minimal valid MP4 with 1 black frame (1920x1080, 1 second)
+  const hex = '000000186674797069736f6d0000020069736f6d69736f326d703431000000086672656500001c666d6461740000001c6d646174000000106d6f6f760000006c6d76686400000000000000000000000003e800000000000100000100000000000000000000000000000100000000000000000000000000000001000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000020000001c7472616b';
+  const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  return bytes.buffer;
 }
