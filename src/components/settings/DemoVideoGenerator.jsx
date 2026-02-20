@@ -438,29 +438,26 @@ export default function DemoVideoGenerator({ resolver = {} }) {
                 ))}
               </div>
 
-              {/* Fallback: Show links if available */}
+              {/* Fallback: Alternative download links */}
               {downloadLinks && Object.keys(downloadLinks).length > 0 && (
                 <div className="pt-3 border-t border-green-200">
-                  <Label className="text-xs text-slate-600">Direct Links</Label>
+                  <Label className="text-xs text-slate-600">Alternative Download Methods</Label>
                   <div className="space-y-1 mt-2">
-                    {Object.entries(downloadLinks).map(([key, url]) => {
-                      if (!url || typeof url !== 'string') return null;
-                      const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
+                    {renderVariants.map(variant => {
+                      const url = downloadLinks[variant.id];
+                      if (!url) return null;
+                      const baseUrl = window.location.origin;
+                      const proxyUrl = `${baseUrl}/api/functions/demoVideoProxyDownload?jobId=${encodeURIComponent(jobId)}&format=${encodeURIComponent(variant.id)}`;
                       return (
-                        <div key={key} className="flex items-center gap-2 text-xs">
-                          <span className="text-slate-600 capitalize">{key.replace(/_url$/, '').replace(/_/g, ' ')}:</span>
-                          {isValidUrl ? (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-600 hover:underline break-all"
-                            >
-                              {url.substring(0, 50)}...
-                            </a>
-                          ) : (
-                            <span className="text-slate-600 break-all">{url.substring(0, 50)}...</span>
-                          )}
+                        <div key={variant.id} className="flex items-center gap-2 text-xs">
+                          <span className="text-slate-600">{variant.label}:</span>
+                          <a
+                            href={proxyUrl}
+                            target="_top"
+                            className="text-emerald-600 hover:underline"
+                          >
+                            Open in new tab
+                          </a>
                         </div>
                       );
                     })}
