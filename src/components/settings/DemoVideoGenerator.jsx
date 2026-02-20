@@ -253,6 +253,33 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     return format === 'thumbnail' ? 'image/jpeg' : 'video/mp4';
   };
 
+  const renderVariants = [
+    { id: '1080p', label: 'Full HD (1920x1080)', description: 'YouTube, marketing materials', urlKey: 'mp4_1080_url' },
+    { id: '720p', label: 'HD (1280x720)', description: 'Web, social media', urlKey: 'mp4_720_url' },
+    { id: '1600x900', label: 'Shopify App Store (1600x900)', description: 'App marketplace', urlKey: 'mp4_shopify_url' },
+    { id: 'thumbnail', label: 'Thumbnail (JPEG)', description: 'Preview image', urlKey: 'thumbnail_url' },
+  ];
+
+  // Update debug info whenever download links change
+  useEffect(() => {
+    if (downloadLinks) {
+      addDebugLog('📋 Download links updated', {
+        keys: Object.keys(downloadLinks),
+        preview: Object.fromEntries(
+          Object.entries(downloadLinks).map(([k, v]) => [
+            k, 
+            typeof v === 'string' ? v.slice(0, 60) + '...' : v
+          ])
+        )
+      });
+      setDebugInfo(prev => ({
+        ...prev,
+        downloadLinksKeys: Object.keys(downloadLinks),
+        lastUpdated: new Date().toISOString()
+      }));
+    }
+  }, [downloadLinks, addDebugLog]);
+
   const versions = [
     {
       id: '60s',
