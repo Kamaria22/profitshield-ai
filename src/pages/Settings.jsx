@@ -57,7 +57,7 @@ import ProfitAlertRulesManager from '@/components/alerts/ProfitAlertRulesManager
 import RiskModelConfig from '@/components/settings/RiskModelConfig';
 import RoleManagement from '@/components/settings/RoleManagement';
 import DataExportPanel from '@/components/settings/DataExportPanel';
-import DemoVideoGenerator from '@/components/settings/DemoVideoGenerator';
+import DemoVideoGenerator from '@/components/settings/DemoVideoGeneratorFixed';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
