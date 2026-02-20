@@ -210,35 +210,70 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         contentLength: res.headers.get('content-length')
       });
 
+      // Handle auth errors explicitly
+      if (res.status === 401) {
+        const errorData = await res.json().catch(() => ({}));
+        const msg = errorData.error || 'Unauthorized';
+        console.error('[DV] Auth error:', msg);
+        toast.error('Unauthorized download', { 
+          description: embedded ? 'Session expired. Please reload the app.' : msg 
+        });
+        setDownloadingVariant(null);
+        return;
+      }
+
       if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(text.slice(0, 200) || `Download failed (${res.status})`);
+        const errorText = await res.text().catch(() => '');
+        console.error('[DV] download error', { status: res.status, errorText });
+        toast.error('Download failed', { 
+          description: errorText.slice(0, 160) || `HTTP ${res.status}` 
+        });
+        setDownloadingVariant(null);
+        return;
       }
 
       const contentType = res.headers.get('content-type') || '';
-      
-      // CRITICAL: Must not be JSON (common error case)
-      if (contentType.includes('application/json')) {
-        const text = await res.text();
-        throw new Error(`Server returned JSON instead of file: ${text.slice(0, 200)}`);
+      const blob = await res.blob();
+
+      // Reject JSON masquerading as a file
+      if (contentType.includes('application/json') || blob.type.includes('json')) {
+        const errorText = await blob.text().catch(() => '');
+        console.error('[DV] Received JSON instead of file:', errorText);
+        toast.error('Download returned JSON, not a file', { 
+          description: errorText.slice(0, 160) 
+        });
+        setDownloadingVariant(null);
+        return;
       }
 
-      const blob = await res.blob();
       console.info('[DV] blob', { size: blob.size, type: blob.type });
 
-      // Sanity check (prevents "mp4 that is actually JSON or error page")
-      if (blob.size < 200_000) {
-        throw new Error(`File too small (${blob.size} bytes). Likely an error page, not a video.`);
+      // Verify minimum file size
+      const minSize = format === 'thumb' ? 500 : 1000;
+      if (blob.size < minSize) {
+        console.error('[DV] File too small:', blob.size, 'bytes');
+        toast.error('Download failed', { 
+          description: `File too small (${blob.size} bytes)` 
+        });
+        setDownloadingVariant(null);
+        return;
       }
 
-      // MP4 signature validation
+      // Verify MP4 signature for video files
       if (format !== 'thumb') {
-        const head = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
-        const headText = Array.from(head).map(b => String.fromCharCode(b)).join('');
-        if (!headText.includes('ftyp')) {
-          throw new Error('Downloaded file is not a valid MP4 (missing ftyp signature).');
+        const header = await blob.slice(0, 12).arrayBuffer();
+        const view = new Uint8Array(header);
+        const ftypIndex = new TextDecoder().decode(view).indexOf('ftyp');
+        
+        if (ftypIndex === -1) {
+          console.error('[DV] Invalid MP4: missing ftyp signature');
+          toast.error('Download failed', { description: 'Invalid MP4 file' });
+          setDownloadingVariant(null);
+          return;
         }
       }
+
+      console.log('[DV] ✓ Valid file:', { format, size: blob.size, type: blob.type });
 
       const url = URL.createObjectURL(blob);
       const filename = format === '1080p' ? 'ProfitShieldAI-demo-1080p.mp4'
@@ -262,8 +297,14 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         description: `${filename} • ${sizeMB}MB` 
       });
     } catch (err) {
-      console.error('[DV] Download failed:', err);
-      toast.error(err.message || 'Download failed');
+      const isTimeout = err?.name === 'AbortError' || String(err?.message).includes('timeout');
+      const msg = isTimeout 
+        ? 'Request timed out. Try refresh or check network.' 
+        : (err?.message || 'Unknown error');
+      
+      console.error('[DV] Download error:', err);
+      toast.error('Download error', { description: msg });
+      // Don't rethrow - prevents DevTools pause spiral
     } finally {
       setDownloadingVariant(null);
     }
