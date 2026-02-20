@@ -103,37 +103,41 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         return;
       }
       
-      // Otherwise use proxy endpoint
+      // Otherwise use proxy endpoint - MUST use fetch directly for binary data
       console.info('[DemoVideo] download-via-proxy', { variant, jobId: jid });
-      const response = await base44.functions.invoke('demoVideoProxyDownload', {
-        jobId: jid,
-        format: variant
+      
+      // Get function URL
+      const functionUrl = `/api/functions/demoVideoProxyDownload`;
+      
+      // Make direct fetch request with binary response type
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Include auth cookie automatically
+        },
+        credentials: 'include', // Send cookies for auth
+        body: JSON.stringify({
+          jobId: jid,
+          format: variant
+        })
       });
       
       // PROOF B: Validate response
-      if (!response || !response.data) {
-        console.error('[DemoVideo] No data in response:', response);
-        throw new Error('No data received from download endpoint');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
+        console.error('[DemoVideo] Download failed:', response.status, errorData);
+        throw new Error(errorData.error || `Download failed with status ${response.status}`);
       }
       
-      console.info('[DemoVideo] Received response:', {
-        dataType: typeof response.data,
-        dataSize: response.data instanceof ArrayBuffer ? response.data.byteLength : 
-                  response.data instanceof Blob ? response.data.size : 
-                  'unknown',
+      // Get binary data as blob
+      const blob = await response.blob();
+      
+      console.info('[DemoVideo] Received binary data:', {
+        blobSize: blob.size,
+        blobType: blob.type,
         status: response.status
       });
-      
-      // Handle response - could be ArrayBuffer or Blob
-      let blob;
-      if (response.data instanceof Blob) {
-        blob = response.data;
-      } else if (response.data instanceof ArrayBuffer) {
-        const mimeType = variant === 'thumbnail' ? 'image/jpeg' : 'video/mp4';
-        blob = new Blob([response.data], { type: mimeType });
-      } else {
-        throw new Error('Invalid response data type');
-      }
       
       const url = window.URL.createObjectURL(blob);
       const filename = getFileName(variant);
@@ -161,7 +165,7 @@ export default function DemoVideoGenerator({ resolver = {} }) {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         console.info('[DemoVideo] ✓ Download complete:', variant);
-        toast.success(`${variant.replace('mp4_', '').toUpperCase()} download started!`);
+        toast.success(`Download started: ${filename}`);
         setIsDownloading(false);
       }, 100);
       
