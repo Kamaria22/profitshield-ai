@@ -331,13 +331,13 @@ export default function Home() {
             {/* Side Rail - Lazy loaded */}
             <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
               <div className="sticky top-0 space-y-4">
-                <LazyPanel>
+                <Suspense fallback={<PanelSkeleton />}>
                   <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
-                </LazyPanel>
+                </Suspense>
                 {resolver?.user?.id && (
-                  <LazyPanel>
+                  <Suspense fallback={<PanelSkeleton />}>
                     <CustomAlerts tenantId={authTenantId} userId={resolver.user.id} />
-                  </LazyPanel>
+                  </Suspense>
                 )}
               </div>
             </div>
