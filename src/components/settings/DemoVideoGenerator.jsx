@@ -259,15 +259,26 @@ export default function DemoVideoGenerator({ resolver = {} }) {
     try {
       const headers = { 'Content-Type': 'application/json' };
       const embedded = isEmbedded();
-      const token = embedded ? await getShopifySessionToken({ timeoutMs: 5000 }) : null;
+      let token = null;
+      let tokenRetrievalFailed = false;
       
+      // Try to get Shopify session token if embedded (non-blocking failure)
       if (embedded) {
-        if (!token) {
-          toast.error('No Shopify session token available');
-          setDownloadingVariant(null);
-          return;
+        try {
+          token = await getShopifySessionToken({ timeoutMs: 3000 });
+        } catch (e) {
+          console.warn('[DV] Token retrieval failed (will use cookie auth):', e.message);
+          tokenRetrievalFailed = true;
         }
+      }
+      
+      // Attach Authorization header ONLY if token exists
+      if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.info('[DV] Sending Bearer token', { tokenLen: token.length, embedded });
+      } else if (tokenRetrievalFailed && embedded) {
+        console.info('[DV] No token available, relying on cookie auth', { embedded });
+        toast.info('Using secure cookie authentication', { description: 'Shopify session token not available' });
       }
       
       const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
