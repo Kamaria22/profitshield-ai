@@ -11,6 +11,13 @@ import React, { useEffect } from 'react';
  * 5. Watermarking and ownership verification
  */
 
+function generateBuildSignature() {
+  // Generate unique build signature
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  return `PS_${timestamp}_${random}`.toUpperCase();
+}
+
 const PROFITSHIELD_SIGNATURE = {
   owner: 'rohan.a.roberts@gmail.com',
   copyright: '© 2026 ProfitShield AI. All Rights Reserved.',
@@ -21,12 +28,7 @@ const PROFITSHIELD_SIGNATURE = {
   build_signature: generateBuildSignature()
 };
 
-function generateBuildSignature() {
-  // Generate unique build signature
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(7);
-  return `PS_${timestamp}_${random}`.toUpperCase();
-}
+export { PROFITSHIELD_SIGNATURE };
 
 function verifyIntegrity() {
   // Check for tampering attempts
