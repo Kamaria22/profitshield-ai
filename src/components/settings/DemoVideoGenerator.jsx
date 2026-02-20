@@ -425,15 +425,37 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   const isReady = jobStatus === 'completed';
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Demo Video Generator</CardTitle>
-        <CardDescription>
-          Generate marketing videos for your ProfitShield AI app
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* AI Scripting Assistant */}
+      <AIScriptingAssistant 
+        onScriptGenerated={(script) => {
+          console.log('[DV] AI Script generated:', script);
+          toast.success('Script ready! Use it to customize your video generation.');
+        }}
+      />
 
-      <CardContent className="space-y-6">
+      {/* Advanced Download Options */}
+      {jobId && jobStatus === 'completed' && (
+        <AdvancedDownloadOptions 
+          onDownload={(opts) => {
+            console.log('[DV] Advanced download:', opts);
+            downloadVariant(opts.format);
+          }}
+        />
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-600" />
+            AI Demo Video Generator
+          </CardTitle>
+          <CardDescription>
+            Generate professional demo videos powered by AI
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
         {/* Version Selection */}
         <div className="space-y-2">
           <Label>Video Length</Label>
