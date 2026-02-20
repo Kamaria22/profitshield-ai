@@ -86,8 +86,19 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    // Validate output exists
-    const outputKey = `${format || 'mp4_1080'}_url`;
+    // Map format to output key
+    const formatMap = {
+      '1080p': 'mp4_1080_url',
+      '720p': 'mp4_720_url',
+      '1600x900': 'mp4_shopify_url',
+      'shopify': 'mp4_shopify_url',
+      'thumbnail': 'thumbnail_url',
+      'thumb': 'thumbnail_url'
+    };
+    
+    const outputKey = formatMap[format] || 'mp4_1080_url';
+    console.log(`[demoVideoProxyDownload:${requestId}] Format mapping: ${format} -> ${outputKey}`);
+    
     if (!job.outputs) {
       console.error(`[demoVideoProxyDownload:${requestId}] No outputs object`);
       return Response.json({ 
