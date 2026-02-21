@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
-import { requireResolved, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { requireResolved } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 import { useAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import AIScriptingAssistant from './AIScriptingAssistant';
 import AdvancedDownloadOptions from './AdvancedDownloadOptions';
-import { 
-  Download, 
+import {
+  Download,
   Loader2,
-  CheckCircle,
-  AlertCircle,
   Sparkles,
-  Clock,
   RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,7 +30,7 @@ function DemoVideoGenerator({ resolver = {} }) {
   let resolverCheck = null;
   let isResolved = false;
   let tenantId = null;
-  
+
   try {
     resolverCheck = requireResolved(resolver);
     isResolved = resolverCheck?.ok === true;
@@ -42,7 +39,7 @@ function DemoVideoGenerator({ resolver = {} }) {
     isResolved = false;
     tenantId = null;
   }
-  
+
   const { hasPermission } = usePermissions() || {};
 
   const [jobId, setJobId] = useState(null);
@@ -54,10 +51,15 @@ function DemoVideoGenerator({ resolver = {} }) {
   const [useDemoData, setUseDemoData] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [testResults, setTestResults] = useState(null);
-  
+
   const pollIntervalRef = useRef(null);
   const pollStartRef = useRef(null);
   const pollCountRef = useRef(0);
+
+  // ✅ ONE place to calculate "embedded" so it’s never undefined
+  const embedded =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('host');
 
   // Real Shopify App Bridge authentication
   const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useAppBridgeToken();
@@ -66,7 +68,7 @@ function DemoVideoGenerator({ resolver = {} }) {
   useEffect(() => {
     const loadRecent = async () => {
       if (!isResolved || !tenantId) return;
-      
+
       try {
         const { data } = await base44.functions.invoke('demoVideoLoadRecent', { tenant_id: tenantId });
         if (data?.job) {
@@ -77,7 +79,7 @@ function DemoVideoGenerator({ resolver = {} }) {
         console.warn('Failed to load recent job:', err.message);
       }
     };
-    
+
     loadRecent();
   }, [isResolved, tenantId]);
 
@@ -160,7 +162,7 @@ function DemoVideoGenerator({ resolver = {} }) {
   const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
-    
+
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } finally {
@@ -171,39 +173,65 @@ function DemoVideoGenerator({ resolver = {} }) {
   // Download handler - STRICT Shopify auth requirement
   const downloadVariant = async (format) => {
     if (downloadingVariant) return;
-    
+
     if (!jobId) {
       toast.error('No video generated', { description: 'Click "Generate Demo Video" first.' });
       return;
     }
-    
+
     if (jobStatus !== 'completed') {
       toast.error('Video not ready', { description: `Current status: ${jobStatus || 'unknown'}` });
       return;
     }
 
-    
-    
-    console.log('[DV] Download start', { jobId, format, embedded, tokenLen: shopifyToken?.length || 0 });
+    // ✅ FIX: prevent crash + give a clear message if embedded but token missing
+    if (embedded && !shopifyToken) {
+      const reason =
+        tokenError || (tokenLoading ? 'Still initializing Shopify auth...' : 'Token retrieval failed');
+
+      toast.error('Shopify auth not initialized', {
+        description: reason,
+        duration: 5000
+      });
+
+      console.error('[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty', {
+        tokenLoading,
+        tokenError,
+        embedded
+      });
+      return;
+    }
+
+    console.log('[DV] Download start', {
+      jobId,
+      format,
+      embedded,
+      tokenLen: shopifyToken?.length || 0
+    });
+
     setDownloadingVariant(format);
 
     try {
       const headers = { 'Content-Type': 'application/json' };
-      
+
       // Attach Shopify bearer token if embedded (REQUIRED)
       if (embedded && shopifyToken) {
         headers['Authorization'] = `Bearer ${shopifyToken}`;
         console.log('[DV] ✓ Shopify bearer token attached, len=', shopifyToken.length);
       }
-      
-      const res = await fetchWithTimeout('/api/functions/demoVideoProxyDownload', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ jobId, format })
-      }, 30000);
 
-      console.log('[DV] Response:', { 
+      const res = await fetchWithTimeout(
+        '/api/functions/demoVideoProxyDownload',
+        {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ jobId, format })
+        },
+        30000
+      );
+
+      console.log('[DV] Response:', {
         status: res.status,
         contentType: res.headers.get('content-type'),
         contentLength: res.headers.get('content-length')
@@ -222,7 +250,9 @@ function DemoVideoGenerator({ resolver = {} }) {
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
         console.error('[DV] ✗ HTTP', res.status, errorText);
-        toast.error('Download failed', { description: errorText.slice(0, 160) || `HTTP ${res.status}` });
+        toast.error('Download failed', {
+          description: errorText.slice(0, 160) || `HTTP ${res.status}`
+        });
         setDownloadingVariant(null);
         return;
       }
@@ -255,7 +285,7 @@ function DemoVideoGenerator({ resolver = {} }) {
         const header = await blob.slice(0, 12).arrayBuffer();
         const view = new Uint8Array(header);
         const ftypIndex = new TextDecoder().decode(view).indexOf('ftyp');
-        
+
         if (ftypIndex === -1) {
           console.error('[DV] ✗ Invalid MP4: no ftyp');
           toast.error('Invalid MP4', { description: 'Missing ftyp signature' });
@@ -268,32 +298,34 @@ function DemoVideoGenerator({ resolver = {} }) {
 
       // Download
       const url = URL.createObjectURL(blob);
-      const filename = format === '1080p' ? 'ProfitShieldAI-demo-1080p.mp4'
-                     : format === '720p' ? 'ProfitShieldAI-demo-720p.mp4'
-                     : format === 'shopify' ? 'ProfitShieldAI-app-store-1600x900.mp4'
-                     : 'ProfitShieldAI-thumb.jpg';
+      const filename =
+        format === '1080p'
+          ? 'ProfitShieldAI-demo-1080p.mp4'
+          : format === '720p'
+            ? 'ProfitShieldAI-demo-720p.mp4'
+            : format === 'shopify'
+              ? 'ProfitShieldAI-app-store-1600x900.mp4'
+              : 'ProfitShieldAI-thumb.jpg';
 
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      
+
       setTimeout(() => {
         a.remove();
         URL.revokeObjectURL(url);
       }, 100);
 
       const sizeMB = (blob.size / 1_000_000).toFixed(2);
-      toast.success('Download complete', { 
-        description: `${filename} • ${sizeMB}MB` 
+      toast.success('Download complete', {
+        description: `${filename} • ${sizeMB}MB`
       });
     } catch (err) {
       const isTimeout = err?.name === 'AbortError' || String(err?.message).includes('timeout');
-      const msg = isTimeout 
-        ? 'Request timed out. Try again.' 
-        : (err?.message || 'Unknown error');
-      
+      const msg = isTimeout ? 'Request timed out. Try again.' : (err?.message || 'Unknown error');
+
       console.error('[DV] ✗ Download error:', err);
       toast.error('Download error', { description: msg });
     } finally {
@@ -319,11 +351,11 @@ function DemoVideoGenerator({ resolver = {} }) {
   // Refresh status
   const handleRefreshStatus = async () => {
     if (!jobId) return;
-    
+
     try {
       const result = await statusMutation.mutateAsync(jobId);
       setJobStatus(result.status);
-      
+
       if (result.status === 'completed') {
         toast.success('Video ready');
       } else if (result.status === 'failed') {
@@ -359,10 +391,17 @@ function DemoVideoGenerator({ resolver = {} }) {
             Generate beautiful demo videos for your app listing
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-6">
           {/* Auth status for embedded */}
-          {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('host') && (
-            <div className={`p-3 rounded-lg text-sm ${shopifyToken ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+          {embedded && (
+            <div
+              className={`p-3 rounded-lg text-sm ${
+                shopifyToken
+                  ? 'bg-emerald-50 border border-emerald-200'
+                  : 'bg-amber-50 border border-amber-200'
+              }`}
+            >
               {shopifyToken ? (
                 <p className="text-emerald-800">
                   ✓ Shopify authentication: Ready ({shopifyToken.length} bytes)
@@ -431,9 +470,11 @@ function DemoVideoGenerator({ resolver = {} }) {
                   {jobStatus}
                 </Badge>
               </div>
+
               {jobStatus === 'rendering' && (
                 <div className="text-xs text-slate-600">Rendering in progress...</div>
               )}
+
               <Button
                 size="sm"
                 variant="outline"
