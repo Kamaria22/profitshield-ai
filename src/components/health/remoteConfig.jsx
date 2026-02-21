@@ -26,6 +26,12 @@ export async function refreshRemoteConfig() {
     ? localStorage.getItem("base44_access_token")
     : null;
 
+// If Base44 SDK isn't available yet, just return defaults (don't crash)
+if (typeof window === "undefined" || !window.base44?.functions?.invoke) {
+  cached = { value: DEFAULT_CONFIG, at: now };
+  return DEFAULT_CONFIG;
+}
+
 const response = await window.base44.functions.invoke("remoteConfigGet", {
   key: "profitshield_runtime",
 });
