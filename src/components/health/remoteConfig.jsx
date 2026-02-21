@@ -26,28 +26,15 @@ export async function refreshRemoteConfig() {
     ? localStorage.getItem("base44_access_token")
     : null;
 
-let res = await fetch("/api/functions/remoteConfigGet", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    ...(base44Token ? { Authorization: `Bearer ${base44Token}` } : {}),
-  },
-  credentials: "include",
-  body: JSON.stringify({ key: "profitshield_runtime" }),
+const response = await window.base44.functions.invoke("remoteConfigGet", {
+  key: "profitshield_runtime",
 });
 
-// If the server rejects the Bearer token, try once more using cookies only
-if (res.status === 401) {
-  res = await fetch("/api/functions/remoteConfigGet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ key: "profitshield_runtime" }),
-  });
+if (!response?.data) {
+  throw new Error("remoteConfigGet failed: no data returned");
 }
 
-if (!res.ok) throw new Error(`remoteConfigGet failed: ${res.status}`);
-const data = await res.json();
+const data = response.data;
 
     const merged = { ...DEFAULT_CONFIG, ...(data?.config || {}) };
     cached = { value: merged, at: now };
