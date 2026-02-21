@@ -1,25 +1,24 @@
-// /app/src/components/shopify/AppBridgeAuth.jsx
+/**
+ * Shopify App Bridge Authentication (NPM version - works in embedded apps)
+ * Replaces CDN loading (which is failing with 404 / ORB).
+ */
+
 import { useEffect, useState } from "react";
 import createApp from "@shopify/app-bridge";
 import { getSessionToken } from "@shopify/app-bridge-utils";
 
-/**
- * Shopify App Bridge Authentication (BUNDLED / NPM)
- * - No CDN script tags
- * - Works better inside Shopify Admin iframe (CSP-safe)
- */
-
+// Get apiKey from runtime injection (Base44 / meta tag)
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) {
     return window.__SHOPIFY_API_KEY__;
   }
 
-  const meta =
-    typeof window !== "undefined"
-      ? document.querySelector('meta[name="shopify-api-key"]')
-      : null;
+  if (typeof document !== "undefined") {
+    const meta = document.querySelector('meta[name="shopify-api-key"]');
+    return meta?.content || null;
+  }
 
-  return meta?.content || null;
+  return null;
 }
 
 function getHost() {
@@ -27,23 +26,17 @@ function getHost() {
   return new URLSearchParams(window.location.search).get("host");
 }
 
-function isEmbedded() {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).has("host");
-}
-
 export async function getAppBridgeToken() {
   try {
     if (typeof window === "undefined") return null;
-
-    const embedded = isEmbedded();
-    if (!embedded) return null; // only needed when embedded
 
     const host = getHost();
     const apiKey = getApiKey();
 
     console.info("[AB-PROOF] href=", window.location.href);
-    console.info("[AB-PROOF] embedded=", embedded);
+    console.info("[AB-PROOF] embedded=", (() => {
+      try { return window.top !== window.self; } catch { return true; }
+    })());
     console.info("[AB-PROOF] host=", host);
     console.info("[AB-PROOF] apiKeyPresent=", !!apiKey);
 
@@ -57,14 +50,21 @@ export async function getAppBridgeToken() {
       return null;
     }
 
-    const app = createApp({ apiKey, host, forceRedirect: true });
+    // Create App Bridge app instance (no CDN)
+    const app = createApp({
+      apiKey,
+      host,
+      forceRedirect: true,
+    });
+
+    // Get session token
     const token = await getSessionToken(app);
 
     console.info("[AB-PROOF] tokenLen=", token?.length || 0);
 
     return token || null;
   } catch (err) {
-    console.error("App Bridge token error:", err);
+    console.error("App Bridge error:", err);
     return null;
   }
 }
@@ -82,14 +82,12 @@ export function useAppBridgeToken() {
 
       if (!mounted) return;
 
-      const embedded = isEmbedded();
-
-      if (embedded && (!tok || tok.length < 50)) {
-        setToken(null);
-        setError("Failed to retrieve Shopify session token");
-      } else {
+      if (tok && tok.length > 50) {
         setToken(tok);
         setError(null);
+      } else {
+        setToken(null);
+        setError("Failed to retrieve Shopify session token");
       }
 
       setLoading(false);
