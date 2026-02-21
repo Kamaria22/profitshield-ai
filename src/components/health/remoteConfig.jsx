@@ -32,7 +32,7 @@ if (typeof window === "undefined" || !window.base44?.functions?.invoke) {
   return DEFAULT_CONFIG;
 }
 
-const response = await window.base44.functions.invoke("remoteConfigGet", {
+const response = await window.base44?.functions?.invoke?.("remoteConfigGet", {
   key: "profitshield_runtime",
 });
 
