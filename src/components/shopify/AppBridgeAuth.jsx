@@ -49,15 +49,14 @@ async function getAppBridgeToken() {
   try {
     if (typeof window === 'undefined') return null;
 
-    const embedded = isEmbedded();
-    const host = getHost();
-    const apiKey = getApiKey();
+    const embedded = window.top !== window.self;
+const host = getHost();
+const apiKey = getApiKey();
 
-    console.info('[AB-PROOF]', {
-      embedded,
-      hostPresent: !!host,
-      apiKeyPresent: !!apiKey,
-    });
+console.info('[AB-PROOF] href=', window.location.href);
+console.info('[AB-PROOF] embedded=', embedded);
+console.info('[AB-PROOF] host=', host);
+console.info('[AB-PROOF] apiKeyPresent=', !!apiKey);
 
     if (!host) {
       console.error('Missing host param. Must open inside Shopify Admin.');
