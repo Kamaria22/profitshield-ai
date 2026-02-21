@@ -158,67 +158,53 @@ function DemoVideoGenerator({ resolver = {} }) {
     return () => stopPolling();
   }, []);
 
-  // Fetch with timeout
-  const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
-
-    try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(id);
-    }
-  };
-
-  // Download handler - STRICT Shopify auth requirement
-  const downloadVariant = async (format) => {
-    if (downloadingVariant) return;
-
-    if (!jobId) {
-      toast.error('No video generated', { description: 'Click "Generate Demo Video" first.' });
-      return;
-    }
-
-    if (jobStatus !== 'completed') {
-      toast.error('Video not ready', { description: `Current status: ${jobStatus || 'unknown'}` });
-      return;
-    }
+    // ✅ Define embedded INSIDE this function so it always exists
+    const embedded =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("host");
 
     // ✅ FIX: prevent crash + give a clear message if embedded but token missing
     if (embedded && !shopifyToken) {
       const reason =
-        tokenError || (tokenLoading ? 'Still initializing Shopify auth...' : 'Token retrieval failed');
+        tokenError ||
+        (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
 
-      toast.error('Shopify auth not initialized', {
+      toast.error("Shopify auth not initialized", {
         description: reason,
-        duration: 5000
+        duration: 5000,
       });
 
-      console.error('[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty', {
+      console.error("[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty", {
         tokenLoading,
         tokenError,
-        embedded
+        embedded,
       });
+
       return;
     }
 
-    console.log('[DV] Download start', {
-      jobId,
-      format,
-      embedded,
-      tokenLen: shopifyToken?.length || 0
-    });
+// ✅ Define embedded BEFORE using it anywhere
+const embedded =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).has("host");
 
-    setDownloadingVariant(format);
+console.log("[DV] Download start", {
+  jobId,
+  format,
+  embedded,
+  tokenLen: shopifyToken?.length || 0,
+});
 
-    try {
-      const headers = { 'Content-Type': 'application/json' };
+setDownloadingVariant(format);
 
-      // Attach Shopify bearer token if embedded (REQUIRED)
-      if (embedded && shopifyToken) {
-        headers['Authorization'] = `Bearer ${shopifyToken}`;
-        console.log('[DV] ✓ Shopify bearer token attached, len=', shopifyToken.length);
-      }
+try {
+  const headers = { "Content-Type": "application/json" };
+
+  // Attach Shopify bearer token if embedded (REQUIRED)
+  if (embedded && shopifyToken) {
+    headers["Authorization"] = `Bearer ${shopifyToken}`;
+    console.log("[DV] ✓ Shopify bearer token attached, len=", shopifyToken.length);
+  }
 
       const res = await fetchWithTimeout(
         '/api/functions/demoVideoProxyDownload',
