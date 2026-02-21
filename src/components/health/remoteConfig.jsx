@@ -20,15 +20,22 @@ export async function refreshRemoteConfig() {
   if (cached && now - cached.at < CACHE_MS) return cached.value;
 
   try {
-    const res = await fetch('/api/functions/remoteConfigGet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ key: 'profitshield_runtime' }),
-    });
+    const base44Token =
+  typeof window !== "undefined"
+    ? localStorage.getItem("base44_access_token")
+    : null;
 
-    if (!res.ok) throw new Error(`remoteConfigGet failed: ${res.status}`);
-    const data = await res.json();
+const res = await fetch("/api/functions/remoteConfigGet", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    ...(base44Token ? { Authorization: `Bearer ${base44Token}` } : {}),
+  },
+  body: JSON.stringify({ key: "profitshield_runtime" }),
+});
+
+if (!res.ok) throw new Error(`remoteConfigGet failed: ${res.status}`);
+const data = await res.json();
 
     const merged = { ...DEFAULT_CONFIG, ...(data?.config || {}) };
     cached = { value: merged, at: now };
