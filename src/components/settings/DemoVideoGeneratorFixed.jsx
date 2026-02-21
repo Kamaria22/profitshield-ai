@@ -182,21 +182,7 @@ function DemoVideoGenerator({ resolver = {} }) {
       return;
     }
 
-    // Embedded context check - BLOCKING if token missing
-    const embedded = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('host');
-    if (embedded && !shopifyToken) {
-      const reason = tokenError || (tokenLoading ? 'Still initializing App Bridge...' : 'Token retrieval failed');
-      toast.error('Shopify auth not initialized', { 
-        description: reason,
-        duration: 5000
-      });
-      console.error('[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty', {
-        tokenLoading,
-        tokenError,
-        embedded
-      });
-      return;
-    }
+    
     
     console.log('[DV] Download start', { jobId, format, embedded, tokenLen: shopifyToken?.length || 0 });
     setDownloadingVariant(format);
