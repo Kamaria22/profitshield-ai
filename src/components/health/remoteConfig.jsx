@@ -52,7 +52,8 @@ const data = await res.json();
     cached = { value: merged, at: now };
     return merged;
   } catch (e) {
-    cached = { value: DEFAULT_CONFIG, at: now };
-    return DEFAULT_CONFIG;
-  }
+  console.warn("remoteConfigGet error:", e);
+  cached = { value: DEFAULT_CONFIG, at: now };
+  return DEFAULT_CONFIG;
+}
 }
