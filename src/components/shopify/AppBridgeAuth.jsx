@@ -78,7 +78,20 @@ console.info('[AB-PROOF] apiKeyPresent=', !!apiKey);
     const { createApp } = window.appBridge;
     const app = createApp({ apiKey, host, forceRedirect: true });
 
-    const token = await app.getSessionToken();
+    // Load App Bridge Utils (needed to fetch session token correctly)
+if (!window.appBridgeUtils) {
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src =
+      "https://cdn.shopify.com/s/app-bridge-utils/3.7.1/app-bridge-utils.min.js";
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+const token = await window.appBridgeUtils.getSessionToken(app);
 
     console.info('[AB-PROOF] tokenLen=', token?.length || 0);
 
