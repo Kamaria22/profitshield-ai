@@ -17,7 +17,8 @@ export function getCachedRemoteConfig() {
 
 export async function refreshRemoteConfig() {
   const now = Date.now();
-  if (cached && now - cached.at < CACHE_MS) return cached.value;
+  // TEMP: disable cache while debugging
+// if (cached && now - cached.at < CACHE_MS) return cached.value;
 
   try {
     const base44Token =
