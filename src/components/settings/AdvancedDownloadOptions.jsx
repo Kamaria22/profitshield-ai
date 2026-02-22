@@ -2,114 +2,118 @@ import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
+import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const OPTIONS = [
-  { value: "1080p", label: "Full HD (1920x1080)" },
-  { value: "720p", label: "HD (1280x720)" },
-  { value: "shopify", label: "Shopify App Store" },
-  { value: "thumb", label: "Thumbnail (JPEG)" },
+const VARIANTS = [
+  { id: "1080p", label: "Full HD (1920x1080)" },
+  { id: "720p", label: "HD (1280x720)" },
+  { id: "shopify", label: "Shopify App Store" },
+  { id: "thumb", label: "Thumbnail (JPEG)" },
 ];
 
 export default function AdvancedDownloadOptions({
+  jobId,
+  jobStatus,
+  outputs,
   embedded,
   shopifyToken,
   tokenLoading,
   tokenError,
-  jobId,
-  jobStatus,
-  availableFormats,
+  tenantId,
   onDownload,
 }) {
   const [format, setFormat] = useState("1080p");
-  const [useDirectExternal, setUseDirectExternal] = useState(false);
+  const [directExternal, setDirectExternal] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const formatAvailable = useMemo(() => {
-    if (!Array.isArray(availableFormats)) return true;
-    return availableFormats.includes(format);
-  }, [availableFormats, format]);
+  const available = useMemo(() => {
+    const keys = outputs && typeof outputs === "object" ? Object.keys(outputs) : [];
+    return new Set(keys);
+  }, [outputs]);
 
-  const handleDownloadWithSettings = () => {
-    if (!jobId) {
-      toast.error("No job yet", { description: 'Generate a video first.' });
-      return;
-    }
-    if (jobStatus !== "completed") {
+  const canDownload = !!jobId && jobStatus === "completed" && !!onDownload;
+
+  const handleDownloadWithSettings = async (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    if (!canDownload) {
       toast.error("Video not ready", { description: `Current status: ${jobStatus || "unknown"}` });
-      return;
-    }
-
-    if (Array.isArray(availableFormats) && !formatAvailable) {
-      toast.error("Format not available for this job", {
-        description: `Available: ${availableFormats.join(", ")}`,
-      });
       return;
     }
 
     if (embedded && !shopifyToken) {
       const reason =
         tokenError || (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
-      toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
+      toast.error("Shopify auth not initialized", { description: reason });
       return;
     }
 
-    // “Use direct external download” is a UI setting — real behavior depends on server.
-    // We still call onDownload(format) to ensure it actually downloads.
-    if (useDirectExternal) {
-      toast.info("Direct external mode enabled", {
-        description: "If Shopify blocks iframe downloads, we’ll open in a new tab when possible.",
-      });
-    }
-
-    if (typeof onDownload === "function") {
-      onDownload(format);
-    } else {
-      toast.error("Advanced download not wired", { description: "onDownload handler missing." });
+    setBusy(true);
+    try {
+      await onDownload(format, e, { directExternal });
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <Card className="border-slate-200">
-      <CardContent className="pt-4 space-y-4">
-        <div className="text-sm font-medium">Advanced Download</div>
+    <div className="pt-4 border-t space-y-3">
+      <div className="text-sm font-medium">Advanced Download</div>
 
-        <div className="space-y-2">
-          <Label>Format</Label>
-          <select
-            value={format}
-            onChange={(e) => setFormat(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
-          >
-            {OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-
-          {Array.isArray(availableFormats) && !formatAvailable && (
-            <div className="text-xs text-amber-700">
-              This format wasn’t generated for this job. Available: {availableFormats.join(", ")}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Switch checked={useDirectExternal} onCheckedChange={setUseDirectExternal} />
-          <Label>Use direct external download (top-level)</Label>
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={handleDownloadWithSettings}
-          disabled={!jobId || jobStatus !== "completed"}
+      <div className="space-y-2">
+        <Label>Format</Label>
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value)}
+          className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
         >
-          Download with Settings
-        </Button>
-      </CardContent>
-    </Card>
+          {VARIANTS.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+
+        {/* optional helper */}
+        {jobStatus === "completed" && outputs && (
+          <div className="text-xs text-slate-600">
+            Available URLs:{" "}
+            {available.size ? Array.from(available).join(", ") : "none (backend must populate outputs)"}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="text-sm font-medium">Use direct external download (top-level)</div>
+          <div className="text-xs text-slate-500">
+            Uses the stored output URL directly (may be blocked in embedded iframes).
+          </div>
+        </div>
+        <Switch checked={directExternal} onCheckedChange={setDirectExternal} />
+      </div>
+
+      <Button
+        type="button"
+        onClick={handleDownloadWithSettings}
+        disabled={!canDownload || busy}
+        className="w-full"
+        variant="outline"
+      >
+        {busy ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Downloading...
+          </>
+        ) : (
+          <>
+            <Download className="w-4 h-4 mr-2" />
+            Download with Settings
+          </>
+        )}
+      </Button>
+    </div>
   );
 }
