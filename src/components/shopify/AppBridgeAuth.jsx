@@ -1,24 +1,23 @@
 /**
- * Shopify App Bridge Authentication (NPM version)
- * Requires:
- *   npm i @shopify/app-bridge @shopify/app-bridge-utils
+ * Shopify App Bridge Authentication (NPM)
+ * IMPORTANT: session tokens are short-lived.
+ * This module provides:
+ *  - getAppBridgeToken({ forceRefresh })  -> ALWAYS safe to call per request
+ *  - useAppBridgeToken() hook             -> includes getToken() to fetch fresh token on demand
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import createApp from "@shopify/app-bridge";
 import { getSessionToken } from "@shopify/app-bridge-utils";
 
-// Get apiKey from runtime injection (Base44 / meta tag)
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) {
     return window.__SHOPIFY_API_KEY__;
   }
-
   if (typeof document !== "undefined") {
     const meta = document.querySelector('meta[name="shopify-api-key"]');
     return meta?.content || null;
   }
-
   return null;
 }
 
@@ -28,82 +27,100 @@ function getHost() {
 }
 
 function isEmbedded() {
-  if (typeof window === "undefined") return false;
   try {
-    return window.top !== window.self;
+    if (typeof window === "undefined") return false;
+    // embedded apps typically have host param; iframe check is extra safety
+    const hasHost = new URLSearchParams(window.location.search).has("host");
+    return hasHost || window.top !== window.self;
   } catch {
     return true;
   }
 }
 
-export async function getAppBridgeToken() {
-  try {
-    if (typeof window === "undefined") return null;
+function createAppBridgeApp() {
+  const host = getHost();
+  const apiKey = getApiKey();
 
-    const host = getHost();
-    const apiKey = getApiKey();
-    const embedded = isEmbedded();
+  if (!host) throw new Error("Missing host param. Must open inside Shopify Admin.");
+  if (!apiKey) throw new Error("Missing SHOPIFY_API_KEY injection.");
 
-    console.info("[AB-PROOF] href=", window.location.href);
-    console.info("[AB-PROOF] embedded=", embedded);
-    console.info("[AB-PROOF] host=", host);
-    console.info("[AB-PROOF] apiKeyPresent=", !!apiKey);
-
-    if (!host) {
-      console.error("[AB] Missing host param. Must open inside Shopify Admin.");
-      return null;
-    }
-
-    if (!apiKey) {
-      console.error("[AB] Missing SHOPIFY_API_KEY injection.");
-      return null;
-    }
-
-    const app = createApp({
-      apiKey,
-      host,
-      forceRedirect: true,
-    });
-
-    const token = await getSessionToken(app);
-
-    console.info("[AB-PROOF] tokenLen=", token?.length || 0);
-
-    return token || null;
-  } catch (err) {
-    console.error("[AB] App Bridge error:", err);
-    return null;
-  }
+  return createApp({
+    apiKey,
+    host,
+    forceRedirect: true,
+  });
 }
 
+/**
+ * Fetch a fresh session token. Safe to call on every request.
+ */
+export async function getAppBridgeToken() {
+  if (typeof window === "undefined") return null;
+  if (!isEmbedded()) return null;
+
+  // Proof logs (keep these while debugging)
+  try {
+    console.info("[AB-PROOF] href=", window.location.href);
+    console.info("[AB-PROOF] embedded=", true);
+    console.info("[AB-PROOF] host=", getHost());
+    console.info("[AB-PROOF] apiKeyPresent=", !!getApiKey());
+  } catch {}
+
+  const app = createAppBridgeApp();
+  const token = await getSessionToken(app);
+  console.info("[AB-PROOF] tokenLen=", token?.length || 0);
+  return token || null;
+}
+
+/**
+ * Hook: keeps a token for UI display, but ALSO exposes getToken()
+ * so callers can fetch a fresh token per click/request.
+ */
 export function useAppBridgeToken() {
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isEmbedded());
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const embedded = useMemo(() => isEmbedded(), []);
 
-    (async () => {
+  const getToken = useCallback(async () => {
+    if (!embedded) return null;
+
+    try {
+      setLoading(true);
       const tok = await getAppBridgeToken();
-
-      if (!mounted) return;
-
       if (tok && tok.length > 50) {
         setToken(tok);
         setError(null);
-      } else {
-        setToken(null);
-        setError("Failed to retrieve Shopify session token");
+        return tok;
       }
-
+      setToken(null);
+      setError("Failed to retrieve Shopify session token");
+      return null;
+    } catch (e) {
+      console.error("App Bridge token error:", e);
+      setToken(null);
+      setError(e?.message || "Failed to retrieve Shopify session token");
+      return null;
+    } finally {
       setLoading(false);
-    })();
+    }
+  }, [embedded]);
 
+  // Initial load for UI indicator only (NOT relied on for downloads)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!embedded) return;
+      const tok = await getToken();
+      if (!mounted) return;
+      // getToken already sets state
+      void tok;
+    })();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [embedded, getToken]);
 
-  return { token, loading, error };
+  return { token, loading, error, getToken, embedded };
 }
