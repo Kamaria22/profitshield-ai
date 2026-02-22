@@ -1,29 +1,62 @@
 /**
- * Shopify App Bridge Authentication (NPM version - works in embedded apps)
- * Replaces CDN loading (which is failing with 404 / ORB).
+ * Shopify App Bridge Authentication (Shopify CDN version)
+ * - Avoids NPM imports (@shopify/app-bridge) so Vite/Base44 won't fail to resolve.
+ * - Uses Shopify's CDN script (preferred for embedded app checks).
  */
 
 import { useEffect, useState } from "react";
-import createApp from "@shopify/app-bridge";
-import { getSessionToken } from "@shopify/app-bridge-utils";
 
-// Get apiKey from runtime injection (Base44 / meta tag)
+const APP_BRIDGE_CDN = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
+
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) {
     return window.__SHOPIFY_API_KEY__;
   }
-
   if (typeof document !== "undefined") {
     const meta = document.querySelector('meta[name="shopify-api-key"]');
     return meta?.content || null;
   }
-
   return null;
 }
 
 function getHost() {
   if (typeof window === "undefined") return null;
   return new URLSearchParams(window.location.search).get("host");
+}
+
+function isEmbedded() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
+async function loadAppBridge() {
+  if (typeof window === "undefined") return null;
+  if (window["app-bridge"]) return window["app-bridge"];
+
+  await new Promise((resolve, reject) => {
+    // Avoid double-inject
+    const existing = document.querySelector(`script[data-ps="app-bridge"][src="${APP_BRIDGE_CDN}"]`);
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = APP_BRIDGE_CDN;
+    script.async = true;
+    script.defer = true;
+    script.dataset.ps = "app-bridge";
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+  return window["app-bridge"] || null;
 }
 
 export async function getAppBridgeToken() {
@@ -34,37 +67,44 @@ export async function getAppBridgeToken() {
     const apiKey = getApiKey();
 
     console.info("[AB-PROOF] href=", window.location.href);
-    console.info("[AB-PROOF] embedded=", (() => {
-      try { return window.top !== window.self; } catch { return true; }
-    })());
+    console.info("[AB-PROOF] embedded=", isEmbedded());
     console.info("[AB-PROOF] host=", host);
     console.info("[AB-PROOF] apiKeyPresent=", !!apiKey);
 
     if (!host) {
-      console.error("Missing host param. Must open inside Shopify Admin.");
+      console.error("[AB] Missing host param. Must open inside Shopify Admin.");
       return null;
     }
-
     if (!apiKey) {
-      console.error("Missing SHOPIFY_API_KEY injection.");
+      console.error("[AB] Missing SHOPIFY_API_KEY injection.");
       return null;
     }
 
-    // Create App Bridge app instance (no CDN)
-    const app = createApp({
+    const AppBridge = await loadAppBridge();
+    if (!AppBridge?.createApp) {
+      console.error("[AB] App Bridge not available after script load.");
+      return null;
+    }
+
+    const app = AppBridge.createApp({
       apiKey,
       host,
       forceRedirect: true,
     });
 
-    // Get session token
-    const token = await getSessionToken(app);
+    // In CDN build, session token util is under AppBridge.utilities
+    const getSessionToken = AppBridge?.utilities?.getSessionToken;
+    if (typeof getSessionToken !== "function") {
+      console.error("[AB] AppBridge.utilities.getSessionToken not found.");
+      return null;
+    }
 
+    const token = await getSessionToken(app);
     console.info("[AB-PROOF] tokenLen=", token?.length || 0);
 
     return token || null;
   } catch (err) {
-    console.error("App Bridge error:", err);
+    console.error("[AB] App Bridge error:", err);
     return null;
   }
 }
