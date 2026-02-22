@@ -1,10 +1,10 @@
-// /app/src/components/settings/DemoVideoGeneratorFixed.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
 import { requireResolved } from "@/components/usePlatformResolver";
 import { usePermissions } from "@/components/usePermissions";
-
+import { useAppBridgeToken } from "@/components/shopify/AppBridgeAuth";
+import AdvancedDownloadOptions from "./AdvancedDownloadOptions";
 import { Download, Loader2, Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,148 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
-/**
- * Minimal in-file stubs so this file compiles even if those components don't exist.
- * Replace with your real ones later.
- */
-function AdvancedDownloadOptions() {
-  return null;
-}
-
-/** ---------------------------
- * Shopify App Bridge (CDN) helpers
- * Fixes your 404 by using UNPKG (Shopify CDN path you used returns 404)
- * --------------------------*/
-
-function getApiKey() {
-  if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) return window.__SHOPIFY_API_KEY__;
-
-  const meta =
-    typeof window !== "undefined"
-      ? document.querySelector('meta[name="shopify-api-key"]')
-      : null;
-
-  return meta?.content || null;
-}
-
-function getHost() {
-  if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("host");
-}
-
-function loadScriptOnce(src, globalCheck) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (globalCheck()) return resolve(true);
-
-      const existing = Array.from(document.scripts).find((s) => s.src === src);
-      if (existing) {
-        existing.addEventListener("load", () => resolve(true));
-        existing.addEventListener("error", (e) => reject(e));
-        return;
-      }
-
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = () => resolve(true);
-      s.onerror = (e) => reject(e);
-      document.head.appendChild(s);
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
-async function getShopifySessionTokenCDN() {
-  if (typeof window === "undefined") return null;
-
-  const host = getHost();
-  const apiKey = getApiKey();
-
-  const embedded =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("host");
-
-  // Only attempt token in embedded context
-  if (!embedded) return null;
-
-  console.info("[AB-PROOF] href=", window.location.href);
-  console.info("[AB-PROOF] embedded=", embedded);
-  console.info("[AB-PROOF] host=", host);
-  console.info("[AB-PROOF] apiKeyPresent=", !!apiKey);
-
-  if (!host || !apiKey) return null;
-
-  // ✅ Use UNPKG CDN bundles (your previous cdn.shopify.com/.../3.7.1 path was 404)
-  // App Bridge global: window["app-bridge"]
-  // Utils global: window["app-bridge-utils"]
-  await loadScriptOnce("https://unpkg.com/@shopify/app-bridge@3", () => !!window["app-bridge"]);
-  await loadScriptOnce("https://unpkg.com/@shopify/app-bridge-utils@3", () => !!window["app-bridge-utils"]);
-
-  const AppBridge = window["app-bridge"];
-  const AppBridgeUtils = window["app-bridge-utils"];
-
-  if (!AppBridge?.default || !AppBridgeUtils?.getSessionToken) {
-    console.error("App Bridge globals missing after load.", { AppBridge, AppBridgeUtils });
-    return null;
-  }
-
-  const createApp = AppBridge.default;
-  const app = createApp({ apiKey, host, forceRedirect: true });
-
-  const token = await AppBridgeUtils.getSessionToken(app);
-  console.info("[AB-PROOF] tokenLen=", token?.length || 0);
-
-  return token || null;
-}
-
-function useShopifyTokenCDN() {
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      try {
-        const tok = await getShopifySessionTokenCDN();
-        if (!mounted) return;
-
-        if (tok && tok.length > 50) {
-          setToken(tok);
-          setError(null);
-        } else {
-          // If embedded and missing token, show a meaningful error; otherwise leave it null quietly.
-          const embedded =
-            typeof window !== "undefined" &&
-            new URLSearchParams(window.location.search).has("host");
-
-          if (embedded) setError("Failed to retrieve Shopify session token");
-          setToken(null);
-        }
-      } catch (e) {
-        if (!mounted) return;
-        setToken(null);
-        setError(e?.message || "App Bridge token error");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { token, loading, error };
-}
-
-/** ---------------------------
- * Demo Video Generator
- * --------------------------*/
-
 const VARIANTS = [
   { id: "1080p", label: "Full HD (1920x1080)", description: "YouTube, marketing materials" },
   { id: "720p", label: "HD (1280x720)", description: "Web, social media" },
@@ -162,12 +20,7 @@ const VARIANTS = [
   { id: "thumb", label: "Thumbnail (JPEG)", description: "Preview image" },
 ];
 
-export default function DemoVideoGeneratorFixed({ resolver = {} }) {
-  // ✅ ONE embedded declaration (ONLY ONCE) — used everywhere
-  const embedded =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("host");
-
+function DemoVideoGeneratorFixed({ resolver = {} }) {
   let resolverCheck = null;
   let isResolved = false;
   let tenantId = null;
@@ -186,6 +39,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [downloadingVariant, setDownloadingVariant] = useState(null);
+
   const [selectedVersion, setSelectedVersion] = useState("90s");
   const [includeVoiceover, setIncludeVoiceover] = useState(true);
   const [includeMusic, setIncludeMusic] = useState(true);
@@ -194,18 +48,21 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const pollCountRef = useRef(0);
 
-  // ✅ Shopify token (CDN) — no external file dependency
-  const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useShopifyTokenCDN();
+  // ✅ ONE embedded declaration ONLY (never redeclare inside downloadVariant)
+  const embedded = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).has("host");
+  }, []);
+
+  // Shopify token
+  const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useAppBridgeToken();
 
   // Load recent job on mount
   useEffect(() => {
     const loadRecent = async () => {
       if (!isResolved || !tenantId) return;
-
       try {
-        const { data } = await base44.functions.invoke("demoVideoLoadRecent", {
-          tenant_id: tenantId,
-        });
+        const { data } = await base44.functions.invoke("demoVideoLoadRecent", { tenant_id: tenantId });
         if (data?.job) {
           setJobId(data.job.id);
           setJobStatus(data.job.status);
@@ -247,20 +104,9 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     },
   });
 
-  const stopPolling = () => {
-    if (pollIntervalRef.current) {
-      clearTimeout(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
-
   // Polling logic
   const startPolling = (jobIdVal) => {
-    stopPolling();
+    if (pollIntervalRef.current) clearTimeout(pollIntervalRef.current);
     pollCountRef.current = 0;
 
     const poll = async () => {
@@ -270,13 +116,14 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           setJobStatus(result.status);
           if (result.status === "completed" || result.status === "failed") {
             stopPolling();
+            return;
           }
         }
       } catch (err) {
         console.warn("Poll error:", err);
+      } finally {
+        pollCountRef.current++;
       }
-
-      pollCountRef.current++;
     };
 
     const getInterval = () => {
@@ -295,11 +142,19 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     poll().then(scheduleNext);
   };
 
-  // Fetch with timeout
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearTimeout(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopPolling(), []);
+
+  // ✅ Fetch with timeout (browser-safe abort)
   const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
-
+    const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } finally {
@@ -309,6 +164,8 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
 
   // Download handler
   const downloadVariant = async (format) => {
+    console.log("[DV] Click download", { format, jobId, jobStatus, embedded });
+
     if (downloadingVariant) return;
 
     if (!jobId) {
@@ -321,13 +178,12 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       return;
     }
 
-    // ✅ FIX: prevent crash + clear message if embedded but token missing
+    // ✅ Embedded requires token
     if (embedded && !shopifyToken) {
       const reason =
         tokenError || (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
 
       toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
-
       console.error("[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty", {
         tokenLoading,
         tokenError,
@@ -348,7 +204,6 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     try {
       const headers = { "Content-Type": "application/json" };
 
-      // Attach Shopify bearer token if embedded
       if (embedded && shopifyToken) {
         headers["Authorization"] = `Bearer ${shopifyToken}`;
         console.log("[DV] ✓ Shopify bearer token attached, len=", shopifyToken.length);
@@ -371,68 +226,55 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
         contentLength: res.headers.get("content-length"),
       });
 
-      // Auth error
       if (res.status === 401) {
         const errorData = await res.json().catch(() => ({}));
         const msg = errorData.error || "Unauthorized";
-        console.error("[DV] ✗ 401 Auth error:", msg);
         toast.error("Unauthorized", { description: msg });
         return;
       }
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => "");
-        console.error("[DV] ✗ HTTP", res.status, errorText);
-        toast.error("Download failed", {
-          description: errorText.slice(0, 160) || `HTTP ${res.status}`,
-        });
+        toast.error("Download failed", { description: errorText.slice(0, 180) || `HTTP ${res.status}` });
         return;
       }
 
       const contentType = res.headers.get("content-type") || "";
       const blob = await res.blob();
 
-      // Reject JSON masquerading as a file
+      // Reject JSON masquerading as file
       if (contentType.includes("application/json") || blob.type.includes("json")) {
         const errorText = await blob.text().catch(() => "");
-        console.error("[DV] ✗ Got JSON instead of file:", errorText);
-        toast.error("Download returned JSON", { description: errorText.slice(0, 160) });
+        toast.error("Download returned JSON", { description: errorText.slice(0, 180) });
         return;
       }
-
-      console.log("[DV] ✓ Blob received:", { size: blob.size, type: blob.type });
 
       // Verify min size
       const minSize = format === "thumb" ? 500 : 1000;
       if (blob.size < minSize) {
-        console.error("[DV] ✗ File too small:", blob.size);
         toast.error("File too small", { description: `${blob.size} bytes` });
         return;
       }
 
-      // Verify MP4 signature
+      // Verify MP4 signature if video
       if (format !== "thumb") {
-        const header = await blob.slice(0, 12).arrayBuffer();
-        const view = new Uint8Array(header);
-        const ftypIndex = new TextDecoder().decode(view).indexOf("ftyp");
-
-        if (ftypIndex === -1) {
-          console.error("[DV] ✗ Invalid MP4: no ftyp");
+        const headerBuf = await blob.slice(0, 16).arrayBuffer();
+        const headerText = new TextDecoder().decode(new Uint8Array(headerBuf));
+        if (!headerText.includes("ftyp")) {
           toast.error("Invalid MP4", { description: "Missing ftyp signature" });
           return;
         }
       }
 
-      // Download
       const url = URL.createObjectURL(blob);
       const filename =
         format === "1080p"
           ? "ProfitShieldAI-demo-1080p.mp4"
           : format === "720p"
-            ? "ProfitShieldAI-demo-720p.mp4"
-            : format === "shopify"
-              ? "ProfitShieldAI-app-store-1600x900.mp4"
-              : "ProfitShieldAI-thumb.jpg";
+          ? "ProfitShieldAI-demo-720p.mp4"
+          : format === "shopify"
+          ? "ProfitShieldAI-app-store-1600x900.mp4"
+          : "ProfitShieldAI-thumb.jpg";
 
       const a = document.createElement("a");
       a.href = url;
@@ -443,15 +285,16 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       setTimeout(() => {
         a.remove();
         URL.revokeObjectURL(url);
-      }, 100);
+      }, 200);
 
       const sizeMB = (blob.size / 1_000_000).toFixed(2);
       toast.success("Download complete", { description: `${filename} • ${sizeMB}MB` });
     } catch (err) {
-      const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
-      const msg = isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error";
+      const isTimeout = err?.name === "AbortError";
+      toast.error("Download error", {
+        description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error",
+      });
       console.error("[DV] ✗ Download error:", err);
-      toast.error("Download error", { description: msg });
     } finally {
       setDownloadingVariant(null);
     }
@@ -471,17 +314,13 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   // Refresh status
   const handleRefreshStatus = async () => {
     if (!jobId) return;
-
     try {
       const result = await statusMutation.mutateAsync(jobId);
-      setJobStatus(result.status);
+      setJobStatus(result?.status || null);
 
-      if (result.status === "completed") toast.success("Video ready");
-      else if (result.status === "failed") toast.error("Generation failed");
-      else if (result.status === "rendering") {
-        startPolling(jobId);
-        toast.info("Still rendering...");
-      }
+      if (result?.status === "completed") toast.success("Video ready");
+      else if (result?.status === "failed") toast.error("Generation failed");
+      else toast.info(`Status: ${result?.status || "unknown"}`);
     } catch {
       toast.error("Failed to refresh status");
     }
@@ -513,17 +352,13 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           {embedded && (
             <div
               className={`p-3 rounded-lg text-sm ${
-                shopifyToken
-                  ? "bg-emerald-50 border border-emerald-200"
-                  : "bg-amber-50 border border-amber-200"
+                shopifyToken ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-200"
               }`}
             >
               {shopifyToken ? (
                 <p className="text-emerald-800">✓ Shopify authentication: Ready ({shopifyToken.length} bytes)</p>
               ) : (
-                <p className="text-amber-800">
-                  {tokenLoading ? "⏳ Initializing Shopify auth..." : `✗ ${tokenError || "No token"}`}
-                </p>
+                <p className="text-amber-800">{tokenLoading ? "⏳ Initializing Shopify auth..." : `✗ ${tokenError || "No token"}`}</p>
               )}
             </div>
           )}
@@ -559,8 +394,9 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
             </div>
           </div>
 
-          {/* Generate Button */}
+          {/* ✅ IMPORTANT: type="button" prevents parent form submit */}
           <Button
+            type="button"
             onClick={handleGenerate}
             disabled={generateMutation.isPending}
             className="w-full bg-emerald-600 hover:bg-emerald-700"
@@ -583,7 +419,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
                 <Badge variant={jobStatus === "completed" ? "default" : "outline"}>{jobStatus}</Badge>
               </div>
 
-              <Button size="sm" variant="outline" onClick={handleRefreshStatus} className="mt-2">
+              <Button type="button" size="sm" variant="outline" onClick={handleRefreshStatus} className="mt-2">
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Refresh
               </Button>
@@ -598,6 +434,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
                 {VARIANTS.map((v) => (
                   <Button
                     key={v.id}
+                    type="button"               // ✅ critical
                     onClick={() => downloadVariant(v.id)}
                     disabled={downloadingVariant === v.id}
                     variant="outline"
@@ -621,10 +458,11 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
             </div>
           )}
 
-          {/* Advanced (stub) */}
           <AdvancedDownloadOptions />
         </CardContent>
       </Card>
     </div>
   );
 }
+
+export default DemoVideoGeneratorFixed;
