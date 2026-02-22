@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
 import { requireResolved } from "@/components/usePlatformResolver";
 import { usePermissions } from "@/components/usePermissions";
 import { useAppBridgeToken } from "@/components/shopify/AppBridgeAuth";
+import AdvancedDownloadOptions from "./AdvancedDownloadOptions";
 import { Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,17 +20,11 @@ const VARIANTS = [
   { id: "thumb", label: "Thumbnail (JPEG)", description: "Preview image" },
 ];
 
-// Fallback if your project doesn’t have this component yet
-function AdvancedDownloadOptions() {
-  return null;
-}
-
-export default function DemoVideoGeneratorFixed({ resolver = {} }) {
+function DemoVideoGeneratorFixed({ resolver = {} }) {
   // ✅ ONE embedded declaration (ONLY ONCE)
-  const embedded = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).has("host");
-  }, []);
+  const embedded =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("host");
 
   let resolverCheck = null;
   let isResolved = false;
@@ -38,17 +33,20 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   try {
     resolverCheck = requireResolved(resolver);
     isResolved = resolverCheck?.ok === true;
-    tenantId = resolverCheck?.tenantId ?? null;
+    tenantId = resolverCheck?.tenantId;
   } catch {
     isResolved = false;
     tenantId = null;
   }
 
   const { hasPermission } = usePermissions() || {};
+  // currently unused, but kept if you later gate actions:
+  void hasPermission;
 
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [downloadingVariant, setDownloadingVariant] = useState(null);
+
   const [selectedVersion, setSelectedVersion] = useState("90s");
   const [includeVoiceover, setIncludeVoiceover] = useState(true);
   const [includeMusic, setIncludeMusic] = useState(true);
@@ -57,7 +55,6 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   const pollIntervalRef = useRef(null);
   const pollCountRef = useRef(0);
 
-  // ✅ Shopify App Bridge authentication
   const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useAppBridgeToken();
 
   // Load recent job on mount
@@ -72,12 +69,55 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           setJobStatus(data.job.status);
         }
       } catch (err) {
-        console.warn("[DV] Failed to load recent job:", err?.message || err);
+        console.warn("Failed to load recent job:", err?.message || err);
       }
     };
 
     loadRecent();
   }, [isResolved, tenantId]);
+
+  const statusMutation = useMutation({
+    mutationFn: async (jobIdVal) => {
+      const { data } = await base44.functions.invoke("demoVideoGetStatus", { job_id: jobIdVal });
+      return data;
+    },
+  });
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearTimeout(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  const startPolling = (jobIdVal) => {
+    stopPolling();
+    pollCountRef.current = 0;
+
+    const pollOnce = async () => {
+      try {
+        const result = await statusMutation.mutateAsync(jobIdVal);
+        if (result?.status) {
+          setJobStatus(result.status);
+          if (result.status === "completed" || result.status === "failed") {
+            stopPolling();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Poll error:", err);
+      }
+
+      pollCountRef.current += 1;
+      const next = pollCountRef.current < 5 ? 2000 : pollCountRef.current < 15 ? 3000 : 5000;
+
+      pollIntervalRef.current = setTimeout(pollOnce, next);
+    };
+
+    pollOnce();
+  };
+
+  useEffect(() => stopPolling, []);
 
   const generateMutation = useMutation({
     mutationFn: async (payload) => {
@@ -94,66 +134,15 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
         toast.error("Generation started but no jobId returned");
       }
     },
-    onError: (err) => toast.error("Generation failed", { description: err?.message || "Unknown error" }),
-  });
-
-  const statusMutation = useMutation({
-    mutationFn: async (jobIdVal) => {
-      const { data } = await base44.functions.invoke("demoVideoGetStatus", { job_id: jobIdVal });
-      return data;
+    onError: (err) => {
+      toast.error("Generation failed", { description: err?.message || "Unknown error" });
     },
   });
 
-  const stopPolling = () => {
-    if (pollIntervalRef.current) {
-      clearTimeout(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
-
-  const startPolling = (jobIdVal) => {
-    stopPolling();
-    pollCountRef.current = 0;
-
-    const poll = async () => {
-      try {
-        const result = await statusMutation.mutateAsync(jobIdVal);
-        if (result?.status) {
-          setJobStatus(result.status);
-          if (result.status === "completed" || result.status === "failed") {
-            stopPolling();
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn("[DV] Poll error:", err);
-      } finally {
-        pollCountRef.current++;
-      }
-    };
-
-    const getInterval = () => {
-      if (pollCountRef.current < 5) return 2000;
-      if (pollCountRef.current < 15) return 3000;
-      return 5000;
-    };
-
-    const scheduleNext = async () => {
-      await poll();
-      pollIntervalRef.current = setTimeout(scheduleNext, getInterval());
-    };
-
-    scheduleNext();
-  };
-
+  // Fetch with timeout
   const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-
+    const id = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } finally {
@@ -161,7 +150,36 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     }
   };
 
-  const downloadVariant = async (format) => {
+  const handleRefreshStatus = async (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    if (!jobId) {
+      toast.error("No job to refresh");
+      return;
+    }
+
+    console.log("[DV] Refresh clicked", { jobId });
+
+    try {
+      const result = await statusMutation.mutateAsync(jobId);
+      setJobStatus(result?.status || null);
+
+      if (result?.status === "completed") toast.success("Video ready");
+      else if (result?.status === "failed") toast.error("Generation failed");
+      else toast.info("Status updated", { description: result?.status || "unknown" });
+    } catch (err) {
+      console.error("[DV] Refresh error:", err);
+      toast.error("Failed to refresh status", { description: err?.message || "Unknown error" });
+    }
+  };
+
+  const downloadVariant = async (format, e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    console.log("[DV] Download clicked", { format, jobId, jobStatus, embedded });
+
     if (downloadingVariant) return;
 
     if (!jobId) {
@@ -174,11 +192,19 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       return;
     }
 
-    // ✅ If embedded, require token (otherwise fetch will 401)
+    // ✅ Clear block message if embedded but token missing
     if (embedded && !shopifyToken) {
-      const reason = tokenError || (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
+      const reason =
+        tokenError || (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
+
       toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
-      console.error("[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty", { tokenLoading, tokenError, embedded });
+
+      console.error("[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty", {
+        tokenLoading,
+        tokenError,
+        embedded,
+      });
+
       return;
     }
 
@@ -194,12 +220,12 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     try {
       const headers = { "Content-Type": "application/json" };
 
+      // Attach Shopify bearer token if embedded
       if (embedded && shopifyToken) {
         headers["Authorization"] = `Bearer ${shopifyToken}`;
         console.log("[DV] ✓ Shopify bearer token attached, len=", shopifyToken.length);
       }
 
-      // IMPORTANT: this endpoint must exist server-side
       const res = await fetchWithTimeout(
         "/api/functions/demoVideoProxyDownload",
         {
@@ -219,46 +245,41 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
 
       if (res.status === 401) {
         const errorData = await res.json().catch(() => ({}));
-        const msg = errorData?.error || "Unauthorized";
+        const msg = errorData.error || "Unauthorized";
         toast.error("Unauthorized", { description: msg });
-        console.error("[DV] ✗ 401:", msg);
         return;
       }
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => "");
-        toast.error("Download failed", { description: errorText.slice(0, 180) || `HTTP ${res.status}` });
-        console.error("[DV] ✗ HTTP", res.status, errorText);
+        toast.error("Download failed", {
+          description: errorText.slice(0, 160) || `HTTP ${res.status}`,
+        });
         return;
       }
 
       const contentType = res.headers.get("content-type") || "";
       const blob = await res.blob();
 
-      // If server returned JSON error as 200
       if (contentType.includes("application/json") || blob.type.includes("json")) {
         const errorText = await blob.text().catch(() => "");
-        toast.error("Download returned JSON", { description: errorText.slice(0, 180) });
-        console.error("[DV] ✗ Got JSON instead of file:", errorText);
+        toast.error("Download returned JSON", { description: errorText.slice(0, 160) });
         return;
       }
 
-      // Sanity size
       const minSize = format === "thumb" ? 500 : 1000;
       if (blob.size < minSize) {
         toast.error("File too small", { description: `${blob.size} bytes` });
-        console.error("[DV] ✗ File too small:", blob.size);
         return;
       }
 
-      // Basic MP4 signature check (non-thumb)
+      // Basic MP4 signature check
       if (format !== "thumb") {
-        const header = await blob.slice(0, 64).arrayBuffer();
+        const header = await blob.slice(0, 12).arrayBuffer();
         const view = new Uint8Array(header);
-        const text = new TextDecoder().decode(view);
-        if (!text.includes("ftyp")) {
+        const ftypIndex = new TextDecoder().decode(view).indexOf("ftyp");
+        if (ftypIndex === -1) {
           toast.error("Invalid MP4", { description: "Missing ftyp signature" });
-          console.error("[DV] ✗ Invalid MP4: no ftyp");
           return;
         }
       }
@@ -282,45 +303,35 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       setTimeout(() => {
         a.remove();
         URL.revokeObjectURL(url);
-      }, 250);
+      }, 100);
 
-      toast.success("Download complete", { description: `${filename} • ${(blob.size / 1_000_000).toFixed(2)}MB` });
-      console.log("[DV] ✓ Downloaded", { filename, size: blob.size });
+      const sizeMB = (blob.size / 1_000_000).toFixed(2);
+      toast.success("Download complete", { description: `${filename} • ${sizeMB}MB` });
     } catch (err) {
-      const isAbort = err?.name === "AbortError";
-      toast.error("Download error", { description: isAbort ? "Request timed out. Try again." : err?.message || "Unknown error" });
-      console.error("[DV] ✗ Download error:", err);
+      const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
+      toast.error("Download error", {
+        description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error",
+      });
+      console.error("[DV] Download error:", err);
     } finally {
       setDownloadingVariant(null);
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    console.log("[DV] Generate clicked", { embedded, tenantId, useDemoData });
+
     const payload = {
       tenant_id: useDemoData ? null : tenantId,
       mode: useDemoData ? "demo" : "real",
       version: selectedVersion,
       options: { voiceover: includeVoiceover, music: includeMusic },
     };
+
     generateMutation.mutate(payload);
-  };
-
-  const handleRefreshStatus = async () => {
-    if (!jobId) return;
-
-    try {
-      const result = await statusMutation.mutateAsync(jobId);
-      setJobStatus(result?.status || null);
-
-      if (result?.status === "completed") toast.success("Video ready");
-      else if (result?.status === "failed") toast.error("Generation failed");
-      else if (result?.status === "rendering") {
-        startPolling(jobId);
-        toast.info("Still rendering...");
-      }
-    } catch {
-      toast.error("Failed to refresh status");
-    }
   };
 
   if (!isResolved) {
@@ -341,11 +352,10 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
             <Sparkles className="w-5 h-5 text-amber-500" />
             Demo Video Generator
           </CardTitle>
-          <CardDescription>Generate beautiful demo videos for your app listing</CardDescription>
+          <CardDescription>Generate demo videos for your app listing</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Embedded auth status */}
           {embedded && (
             <div
               className={`p-3 rounded-lg text-sm ${
@@ -355,12 +365,13 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
               {shopifyToken ? (
                 <p className="text-emerald-800">✓ Shopify authentication: Ready ({shopifyToken.length} bytes)</p>
               ) : (
-                <p className="text-amber-800">{tokenLoading ? "⏳ Initializing Shopify auth..." : `✗ ${tokenError || "No token"}`}</p>
+                <p className="text-amber-800">
+                  {tokenLoading ? "⏳ Initializing Shopify auth..." : `✗ ${tokenError || "No token"}`}
+                </p>
               )}
             </div>
           )}
 
-          {/* Options */}
           <div className="space-y-4">
             <div>
               <Label>Video Length</Label>
@@ -391,7 +402,12 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
             </div>
           </div>
 
-          <Button onClick={handleGenerate} disabled={generateMutation.isPending} className="w-full bg-emerald-600 hover:bg-emerald-700">
+          <Button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generateMutation.isPending}
+            className="w-full bg-emerald-600 hover:bg-emerald-700"
+          >
             {generateMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -409,7 +425,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
                 <Badge variant={jobStatus === "completed" ? "default" : "outline"}>{jobStatus}</Badge>
               </div>
 
-              <Button size="sm" variant="outline" onClick={handleRefreshStatus} className="mt-2">
+              <Button type="button" size="sm" variant="outline" onClick={handleRefreshStatus} className="mt-2">
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Refresh
               </Button>
@@ -422,8 +438,9 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
               <div className="grid grid-cols-2 gap-2">
                 {VARIANTS.map((v) => (
                   <Button
+                    type="button"
                     key={v.id}
-                    onClick={() => downloadVariant(v.id)}
+                    onClick={(e) => downloadVariant(v.id, e)}
                     disabled={downloadingVariant === v.id}
                     variant="outline"
                     size="sm"
@@ -452,3 +469,5 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     </div>
   );
 }
+
+export default DemoVideoGeneratorFixed;
