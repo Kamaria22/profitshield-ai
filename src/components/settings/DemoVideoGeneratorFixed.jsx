@@ -9,13 +9,7 @@ import AdvancedDownloadOptions from "./AdvancedDownloadOptions";
 import DownloadableVideoManagement, { saveJobToHistory } from "./DownloadableVideoManagement";
 import { Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -25,7 +19,7 @@ const VARIANTS = [
   { id: "1080p", label: "Full HD (1920x1080)", description: "YouTube, marketing materials" },
   { id: "720p", label: "HD (1280x720)", description: "Web, social media" },
   { id: "shopify", label: "Shopify App Store", description: "App marketplace preview" },
-  { id: "thumb", label: "Thumbnail (JPEG)", description: "Preview image" }
+  { id: "thumb", label: "Thumbnail (JPEG)", description: "Preview image" },
 ];
 
 // ---- helpers
@@ -48,8 +42,17 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
   }
 }
 
+// handles both "AAAA..." and "data:video/mp4;base64,AAAA..."
+function normalizeBase64(b64) {
+  if (!b64) return "";
+  const s = String(b64);
+  if (s.includes(",")) return s.split(",").pop() || "";
+  return s;
+}
+
 function b64ToBlob(base64, contentType = "application/octet-stream") {
-  const byteChars = atob(base64);
+  const cleaned = normalizeBase64(base64);
+  const byteChars = atob(cleaned);
   const byteNumbers = new Array(byteChars.length);
   for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
   return new Blob([new Uint8Array(byteNumbers)], { type: contentType });
@@ -63,7 +66,7 @@ function filenameForVariant(format) {
 }
 
 async function mp4LooksValid(blob) {
-  const header = await blob.slice(0, 16).arrayBuffer();
+  const header = await blob.slice(0, 32).arrayBuffer();
   const view = new Uint8Array(header);
   const s = new TextDecoder().decode(view);
   return s.includes("ftyp");
@@ -71,7 +74,6 @@ async function mp4LooksValid(blob) {
 
 function triggerBrowserDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
@@ -84,9 +86,15 @@ function triggerBrowserDownload(blob, filename) {
   }, 200);
 }
 
+function hasValidOutput(output) {
+  if (!output) return false;
+  if (typeof output.url === "string" && output.url.startsWith("http")) return true;
+  if (typeof output.base64 === "string" && output.base64.length > 50 && output.contentType) return true;
+  return false;
+}
+
 // ---- component
 export default function DemoVideoGeneratorFixed({ resolver = {} }) {
-  // ✅ ONE embedded declaration (ONLY ONCE)
   const embedded = isEmbedded();
 
   let resolverCheck = null;
@@ -131,7 +139,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           setJobId(data.job.id);
           setJobStatus(data.job.status);
           if (data.job.outputs) setOutputs(data.job.outputs);
-          saveJobToHistory(tenantId, { id: data.job.id, status: data.job.status });
+          saveJobToHistory(tenantId, { id: data.job.id, status: data.job.status, outputs: data.job.outputs || null });
         }
       } catch (err) {
         console.warn("[DV] Failed to load recent job:", err?.message || err);
@@ -150,7 +158,8 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       if (data?.jobId) {
         setJobId(data.jobId);
         setJobStatus("queued");
-        saveJobToHistory(tenantId, { id: data.jobId, status: "queued" });
+        setOutputs(null);
+        saveJobToHistory(tenantId, { id: data.jobId, status: "queued", outputs: null });
         toast.success("Video generation started");
         startPolling(data.jobId);
       } else {
@@ -160,14 +169,15 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     onError: (err) => {
       console.error("[DV] Generation error (FULL):", err);
       toast.error("Generation failed", { description: err?.message || "Unknown error" });
-    }
+    },
   });
 
   const statusMutation = useMutation({
     mutationFn: async (jobIdVal) => {
+      // your backend expects { jobId }
       const { data } = await base44.functions.invoke("demoVideoGetStatus", { jobId: jobIdVal });
       return data;
-    }
+    },
   });
 
   const stopPolling = () => {
@@ -187,6 +197,8 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
         if (st?.status) setJobStatus(st.status);
         if (st?.outputs) setOutputs(st.outputs);
 
+        saveJobToHistory(tenantId, { id: jobIdVal, status: st?.status || null, outputs: st?.outputs || null });
+
         if (st?.status === "completed" || st?.status === "failed") {
           stopPolling();
           return;
@@ -203,9 +215,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     pollOnce();
   };
 
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
+  useEffect(() => () => stopPolling(), []);
 
   const handleGenerate = (e) => {
     e?.preventDefault?.();
@@ -217,7 +227,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       tenant_id: useDemoData ? null : tenantId,
       mode: useDemoData ? "demo" : "real",
       version: selectedVersion,
-      options: { voiceover: includeVoiceover, music: includeMusic }
+      options: { voiceover: includeVoiceover, music: includeMusic },
     };
 
     generateMutation.mutate(payload);
@@ -238,7 +248,8 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       const st = await statusMutation.mutateAsync(jobId);
       setJobStatus(st?.status || null);
       if (st?.outputs) setOutputs(st.outputs);
-      saveJobToHistory(tenantId, { id: jobId, status: st?.status });
+
+      saveJobToHistory(tenantId, { id: jobId, status: st?.status || null, outputs: st?.outputs || null });
 
       if (st?.status === "completed") toast.success("Video ready");
       else if (st?.status === "failed") toast.error("Generation failed");
@@ -249,8 +260,38 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
     }
   };
 
+  // Poll for a specific output format to exist (up to maxMs)
+  const waitForOutputReady = async (jobIdVal, format, maxMs = 45000) => {
+    const start = Date.now();
+    let lastStatus = null;
+
+    while (Date.now() - start < maxMs) {
+      try {
+        const st = await statusMutation.mutateAsync(jobIdVal);
+        lastStatus = st?.status || null;
+        if (st?.status) setJobStatus(st.status);
+        if (st?.outputs) setOutputs(st.outputs);
+
+        saveJobToHistory(tenantId, { id: jobIdVal, status: st?.status || null, outputs: st?.outputs || null });
+
+        const out = st?.outputs?.[format];
+        if (hasValidOutput(out)) return { ok: true, status: st?.status, outputs: st?.outputs };
+        if (st?.status === "failed") return { ok: false, status: "failed" };
+      } catch (e) {
+        // ignore and keep trying briefly
+      }
+
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+
+    return { ok: false, status: lastStatus || "unknown" };
+  };
+
   /**
-   * Download with fresh status check and token refresh on 401
+   * Download with:
+   * - pre-refresh status
+   * - token refresh + retry on 401
+   * - 409 OUTPUT_NOT_READY => wait until output exists, then retry
    */
   const downloadVariant = async (format, e) => {
     e?.preventDefault?.();
@@ -270,16 +311,17 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       return;
     }
 
-    // Refresh status before download to ensure outputs are fresh
+    // Refresh status before download
     try {
       const st = await statusMutation.mutateAsync(jobId);
       if (st?.status) setJobStatus(st.status);
       if (st?.outputs) setOutputs(st.outputs);
-    } catch (err) {
-      console.warn("[DV] Pre-download status refresh failed:", err);
+      saveJobToHistory(tenantId, { id: jobId, status: st?.status || null, outputs: st?.outputs || null });
+    } catch {
+      // ok to continue
     }
 
-    // Get fresh token if embedded
+    // embedded token handling
     let currentToken = shopifyToken;
     if (embedded) {
       if (!shopifyToken && tokenLoading) {
@@ -287,179 +329,139 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
         return;
       }
 
-      // Force fresh token
       currentToken = await getFreshAppBridgeToken({ force: true });
       if (!currentToken) {
-        const reason = tokenError || "Token retrieval failed";
-        toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
-        console.error("[DV-DL] ✗ BLOCKED: embedded=true but token empty", { tokenLoading, tokenError });
+        toast.error("Shopify auth not initialized", {
+          description: tokenError || "Token retrieval failed",
+          duration: 5000,
+        });
         return;
       }
-      console.log("[DV] ✓ Fresh token obtained for download, len=", currentToken.length);
     }
 
     setDownloadingVariant(format);
 
-    const attemptDownload = async (retryCount = 0) => {
-      try {
-        const headers = { "Content-Type": "application/json" };
-        if (embedded && currentToken) {
-          headers.Authorization = `Bearer ${currentToken}`;
-          console.log("[DV] ✓ Shopify bearer token attached, len=", currentToken.length);
-        }
+    const doRequest = async (tokenToUse) => {
+      const headers = { "Content-Type": "application/json" };
+      if (embedded && tokenToUse) headers.Authorization = `Bearer ${tokenToUse}`;
 
-        const res = await fetchWithTimeout(
-          "/api/functions/demoVideoProxyDownload",
-          {
-            method: "POST",
-            headers,
-            credentials: "include",
-            body: JSON.stringify({ jobId, format })
-          },
-          60000
-        );
-
-        const contentType = res.headers.get("content-type") || "";
-        console.log("[DV] Response:", {
-          status: res.status,
-          contentType,
-          contentLength: res.headers.get("content-length")
-        });
-
-        // Handle 401 with token expiry - retry once with fresh token
-        if (!res.ok && res.status === 401 && retryCount === 0) {
-          const text = await res.text().catch(() => "");
-          console.error("[DV] 401 error:", text);
-
-          if (text.includes("exp") || text.includes("expired") || text.includes("JWT")) {
-            console.warn("[DV] Token expired, retrying with fresh token...");
-            
-            // Force new token
-            const freshToken = await getFreshAppBridgeToken({ force: true });
-            if (freshToken) {
-              currentToken = freshToken;
-              console.log("[DV] Got fresh token, retrying download...");
-              return attemptDownload(1); // Retry once
-            }
-          }
-        }
-
-        // Handle non-OK
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          console.error("[DV] ✗ Download error:", res.status, text);
-
-          // 409 = output not ready
-          if (res.status === 409) {
-            const data = await res.json().catch(() => ({}));
-
-            if (data?.code === "OUTPUT_NOT_READY") {
-              toast.info("Finalizing video…", { description: "Refreshing outputs. Try again in a moment." });
-
-              try {
-                const st = await statusMutation.mutateAsync(jobId);
-                setJobStatus(st?.status || jobStatus);
-                if (st?.outputs) setOutputs(st.outputs);
-
-                // Restart polling briefly to let outputs appear
-                startPolling(jobId);
-              } catch (err) {
-                console.error("[DV] status refresh after 409 failed:", err);
-              }
-
-              return;
-            }
-            
-            // Fallback for 409 without OUTPUT_NOT_READY code
-            toast.error("Not ready yet", { description: text.slice(0, 220) });
-            return;
-          }
-
-          // 404 = URL not available (shouldn't happen if backend refreshes first)
-          if (res.status === 404 && text.includes("URL not available")) {
-            toast.error("Not ready yet", { description: text.slice(0, 220) });
-            return;
-          }
-
-          // 401
-          if (res.status === 401) {
-            toast.error("Unauthorized", { description: "Authentication failed" });
-            return;
-          }
-
-          toast.error("Download failed", { description: text.slice(0, 220) || `HTTP ${res.status}` });
-          return;
-        }
-
-        // OK response: could be JSON(base64) OR a file stream
-        let downloadedBlob = null;
-        let downloadedName = filenameForVariant(format);
-
-        if (contentType.includes("application/json")) {
-          const data = await res.json().catch(() => null);
-          if (!data) {
-            toast.error("Download failed", { description: "Invalid JSON response" });
-            return;
-          }
-
-          // base64 payload
-          if (data.base64) {
-            downloadedBlob = b64ToBlob(data.base64, data.contentType || "application/octet-stream");
-            downloadedName = data.filename || downloadedName;
-          } else if (data.url) {
-            const urlRes = await fetchWithTimeout(data.url, { method: "GET" }, 60000);
-            if (!urlRes.ok) {
-              const t = await urlRes.text().catch(() => "");
-              toast.error("Direct download failed", { description: t.slice(0, 220) || `HTTP ${urlRes.status}` });
-              return;
-            }
-            downloadedBlob = await urlRes.blob();
-            downloadedName = data.filename || downloadedName;
-          } else {
-            toast.error("Download failed", { description: "No base64/url in response" });
-            return;
-          }
-        } else {
-          // file stream
-          downloadedBlob = await res.blob();
-        }
-
-        if (!downloadedBlob) {
-          toast.error("Download failed", { description: "No file data returned" });
-          return;
-        }
-
-        // Size sanity
-        const minSize = format === "thumb" ? 500 : 1000;
-        if (downloadedBlob.size < minSize) {
-          toast.error("File too small", { description: `${downloadedBlob.size} bytes` });
-          return;
-        }
-
-        // MP4 signature check (non-thumb)
-        if (format !== "thumb") {
-          const ok = await mp4LooksValid(downloadedBlob);
-          if (!ok) {
-            toast.error("Invalid MP4", { description: "Missing ftyp signature" });
-            return;
-          }
-        }
-
-        triggerBrowserDownload(downloadedBlob, downloadedName);
-
-        const sizeMB = (downloadedBlob.size / 1_000_000).toFixed(2);
-        toast.success("Download complete", { description: `${downloadedName} • ${sizeMB}MB` });
-      } catch (err) {
-        const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
-        console.error("[DV] Download error:", err);
-        toast.error("Download error", {
-          description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error"
-        });
-      }
+      return fetchWithTimeout(
+        "/api/functions/demoVideoProxyDownload",
+        {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({ jobId, format }),
+        },
+        60000
+      );
     };
 
-    await attemptDownload();
-    setDownloadingVariant(null);
+    try {
+      // attempt 1
+      let res = await doRequest(currentToken);
+      let ct = res.headers.get("content-type") || "";
+
+      // 401 => refresh token once => retry
+      if (res.status === 401 && embedded) {
+        const text = await res.text().catch(() => "");
+        console.warn("[DV] 401 download:", text);
+        const fresh = await getFreshAppBridgeToken({ force: true });
+        if (fresh) {
+          currentToken = fresh;
+          res = await doRequest(currentToken);
+          ct = res.headers.get("content-type") || "";
+        }
+      }
+
+      // 409 OUTPUT_NOT_READY => wait => retry once
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.code === "OUTPUT_NOT_READY") {
+          toast.info("Finalizing video…", { description: `Preparing ${format}. This can take a moment.` });
+
+          const wait = await waitForOutputReady(jobId, format, 45000);
+          if (!wait.ok) {
+            toast.error("Still not ready", { description: `Try again shortly (status: ${wait.status || "unknown"})` });
+            return;
+          }
+
+          // retry after ready
+          res = await doRequest(currentToken);
+          ct = res.headers.get("content-type") || "";
+        }
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        console.error("[DV] ✗ Download error:", res.status, text);
+        if (res.status === 401) toast.error("Unauthorized", { description: "Authentication failed" });
+        else toast.error("Download failed", { description: text.slice(0, 220) || `HTTP ${res.status}` });
+        return;
+      }
+
+      // OK: JSON or stream
+      let blob = null;
+      let filename = filenameForVariant(format);
+
+      if (ct.includes("application/json")) {
+        const data = await res.json().catch(() => null);
+        if (!data) {
+          toast.error("Download failed", { description: "Invalid JSON response" });
+          return;
+        }
+
+        if (data.base64) {
+          blob = b64ToBlob(data.base64, data.contentType || "application/octet-stream");
+          filename = data.filename || filename;
+        } else if (data.url) {
+          const urlRes = await fetchWithTimeout(data.url, { method: "GET" }, 60000);
+          if (!urlRes.ok) {
+            const t = await urlRes.text().catch(() => "");
+            toast.error("Direct download failed", { description: t.slice(0, 220) || `HTTP ${urlRes.status}` });
+            return;
+          }
+          blob = await urlRes.blob();
+          filename = data.filename || filename;
+        } else {
+          toast.error("Download failed", { description: "No base64/url in response" });
+          return;
+        }
+      } else {
+        blob = await res.blob();
+      }
+
+      if (!blob) {
+        toast.error("Download failed", { description: "No file data returned" });
+        return;
+      }
+
+      const minSize = format === "thumb" ? 500 : 1000;
+      if (blob.size < minSize) {
+        toast.error("File too small", { description: `${blob.size} bytes` });
+        return;
+      }
+
+      if (format !== "thumb") {
+        const ok = await mp4LooksValid(blob);
+        if (!ok) {
+          toast.error("Invalid MP4", { description: "Missing ftyp signature" });
+          return;
+        }
+      }
+
+      triggerBrowserDownload(blob, filename);
+      const sizeMB = (blob.size / 1_000_000).toFixed(2);
+      toast.success("Download complete", { description: `${filename} • ${sizeMB}MB` });
+    } catch (err) {
+      const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
+      console.error("[DV] Download error:", err);
+      toast.error("Download error", {
+        description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error",
+      });
+    } finally {
+      setDownloadingVariant(null);
+    }
   };
 
   if (!resolvedOk) {
@@ -488,9 +490,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           {embedded && (
             <div
               className={`p-3 rounded-lg text-sm ${
-                shopifyToken
-                  ? "bg-emerald-50 border border-emerald-200"
-                  : "bg-amber-50 border border-amber-200"
+                shopifyToken ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-200"
               }`}
             >
               {shopifyToken ? (
@@ -601,22 +601,45 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           {/* Advanced */}
           <AdvancedDownloadOptions embedded={embedded} jobId={jobId} jobStatus={jobStatus} outputs={outputs} />
 
-          {/* Downloadable Video Management */}
+          {/* Download history */}
           <DownloadableVideoManagement
             tenantId={tenantId}
             onSelectJob={(j) => {
               setJobId(j.id);
               setJobStatus(j.status || null);
+              if (j.outputs) setOutputs(j.outputs);
               toast.success("Loaded job from history");
             }}
             onRefreshJob={async (jobIdVal) => {
               const res = await statusMutation.mutateAsync(jobIdVal);
+              // also push into state if this is current job
+              if (jobIdVal === jobId) {
+                setJobStatus(res?.status || null);
+                if (res?.outputs) setOutputs(res.outputs);
+              }
               return { status: res?.status, outputs: res?.outputs };
             }}
             onDownload={(jobIdVal, format) => {
+              // switch to that job, then download
               setJobId(jobIdVal);
-              setJobStatus("completed");
-              downloadVariant(format);
+              // DO NOT force status to completed; refresh first
+              (async () => {
+                try {
+                  const st = await statusMutation.mutateAsync(jobIdVal);
+                  setJobStatus(st?.status || null);
+                  if (st?.outputs) setOutputs(st.outputs);
+                  saveJobToHistory(tenantId, { id: jobIdVal, status: st?.status || null, outputs: st?.outputs || null });
+
+                  if (st?.status !== "completed") {
+                    toast.error("Video not ready", { description: `Current status: ${st?.status || "unknown"}` });
+                    return;
+                  }
+
+                  await downloadVariant(format);
+                } catch (e) {
+                  toast.error("Failed to load job", { description: e?.message || "Unknown error" });
+                }
+              })();
             }}
           />
         </CardContent>
