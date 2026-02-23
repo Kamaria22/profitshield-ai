@@ -37,15 +37,23 @@ Deno.serve(async (req) => {
     const url = data?.response?.url;
 
     if (status === "done" && url) {
-      const outputs = await convertToFormats(url);
-
-      await base44.asServiceRole.entities.DemoVideoJob.update(jobId, {
-        status: "completed",
-        progress: 100,
-        outputs,
+      // Upload to CDN instead of using Shotstack URL directly
+      base44.asServiceRole.functions.invoke("demoVideoCDNUpload", {
+        jobId,
+        sourceUrl: url,
+      }).catch((err) => {
+        console.error("[shotstackPollStatus] CDN upload failed:", err);
+        base44.asServiceRole.entities.DemoVideoJob.update(jobId, {
+          status: "failed",
+          error_message: `CDN upload failed: ${err?.message || "Unknown error"}`,
+        }).catch(() => {});
       });
 
-      return Response.json({ success: true, status: "completed" }, { status: 200 });
+      await base44.asServiceRole.entities.DemoVideoJob.update(jobId, {
+        progress: 80,
+      });
+
+      return Response.json({ success: true, status: "uploading_to_cdn" }, { status: 200 });
     } else if (status === "failed") {
       await base44.asServiceRole.entities.DemoVideoJob.update(jobId, {
         status: "failed",
