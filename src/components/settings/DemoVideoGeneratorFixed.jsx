@@ -6,6 +6,7 @@ import { requireResolved } from "@/components/usePlatformResolver";
 import { usePermissions } from "@/components/usePermissions";
 import { useAppBridgeToken } from "@/components/shopify/AppBridgeAuth";
 import AdvancedDownloadOptions from "./AdvancedDownloadOptions";
+import DownloadableVideoManagement, { saveJobToHistory } from "./DownloadableVideoManagement";
 import { Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,6 +135,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           setJobId(data.job.id);
           setJobStatus(data.job.status);
           if (data.job.outputs) setOutputs(data.job.outputs);
+          saveJobToHistory(tenantId, { id: data.job.id, status: data.job.status });
         }
       } catch (err) {
         console.warn("[DV] Failed to load recent job:", err?.message || err);
@@ -152,6 +154,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       if (data?.jobId) {
         setJobId(data.jobId);
         setJobStatus("queued");
+        saveJobToHistory(tenantId, { id: data.jobId, status: "queued" });
         toast.success("Video generation started");
         startPolling(data.jobId);
       } else {
@@ -239,6 +242,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       const st = await statusMutation.mutateAsync(jobId);
       setJobStatus(st?.status || null);
       if (st?.outputs) setOutputs(st.outputs);
+      saveJobToHistory(tenantId, { id: jobId, status: st?.status });
 
       if (st?.status === "completed") toast.success("Video ready");
       else if (st?.status === "failed") toast.error("Generation failed");
@@ -556,6 +560,25 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
 
           {/* Advanced */}
           <AdvancedDownloadOptions embedded={embedded} jobId={jobId} jobStatus={jobStatus} outputs={outputs} />
+
+          {/* Downloadable Video Management */}
+          <DownloadableVideoManagement
+            tenantId={tenantId}
+            onSelectJob={(j) => {
+              setJobId(j.id);
+              setJobStatus(j.status || null);
+              toast.success("Loaded job from history");
+            }}
+            onRefreshJob={async (jobIdVal) => {
+              const res = await statusMutation.mutateAsync(jobIdVal);
+              return { status: res?.status, outputs: res?.outputs };
+            }}
+            onDownload={(jobIdVal, format) => {
+              setJobId(jobIdVal);
+              setJobStatus("completed");
+              downloadVariant(format);
+            }}
+          />
         </CardContent>
       </Card>
     </div>
