@@ -14,9 +14,12 @@ import {
   RefreshCw,
   X,
   Download,
-  AlertCircle
+  AlertCircle,
+  Share2
 } from 'lucide-react';
 import { format } from 'date-fns';
+import ShareVideoDialog from '@/components/video/ShareVideoDialog';
+import VideoJobNotifications from '@/components/notifications/VideoJobNotifications';
 
 const statusConfig = {
   queued: { icon: Clock, color: 'bg-blue-100 text-blue-700', label: 'Queued' },
@@ -29,6 +32,9 @@ const statusConfig = {
 export default function VideoJobs() {
   const queryClient = useQueryClient();
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareVideoUrl, setShareVideoUrl] = useState('');
+  const [shareJobId, setShareJobId] = useState('');
 
   const { data: jobs = [], isLoading, refetch } = useQuery({
     queryKey: ['videoJobs'],
@@ -87,6 +93,12 @@ export default function VideoJobs() {
     a.remove();
   };
 
+  const handleShare = (videoUrl, jobId) => {
+    setShareVideoUrl(videoUrl);
+    setShareJobId(jobId);
+    setShareDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -97,6 +109,7 @@ export default function VideoJobs() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      <VideoJobNotifications />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Video Jobs</h1>
@@ -265,7 +278,18 @@ export default function VideoJobs() {
                   {/* Download Buttons */}
                   {job.status === 'completed' && job.outputs && (
                     <div>
-                      <p className="text-sm font-medium text-slate-900 mb-3">Available Downloads</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-medium text-slate-900">Available Downloads</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleShare(job.outputs['1080p']?.url || job.outputs['720p']?.url, job.id)}
+                          className="gap-2"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          Share
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {Object.entries(job.outputs).map(([format, output]) => {
                           if (!output?.url) return null;
@@ -317,6 +341,13 @@ export default function VideoJobs() {
           })
         )}
       </div>
+
+      <ShareVideoDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        videoUrl={shareVideoUrl}
+        jobId={shareJobId}
+      />
     </div>
   );
 }
