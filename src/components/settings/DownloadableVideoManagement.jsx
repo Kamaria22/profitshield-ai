@@ -11,11 +11,10 @@ import { RefreshCw, Download, Trash2, Copy } from "lucide-react";
  * - Lets user refresh job status and re-download variants
  *
  * Requires:
- *  - props.tenantId (string|null)
- *  - props.jobs: optional (array) current job list from parent (if you maintain it there)
- *  - props.onSelectJob(job): called when user clicks "Use"
- *  - props.onRefreshJob(jobId): async => returns { status, outputs? }
- *  - props.onDownload(jobId, format): triggers download for a stored job
+ *  - tenantId (string|null)
+ *  - onSelectJob(job)
+ *  - onRefreshJob(jobId): async => returns { status, outputs? }
+ *  - onDownload(jobId, format)
  */
 
 function safeJsonParse(s, fallback) {
@@ -31,19 +30,24 @@ function storageKey(tenantId) {
 }
 
 export function saveJobToHistory(tenantId, job) {
+  if (typeof window === "undefined") return;
   if (!job?.id) return;
-  const key = storageKey(tenantId);
 
-  const existing = safeJsonParse(localStorage.getItem(key) || "[]", []);
+  const key = storageKey(tenantId);
   const now = new Date().toISOString();
 
-  // de-dupe by id, newest first
-  const merged = [
-    { ...job, updatedAt: now, createdAt: job.createdAt || now },
-    ...existing.filter((j) => j?.id !== job.id),
-  ].slice(0, 25);
+  try {
+    const existing = safeJsonParse(localStorage.getItem(key) || "[]", []);
+    const merged = [
+      { ...job, updatedAt: now, createdAt: job.createdAt || now },
+      ...existing.filter((j) => j?.id !== job.id),
+    ].slice(0, 25);
 
-  localStorage.setItem(key, JSON.stringify(merged));
+    localStorage.setItem(key, JSON.stringify(merged));
+  } catch (e) {
+    // Storage can fail in embedded/private modes—do not crash the app
+    console.warn("[DVM] saveJobToHistory storage error:", e);
+  }
 }
 
 export default function DownloadableVideoManagement({
@@ -58,13 +62,23 @@ export default function DownloadableVideoManagement({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = localStorage.getItem(key);
-    setItems(safeJsonParse(raw || "[]", []));
+    try {
+      const raw = localStorage.getItem(key);
+      setItems(safeJsonParse(raw || "[]", []));
+    } catch (e) {
+      console.warn("[DVM] load storage error:", e);
+      setItems([]);
+    }
   }, [key]);
 
   const persist = (next) => {
     setItems(next);
-    localStorage.setItem(key, JSON.stringify(next));
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) {
+      console.warn("[DVM] persist storage error:", e);
+    }
   };
 
   const removeJob = (jobId) => {
@@ -123,7 +137,13 @@ export default function DownloadableVideoManagement({
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base">Downloadable Video Management</CardTitle>
         <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={clearAll} disabled={items.length === 0}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearAll}
+            disabled={items.length === 0}
+          >
             <Trash2 className="w-4 h-4 mr-1" />
             Clear
           </Button>
@@ -148,7 +168,8 @@ export default function DownloadableVideoManagement({
                       Job: {String(j.id).slice(0, 10)}…
                     </div>
                     <div className="text-xs text-slate-500">
-                      Updated: {j.updatedAt ? new Date(j.updatedAt).toLocaleString() : "—"}
+                      Updated:{" "}
+                      {j.updatedAt ? new Date(j.updatedAt).toLocaleString() : "—"}
                     </div>
                   </div>
 
@@ -186,7 +207,9 @@ export default function DownloadableVideoManagement({
                     onClick={() => refreshOne(j.id)}
                     disabled={busyId === j.id}
                   >
-                    <RefreshCw className={`w-4 h-4 mr-1 ${busyId === j.id ? "animate-spin" : ""}`} />
+                    <RefreshCw
+                      className={`w-4 h-4 mr-1 ${busyId === j.id ? "animate-spin" : ""}`}
+                    />
                     Refresh
                   </Button>
 
