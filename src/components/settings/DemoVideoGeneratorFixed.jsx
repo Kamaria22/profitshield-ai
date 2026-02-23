@@ -349,17 +349,29 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
           const text = await res.text().catch(() => "");
           console.error("[DV] ✗ Download error:", res.status, text);
 
-          // 409 = output not ready (backend should re-fetch status first)
-          if (res.status === 409 && text.includes("not ready")) {
-            toast.error("Not ready yet", { description: text.slice(0, 220) });
-            
-            // Refresh status
-            try {
-              const st = await statusMutation.mutateAsync(jobId);
-              if (st?.status) setJobStatus(st.status);
-              if (st?.outputs) setOutputs(st.outputs);
-            } catch {}
+          // 409 = output not ready
+          if (res.status === 409) {
+            const data = await res.json().catch(() => ({}));
 
+            if (data?.code === "OUTPUT_NOT_READY") {
+              toast.info("Finalizing video…", { description: "Refreshing outputs. Try again in a moment." });
+
+              try {
+                const st = await statusMutation.mutateAsync(jobId);
+                setJobStatus(st?.status || jobStatus);
+                if (st?.outputs) setOutputs(st.outputs);
+
+                // Restart polling briefly to let outputs appear
+                startPolling(jobId);
+              } catch (err) {
+                console.error("[DV] status refresh after 409 failed:", err);
+              }
+
+              return;
+            }
+            
+            // Fallback for 409 without OUTPUT_NOT_READY code
+            toast.error("Not ready yet", { description: text.slice(0, 220) });
             return;
           }
 
