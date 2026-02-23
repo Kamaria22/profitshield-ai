@@ -18,6 +18,7 @@ import {
   Share2
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import ShareVideoDialog from '@/components/video/ShareVideoDialog';
 import VideoJobNotifications from '@/components/notifications/VideoJobNotifications';
 
@@ -82,15 +83,27 @@ export default function VideoJobs() {
   const completedCount = jobs.filter(j => j.status === 'completed').length;
   const failedCount = jobs.filter(j => j.status === 'failed').length;
 
-  const handleDownload = (output) => {
-    if (!output?.url) return;
-    const a = document.createElement('a');
-    a.href = output.url;
-    a.download = output.filename || 'video.mp4';
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const handleDownload = async (format, jobId) => {
+    try {
+      const response = await base44.functions.invoke('demoVideoProxyDownload', {
+        jobId,
+        format
+      });
+
+      const blob = new Blob([response.data], { 
+        type: format === 'thumb' ? 'image/jpeg' : 'video/mp4' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = format === 'thumb' ? 'ProfitShieldAI-thumb.jpg' : `ProfitShieldAI-${format}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Download failed: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const handleShare = (videoUrl, jobId) => {
@@ -298,7 +311,7 @@ export default function VideoJobs() {
                               key={format}
                               size="sm"
                               variant="outline"
-                              onClick={() => handleDownload(output)}
+                              onClick={() => handleDownload(format, job.id)}
                               className="w-full"
                             >
                               <Download className="w-3 h-3 mr-2" />
