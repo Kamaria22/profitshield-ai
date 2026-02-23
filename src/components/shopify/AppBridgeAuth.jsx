@@ -1,9 +1,15 @@
 /**
  * Shopify App Bridge Authentication (NPM version - works in embedded apps)
+ * With fresh token management for reliable JWT handling
  */
 import { useEffect, useMemo, useState } from "react";
 import createApp from "@shopify/app-bridge";
 import { getSessionToken } from "@shopify/app-bridge-utils";
+
+// Token cache (module scope)
+let cachedToken = null;
+let tokenFetchedAt = 0;
+const TOKEN_CACHE_TTL_MS = 20000; // 20 seconds
 
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) return window.__SHOPIFY_API_KEY__;
@@ -25,47 +31,66 @@ function isEmbedded() {
   return new URLSearchParams(window.location.search).has("host");
 }
 
-export async function getAppBridgeToken() {
+/**
+ * Get a fresh or cached Shopify session token
+ * @param {Object} options
+ * @param {boolean} options.force - Force fresh token fetch (ignore cache)
+ * @returns {Promise<string|null>} Token or null on failure
+ */
+export async function getFreshAppBridgeToken({ force = false } = {}) {
   try {
     if (typeof window === "undefined") return null;
 
     const host = getHost();
     const apiKey = getApiKey();
 
-    console.info("[AB-PROOF] href=", window.location.href);
-    console.info(
-      "[AB-PROOF] embedded=",
-      (() => {
-        try {
-          return window.top !== window.self;
-        } catch {
-          return true;
-        }
-      })()
-    );
-    console.info("[AB-PROOF] host=", host);
-    console.info("[AB-PROOF] apiKeyPresent=", !!apiKey);
-
+    // Not embedded? No token needed
     if (!host) {
-      console.error("[AB] Missing host param (must open inside Shopify Admin).");
       return null;
     }
+
     if (!apiKey) {
       console.error("[AB] Missing SHOPIFY_API_KEY injection.");
       return null;
     }
 
+    // Return cached token if fresh enough and not forced
+    const now = Date.now();
+    if (!force && cachedToken && (now - tokenFetchedAt) < TOKEN_CACHE_TTL_MS) {
+      console.log(`[AB] Using cached token (${Math.round((now - tokenFetchedAt) / 1000)}s old)`);
+      return cachedToken;
+    }
+
+    // Fetch fresh token
+    console.log(`[AB] Fetching fresh token (force=${force})`);
     const app = createApp({ apiKey, host, forceRedirect: true });
     const token = await getSessionToken(app);
 
-    console.info("[AB-PROOF] tokenLen=", token?.length || 0);
-    return token || null;
+    if (token && token.length > 50) {
+      cachedToken = token;
+      tokenFetchedAt = now;
+      console.log(`[AB] Fresh token obtained (${token.length} bytes)`);
+      return token;
+    }
+
+    console.error("[AB] Token fetch returned invalid value");
+    return null;
   } catch (err) {
-    console.error("[AB] App Bridge error:", err);
+    console.error("[AB] App Bridge error:", err?.message || err);
     return null;
   }
 }
 
+/**
+ * Legacy getAppBridgeToken (uses cache by default)
+ */
+export async function getAppBridgeToken() {
+  return getFreshAppBridgeToken({ force: false });
+}
+
+/**
+ * React hook for App Bridge token with automatic initialization
+ */
 export function useAppBridgeToken() {
   const embedded = useMemo(() => isEmbedded(), []);
   const [token, setToken] = useState(null);
@@ -86,7 +111,7 @@ export function useAppBridgeToken() {
     }
 
     (async () => {
-      const tok = await getAppBridgeToken();
+      const tok = await getFreshAppBridgeToken({ force: false });
       if (!mounted) return;
 
       if (tok && tok.length > 50) {

@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
 import { requireResolved } from "@/components/usePlatformResolver";
 import { usePermissions } from "@/components/usePermissions";
-import { useAppBridgeToken } from "@/components/shopify/AppBridgeAuth";
+import { useAppBridgeToken, getFreshAppBridgeToken } from "@/components/shopify/AppBridgeAuth";
 import AdvancedDownloadOptions from "./AdvancedDownloadOptions";
 import DownloadableVideoManagement, { saveJobToHistory } from "./DownloadableVideoManagement";
 import { Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
@@ -32,7 +32,6 @@ const VARIANTS = [
 function isEmbedded() {
   if (typeof window === "undefined") return false;
   try {
-    // Your app uses ?host= when embedded
     return new URLSearchParams(window.location.search).has("host");
   } catch {
     return false;
@@ -64,7 +63,6 @@ function filenameForVariant(format) {
 }
 
 async function mp4LooksValid(blob) {
-  // Basic "ftyp" check
   const header = await blob.slice(0, 16).arrayBuffer();
   const view = new Uint8Array(header);
   const s = new TextDecoder().decode(view);
@@ -88,7 +86,7 @@ function triggerBrowserDownload(blob, filename) {
 
 // ---- component
 export default function DemoVideoGeneratorFixed({ resolver = {} }) {
-  // ✅ ONE embedded declaration (ONLY ONCE) — never redeclare
+  // ✅ ONE embedded declaration (ONLY ONCE)
   const embedded = isEmbedded();
 
   let resolverCheck = null;
@@ -110,8 +108,6 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [downloadingVariant, setDownloadingVariant] = useState(null);
-
-  // keep latest outputs from status responses (some backends return variant URLs or base64 here)
   const [outputs, setOutputs] = useState(null);
 
   const [selectedVersion, setSelectedVersion] = useState("90s");
@@ -169,7 +165,7 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
 
   const statusMutation = useMutation({
     mutationFn: async (jobIdVal) => {
-      const { data } = await base44.functions.invoke("demoVideoGetStatus", { job_id: jobIdVal });
+      const { data } = await base44.functions.invoke("demoVideoGetStatus", { jobId: jobIdVal });
       return data;
     }
   });
@@ -248,21 +244,13 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       else if (st?.status === "failed") toast.error("Generation failed");
       else toast.info("Status updated", { description: st?.status || "unknown" });
     } catch (err) {
-      // ✅ log full object (fix you asked for)
       console.error("[DV] Refresh error:", err);
       toast.error("Failed to refresh status", { description: err?.message || "Unknown error" });
     }
   };
 
   /**
-   * Download strategy:
-   * 1) Call /api/functions/demoVideoProxyDownload (server should validate Shopify JWT and return either:
-   *    - { base64, contentType, filename } JSON, OR
-   *    - direct file stream (blob)
-   * 2) If it returns JSON with base64 => decode and download.
-   * 3) If it returns 404 "URL not available ..." => auto-refresh status (to update outputs), then tell user.
-   * 4) If embedded and token missing => show clear toast and do not crash.
-   * 5) Never redeclare `filename` / `a`.
+   * Download with fresh status check and token refresh on 401
    */
   const downloadVariant = async (format, e) => {
     e?.preventDefault?.();
@@ -282,144 +270,184 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
       return;
     }
 
-    // embedded auth block
-    if (embedded && !shopifyToken) {
-      const reason =
-        tokenError || (tokenLoading ? "Still initializing Shopify auth..." : "Token retrieval failed");
+    // Refresh status before download to ensure outputs are fresh
+    try {
+      const st = await statusMutation.mutateAsync(jobId);
+      if (st?.status) setJobStatus(st.status);
+      if (st?.outputs) setOutputs(st.outputs);
+    } catch (err) {
+      console.warn("[DV] Pre-download status refresh failed:", err);
+    }
 
-      toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
-      console.error("[DV-DL] ✗ BLOCKED: embedded=true but shopifyToken empty", {
-        tokenLoading,
-        tokenError,
-        embedded
-      });
-      return;
+    // Get fresh token if embedded
+    let currentToken = shopifyToken;
+    if (embedded) {
+      if (!shopifyToken && tokenLoading) {
+        toast.error("Shopify auth not ready", { description: "Still initializing...", duration: 5000 });
+        return;
+      }
+
+      // Force fresh token
+      currentToken = await getFreshAppBridgeToken({ force: true });
+      if (!currentToken) {
+        const reason = tokenError || "Token retrieval failed";
+        toast.error("Shopify auth not initialized", { description: reason, duration: 5000 });
+        console.error("[DV-DL] ✗ BLOCKED: embedded=true but token empty", { tokenLoading, tokenError });
+        return;
+      }
+      console.log("[DV] ✓ Fresh token obtained for download, len=", currentToken.length);
     }
 
     setDownloadingVariant(format);
 
-    try {
-      const headers = { "Content-Type": "application/json" };
-      if (embedded && shopifyToken) {
-        headers.Authorization = `Bearer ${shopifyToken}`;
-        console.log("[DV] ✓ Shopify bearer token attached, len=", shopifyToken.length);
-      }
-
-      const res = await fetchWithTimeout(
-        "/api/functions/demoVideoProxyDownload",
-        {
-          method: "POST",
-          headers,
-          credentials: "include",
-          body: JSON.stringify({ jobId, format })
-        },
-        60000
-      );
-
-      const contentType = res.headers.get("content-type") || "";
-      console.log("[DV] Response:", {
-        status: res.status,
-        contentType,
-        contentLength: res.headers.get("content-length")
-      });
-
-      // ---- handle non-OK first by reading text (better debugging)
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("[DV] ✗ Download error:", res.status, text);
-
-        // common backend message: URL not available for 1080p
-        if (res.status === 404 && text.includes("URL not available")) {
-          toast.error("Not ready yet", { description: text.slice(0, 220) });
-
-          // auto-refresh status to pull updated outputs (in case backend just finished)
-          try {
-            const st = await statusMutation.mutateAsync(jobId);
-            if (st?.status) setJobStatus(st.status);
-            if (st?.outputs) setOutputs(st.outputs);
-          } catch {}
-
-          return;
+    const attemptDownload = async (retryCount = 0) => {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (embedded && currentToken) {
+          headers.Authorization = `Bearer ${currentToken}`;
+          console.log("[DV] ✓ Shopify bearer token attached, len=", currentToken.length);
         }
 
-        if (res.status === 401 && text.includes("JWT verification failed")) {
-          toast.error("Unauthorized", { description: text.slice(0, 220) });
-          return;
+        const res = await fetchWithTimeout(
+          "/api/functions/demoVideoProxyDownload",
+          {
+            method: "POST",
+            headers,
+            credentials: "include",
+            body: JSON.stringify({ jobId, format })
+          },
+          60000
+        );
+
+        const contentType = res.headers.get("content-type") || "";
+        console.log("[DV] Response:", {
+          status: res.status,
+          contentType,
+          contentLength: res.headers.get("content-length")
+        });
+
+        // Handle 401 with token expiry - retry once with fresh token
+        if (!res.ok && res.status === 401 && retryCount === 0) {
+          const text = await res.text().catch(() => "");
+          console.error("[DV] 401 error:", text);
+
+          if (text.includes("exp") || text.includes("expired") || text.includes("JWT")) {
+            console.warn("[DV] Token expired, retrying with fresh token...");
+            
+            // Force new token
+            const freshToken = await getFreshAppBridgeToken({ force: true });
+            if (freshToken) {
+              currentToken = freshToken;
+              console.log("[DV] Got fresh token, retrying download...");
+              return attemptDownload(1); // Retry once
+            }
+          }
         }
 
-        toast.error("Download failed", { description: text.slice(0, 220) || `HTTP ${res.status}` });
-        return;
-      }
+        // Handle non-OK
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          console.error("[DV] ✗ Download error:", res.status, text);
 
-      // ---- OK response: could be JSON(base64) OR a file stream
-      // If JSON, parse it. If parse fails, treat as blob.
-      let downloadedBlob = null;
-      let downloadedName = filenameForVariant(format);
+          // 409 = output not ready (backend should re-fetch status first)
+          if (res.status === 409 && text.includes("not ready")) {
+            toast.error("Not ready yet", { description: text.slice(0, 220) });
+            
+            // Refresh status
+            try {
+              const st = await statusMutation.mutateAsync(jobId);
+              if (st?.status) setJobStatus(st.status);
+              if (st?.outputs) setOutputs(st.outputs);
+            } catch {}
 
-      if (contentType.includes("application/json")) {
-        const data = await res.json().catch(() => null);
-        if (!data) {
-          toast.error("Download failed", { description: "Invalid JSON response" });
-          return;
-        }
-
-        // base64 payload
-        if (data.base64) {
-          downloadedBlob = b64ToBlob(data.base64, data.contentType || "application/octet-stream");
-          downloadedName = data.filename || downloadedName;
-        } else if (data.url) {
-          // optional: backend could return URL; fetch it top-level
-          const urlRes = await fetchWithTimeout(data.url, { method: "GET" }, 60000);
-          if (!urlRes.ok) {
-            const t = await urlRes.text().catch(() => "");
-            toast.error("Direct download failed", { description: t.slice(0, 220) || `HTTP ${urlRes.status}` });
             return;
           }
-          downloadedBlob = await urlRes.blob();
-          downloadedName = data.filename || downloadedName;
+
+          // 404 = URL not available (shouldn't happen if backend refreshes first)
+          if (res.status === 404 && text.includes("URL not available")) {
+            toast.error("Not ready yet", { description: text.slice(0, 220) });
+            return;
+          }
+
+          // 401
+          if (res.status === 401) {
+            toast.error("Unauthorized", { description: "Authentication failed" });
+            return;
+          }
+
+          toast.error("Download failed", { description: text.slice(0, 220) || `HTTP ${res.status}` });
+          return;
+        }
+
+        // OK response: could be JSON(base64) OR a file stream
+        let downloadedBlob = null;
+        let downloadedName = filenameForVariant(format);
+
+        if (contentType.includes("application/json")) {
+          const data = await res.json().catch(() => null);
+          if (!data) {
+            toast.error("Download failed", { description: "Invalid JSON response" });
+            return;
+          }
+
+          // base64 payload
+          if (data.base64) {
+            downloadedBlob = b64ToBlob(data.base64, data.contentType || "application/octet-stream");
+            downloadedName = data.filename || downloadedName;
+          } else if (data.url) {
+            const urlRes = await fetchWithTimeout(data.url, { method: "GET" }, 60000);
+            if (!urlRes.ok) {
+              const t = await urlRes.text().catch(() => "");
+              toast.error("Direct download failed", { description: t.slice(0, 220) || `HTTP ${urlRes.status}` });
+              return;
+            }
+            downloadedBlob = await urlRes.blob();
+            downloadedName = data.filename || downloadedName;
+          } else {
+            toast.error("Download failed", { description: "No base64/url in response" });
+            return;
+          }
         } else {
-          toast.error("Download failed", { description: "No base64/url in response" });
+          // file stream
+          downloadedBlob = await res.blob();
+        }
+
+        if (!downloadedBlob) {
+          toast.error("Download failed", { description: "No file data returned" });
           return;
         }
-      } else {
-        // file stream
-        downloadedBlob = await res.blob();
-      }
 
-      if (!downloadedBlob) {
-        toast.error("Download failed", { description: "No file data returned" });
-        return;
-      }
-
-      // Size sanity
-      const minSize = format === "thumb" ? 500 : 1000;
-      if (downloadedBlob.size < minSize) {
-        toast.error("File too small", { description: `${downloadedBlob.size} bytes` });
-        return;
-      }
-
-      // MP4 signature check (non-thumb)
-      if (format !== "thumb") {
-        const ok = await mp4LooksValid(downloadedBlob);
-        if (!ok) {
-          toast.error("Invalid MP4", { description: "Missing ftyp signature" });
+        // Size sanity
+        const minSize = format === "thumb" ? 500 : 1000;
+        if (downloadedBlob.size < minSize) {
+          toast.error("File too small", { description: `${downloadedBlob.size} bytes` });
           return;
         }
+
+        // MP4 signature check (non-thumb)
+        if (format !== "thumb") {
+          const ok = await mp4LooksValid(downloadedBlob);
+          if (!ok) {
+            toast.error("Invalid MP4", { description: "Missing ftyp signature" });
+            return;
+          }
+        }
+
+        triggerBrowserDownload(downloadedBlob, downloadedName);
+
+        const sizeMB = (downloadedBlob.size / 1_000_000).toFixed(2);
+        toast.success("Download complete", { description: `${downloadedName} • ${sizeMB}MB` });
+      } catch (err) {
+        const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
+        console.error("[DV] Download error:", err);
+        toast.error("Download error", {
+          description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error"
+        });
       }
+    };
 
-      triggerBrowserDownload(downloadedBlob, downloadedName);
-
-      const sizeMB = (downloadedBlob.size / 1_000_000).toFixed(2);
-      toast.success("Download complete", { description: `${downloadedName} • ${sizeMB}MB` });
-    } catch (err) {
-      const isTimeout = err?.name === "AbortError" || String(err?.message).includes("timeout");
-      console.error("[DV] Download error:", err);
-      toast.error("Download error", {
-        description: isTimeout ? "Request timed out. Try again." : err?.message || "Unknown error"
-      });
-    } finally {
-      setDownloadingVariant(null);
-    }
+    await attemptDownload();
+    setDownloadingVariant(null);
   };
 
   if (!resolvedOk) {

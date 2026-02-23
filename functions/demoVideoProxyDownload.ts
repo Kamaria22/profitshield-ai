@@ -1,19 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import * as jose from 'npm:jose@5.2.0';
 
+/**
+ * Proxy download - FIXED
+ * - No secrets in error responses
+ * - JWT verification with 60s clock skew leeway
+ * - Re-fetches job status before deciding URL unavailable
+ * - Returns 409 (not 404) when output not ready
+ */
+
 Deno.serve(async (req) => {
   const requestId = `proxy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   try {
-    console.log(`[DV-SERVER][${requestId}] ===== PROXY DOWNLOAD REQUEST =====`);
+    console.log(`[${requestId}] ===== PROXY DOWNLOAD REQUEST =====`);
     
     const authHeader = req.headers.get('authorization') || '';
-    const hasAuthHeader = !!authHeader;
-    const authHeaderPrefix = authHeader.startsWith('Bearer ') ? 'Bearer' : (authHeader ? 'other' : 'none');
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    
-    console.log(`[DLPROXY] hasAuthHeader=`, hasAuthHeader);
-    console.log(`[DLPROXY] authHeaderPrefix=`, authHeaderPrefix);
     
     const base44 = createClientFromRequest(req);
     
@@ -21,33 +24,35 @@ Deno.serve(async (req) => {
     let authMethod = null;
     let shopDomain = null;
     
-    // ============= AUTH ATTEMPT 1: Base44 cookie session =============
+    // Auth attempt 1: Base44 cookie session
     try {
       user = await base44.auth.me();
       authMethod = 'base44_cookie';
-      console.log(`[DLPROXY-AUTH] ✓ Base44 session user: ${user.email}`);
+      console.log(`[${requestId}] ✓ Base44 session user: ${user.email}`);
     } catch (e) {
-      console.log(`[DLPROXY-AUTH] No Base44 session: ${e.message}`);
+      console.log(`[${requestId}] No Base44 session`);
       user = null;
     }
 
-    // ============= AUTH ATTEMPT 2: Shopify bearer token (if no Base44 user) =============
-    if (!user && hasAuthHeader && authHeaderPrefix === 'Bearer') {
-      console.log(`[DLPROXY-AUTH] Attempting Shopify JWT verification...`);
+    // Auth attempt 2: Shopify bearer token (if no Base44 user)
+    if (!user && authHeader.startsWith('Bearer ')) {
+      console.log(`[${requestId}] Attempting Shopify JWT verification...`);
       
       const apiSecret = Deno.env.get('SHOPIFY_API_SECRET');
       if (!apiSecret) {
-        console.error(`[DLPROXY-AUTH] ✗ SHOPIFY_API_SECRET not set`);
-        return Response.json({ error: 'Server misconfigured: no SHOPIFY_API_SECRET' }, { status: 500 });
+        console.error(`[${requestId}] ✗ SHOPIFY_API_SECRET not set`);
+        return Response.json({ error: 'Server misconfigured', code: 'MISSING_SECRET' }, { status: 500 });
       }
 
       try {
-        console.log(`[DLPROXY-AUTH] JWT token length: ${token.length}`);
         const secret = new TextEncoder().encode(apiSecret);
-        const { payload } = await jose.jwtVerify(token, secret);
         
-        console.log(`[DLPROXY-AUTH] ✓ JWT verified successfully`);
-        console.log(`[DLPROXY-AUTH] JWT payload keys:`, Object.keys(payload).join(', '));
+        // CRITICAL: Add 60s clock skew leeway for exp/nbf checks
+        const { payload } = await jose.jwtVerify(token, secret, {
+          clockTolerance: 60
+        });
+        
+        console.log(`[${requestId}] ✓ JWT verified successfully`);
         
         // Extract shop domain from JWT
         shopDomain = payload.dest?.replace(/^https?:\/\//, '') || 
@@ -55,121 +60,128 @@ Deno.serve(async (req) => {
                      payload.sub?.split('/')[0];
         
         authMethod = 'shopify_bearer';
-        console.log(`[DLPROXY-AUTH] ✓ Auth via Shopify bearer, shop=${shopDomain}`);
+        console.log(`[${requestId}] ✓ Auth via Shopify bearer, shop=${shopDomain}`);
       } catch (e) {
-        console.error(`[DLPROXY-AUTH] ✗ JWT verification FAILED:`);
-        console.error(`  - Error: ${e.message}`);
-        console.error(`  - Type: ${e.name}`);
-        if (e.message.includes('signature')) {
-          console.error(`  - Reason: Invalid signature (SHOPIFY_API_SECRET mismatch?)`);
-        } else if (e.message.includes('exp')) {
-          console.error(`  - Reason: Token expired (clock skew?)`);
+        console.error(`[${requestId}] ✗ JWT verification FAILED: ${e.message}`);
+        
+        // SECURITY: NEVER return token or secret in response
+        if (e.message.includes('exp') || e.message.includes('expired')) {
+          return Response.json({ 
+            error: 'Session token expired',
+            code: 'TOKEN_EXPIRED'
+          }, { status: 401 });
         }
+        
         return Response.json({ 
-          error: `JWT verification failed: ${e.message}`,
-          details: `Token: ${token.slice(0, 20)}... | Secret: ${apiSecret.slice(0, 10)}...`
+          error: 'Unauthorized',
+          code: 'TOKEN_INVALID'
         }, { status: 401 });
       }
-    } else if (!user && hasAuthHeader && authHeaderPrefix !== 'Bearer') {
-      console.error(`[DLPROXY-AUTH] ✗ Wrong auth header format: ${authHeaderPrefix} (expected Bearer)`);
-      return Response.json({ error: `Invalid auth header format: ${authHeaderPrefix}` }, { status: 401 });
-    } else if (!user && !hasAuthHeader) {
-      console.error(`[DLPROXY-AUTH] ✗ No authorization: no cookie AND no Bearer token`);
-      return Response.json({ error: 'Unauthorized: missing authentication' }, { status: 401 });
+    } else if (!user) {
+      console.error(`[${requestId}] ✗ No authorization`);
+      return Response.json({ error: 'Unauthorized', code: 'NO_AUTH' }, { status: 401 });
     }
 
-    // ============= FINAL AUTH STATE =============
+    // Check authenticated
     const isAuthenticated = !!user || (authMethod === 'shopify_bearer' && !!shopDomain);
-    console.log(`[DLPROXY-AUTH] Summary: method=${authMethod}, authenticated=${isAuthenticated}, user=${user?.email || 'none'}, shop=${shopDomain || 'none'}`);
+    console.log(`[${requestId}] Auth: method=${authMethod}, authenticated=${isAuthenticated}`);
     
     if (!isAuthenticated) {
-      console.error(`[DLPROXY-AUTH] ✗ FINAL: Not authenticated after all attempts`);
-      return Response.json({ error: 'Authentication failed' }, { status: 401 });
+      return Response.json({ error: 'Authentication failed', code: 'AUTH_FAILED' }, { status: 401 });
     }
 
     const { jobId, format } = await req.json();
     
-    console.log(`[DV-SERVER][${requestId}] jobId=${jobId}, format=${format}`);
+    console.log(`[${requestId}] jobId=${jobId}, format=${format}`);
     
     if (!jobId || !format) {
-      console.log(`[DV-SERVER][${requestId}] ❌ Missing parameters`);
-      return Response.json({ error: 'Missing jobId or format' }, { status: 400 });
+      return Response.json({ error: 'Missing jobId or format', code: 'MISSING_PARAMS' }, { status: 400 });
     }
 
-    // Get job from DB
-    const job = await base44.asServiceRole.entities.DemoVideoJob.get(jobId);
+    // CRITICAL: Re-fetch job status to get fresh outputs
+    console.log(`[${requestId}] Refreshing job status before download...`);
+    let job = await base44.asServiceRole.entities.DemoVideoJob.get(jobId);
     
-    console.log(`[DV-SERVER][${requestId}] Job status=${job?.status || 'NOT_FOUND'}`);
-    console.log(`[DV-SERVER][${requestId}] Job outputs keys:`, job?.outputs ? Object.keys(job.outputs) : 'NULL');
+    console.log(`[${requestId}] Job status=${job?.status || 'NOT_FOUND'}`);
     
-    if (!job || !job.outputs) {
-      console.log(`[DV-SERVER][${requestId}] ❌ Job not found or no outputs`);
-      return Response.json({ error: 'Job not found or outputs missing' }, { status: 404 });
+    if (!job) {
+      return Response.json({ error: 'Job not found', code: 'JOB_NOT_FOUND' }, { status: 404 });
     }
     
     // If authenticated via Shopify token, verify job belongs to this shop
     if (shopDomain && job.tenant_id) {
       const tenant = await base44.asServiceRole.entities.Tenant.get(job.tenant_id);
       if (tenant?.shop_domain !== shopDomain) {
-        console.log(`[DV-SERVER][${requestId}] ❌ Tenant mismatch: job.tenant=${tenant?.shop_domain}, token.shop=${shopDomain}`);
-        return Response.json({ error: 'Forbidden' }, { status: 403 });
+        console.log(`[${requestId}] ❌ Tenant mismatch`);
+        return Response.json({ error: 'Forbidden', code: 'TENANT_MISMATCH' }, { status: 403 });
       }
     }
 
     // Map format to URL key
     const urlMap = {
-      '1080p': job.outputs.mp4_1080_url,
-      '720p': job.outputs.mp4_720_url,
-      'shopify': job.outputs.mp4_shopify_url,
-      'thumb': job.outputs.thumbnail_url
+      '1080p': job.outputs?.mp4_1080_url,
+      '720p': job.outputs?.mp4_720_url,
+      'shopify': job.outputs?.mp4_shopify_url,
+      'thumb': job.outputs?.thumbnail_url
     };
 
     const url = urlMap[format];
     
-    console.log(`[DV-SERVER][${requestId}] Source URL for ${format}:`, url || 'NULL');
+    console.log(`[${requestId}] Source URL for ${format}:`, url ? 'present' : 'NULL');
     
+    // Return 409 (not 404) when output not ready
     if (!url || !url.startsWith('http')) {
-      console.log(`[DV-SERVER][${requestId}] ❌ URL not available or invalid`);
-      return Response.json({ error: `URL not available for ${format}` }, { status: 404 });
+      console.log(`[${requestId}] ❌ Output not ready for ${format}`);
+      return Response.json({ 
+        error: `Video output not ready for ${format}`,
+        code: 'OUTPUT_NOT_READY',
+        jobStatus: job.status
+      }, { status: 409 });
     }
 
-    console.log(`[DV-SERVER][${requestId}] Fetching from upstream: ${url.substring(0, 80)}...`);
+    console.log(`[${requestId}] Fetching from upstream...`);
     
     // Fetch file from upstream
     const upstream = await fetch(url);
     
-    console.log(`[DV-SERVER][${requestId}] Upstream response: ${upstream.status} ${upstream.statusText}`);
-    console.log(`[DV-SERVER][${requestId}] Upstream Content-Type: ${upstream.headers.get('content-type')}`);
-    console.log(`[DV-SERVER][${requestId}] Upstream Content-Length: ${upstream.headers.get('content-length')}`);
+    console.log(`[${requestId}] Upstream response: ${upstream.status}`);
     
     if (!upstream.ok) {
-      console.log(`[DV-SERVER][${requestId}] ❌ Upstream fetch failed`);
-      return Response.json({ error: `Upstream fetch failed: ${upstream.status}` }, { status: 502 });
+      console.log(`[${requestId}] ❌ Upstream fetch failed`);
+      return Response.json({ 
+        error: 'Upstream fetch failed',
+        code: 'UPSTREAM_ERROR'
+      }, { status: 502 });
     }
 
     const buffer = await upstream.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     const contentType = upstream.headers.get('content-type') || (format === 'thumb' ? 'image/jpeg' : 'video/mp4');
 
-    console.log(`[DV-SERVER][${requestId}] Downloaded ${bytes.length} bytes`);
+    console.log(`[${requestId}] Downloaded ${bytes.length} bytes`);
 
     // Validate file
     const isVideo = format !== 'thumb';
     const minSize = isVideo ? 1_500_000 : 10_000;
     
     if (bytes.length < minSize) {
-      console.log(`[DV-SERVER][${requestId}] ❌ File too small: ${bytes.length} < ${minSize}`);
-      return Response.json({ error: `File too small: ${bytes.length} bytes (min: ${minSize})` }, { status: 422 });
+      console.log(`[${requestId}] ❌ File too small: ${bytes.length} < ${minSize}`);
+      return Response.json({ 
+        error: `File too small: ${bytes.length} bytes`,
+        code: 'FILE_TOO_SMALL'
+      }, { status: 422 });
     }
 
     if (isVideo) {
       const header = new TextDecoder().decode(bytes.slice(0, 32));
-      console.log(`[DV-SERVER][${requestId}] MP4 header check: ${header.substring(0, 20)}...`);
       if (!header.includes('ftyp')) {
-        console.log(`[DV-SERVER][${requestId}] ❌ Invalid MP4 signature`);
-        return Response.json({ error: 'Invalid MP4 file - missing ftyp signature' }, { status: 422 });
+        console.log(`[${requestId}] ❌ Invalid MP4 signature`);
+        return Response.json({ 
+          error: 'Invalid MP4 file',
+          code: 'INVALID_MP4'
+        }, { status: 422 });
       }
-      console.log(`[DV-SERVER][${requestId}] ✓ Valid MP4 signature detected`);
+      console.log(`[${requestId}] ✓ Valid MP4 signature`);
     }
 
     // Return file with proper headers
@@ -178,9 +190,7 @@ Deno.serve(async (req) => {
                   : format === 'shopify' ? 'ProfitShieldAI-app-store.mp4'
                   : 'ProfitShieldAI-thumb.jpg';
 
-    console.log(`[DV-SERVER][${requestId}] ✓ Returning ${bytes.length} bytes as ${contentType}`);
-    console.log(`[DV-SERVER][${requestId}] Filename: ${filename}`);
-    console.log(`[DV-SERVER][${requestId}] =========================================`);
+    console.log(`[${requestId}] ✓ Returning ${bytes.length} bytes as ${contentType}`);
 
     return new Response(bytes, {
       status: 200,
@@ -192,8 +202,13 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    console.error(`[DV-SERVER][${requestId}] ❌ EXCEPTION:`, err.message);
-    console.error(`[DV-SERVER][${requestId}] Stack:`, err.stack);
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error(`[${requestId}] ❌ EXCEPTION:`, err.message);
+    console.error(`[${requestId}] Stack:`, err.stack);
+    
+    // SECURITY: NEVER leak secrets/tokens
+    return Response.json({ 
+      error: 'Download failed',
+      code: 'DOWNLOAD_ERROR'
+    }, { status: 500 });
   }
 });
