@@ -90,6 +90,20 @@ export default function VideoJobs() {
         format
       });
 
+      // If response contains a URL for redirect mode (demo videos)
+      if (response.data?.mode === 'redirect' && response.data?.url) {
+        const a = document.createElement('a');
+        a.href = response.data.url;
+        a.download = response.data.filename || `ProfitShieldAI-${format}.mp4`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        toast.success('Download started');
+        return;
+      }
+
+      // Otherwise handle as blob (real mode videos)
       const blob = new Blob([response.data], { 
         type: format === 'thumb' ? 'image/jpeg' : 'video/mp4' 
       });
@@ -101,6 +115,7 @@ export default function VideoJobs() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast.success('Download started');
     } catch (err) {
       toast.error('Download failed: ' + (err.message || 'Unknown error'));
     }

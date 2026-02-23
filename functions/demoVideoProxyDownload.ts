@@ -57,12 +57,29 @@ Deno.serve(async (req) => {
     const out = job.outputs?.[format];
     const url = out?.url;
 
-    if (!url || !url.startsWith("http")) {
+    if (!url) {
       return Response.json({
         error: `Video output not ready for ${format}`,
         code: "OUTPUT_NOT_READY",
         jobStatus: job.status,
       }, { status: 409 });
+    }
+
+    // For demo mode, return direct URL for browser to handle
+    if (job.mode === 'demo') {
+      return Response.json({
+        url,
+        filename: filenameFor(format),
+        mode: 'redirect'
+      }, { status: 200 });
+    }
+
+    // For real mode, proxy the download
+    if (!url.startsWith("http")) {
+      return Response.json({
+        error: `Invalid URL for ${format}`,
+        code: "INVALID_URL",
+      }, { status: 400 });
     }
 
     const upstream = await fetch(url);
