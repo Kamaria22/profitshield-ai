@@ -39,8 +39,33 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Job ${jobId} status=${job.status}`);
     console.log(`[${requestId}] Outputs:`, Object.keys(outputs));
 
+    // Validate outputs exist for completed status
+    const hasValidOutput = (output) => {
+      if (!output) return false;
+      // Must have url OR (base64 + contentType + filename)
+      if (output.url && typeof output.url === 'string' && output.url.length > 0) return true;
+      if (output.base64 && output.contentType && output.filename) return true;
+      return false;
+    };
+
+    // If status is "completed" but no valid outputs, downgrade to "finalizing"
+    let actualStatus = job.status;
+    if (job.status === 'completed') {
+      const has1080p = hasValidOutput(outputs['1080p']);
+      const has720p = hasValidOutput(outputs['720p']);
+      const hasShopify = hasValidOutput(outputs['shopify']);
+      const hasThumb = hasValidOutput(outputs['thumb']);
+      
+      const hasAnyValidOutput = has1080p || has720p || hasShopify || hasThumb;
+      
+      if (!hasAnyValidOutput) {
+        console.warn(`[${requestId}] Job ${jobId} marked completed but no valid outputs - returning finalizing`);
+        actualStatus = 'finalizing';
+      }
+    }
+
     // If stuck in rendering > 2 min, mark failed
-    if (job.status === 'rendering' && job.created_date) {
+    if (actualStatus === 'rendering' && job.created_date) {
       const ageMs = Date.now() - new Date(job.created_date).getTime();
       if (ageMs > 120000) {
         console.warn(`[${requestId}] Job ${jobId} stuck (${Math.round(ageMs / 1000)}s), marking failed`);
@@ -62,7 +87,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       jobId: job.id,
-      status: job.status,
+      status: actualStatus,
       progress: job.progress || 0,
       mode: job.mode,
       version: job.version,
