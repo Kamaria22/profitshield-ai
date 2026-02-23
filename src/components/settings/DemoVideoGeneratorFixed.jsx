@@ -268,36 +268,37 @@ export default function DemoVideoGeneratorFixed({ resolver = {} }) {
         60000
       );
 
-      const contentType = res.headers.get("content-type");
-      const maybeJson = contentType && contentType.includes("application/json");
+      // ✅ NEW: demoVideoProxyDownload returns JSON { ok, base64, filename, contentType, size, error? }
+const data = await res.json().catch(() => null);
 
-      // If backend returns error JSON, surface it
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("[DV] ✗ Download error:", res.status, text);
-        toast.error("Download failed", { description: text.slice(0, 220) || `HTTP ${res.status}` });
+if (!res.ok || !data?.ok || !data?.base64) {
+  const msg = data?.error || data?.message || `HTTP ${res.status}`;
+  console.error("[DV] ✗ Download JSON error:", res.status, data);
+  toast.error("Download failed", { description: String(msg).slice(0, 220) });
 
-        // If this is "URL not available", trigger a refresh to pull updated outputs
-        if (text.includes("URL not available")) {
-          try {
-            const st = await statusMutation.mutateAsync(jobId);
-            setJobStatus(st?.status || jobStatus);
-            setOutputs(st?.outputs || outputs);
-          } catch {}
-        }
-        return;
-      }
+  // If URL missing, refresh status/outputs (optional but useful)
+  if (String(msg).includes("URL not available")) {
+    try {
+      const st = await statusMutation.mutateAsync(jobId);
+      setJobStatus(st?.status || jobStatus);
+      setOutputs(st?.outputs || outputs);
+    } catch {}
+  }
 
-      // Prefer blob for actual file
-      const blob = await res.blob();
+  return;
+}
 
-      // Reject JSON masquerading as file
-      if (maybeJson || blob.type.includes("json")) {
-        const errorText = await blob.text().catch(() => "");
-        console.error("[DV] ✗ Got JSON instead of file:", errorText);
-        toast.error("Download returned JSON", { description: errorText.slice(0, 220) });
-        return;
-      }
+// base64 -> Blob
+const byteChars = atob(data.base64);
+const byteNumbers = new Array(byteChars.length);
+for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+const byteArray = new Uint8Array(byteNumbers);
+
+const blob = new Blob([byteArray], {
+  type: data.contentType || "application/octet-stream",
+});
+
+const filename = data.filename || "download.bin";
 
       // Size sanity
       const minSize = format === "thumb" ? 500 : 1000;
