@@ -84,14 +84,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // REAL mode (leave queued for now; you can wire real renderer later)
-    console.log(`[${requestId}] Real job created (renderer not wired)`, {
+    // REAL mode: start Shotstack render
+    const tenantId = body?.tenant_id;
+    const integrationId = body?.integration_id;
+    const options = body?.options || {};
+
+    // Kick off render asynchronously
+    base44.asServiceRole.functions.invoke("shotstackRenderVideo", {
       jobId: job.id,
-      tenant_id,
+      tenantId,
+      integrationId,
       version,
+      options,
+    }).catch((e) => {
+      console.error(`[${requestId}] Failed to start render:`, e);
+      base44.asServiceRole.entities.DemoVideoJob.update(job.id, {
+        status: "failed",
+        error_message: `Render start failed: ${e?.message || "Unknown error"}`,
+      }).catch(() => {});
     });
 
-    return Response.json({ jobId: job.id, status: "queued" }, { status: 200 });
+    console.log(`[${requestId}] Real job queued, render starting`, { jobId: job.id });
+
+    return Response.json({ jobId: job.id, status: "queued" }, { status: 202 });
   } catch (err) {
     console.error(`[demoVideoGenerator] error:`, err);
     return Response.json(
