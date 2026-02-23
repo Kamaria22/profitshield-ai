@@ -42,7 +42,8 @@ import {
   Copy,
   CheckCircle,
   Gift,
-  CreditCard
+  CreditCard,
+  Video
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +71,7 @@ const navItems = [
   { name: 'Risk Intelligence', page: 'Intelligence', icon: Shield, permission: 'risk_rules_view' },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
+  { name: 'Video Jobs', page: 'VideoJobs', icon: Brain, permission: 'dashboard_view' },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },

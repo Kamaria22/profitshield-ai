@@ -69,6 +69,7 @@ import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
+import VideoJobs from './pages/VideoJobs';
 import __Layout from './Layout.jsx';
 
 
@@ -95,6 +96,7 @@ export const PAGES = {
     "Shipping": Shipping,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
+    "VideoJobs": VideoJobs,
 }
 
 export const pagesConfig = {
