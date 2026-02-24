@@ -67,7 +67,12 @@ Deno.serve(async (req) => {
       const shopData = shopResponse.ok ? (await shopResponse.json()).shop : {};
       
       // Get current user
-      const user = await base44.auth.me();
+      let user = null;
+      try {
+        user = await base44.auth.me();
+      } catch (e) {
+        console.log('[shopifyAuth] No authenticated user yet');
+      }
       
       // Resolve tenant (single source of truth)
       console.log('[shopifyAuth] Resolving tenant for shop:', shopDomain);
@@ -95,8 +100,9 @@ Deno.serve(async (req) => {
           subscription_tier: 'trial',
           monthly_order_limit: 100,
           orders_this_month: 0,
-          onboarding_completed: true,
+          onboarding_completed: false,
           trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_started_at: new Date().toISOString(),
           currency: shopData.currency || 'USD',
           webhook_secret: crypto.randomUUID()
         });
@@ -117,6 +123,35 @@ Deno.serve(async (req) => {
           weekly_report_enabled: true,
           badge_public: false,
           badge_style: 'light'
+        });
+      }
+      
+      // Create PlatformIntegration record
+      const existingIntegrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
+        tenant_id: tenant.id,
+        platform: 'shopify'
+      });
+      
+      let integration;
+      if (existingIntegrations.length > 0) {
+        integration = existingIntegrations[0];
+        await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+          status: 'connected',
+          store_name: shopData.name || shopDomain,
+          last_connected_at: new Date().toISOString()
+        });
+      } else {
+        integration = await base44.asServiceRole.entities.PlatformIntegration.create({
+          tenant_id: tenant.id,
+          platform: 'shopify',
+          store_key: shopDomain,
+          store_url: `https://${shopDomain}`,
+          store_name: shopData.name || shopDomain,
+          status: 'connected',
+          is_primary: true,
+          installed_at: new Date().toISOString(),
+          last_connected_at: new Date().toISOString(),
+          scopes: scope.split(',')
         });
       }
       
@@ -144,9 +179,28 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Update user with tenant_id
+      // CRITICAL: Link user to tenant safely (idempotent)
       if (user) {
-        await base44.auth.updateMe({ tenant_id: tenant.id });
+        console.log('[shopifyAuth] Linking user to tenant:', { userId: user.id, tenantId: tenant.id });
+        
+        // Only update if tenant_id is not set or if it's null
+        const currentTenantId = user.tenant_id;
+        const currentRole = user.role || 'user';
+        
+        if (!currentTenantId) {
+          // Set tenant_id and upgrade to owner if role is currently 'user'
+          const updates = { tenant_id: tenant.id };
+          if (currentRole === 'user') {
+            updates.role = 'owner';
+          }
+          
+          await base44.auth.updateMe(updates);
+          console.log('[shopifyAuth] User linked as owner:', updates);
+        } else if (currentTenantId !== tenant.id) {
+          console.warn('[shopifyAuth] User already linked to different tenant:', currentTenantId);
+        }
+      } else {
+        console.log('[shopifyAuth] No authenticated user - will link on next login');
       }
       
       // Register webhooks

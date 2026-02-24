@@ -106,13 +106,44 @@ export default function Onboarding() {
       
       // Check if already onboarded
       if (currentUser?.tenant_id) {
-        const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
-        if (tenants.length > 0 && tenants[0].onboarding_completed) {
-          navigate(createPageUrl('Home'));
+        try {
+          const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
+          if (tenants.length > 0 && tenants[0].onboarding_completed) {
+            navigate(createPageUrl('Home'));
+          }
+        } catch (e) {
+          // If tenant access fails, try to repair it
+          console.log('Tenant access issue, attempting repair');
+          await attemptAccessRepair();
         }
       }
     } catch (e) {
       console.log('User not logged in');
+    }
+  };
+  
+  const attemptAccessRepair = async () => {
+    try {
+      // Get shop domain from URL or persisted context
+      const urlParams = new URLSearchParams(window.location.search);
+      const shopDomain = urlParams.get('shop');
+      
+      if (!shopDomain) {
+        console.log('No shop domain available for repair');
+        return;
+      }
+      
+      const { data } = await base44.functions.invoke('repairUserAccess', {
+        shopDomain
+      });
+      
+      if (data?.success) {
+        console.log('Access repaired successfully');
+        // Reload user
+        await loadUser();
+      }
+    } catch (e) {
+      console.error('Access repair failed:', e);
     }
   };
 
