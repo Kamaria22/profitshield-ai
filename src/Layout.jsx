@@ -14,6 +14,8 @@ import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager'
 import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
 import { healthAgent } from '@/components/health/HealthAgent';
 import { HealthErrorBoundary } from '@/components/health/HealthErrorBoundary';
+import { LanguageProvider } from '@/components/i18n/LanguageContext';
+import LanguageSelector from '@/components/i18n/LanguageSelector';
 
 // PERFORMANCE: Defer non-critical components - loaded after idle
 const MerchantAIChat = lazy(() => import('@/components/merchant/MerchantAIChat'));
@@ -568,6 +570,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             {/* Sync Status */}
             <SyncStatusIndicator compact />
 
+            {/* Language Selector */}
+            <LanguageSelector />
+
             {/* Notification Settings */}
             <NotificationSettingsButton />
 
@@ -685,13 +690,15 @@ return (
 export default function Layout({ children, currentPageName }) {
   return (
     <SecurityHardeningLayer>
-      <PermissionsProvider>
-        <NotificationProvider>
-          <LayoutWithProviders currentPageName={currentPageName}>
-            {children}
-          </LayoutWithProviders>
-        </NotificationProvider>
-      </PermissionsProvider>
+      <LanguageProvider>
+        <PermissionsProvider>
+          <NotificationProvider>
+            <LayoutWithProviders currentPageName={currentPageName}>
+              {children}
+            </LayoutWithProviders>
+          </NotificationProvider>
+        </PermissionsProvider>
+      </LanguageProvider>
     </SecurityHardeningLayer>
   );
 }
