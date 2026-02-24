@@ -427,15 +427,45 @@ async function processRefund(base44, tenant, refundData) {
 }
 
 async function handleUninstall(base44, tenant) {
+  console.log('[handleUninstall] Processing app uninstall for tenant:', tenant.id);
+  
+  // Mark tenant as inactive
   await base44.asServiceRole.entities.Tenant.update(tenant.id, {
-    status: 'inactive'
+    status: 'inactive',
+    uninstalled_at: new Date().toISOString()
   });
   
-  // Clear OAuth token
+  // Invalidate all OAuth tokens
   const tokens = await base44.asServiceRole.entities.OAuthToken.filter({ tenant_id: tenant.id });
   for (const token of tokens) {
     await base44.asServiceRole.entities.OAuthToken.update(token.id, { is_valid: false });
   }
+  
+  // Mark platform integrations as disconnected
+  const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenant.id });
+  for (const integration of integrations) {
+    await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, { 
+      status: 'disconnected' 
+    });
+  }
+  
+  // Log uninstall for audit trail
+  await base44.asServiceRole.entities.AuditLog.create({
+    tenant_id: tenant.id,
+    action: 'app_uninstalled',
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    performed_by: 'shopify_webhook',
+    description: `App uninstalled for ${tenant.shop_domain}. GDPR deletion will occur in 48 hours.`,
+    metadata: {
+      shop_domain: tenant.shop_domain,
+      uninstalled_at: new Date().toISOString()
+    },
+    category: 'integration',
+    severity: 'high'
+  });
+  
+  console.log('[handleUninstall] Uninstall processed. GDPR cleanup will be triggered by Shopify in 48 hours.');
 }
 
 function mapOrderStatus(order) {
