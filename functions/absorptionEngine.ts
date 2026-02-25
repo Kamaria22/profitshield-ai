@@ -9,10 +9,11 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { action } = body;
 
-    if (action === 'run_scan') {
+    // Default to run_scan for scheduled automations
+    if (!action || action === 'run_scan') {
       return await runAbsorptionScanner(base44);
     } else if (action === 'get_radar') {
       return await getAbsorptionRadar(base44);
@@ -118,8 +119,10 @@ async function runAbsorptionScanner(base44) {
 
   // Log telemetry
   await base44.asServiceRole.entities.ClientTelemetry.create({
-    event_type: 'absorption_scan',
-    event_data: {
+    level: 'info',
+    message: `Absorption scan completed: ${scanned.length} competitors scanned, ${playsGenerated.length} plays generated`,
+    context_json: {
+      event_type: 'absorption_scan',
       competitors_scanned: scanned.length,
       plays_generated: playsGenerated.length
     },
