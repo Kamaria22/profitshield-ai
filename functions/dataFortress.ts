@@ -390,19 +390,24 @@ async function runAnomalyDetection(base44) {
     }
   }
 
-  // Log telemetry
+  // Log telemetry with safe defaults
   const criticalCount = anomaliesDetected.filter(a => a.severity === 'critical').length;
-  await base44.asServiceRole.entities.ClientTelemetry.create({
-    level: criticalCount > 0 ? 'error' : anomaliesDetected.length > 0 ? 'warn' : 'info',
-    message: `Data Fortress scan: ${regions.length} regions scanned, ${anomaliesDetected.length} anomalies detected (${criticalCount} critical)`,
-    context_json: {
-      event_type: 'anomaly_detection_scan',
-      regions_scanned: regions.length,
-      anomalies_detected: anomaliesDetected.length,
-      critical_anomalies: criticalCount
-    },
-    timestamp: new Date().toISOString()
-  });
+  try {
+    await base44.asServiceRole.entities.ClientTelemetry.create({
+      level: criticalCount > 0 ? 'error' : anomaliesDetected.length > 0 ? 'warn' : 'info',
+      message: `Data Fortress scan: ${regions.length} regions scanned, ${anomaliesDetected.length} anomalies detected (${criticalCount} critical)`,
+      context_json: {
+        event_type: 'anomaly_detection_scan',
+        regions_scanned: regions.length,
+        anomalies_detected: anomaliesDetected.length,
+        critical_anomalies: criticalCount
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (telemetryError) {
+    // If telemetry fails, log to console but don't fail the whole operation
+    console.error('[DataFortress] Telemetry logging failed:', telemetryError.message);
+  }
 
   return Response.json({
     success: true,
