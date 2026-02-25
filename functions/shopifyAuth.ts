@@ -16,7 +16,8 @@ Deno.serve(async (req) => {
       }
       
       const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-      const redirectUri = `${Deno.env.get('APP_URL') || req.headers.get('origin')}/api/shopify/callback`;
+      const appUrl = Deno.env.get('APP_URL') || req.headers.get('origin') || 'https://profitshield.base44.app';
+      const redirectUri = `${appUrl}/ShopifyCallback`;
       const nonce = crypto.randomUUID();
       
       const installUrl = `https://${shopDomain}/admin/oauth/authorize?` + new URLSearchParams({
@@ -219,7 +220,9 @@ Deno.serve(async (req) => {
       return Response.json({ 
         success: true, 
         tenant_id: tenant.id,
-        shop_name: shopData.name || shopDomain
+        shop_domain: shopDomain,
+        shop_name: shopData.name || shopDomain,
+        redirect_url: `/Onboarding?shop=${shopDomain}&platform=shopify`
       });
     }
     

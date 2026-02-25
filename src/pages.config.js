@@ -71,6 +71,7 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
 import Install from './pages/Install';
+import ShopifyCallback from './pages/ShopifyCallback';
 import __Layout from './Layout.jsx';
 
 
@@ -99,6 +100,7 @@ export const PAGES = {
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
     "Install": Install,
+    "ShopifyCallback": ShopifyCallback,
 }
 
 export const pagesConfig = {
