@@ -140,9 +140,10 @@ function PendingRequests() {
     queryKey: ['pendingAccessRequests'],
     queryFn: async () => {
       try {
-        // Fetch pending access requests from Base44 platform
-        const requests = await base44.users.listPendingRequests();
-        return requests || [];
+        const response = await base44.functions.invoke('userAccessManagement', { 
+          action: 'listPending' 
+        });
+        return response.data?.requests || [];
       } catch (error) {
         console.error('Error fetching pending requests:', error);
         return [];
@@ -154,12 +155,22 @@ function PendingRequests() {
   const handleApprove = async (request) => {
     setProcessingId(request.id);
     try {
-      await base44.users.approveRequest(request.id, request.email, 'user');
-      toast.success(`Access granted to ${request.email}`);
-      refetch();
-      queryClient.invalidateQueries(['allUsers']);
+      const response = await base44.functions.invoke('userAccessManagement', {
+        action: 'approve',
+        requestId: request.id,
+        email: request.email,
+        role: 'user'
+      });
+      
+      if (response.data?.success) {
+        toast.success(`Access granted to ${request.email}`);
+        refetch();
+        queryClient.invalidateQueries(['allUsers']);
+      } else {
+        throw new Error(response.data?.error || 'Failed to approve');
+      }
     } catch (error) {
-      toast.error('Failed to approve request');
+      toast.error(error.message || 'Failed to approve request');
       console.error(error);
     } finally {
       setProcessingId(null);
@@ -169,11 +180,19 @@ function PendingRequests() {
   const handleDeny = async (request) => {
     setProcessingId(request.id);
     try {
-      await base44.users.denyRequest(request.id);
-      toast.success('Request denied');
-      refetch();
+      const response = await base44.functions.invoke('userAccessManagement', {
+        action: 'deny',
+        requestId: request.id
+      });
+      
+      if (response.data?.success) {
+        toast.success('Request denied');
+        refetch();
+      } else {
+        throw new Error(response.data?.error || 'Failed to deny');
+      }
     } catch (error) {
-      toast.error('Failed to deny request');
+      toast.error(error.message || 'Failed to deny request');
       console.error(error);
     } finally {
       setProcessingId(null);
