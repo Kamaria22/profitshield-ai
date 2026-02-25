@@ -393,10 +393,10 @@ async function runAnomalyDetection(base44) {
   // Log telemetry
   const criticalCount = anomaliesDetected.filter(a => a.severity === 'critical').length;
   await base44.asServiceRole.entities.ClientTelemetry.create({
-    event_type: 'anomaly_detection_scan',
-    level: criticalCount > 0 ? 'critical' : anomaliesDetected.length > 0 ? 'warning' : 'info',
+    level: criticalCount > 0 ? 'error' : anomaliesDetected.length > 0 ? 'warn' : 'info',
     message: `Data Fortress scan: ${regions.length} regions scanned, ${anomaliesDetected.length} anomalies detected (${criticalCount} critical)`,
-    event_data: {
+    context_json: {
+      event_type: 'anomaly_detection_scan',
       regions_scanned: regions.length,
       anomalies_detected: anomaliesDetected.length,
       critical_anomalies: criticalCount
