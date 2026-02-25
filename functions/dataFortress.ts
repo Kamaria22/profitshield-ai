@@ -30,15 +30,7 @@ const THREAT_SEVERITY = {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (user?.role !== 'admin') {
-      return Response.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
-
+    
     let body = {};
     try {
       body = await req.json();
@@ -50,6 +42,17 @@ Deno.serve(async (req) => {
 
     if (!action) {
       return Response.json({ error: 'action required' }, { status: 400 });
+    }
+
+    // Authenticate user - allow scheduled automations (no user) to proceed
+    const user = await base44.auth.me().catch(() => null);
+    
+    // If there is a user, verify admin role
+    if (user && user.role !== 'admin') {
+      return Response.json(
+        { error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      );
     }
 
     // Route actions
