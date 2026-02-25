@@ -78,16 +78,10 @@ async function diagnoseTenant(base44, tenant_id) {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me().catch(() => null);
-    
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json().catch(() => ({}));
     const { action = 'diagnose', tenant_id, issue_id, issue_description } = body;
 
-    // For scheduled automations, scan all active tenants
+    // For scheduled automations (no tenant_id), scan all active tenants
     if (!tenant_id) {
       const tenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
       const allIssues = [];
@@ -103,6 +97,12 @@ Deno.serve(async (req) => {
         tenants_scanned: tenants.length,
         results: allIssues
       });
+    }
+
+    // Validate user authentication for manual actions
+    const user = await base44.auth.me().catch(() => null);
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // DIAGNOSE: Analyze system health and identify issues
