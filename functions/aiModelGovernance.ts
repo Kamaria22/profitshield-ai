@@ -114,16 +114,22 @@ async function runModelDriftDetection(base44) {
     }
   }
 
-  // Log telemetry
-  await base44.asServiceRole.entities.ClientTelemetry.create({
-    event_type: 'model_drift_detection',
-    event_data: {
-      models_checked: models.length,
-      drift_events: driftEvents.length,
-      retraining_proposals: retrainingProposals.length
-    },
-    timestamp: new Date().toISOString()
-  });
+  // Log telemetry with required fields
+  try {
+    await base44.asServiceRole.entities.ClientTelemetry.create({
+      level: driftEvents.length > 2 ? 'error' : driftEvents.length > 0 ? 'warn' : 'info',
+      message: `AI Model Drift Detection: ${models.length} models checked, ${driftEvents.length} drift events detected, ${retrainingProposals.length} retraining proposals`,
+      context_json: {
+        event_type: 'model_drift_detection',
+        models_checked: models.length,
+        drift_events: driftEvents.length,
+        retraining_proposals: retrainingProposals.length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (telemetryError) {
+    console.error('[AIModelGovernance] Telemetry logging failed:', telemetryError.message);
+  }
 
   return Response.json({
     success: true,
