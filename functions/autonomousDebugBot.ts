@@ -12,10 +12,73 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const SYSTEM_SIGNATURE = 'PROFITSHIELD_AUTONOMOUS_v1_' + Date.now().toString(36);
 
+async function diagnoseTenant(base44, tenant_id) {
+  const [tasks, alerts, orders, profitLeaks] = await Promise.all([
+    base44.asServiceRole.entities.Task.filter({ 
+      tenant_id, 
+      category: 'auto_fix',
+      status: 'pending'
+    }, '-created_date', 20),
+    base44.asServiceRole.entities.Alert.filter({ 
+      tenant_id, 
+      status: 'pending',
+      severity: 'critical'
+    }, '-created_date', 20),
+    base44.asServiceRole.entities.Order.filter({ tenant_id }, '-created_date', 100),
+    base44.asServiceRole.entities.ProfitLeak.filter({ tenant_id, status: 'active' })
+  ]);
+
+  const issues = [];
+  
+  const ordersWithMissingData = orders.filter(o => !o.total_revenue || !o.customer_email);
+  if (ordersWithMissingData.length > 5) {
+    issues.push({
+      type: 'data_quality',
+      severity: 'medium',
+      description: `${ordersWithMissingData.length} orders with incomplete data`,
+      auto_fixable: true,
+      fix_action: 'enrich_order_data'
+    });
+  }
+
+  const criticalLeaks = profitLeaks.filter(l => l.impact_amount > 500);
+  if (criticalLeaks.length > 0) {
+    issues.push({
+      type: 'profit_leak',
+      severity: 'high',
+      description: `${criticalLeaks.length} critical profit leaks totaling $${criticalLeaks.reduce((s, l) => s + (l.impact_amount || 0), 0).toFixed(2)}`,
+      auto_fixable: true,
+      fix_action: 'create_remediation_tasks'
+    });
+  }
+
+  const staleAlerts = alerts.filter(a => {
+    const age = Date.now() - new Date(a.created_date).getTime();
+    return age > 7 * 24 * 60 * 60 * 1000;
+  });
+  if (staleAlerts.length > 0) {
+    issues.push({
+      type: 'stale_alerts',
+      severity: 'low',
+      description: `${staleAlerts.length} alerts pending for over 7 days`,
+      auto_fixable: true,
+      fix_action: 'escalate_or_archive'
+    });
+  }
+
+  return {
+    health_score: Math.max(0, 100 - (issues.length * 15)),
+    issues_found: issues.length,
+    issues,
+    pending_fixes: tasks.length,
+    critical_alerts: alerts.length
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const user = await base44.auth.me().catch(() => null);
     
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,79 +87,31 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action = 'diagnose', tenant_id, issue_id, issue_description } = body;
 
+    // For scheduled automations, scan all active tenants
     if (!tenant_id) {
-      return Response.json({ error: 'tenant_id required' }, { status: 400 });
+      const tenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
+      const allIssues = [];
+      
+      for (const tenant of tenants) {
+        const issues = await diagnoseTenant(base44, tenant.id);
+        allIssues.push({ tenant_id: tenant.id, shop_name: tenant.shop_name, ...issues });
+      }
+      
+      return Response.json({
+        success: true,
+        signature: SYSTEM_SIGNATURE,
+        tenants_scanned: tenants.length,
+        results: allIssues
+      });
     }
 
     // DIAGNOSE: Analyze system health and identify issues
     if (action === 'diagnose') {
-      const [tasks, alerts, orders, profitLeaks] = await Promise.all([
-        base44.asServiceRole.entities.Task.filter({ 
-          tenant_id, 
-          category: 'auto_fix',
-          status: 'pending'
-        }, '-created_date', 20),
-        base44.asServiceRole.entities.Alert.filter({ 
-          tenant_id, 
-          status: 'pending',
-          severity: 'critical'
-        }, '-created_date', 20),
-        base44.asServiceRole.entities.Order.filter({ tenant_id }, '-created_date', 100),
-        base44.asServiceRole.entities.ProfitLeak.filter({ tenant_id, status: 'active' })
-      ]);
-
-      // Analyze patterns
-      const issues = [];
-      
-      // Check for data inconsistencies
-      const ordersWithMissingData = orders.filter(o => !o.total_revenue || !o.customer_email);
-      if (ordersWithMissingData.length > 5) {
-        issues.push({
-          type: 'data_quality',
-          severity: 'medium',
-          description: `${ordersWithMissingData.length} orders with incomplete data`,
-          auto_fixable: true,
-          fix_action: 'enrich_order_data'
-        });
-      }
-
-      // Check for unresolved profit leaks
-      const criticalLeaks = profitLeaks.filter(l => l.impact_amount > 500);
-      if (criticalLeaks.length > 0) {
-        issues.push({
-          type: 'profit_leak',
-          severity: 'high',
-          description: `${criticalLeaks.length} critical profit leaks totaling $${criticalLeaks.reduce((s, l) => s + (l.impact_amount || 0), 0).toFixed(2)}`,
-          auto_fixable: true,
-          fix_action: 'create_remediation_tasks'
-        });
-      }
-
-      // Check for stale alerts
-      const staleAlerts = alerts.filter(a => {
-        const age = Date.now() - new Date(a.created_date).getTime();
-        return age > 7 * 24 * 60 * 60 * 1000; // 7 days
-      });
-      if (staleAlerts.length > 0) {
-        issues.push({
-          type: 'stale_alerts',
-          severity: 'low',
-          description: `${staleAlerts.length} alerts pending for over 7 days`,
-          auto_fixable: true,
-          fix_action: 'escalate_or_archive'
-        });
-      }
-
+      const diagnosis = await diagnoseTenant(base44, tenant_id);
       return Response.json({
         success: true,
         signature: SYSTEM_SIGNATURE,
-        diagnosis: {
-          health_score: Math.max(0, 100 - (issues.length * 15)),
-          issues_found: issues.length,
-          issues,
-          pending_fixes: tasks.length,
-          critical_alerts: alerts.length
-        }
+        diagnosis
       });
     }
 
