@@ -131,134 +131,6 @@ function InviteUserForm() {
   );
 }
 
-// Pending requests component
-function PendingRequests() {
-  const queryClient = useQueryClient();
-  const [processingId, setProcessingId] = useState(null);
-  
-  const { data: pendingRequests = [], isLoading, refetch } = useQuery({
-    queryKey: ['pendingAccessRequests'],
-    queryFn: async () => {
-      try {
-        const response = await base44.functions.invoke('userAccessManagement', { 
-          action: 'listPending' 
-        });
-        return response.data?.requests || [];
-      } catch (error) {
-        console.error('Error fetching pending requests:', error);
-        return [];
-      }
-    },
-    refetchInterval: 10000 // Auto-refresh every 10 seconds
-  });
-
-  const handleApprove = async (request) => {
-    setProcessingId(request.id);
-    try {
-      const response = await base44.functions.invoke('userAccessManagement', {
-        action: 'approve',
-        requestId: request.id,
-        email: request.email,
-        role: 'user'
-      });
-      
-      if (response.data?.success) {
-        toast.success(`Access granted to ${request.email}`);
-        refetch();
-        queryClient.invalidateQueries(['allUsers']);
-      } else {
-        throw new Error(response.data?.error || 'Failed to approve');
-      }
-    } catch (error) {
-      toast.error(error.message || 'Failed to approve request');
-      console.error(error);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleDeny = async (request) => {
-    setProcessingId(request.id);
-    try {
-      const response = await base44.functions.invoke('userAccessManagement', {
-        action: 'deny',
-        requestId: request.id
-      });
-      
-      if (response.data?.success) {
-        toast.success('Request denied');
-        refetch();
-      } else {
-        throw new Error(response.data?.error || 'Failed to deny');
-      }
-    } catch (error) {
-      toast.error(error.message || 'Failed to deny request');
-      console.error(error);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8 text-slate-500">Loading pending requests...</div>;
-  }
-
-  if (pendingRequests.length === 0) {
-    return (
-      <div className="text-center py-8 text-slate-500">
-        <Shield className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-        <p>No pending access requests</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {pendingRequests.map((request) => (
-        <div key={request.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">{request.email}</p>
-              <p className="text-sm text-slate-500">
-                Requested access {request.requested_at ? new Date(request.requested_at).toLocaleDateString() : 'recently'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDeny(request)}
-              disabled={processingId === request.id}
-              className="text-red-600 hover:bg-red-50"
-            >
-              {processingId === request.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Deny'}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => handleApprove(request)}
-              disabled={processingId === request.id}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {processingId === request.id ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Approve
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Users list component
 function UsersList() {
   const { data: users = [], isLoading, refetch } = useQuery({
@@ -721,16 +593,18 @@ export default function Settings() {
         {/* Users Tab - Owner Only */}
         {user?.email === 'rohan.a.roberts@gmail.com' && (
           <TabsContent value="users" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
-                  Pending Access Requests
-                </CardTitle>
-                <CardDescription>Review and approve user access requests</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PendingRequests />
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">Access Requests</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      When users request access, you'll receive an email notification. 
+                      Invite them below to grant access to ProfitShield.
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
