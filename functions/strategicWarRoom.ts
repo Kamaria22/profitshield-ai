@@ -134,8 +134,10 @@ async function runWarRoomScan(base44) {
 
   // Log to telemetry
   await base44.asServiceRole.entities.ClientTelemetry.create({
-    event_type: 'war_room_scan',
-    event_data: {
+    level: 'info',
+    message: `War Room scan completed: ${signals_detected.length} signals, ${response_plans.length} plans, ${highSeverity.length} escalated`,
+    context_json: {
+      event_type: 'war_room_scan',
       signals_detected: signals_detected.length,
       response_plans_created: response_plans.length,
       escalated: highSeverity.length
