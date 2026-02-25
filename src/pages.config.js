@@ -70,6 +70,7 @@ import Shipping from './pages/Shipping';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
+import Install from './pages/Install';
 import __Layout from './Layout.jsx';
 
 
@@ -97,6 +98,7 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
+    "Install": Install,
 }
 
 export const pagesConfig = {
