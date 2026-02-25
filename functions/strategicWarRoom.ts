@@ -12,7 +12,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action, plan_id } = body;
 
-    if (action === 'run_scan') {
+    // Default to run_scan for scheduled automations
+    if (!action || action === 'run_scan') {
       return await runWarRoomScan(base44);
     } else if (action === 'get_dashboard') {
       return await getWarRoomDashboard(base44);
