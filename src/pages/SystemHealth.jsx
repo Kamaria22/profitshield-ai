@@ -86,6 +86,11 @@ export default function SystemHealth() {
         </Badge>
       </div>
 
+      {/* Autonomous Health Monitor */}
+      {canQuery && (
+        <AutonomousHealthDashboard tenantId={queryFilter.tenant_id} />
+      )}
+
       {/* Overview Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
