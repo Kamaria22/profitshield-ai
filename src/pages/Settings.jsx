@@ -62,6 +62,117 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/compone
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
 
+// User invitation form component
+function InviteUserForm() {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('user');
+  const [inviting, setInviting] = useState(false);
+
+  const handleInvite = async () => {
+    if (!email || !email.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    
+    setInviting(true);
+    try {
+      await base44.users.inviteUser(email, role);
+      toast.success(`Invitation sent to ${email}`);
+      setEmail('');
+      setRole('user');
+    } catch (error) {
+      toast.error('Failed to send invitation');
+      console.error(error);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label>Email Address</Label>
+          <Input
+            type="email"
+            placeholder="user@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label>Role</Label>
+          <Select value={role} onValueChange={setRole}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="user">User</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button onClick={handleInvite} disabled={inviting} className="gap-2">
+        {inviting ? (
+          <>
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Sending...
+          </>
+        ) : (
+          <>
+            <Plus className="w-4 h-4" />
+            Send Invitation
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+// Users list component
+function UsersList() {
+  const { data: users = [], isLoading, refetch } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: async () => {
+      const allUsers = await base44.entities.User.list();
+      return allUsers;
+    }
+  });
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-slate-500">Loading users...</div>;
+  }
+
+  if (users.length === 0) {
+    return <div className="text-center py-8 text-slate-500">No users found</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {users.map((user) => (
+        <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-slate-600">
+                {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">{user.full_name || user.email}</p>
+              <p className="text-sm text-slate-500">{user.email}</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="capitalize">
+            {user.role || 'user'}
+          </Badge>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Settings() {
   // Use platform resolver instead of deprecated tenant resolver
   const resolver = usePlatformResolver();
@@ -216,12 +327,18 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="costs">Costs</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
+          {user?.email === 'rohan.a.roberts@gmail.com' && (
+            <TabsTrigger value="users">
+              <Users className="w-4 h-4 mr-2" />
+              Users
+            </TabsTrigger>
+          )}
           {(user?.role === 'admin' || user?.role === 'owner') && (
             <TabsTrigger value="demo-video" className="flex items-center gap-2">
               <Film className="w-4 h-4" />
@@ -472,6 +589,31 @@ export default function Settings() {
         <TabsContent value="export" className="mt-6">
           <DataExportPanel tenantId={tenantId} />
         </TabsContent>
+
+        {/* Users Tab - Owner Only */}
+        {user?.email === 'rohan.a.roberts@gmail.com' && (
+          <TabsContent value="users" className="mt-6 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite User</CardTitle>
+                <CardDescription>Send an invitation to grant access to ProfitShield</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InviteUserForm />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Registered Users</CardTitle>
+                <CardDescription>Manage user access and roles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UsersList />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* Demo Video Tab */}
         {(user?.role === 'admin' || user?.role === 'owner') && (

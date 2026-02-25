@@ -55,6 +55,7 @@ import Customers from './pages/Customers';
 import DataCompliance from './pages/DataCompliance';
 import FounderDashboard from './pages/FounderDashboard';
 import Home from './pages/Home';
+import Install from './pages/Install';
 import Integrations from './pages/Integrations';
 import Intelligence from './pages/Intelligence';
 import Onboarding from './pages/Onboarding';
@@ -67,11 +68,10 @@ import ResolverTestHarness from './pages/ResolverTestHarness';
 import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
+import ShopifyCallback from './pages/ShopifyCallback';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
-import Install from './pages/Install';
-import ShopifyCallback from './pages/ShopifyCallback';
 import __Layout from './Layout.jsx';
 
 
@@ -84,6 +84,7 @@ export const PAGES = {
     "DataCompliance": DataCompliance,
     "FounderDashboard": FounderDashboard,
     "Home": Home,
+    "Install": Install,
     "Integrations": Integrations,
     "Intelligence": Intelligence,
     "Onboarding": Onboarding,
@@ -96,11 +97,10 @@ export const PAGES = {
     "SelectStore": SelectStore,
     "Settings": Settings,
     "Shipping": Shipping,
+    "ShopifyCallback": ShopifyCallback,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
-    "Install": Install,
-    "ShopifyCallback": ShopifyCallback,
 }
 
 export const pagesConfig = {
