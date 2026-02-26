@@ -1,55 +1,19 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// INSTRUMENTATION: Track last entity write attempt
-let lastEntityWrite = { entityName: null, operation: null, payloadKeys: [], hasLevel: false, hasMessage: false };
-
-// Instrumented entity wrapper - logs all writes
-function instrumentEntityWrite(base44) {
-  const originalProxy = new Proxy(base44.asServiceRole.entities, {
-    get(target, entityName) {
-      if (typeof entityName !== 'string') return target[entityName];
-      
-      const originalEntity = target[entityName];
-      return new Proxy(originalEntity, {
-        get(entityTarget, method) {
-          if (method !== 'create' && method !== 'update' && method !== 'insert') {
-            return entityTarget[method];
-          }
-          
-          return async function(...args) {
-            const payload = args[method === 'update' ? 1 : 0];
-            const payloadKeys = payload ? Object.keys(payload) : [];
-            const hasLevel = payload && 'level' in payload;
-            const hasMessage = payload && 'message' in payload;
-            
-            lastEntityWrite = {
-              entityName,
-              operation: method,
-              payloadKeys,
-              hasLevel,
-              hasMessage,
-              timestamp: new Date().toISOString()
-            };
-            
-            console.log(`[INSTRUMENT] ${method} ${entityName}:`, {
-              keys: payloadKeys,
-              hasLevel,
-              hasMessage
-            });
-            
-            try {
-              return await entityTarget[method](...args);
-            } catch (error) {
-              console.error(`[INSTRUMENT] FAILED ${method} ${entityName}:`, error.message);
-              throw error;
-            }
-          };
-        }
-      });
-    }
-  });
-  
-  return { ...base44, asServiceRole: { ...base44.asServiceRole, entities: originalProxy } };
+// Strict DB write wrapper - catches and enriches errors with entity details
+async function safeDbWrite(entityName, opName, payload, writeFn) {
+  try {
+    return await writeFn(payload);
+  } catch (err) {
+    const hasLevel = payload && Object.prototype.hasOwnProperty.call(payload, 'level');
+    const hasMessage = payload && Object.prototype.hasOwnProperty.call(payload, 'message');
+    const keys = payload ? Object.keys(payload) : [];
+    
+    const errorMsg = `[DB_WRITE_FAILED] entity=${entityName} op=${opName} hasLevel=${hasLevel} hasMessage=${hasMessage} keys=${keys.join(',')} original=${err?.message || err}`;
+    console.error(errorMsg);
+    
+    throw new Error(errorMsg);
+  }
 }
 
 // Safe logging helper with guaranteed defaults
@@ -62,12 +26,9 @@ async function safeCreateTelemetry(base44, data = {}) {
     ...data
   };
   
-  try {
-    return await base44.asServiceRole.entities.ClientTelemetry.create(safeData);
-  } catch (error) {
-    console.error('[SafeLog] Telemetry creation failed:', error.message);
-    return null;
-  }
+  return await safeDbWrite('ClientTelemetry', 'create', safeData, 
+    (p) => base44.asServiceRole.entities.ClientTelemetry.create(p)
+  );
 }
 
 // Thresholds for model deployment safety
@@ -92,12 +53,9 @@ const DEMOGRAPHIC_SEGMENTS = [
 ];
 
 Deno.serve(async (req) => {
-  let base44 = createClientFromRequest(req);
+  const base44 = createClientFromRequest(req);
   
   try {
-    // INSTRUMENT: Wrap all entity writes for debugging
-    base44 = instrumentEntityWrite(base44);
-    
     // Allow scheduled automations (no user) to proceed
     const user = await base44.auth.me().catch(() => null);
     
@@ -142,27 +100,29 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    // CAPTURE: Log detailed error with last entity write attempt
+    // CAPTURE: Log detailed error
     console.error('[ERROR] AI Model Governance failed:', {
       error: error.message,
-      stack: error.stack,
-      lastEntityWrite: lastEntityWrite
+      stack: error.stack
     });
     
-    // Log error with safe defaults - prevents scheduled job from failing
-    await safeCreateTelemetry(base44, {
-      level: 'error',
-      message: `AI Model Governance failed: ${error.message}`,
-      context_json: {
-        action: 'error_handler',
-        error: error.message,
-        stack: error.stack,
-        lastEntityWrite: lastEntityWrite
-      }
-    });
+    // Try to log error telemetry - but don't fail if it fails
+    try {
+      await safeCreateTelemetry(base44, {
+        level: 'error',
+        message: `AI Model Governance failed: ${error.message}`,
+        context_json: {
+          action: 'error_handler',
+          error: error.message,
+          stack: error.stack
+        }
+      });
+    } catch (logErr) {
+      console.error('[ERROR] Failed to log error telemetry:', logErr.message);
+    }
+    
     return Response.json({ 
-      error: error.message,
-      lastEntityWrite: lastEntityWrite 
+      error: error.message
     }, { status: 500 });
   }
 });
@@ -199,15 +159,15 @@ async function runModelDriftDetection(base44) {
 
     console.log(`[DEBUG] Processing model ${model.model_name}, about to update AIModelVersion`);
     // Update model with current scores
-    await base44.asServiceRole.entities.AIModelVersion.update(model.id, {
+    await safeDbWrite('AIModelVersion', 'update', {
       drift_score: currentDrift,
       bias_score: currentBias
-    });
+    }, (p) => base44.asServiceRole.entities.AIModelVersion.update(model.id, p));
 
     if (driftDetected || biasDetected) {
       console.log(`[DEBUG] Drift/bias detected for ${model.model_name}, about to create GovernanceAuditEvent`);
       // Log governance audit event
-      await base44.asServiceRole.entities.GovernanceAuditEvent.create({
+      await safeDbWrite('GovernanceAuditEvent', 'create', {
         event_type: driftDetected ? 'anomaly_detected' : 'compliance_check',
         entity_affected: 'AIModelVersion',
         entity_id: model.id,
@@ -217,7 +177,7 @@ async function runModelDriftDetection(base44) {
         severity: (driftDetected && biasDetected) ? 'critical' : 'warning',
         compliance_frameworks: ['AI_GOVERNANCE'],
         requires_review: true
-      });
+      }, (p) => base44.asServiceRole.entities.GovernanceAuditEvent.create(p));
       console.log(`[DEBUG] GovernanceAuditEvent created successfully`);
 
       driftEvents.push({
