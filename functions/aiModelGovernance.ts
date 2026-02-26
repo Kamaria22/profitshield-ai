@@ -41,9 +41,9 @@ const DEMOGRAPHIC_SEGMENTS = [
 ];
 
 Deno.serve(async (req) => {
+  const base44 = createClientFromRequest(req);
+  
   try {
-    const base44 = createClientFromRequest(req);
-    
     // Allow scheduled automations (no user) to proceed
     const user = await base44.auth.me().catch(() => null);
     
@@ -88,6 +88,16 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
+    // Log error with safe defaults - prevents scheduled job from failing
+    await safeCreateTelemetry(base44, {
+      level: 'error',
+      message: `AI Model Governance failed: ${error.message}`,
+      context_json: {
+        action: 'error_handler',
+        error: error.message,
+        stack: error.stack
+      }
+    });
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
