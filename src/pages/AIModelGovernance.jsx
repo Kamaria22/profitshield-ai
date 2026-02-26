@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePlatformResolver, requireResolved } from '@/components/usePlatformResolver';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,14 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, RefreshCw, Activity, History } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, RefreshCw, Activity, History, Play, Lightbulb } from 'lucide-react';
+import ModelExplainabilityPanel from '@/components/ai/ModelExplainabilityPanel';
+import RetrainingWorkflowPanel from '@/components/ai/RetrainingWorkflowPanel';
 
 export default function AIModelGovernance() {
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   const tenantId = resolverCheck.tenantId;
+  const queryClient = useQueryClient();
 
   const [selectedModel, setSelectedModel] = useState(null);
+  const [explainability, setExplainability] = useState(null);
 
   // Fetch AI model versions
   const { data: models = [], isLoading: loadingModels } = useQuery({
@@ -50,6 +54,42 @@ export default function AIModelGovernance() {
     },
     enabled: !!tenantId,
   });
+
+  // Fetch model experiments
+  const { data: experiments = [] } = useQuery({
+    queryKey: ['modelExperiments', tenantId],
+    queryFn: async () => {
+      const all = await base44.entities.ModelExperiment.list();
+      return all.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    },
+    enabled: !!tenantId,
+  });
+
+  // Mutation to trigger drift detection
+  const triggerDriftDetection = useMutation({
+    mutationFn: async () => {
+      const { data } = await base44.functions.invoke('aiModelGovernance', {
+        tenant_id: tenantId,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['modelTelemetry']);
+    },
+  });
+
+  // Load explainability data
+  const loadExplainability = async (modelId) => {
+    try {
+      const { data } = await base44.functions.invoke('modelRetrainingWorkflow', {
+        action: 'get_explainability',
+        model_id: modelId,
+      });
+      setExplainability(data);
+    } catch (error) {
+      console.error('Failed to load explainability:', error);
+    }
+  };
 
   // Calculate summary statistics
   const deployedModels = models.filter(m => m.is_deployed).length;
@@ -95,12 +135,25 @@ export default function AIModelGovernance() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-          <Brain className="w-8 h-8 text-purple-600" />
-          AI Model Governance
-        </h1>
-        <p className="text-slate-500 mt-1">Monitor model performance, drift, bias, and automate retraining decisions</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+            <Brain className="w-8 h-8 text-purple-600" />
+            AI Model Governance
+          </h1>
+          <p className="text-slate-500 mt-1">Monitor model performance, drift, bias, and automate retraining decisions</p>
+        </div>
+        <Button
+          onClick={() => triggerDriftDetection.mutate()}
+          disabled={triggerDriftDetection.isLoading}
+        >
+          {triggerDriftDetection.isLoading ? (
+            <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+          ) : (
+            <Play className="w-4 h-4 mr-2" />
+          )}
+          Run Drift Detection
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -183,6 +236,8 @@ export default function AIModelGovernance() {
           <TabsTrigger value="models">Models</TabsTrigger>
           <TabsTrigger value="drift">Drift Trends</TabsTrigger>
           <TabsTrigger value="retraining">Retraining</TabsTrigger>
+          <TabsTrigger value="explainability">Explainability</TabsTrigger>
+          <TabsTrigger value="workflow">Workflow</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
@@ -273,9 +328,22 @@ export default function AIModelGovernance() {
                         Version {model.version} • {model.model_type}
                       </CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setSelectedModel(model)}>
-                      View Details
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedModel(model)}>
+                        View Details
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedModel(model);
+                          loadExplainability(model.id);
+                        }}
+                      >
+                        <Lightbulb className="w-4 h-4 mr-2" />
+                        Explain
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -445,6 +513,16 @@ export default function AIModelGovernance() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Explainability Tab */}
+        <TabsContent value="explainability" className="space-y-4">
+          <ModelExplainabilityPanel explainability={explainability} />
+        </TabsContent>
+
+        {/* Workflow Tab */}
+        <TabsContent value="workflow" className="space-y-4">
+          <RetrainingWorkflowPanel model={selectedModel} experiments={experiments} />
         </TabsContent>
 
         {/* History Tab */}
