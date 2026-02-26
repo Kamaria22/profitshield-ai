@@ -109,6 +109,8 @@ Deno.serve(async (req) => {
   const runId = `drift-${Date.now()}`;
   const startedAt = nowISO();
 
+  console.log(`[AI_MODEL_GOVERNANCE] Starting with BUILD_ID=${BUILD_ID} runId=${runId}`);
+
   try {
     // Allow scheduled automations (no user required)
     const user = await base44.auth.me().catch(() => null);
@@ -255,6 +257,8 @@ Deno.serve(async (req) => {
 
     return Response.json({
       ok: true,
+      level: "INFO",
+      message: summary.high > 0 ? "AI Model Drift Detection completed with warnings" : "AI Model Drift Detection completed successfully",
       build_id: BUILD_ID,
       run_id: runId,
       tenant_id: tenantId,
@@ -283,7 +287,12 @@ Deno.serve(async (req) => {
     }
 
     return Response.json({ 
-      error: `[${BUILD_ID}] ${errorMsg}`
+      ok: false,
+      level: "ERROR",
+      message: "AI Model Drift Detection failed",
+      error: errorMsg,
+      build_id: BUILD_ID,
+      run_id: runId
     }, { status: 500 });
   }
 });
