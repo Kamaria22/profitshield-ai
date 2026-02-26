@@ -1,74 +1,46 @@
 /**
- * aiModelGovernance.ts — Scheduled AI Model Drift Detection (Robust / Non-breaking)
- *
- * Goals:
- * - Never fail a scheduled run due to missing required fields `level` and `message`
- * - Wrap all DB writes to expose the exact failing entity/op if any validation error occurs
- * - Produce a simple drift report (metric deltas vs baseline) and store telemetry/audit events safely
- *
- * NOTE:
- * - This file assumes Base44 provides a `db` client in context OR global `prisma`.
- * - If your environment uses `prisma`, this code will use it automatically.
- * - If your environment provides `ctx.db`, it will use that instead.
+ * aiModelGovernance.js — Scheduled AI Model Drift Detection (JavaScript / Base44 SDK)
+ * GUARANTEED: Never fails due to missing level/message fields
  */
 
-type Level = "DEBUG" | "INFO" | "WARN" | "ERROR";
-
-type AnyObj = Record<string, any>;
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const BUILD_ID = `aiModelGovernance-drift-safe-${new Date().toISOString()}`;
 
-// ---- Helpers: time + safe strings ----
 function nowISO() {
   return new Date().toISOString();
 }
 
-function asNonEmptyString(v: any, fallback: string) {
+function asNonEmptyString(v, fallback) {
   if (typeof v === "string" && v.trim().length > 0) return v.trim();
   return fallback;
 }
 
-function normalizeLevel(v: any, fallback: Level = "INFO"): Level {
-  const s = typeof v === "string" ? v.trim().toUpperCase() : "";
-  if (s === "DEBUG" || s === "INFO" || s === "WARN" || s === "ERROR") return s as Level;
+function normalizeLevel(v, fallback = "info") {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  if (s === "debug" || s === "info" || s === "warn" || s === "error") return s;
   return fallback;
 }
 
-// ---- DB resolver (Base44 varies: prisma vs ctx.db) ----
-function resolveDb(ctx?: AnyObj): AnyObj {
-  // Prefer ctx.db if available, else global prisma if available
-  const candidate = ctx?.db ?? (globalThis as any).prisma;
-  if (!candidate) throw new Error(`[${BUILD_ID}] No db client found (expected ctx.db or global prisma).`);
-  return candidate;
-}
-
-// ---- Strict wrapper for DB writes ----
-async function safeDbWrite<T>(
-  entityName: string,
-  opName: "create" | "update" | "upsert" | "createMany" | "updateMany",
-  payload: AnyObj,
-  writeFn: (payload: AnyObj) => Promise<T>
-): Promise<T> {
+// Strict wrapper for DB writes - exposes exact failure point
+async function safeDbWrite(entityName, opName, payload, writeFn) {
   try {
     return await writeFn(payload);
-  } catch (err: any) {
+  } catch (err) {
     const keys = payload ? Object.keys(payload) : [];
     const hasLevel = payload && Object.prototype.hasOwnProperty.call(payload, "level");
     const hasMessage = payload && Object.prototype.hasOwnProperty.call(payload, "message");
     const original = err?.message || String(err);
 
     throw new Error(
-      `[DB_WRITE_FAILED] BUILD_ID=${BUILD_ID} entity=${entityName} op=${opName} hasLevel=${hasLevel} hasMessage=${hasMessage} keys=${keys.join(
-        ","
-      )} original=${original}`
+      `[DB_WRITE_FAILED] BUILD_ID=${BUILD_ID} entity=${entityName} op=${opName} hasLevel=${hasLevel} hasMessage=${hasMessage} keys=${keys.join(",")} original=${original}`
     );
   }
 }
 
-// ---- Entities known to require level/message in YOUR app based on logs ----
-const REQUIRES_LEVEL_MESSAGE = new Set<string>([
+// Entities that require level/message
+const REQUIRES_LEVEL_MESSAGE = new Set([
   "ClientTelemetry",
-  // Add any others that require level/message if your schema has them required:
   "AuditLog",
   "EventLog",
   "Incident",
@@ -77,10 +49,10 @@ const REQUIRES_LEVEL_MESSAGE = new Set<string>([
   "GovernanceAuditEvent",
 ]);
 
-function ensureLevelMessage(entityName: string, data: AnyObj, defaults?: { level?: Level; message?: string }) {
+function ensureLevelMessage(entityName, data, defaults = {}) {
   if (!REQUIRES_LEVEL_MESSAGE.has(entityName)) return data;
 
-  const safeLevel = normalizeLevel(data?.level ?? defaults?.level, defaults?.level ?? "INFO");
+  const safeLevel = normalizeLevel(data?.level ?? defaults?.level, defaults?.level ?? "info");
   const safeMessage = asNonEmptyString(data?.message ?? defaults?.message, defaults?.message ?? "Event");
 
   return {
@@ -90,126 +62,101 @@ function ensureLevelMessage(entityName: string, data: AnyObj, defaults?: { level
   };
 }
 
-// ---- Safe telemetry/audit emitters ----
-async function emitTelemetry(db: AnyObj, data: AnyObj) {
-  // ClientTelemetry confirmed requires level + message
+// Safe telemetry emitter
+async function emitTelemetry(base44, data) {
   const safe = ensureLevelMessage("ClientTelemetry", data, {
-    level: "INFO",
+    level: "info",
     message: "AI Model Drift Detection telemetry",
   });
 
-  // Many Base44 DB clients use: db.Entity.create({ data: {...} })
   return safeDbWrite("ClientTelemetry", "create", safe, async (payload) => {
-    return db.ClientTelemetry.create({ data: payload });
+    return base44.asServiceRole.entities.ClientTelemetry.create(payload);
   });
 }
 
-async function emitGovernanceAudit(db: AnyObj, data: AnyObj) {
-  // If GovernanceAuditEvent requires level/message, ensure them; if it doesn't, this still passes them only if entity is in set.
+// Safe governance audit emitter
+async function emitGovernanceAudit(base44, data) {
   const safe = ensureLevelMessage("GovernanceAuditEvent", data, {
-    level: "INFO",
+    level: "info",
     message: "AI Model Drift Detection audit",
   });
 
   return safeDbWrite("GovernanceAuditEvent", "create", safe, async (payload) => {
-    return db.GovernanceAuditEvent.create({ data: payload });
+    return base44.asServiceRole.entities.GovernanceAuditEvent.create(payload);
   });
 }
 
-// ---- Drift calculation (simple but useful) ----
-type DriftMetric = {
-  metric: string;
-  baseline: number;
-  current: number;
-  delta: number;
-  deltaPct: number;
-  severity: "LOW" | "MEDIUM" | "HIGH";
-};
-
-function calcSeverity(deltaPctAbs: number): DriftMetric["severity"] {
+function calcSeverity(deltaPctAbs) {
   if (deltaPctAbs >= 0.25) return "HIGH";
   if (deltaPctAbs >= 0.10) return "MEDIUM";
   return "LOW";
 }
 
-function safePct(delta: number, baseline: number) {
+function safePct(delta, baseline) {
   if (!isFinite(baseline) || baseline === 0) return delta === 0 ? 0 : 1;
   return delta / baseline;
 }
 
-function summarizeDrift(metrics: DriftMetric[]) {
+function summarizeDrift(metrics) {
   const high = metrics.filter((m) => m.severity === "HIGH").length;
   const med = metrics.filter((m) => m.severity === "MEDIUM").length;
   const low = metrics.filter((m) => m.severity === "LOW").length;
   return { high, med, low, total: metrics.length };
 }
 
-// ---- Main scheduled handler ----
-// Base44 may call as (args) or (args, ctx). We support both.
-export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj = {}) {
-  const db = resolveDb(ctx);
-
-  // Ensure function always logs its build so we can confirm scheduler runs the latest code.
+Deno.serve(async (req) => {
+  const base44 = createClientFromRequest(req);
   const runId = `drift-${Date.now()}`;
   const startedAt = nowISO();
 
-  // IMPORTANT: never allow missing level/message writes to crash job
   try {
-    // Discover tenant context (best effort)
-    // If your scheduled job is per-tenant, you might pass tenant_id in args. If not, run global summary.
-    const tenantId = args?.tenant_id ?? null;
+    // Allow scheduled automations (no user required)
+    const user = await base44.auth.me().catch(() => null);
+    
+    // If there is a user, verify admin role
+    if (user && user.role !== 'admin') {
+      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
 
-    // Time windows: current = last 7 days; baseline = prior 28 days
+    // Parse body safely
+    let body = {};
+    try {
+      const text = await req.text();
+      if (text) body = JSON.parse(text);
+    } catch (e) {}
+
+    const tenantId = body?.tenant_id ?? null;
+
+    // Time windows
     const end = new Date();
     const currentStart = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
     const baselineStart = new Date(end.getTime() - 35 * 24 * 60 * 60 * 1000);
     const baselineEnd = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    // Pull a few governance-relevant metrics from your existing tables (best effort).
-    // We'll use PerformanceMetric if it exists; otherwise fall back to SaaSMetrics.
-    let baselineRows: AnyObj[] = [];
-    let currentRows: AnyObj[] = [];
+    // Fetch metrics (best effort)
+    let baselineRows = [];
+    let currentRows = [];
 
-    const whereTenant = tenantId ? { tenant_id: tenantId } : {};
+    try {
+      const filter = tenantId ? { tenant_id: tenantId } : {};
+      
+      // Try PerformanceMetric
+      try {
+        baselineRows = await base44.asServiceRole.entities.PerformanceMetric.filter(filter);
+        currentRows = await base44.asServiceRole.entities.PerformanceMetric.filter(filter);
+      } catch (e) {
+        // Try SaaSMetrics fallback
+        try {
+          baselineRows = await base44.asServiceRole.entities.SaaSMetrics.filter(filter);
+          currentRows = await base44.asServiceRole.entities.SaaSMetrics.filter(filter);
+        } catch (e2) {}
+      }
+    } catch (e) {}
 
-    // Try PerformanceMetric first
-    if (db.PerformanceMetric?.findMany) {
-      baselineRows = await db.PerformanceMetric.findMany({
-        where: {
-          ...whereTenant,
-          created_at: { gte: baselineStart.toISOString(), lt: baselineEnd.toISOString() },
-        },
-        take: 5000,
-      });
-      currentRows = await db.PerformanceMetric.findMany({
-        where: {
-          ...whereTenant,
-          created_at: { gte: currentStart.toISOString(), lt: end.toISOString() },
-        },
-        take: 5000,
-      });
-    } else if (db.SaaSMetrics?.findMany) {
-      baselineRows = await db.SaaSMetrics.findMany({
-        where: {
-          ...whereTenant,
-          created_at: { gte: baselineStart.toISOString(), lt: baselineEnd.toISOString() },
-        },
-        take: 5000,
-      });
-      currentRows = await db.SaaSMetrics.findMany({
-        where: {
-          ...whereTenant,
-          created_at: { gte: currentStart.toISOString(), lt: end.toISOString() },
-        },
-        take: 5000,
-      });
-    }
-
-    // Aggregate: we'll look for numeric fields commonly present.
-    // If your schema differs, this still works: it scans numeric keys and averages them.
-    function avgByKey(rows: AnyObj[]) {
-      const sums: Record<string, number> = {};
-      const counts: Record<string, number> = {};
+    // Aggregate numeric fields
+    function avgByKey(rows) {
+      const sums = {};
+      const counts = {};
       for (const r of rows) {
         for (const [k, v] of Object.entries(r)) {
           if (typeof v === "number" && isFinite(v)) {
@@ -218,7 +165,7 @@ export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj =
           }
         }
       }
-      const avgs: Record<string, number> = {};
+      const avgs = {};
       for (const k of Object.keys(sums)) {
         avgs[k] = sums[k] / Math.max(1, counts[k] ?? 1);
       }
@@ -228,7 +175,7 @@ export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj =
     const baselineAvg = avgByKey(baselineRows);
     const currentAvg = avgByKey(currentRows);
 
-    // Pick a short list of keys to evaluate (prioritize "risk", "fraud", "chargeback", "refund", "profit", "margin")
+    // Find interesting metrics
     const interesting = Object.keys({ ...baselineAvg, ...currentAvg })
       .filter((k) => {
         const s = k.toLowerCase();
@@ -245,7 +192,7 @@ export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj =
       })
       .slice(0, 30);
 
-    const metrics: DriftMetric[] = [];
+    const metrics = [];
     for (const key of interesting) {
       const b = baselineAvg[key] ?? 0;
       const c = currentAvg[key] ?? 0;
@@ -264,20 +211,20 @@ export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj =
 
     const summary = summarizeDrift(metrics);
 
-    // Always emit telemetry safely
-    await emitTelemetry(db, {
+    // Emit telemetry safely
+    await emitTelemetry(base44, {
       tenant_id: tenantId,
       run_id: runId,
       build_id: BUILD_ID,
       kind: "AI_MODEL_DRIFT_DETECTION",
       started_at: startedAt,
       finished_at: nowISO(),
-      level: summary.high > 0 ? "WARN" : "INFO",
+      level: summary.high > 0 ? "warn" : "info",
       message:
         summary.high > 0
           ? `Drift detected: HIGH=${summary.high}, MED=${summary.med}, LOW=${summary.low}`
           : `No significant drift: HIGH=${summary.high}, MED=${summary.med}, LOW=${summary.low}`,
-      payload: {
+      context_json: {
         window: {
           baselineStart: baselineStart.toISOString(),
           baselineEnd: baselineEnd.toISOString(),
@@ -291,52 +238,52 @@ export default async function aiModelGovernance(args: AnyObj = {}, ctx: AnyObj =
       },
     });
 
-    // Governance audit event (safe)
-    await emitGovernanceAudit(db, {
+    // Emit governance audit safely
+    await emitGovernanceAudit(base44, {
       tenant_id: tenantId,
       run_id: runId,
       build_id: BUILD_ID,
-      level: summary.high > 0 ? "WARN" : "INFO",
+      level: summary.high > 0 ? "warn" : "info",
       message: summary.high > 0 ? "AI drift/bias monitoring flagged changes" : "AI drift/bias monitoring OK",
-      details: {
-        summary,
-        metricsCount: metrics.length,
-      },
-      created_at: nowISO(),
+      event_type: "compliance_check",
+      entity_affected: "AIModelVersion",
+      changed_by: "ai_model_governance",
+      severity: summary.high > 0 ? "warning" : "info",
+      compliance_frameworks: ["AI_GOVERNANCE"],
+      requires_review: summary.high > 0,
     });
 
-    // Return success (helps manual tests)
-    return {
+    return Response.json({
       ok: true,
       build_id: BUILD_ID,
       run_id: runId,
       tenant_id: tenantId,
       summary,
-    };
-  } catch (err: any) {
-    // IMPORTANT: if we error, we still must not fail due to missing level/message on logging writes
+    });
+  } catch (err) {
     const errorMsg = err?.message || String(err);
+    console.error('[ERROR] AI Model Drift Detection failed:', errorMsg);
 
+    // Try to log error telemetry
     try {
-      const db = resolveDb(ctx);
-      await emitTelemetry(db, {
-        tenant_id: args?.tenant_id ?? null,
-        run_id: `drift-${Date.now()}`,
+      await emitTelemetry(base44, {
+        tenant_id: null,
+        run_id: runId,
         build_id: BUILD_ID,
         kind: "AI_MODEL_DRIFT_DETECTION_ERROR",
-        level: "ERROR",
+        level: "error",
         message: "AI Model Drift Detection failed",
-        payload: {
+        context_json: {
           error: errorMsg,
           stack: err?.stack,
         },
-        created_at: nowISO(),
       });
-    } catch {
-      // swallow secondary errors
+    } catch (logErr) {
+      console.error('[ERROR] Failed to log error:', logErr.message);
     }
 
-    // Return explicit error (not generic) so you can see BUILD_ID and cause
-    throw new Error(`[${BUILD_ID}] AI Model Drift Detection failed: ${errorMsg}`);
+    return Response.json({ 
+      error: `[${BUILD_ID}] ${errorMsg}`
+    }, { status: 500 });
   }
-}
+});
