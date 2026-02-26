@@ -7,6 +7,8 @@ import { PermissionsProvider, usePermissions } from '@/components/usePermissions
 import StoreSwitcher from '@/components/StoreSwitcher';
 import ResolverHealthIndicator from '@/components/ResolverHealthIndicator';
 import SecurityHardeningLayer from '@/components/security/SecurityHardeningLayer';
+import InstallPrompt from '@/components/pwa/InstallPrompt';
+import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import { maskEmail } from '@/components/utils/safeLog';
 import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
@@ -45,7 +47,8 @@ import {
   CheckCircle,
   Gift,
   CreditCard,
-  Video
+  Video,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,8 +76,9 @@ const navItems = [
   { name: 'Risk Intelligence', page: 'Intelligence', icon: Shield, permission: 'risk_rules_view' },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
-  { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view' },
+  { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
+  { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
@@ -567,6 +571,19 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Desktop Download */}
+            <Link to={createPageUrl('Download', location.search)}>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+                aria-label="Download Desktop App"
+              >
+                <Store className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Desktop</span>
+              </Button>
+            </Link>
+
             {/* Sync Status */}
             <SyncStatusIndicator compact />
 
@@ -634,7 +651,11 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         search={location.search}
       />
 
-
+      {/* PWA Install Prompt */}
+      {activeUser && <InstallPrompt userId={activeUser.id} />}
+      
+      {/* Offline Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }
