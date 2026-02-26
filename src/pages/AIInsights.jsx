@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Users, Megaphone, Search, Sparkles } from 'lucide-react';
 import { usePlatformResolver, requireResolved } from '../components/usePlatformResolver';
+import { usePermissions } from '../components/usePermissions';
 import CustomerSegmentationPanel from '../components/ai/CustomerSegmentationPanel';
 import MarketingCampaignsPanel from '../components/ai/MarketingCampaignsPanel';
 import ProfitLeakForensicsPanel from '../components/ai/ProfitLeakForensicsPanel';
@@ -21,6 +22,10 @@ export default function AIInsights() {
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   const authTenantId = resolverCheck.tenantId;
+  const { user } = usePermissions();
+  
+  // Check if user is admin/owner
+  const isAdmin = user && (user.role === 'admin' || user.role === 'owner' || user.app_role === 'admin' || user.app_role === 'owner');
 
   if (resolver?.status === 'resolving') {
     return (
@@ -77,17 +82,19 @@ export default function AIInsights() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-pink-50 to-white border-pink-200">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3">
-              <Megaphone className="w-8 h-8 text-pink-600" />
-              <div>
-                <h3 className="font-semibold text-pink-900">Marketing Automation</h3>
-                <p className="text-xs text-pink-600">AI-generated campaigns</p>
+        {isAdmin && (
+          <Card className="bg-gradient-to-br from-pink-50 to-white border-pink-200">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <Megaphone className="w-8 h-8 text-pink-600" />
+                <div>
+                  <h3 className="font-semibold text-pink-900">Marketing Automation</h3>
+                  <p className="text-xs text-pink-600">AI-generated campaigns</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
         <Card className="bg-gradient-to-br from-slate-50 to-white border-slate-200">
           <CardContent className="py-4">
             <div className="flex items-center gap-3">
@@ -102,13 +109,15 @@ export default function AIInsights() {
       </motion.div>
 
       {/* Main Panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : ''} gap-6`}>
         <motion.div variants={fadeInUp}>
           <CustomerSegmentationPanel tenantId={authTenantId} />
         </motion.div>
-        <motion.div variants={fadeInUp}>
-          <MarketingCampaignsPanel tenantId={authTenantId} />
-        </motion.div>
+        {isAdmin && (
+          <motion.div variants={fadeInUp}>
+            <MarketingCampaignsPanel tenantId={authTenantId} />
+          </motion.div>
+        )}
       </div>
 
       {/* Forensics Panel - Full Width */}
