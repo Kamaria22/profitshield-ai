@@ -78,6 +78,18 @@ async function runModelDriftDetection(base44) {
   const driftEvents = [];
   const retrainingProposals = [];
 
+  // If no deployed models, return success without creating any events
+  if (models.length === 0) {
+    console.log('[AI Model Governance] No deployed models found - skipping drift detection');
+    return Response.json({
+      success: true,
+      models_checked: 0,
+      drift_events: [],
+      retraining_proposals: [],
+      overall_health: 'healthy'
+    });
+  }
+
   for (const model of models) {
     // Simulate drift detection (in production, would compare against baseline metrics)
     const currentDrift = simulateDriftScore(model);
