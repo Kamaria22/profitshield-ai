@@ -56,8 +56,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { action } = body;
+    // Parse body safely - scheduled automations may have empty body
+    let body = {};
+    try {
+      const text = await req.text();
+      if (text) {
+        body = JSON.parse(text);
+      }
+    } catch (e) {
+      // Empty or invalid body - use defaults
+    }
+    
+    // Default action for scheduled automations (drift detection)
+    const action = body.action || 'run_drift_detection';
 
     if (action === 'run_drift_detection') {
       return await runModelDriftDetection(base44);
