@@ -1,18 +1,31 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
+  let level = "info";
+  let message = "Initializing";
+  let status = "success";
+  let data = {};
+
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
     
-    if (user?.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch (e) {
+      user = null;
+    }
+    
+    if (user && user.role !== 'admin') {
+      level = "error";
+      message = "Admin access required";
+      status = "error";
+      return Response.json({ level, message, status, data }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
     const { action } = body;
 
-    // Default to run_scan for scheduled automations
     if (!action || action === 'run_scan') {
       return await runAbsorptionScanner(base44);
     } else if (action === 'get_radar') {
@@ -23,125 +36,139 @@ Deno.serve(async (req) => {
       return await createCompetitorProfile(base44, body);
     }
 
-    return Response.json({ error: 'Invalid action' }, { status: 400 });
+    level = "error";
+    message = "Invalid action";
+    status = "error";
+    return Response.json({ level, message, status, data }, { status: 400 });
+    
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    level = "error";
+    message = `Execution failed: ${error.message}`;
+    status = "error";
+    data = { error: error.message };
+    return Response.json({ level, message, status, data }, { status: 500 });
   }
 });
 
 async function runAbsorptionScanner(base44) {
-  const competitors = await base44.asServiceRole.entities.CompetitorProfile.filter({ status: 'monitoring' });
-  const competitiveSignals = await base44.asServiceRole.entities.CompetitiveSignal.filter({ is_active: true });
-  
-  const scanned = [];
-  const playsGenerated = [];
+  let level = "info";
+  let message = "Starting scan";
+  let status = "success";
+  let data = {};
 
-  for (const competitor of competitors) {
-    // Aggregate weakness signals from CompetitiveSignal
-    const signals = competitiveSignals.filter(s => 
-      s.competitor_name?.toLowerCase() === competitor.name?.toLowerCase()
-    );
+  try {
+    const competitors = await base44.asServiceRole.entities.CompetitorProfile.filter({ status: 'monitoring' });
+    const competitiveSignals = await base44.asServiceRole.entities.CompetitiveSignal.filter({ is_active: true });
+    
+    const scanned = [];
+    const playsGenerated = [];
 
-    const weaknessSignals = [];
-    let churnVulnerability = competitor.churn_vulnerability_score || 30;
-    let absorptionPriority = competitor.absorption_priority_score || 30;
+    for (const competitor of competitors) {
+      const signals = competitiveSignals.filter(s => 
+        s.competitor_name?.toLowerCase() === competitor.name?.toLowerCase()
+      );
 
-    // Detect weakness patterns
-    for (const signal of signals) {
-      if (signal.signal_type === 'review_trend' && signal.sentiment_score < 0) {
-        weaknessSignals.push({ signal_type: 'negative_reviews', severity: 60, detected_at: new Date().toISOString() });
+      const weaknessSignals = [];
+      let churnVulnerability = competitor.churn_vulnerability_score || 30;
+      let absorptionPriority = competitor.absorption_priority_score || 30;
+
+      for (const signal of signals) {
+        if (signal.signal_type === 'review_trend' && signal.sentiment_score < 0) {
+          weaknessSignals.push({ signal_type: 'negative_reviews', severity: 60, detected_at: new Date().toISOString() });
+          churnVulnerability += 10;
+        }
+        if (signal.signal_type === 'pricing_change') {
+          weaknessSignals.push({ signal_type: 'pricing_instability', severity: 50, detected_at: new Date().toISOString() });
+          absorptionPriority += 15;
+        }
+        if (signal.signal_type === 'vulnerability') {
+          weaknessSignals.push({ signal_type: signal.weakness_detected || 'general_weakness', severity: 70, detected_at: new Date().toISOString() });
+          churnVulnerability += 15;
+          absorptionPriority += 20;
+        }
+      }
+
+      const featureParity = competitor.feature_parity_score || 50;
+      const growthVelocity = competitor.growth_velocity || 0;
+      
+      if (growthVelocity < 0.05) {
+        weaknessSignals.push({ signal_type: 'growth_stagnation', severity: 55, detected_at: new Date().toISOString() });
         churnVulnerability += 10;
       }
-      if (signal.signal_type === 'pricing_change') {
-        weaknessSignals.push({ signal_type: 'pricing_instability', severity: 50, detected_at: new Date().toISOString() });
-        absorptionPriority += 15;
-      }
-      if (signal.signal_type === 'vulnerability') {
-        weaknessSignals.push({ signal_type: signal.weakness_detected || 'general_weakness', severity: 70, detected_at: new Date().toISOString() });
-        churnVulnerability += 15;
-        absorptionPriority += 20;
-      }
-    }
 
-    // Calculate scores
-    const featureParity = competitor.feature_parity_score || 50;
-    const growthVelocity = competitor.growth_velocity || 0;
-    
-    // Lower growth = higher vulnerability
-    if (growthVelocity < 0.05) {
-      weaknessSignals.push({ signal_type: 'growth_stagnation', severity: 55, detected_at: new Date().toISOString() });
-      churnVulnerability += 10;
-    }
+      let acquisitionProbability = 30;
+      if (competitor.funding_status === 'bootstrapped') acquisitionProbability = 60;
+      else if (competitor.funding_status === 'seed') acquisitionProbability = 50;
+      else if (competitor.funding_status === 'series_a') acquisitionProbability = 40;
 
-    // Calculate acquisition probability based on funding status
-    let acquisitionProbability = 30;
-    if (competitor.funding_status === 'bootstrapped') acquisitionProbability = 60;
-    else if (competitor.funding_status === 'seed') acquisitionProbability = 50;
-    else if (competitor.funding_status === 'series_a') acquisitionProbability = 40;
+      absorptionPriority = Math.min(100, absorptionPriority + (churnVulnerability * 0.3) + (100 - featureParity) * 0.2);
 
-    // Final absorption priority
-    absorptionPriority = Math.min(100, absorptionPriority + (churnVulnerability * 0.3) + (100 - featureParity) * 0.2);
+      await base44.asServiceRole.entities.CompetitorProfile.update(competitor.id, {
+        weakness_signals: weaknessSignals,
+        churn_vulnerability_score: Math.min(100, churnVulnerability),
+        acquisition_probability_score: acquisitionProbability,
+        absorption_priority_score: Math.min(100, absorptionPriority),
+        last_analyzed: new Date().toISOString()
+      });
 
-    // Update competitor profile
-    await base44.asServiceRole.entities.CompetitorProfile.update(competitor.id, {
-      weakness_signals: weaknessSignals,
-      churn_vulnerability_score: Math.min(100, churnVulnerability),
-      acquisition_probability_score: acquisitionProbability,
-      absorption_priority_score: Math.min(100, absorptionPriority),
-      last_analyzed: new Date().toISOString()
-    });
+      scanned.push(competitor.name);
 
-    scanned.push(competitor.name);
-
-    // Generate plays for high-priority targets
-    if (absorptionPriority >= 60) {
-      const plays = generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerability, acquisitionProbability);
-      
-      for (const playData of plays) {
-        // Check if similar play already exists
-        const existing = await base44.asServiceRole.entities.AbsorptionPlay.filter({
-          competitor_id: competitor.id,
-          play_type: playData.play_type,
-          execution_status: 'proposed'
-        });
-
-        if (existing.length === 0) {
-          const play = await base44.asServiceRole.entities.AbsorptionPlay.create({
+      if (absorptionPriority >= 60) {
+        const plays = generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerability, acquisitionProbability);
+        
+        for (const playData of plays) {
+          const existing = await base44.asServiceRole.entities.AbsorptionPlay.filter({
             competitor_id: competitor.id,
-            competitor_name: competitor.name,
-            ...playData
+            play_type: playData.play_type,
+            execution_status: 'proposed'
           });
-          playsGenerated.push(play);
+
+          if (existing.length === 0) {
+            const play = await base44.asServiceRole.entities.AbsorptionPlay.create({
+              competitor_id: competitor.id,
+              competitor_name: competitor.name,
+              ...playData
+            });
+            playsGenerated.push(play);
+          }
         }
       }
     }
-  }
 
-  // Log telemetry
-  await base44.asServiceRole.entities.ClientTelemetry.create({
-    level: 'info',
-    message: `Absorption scan completed: ${scanned.length} competitors scanned, ${playsGenerated.length} plays generated`,
-    context_json: {
-      event_type: 'absorption_scan',
+    await base44.asServiceRole.entities.ClientTelemetry.create({
+      level: 'info',
+      message: `Absorption scan completed: ${scanned.length} competitors scanned, ${playsGenerated.length} plays generated`,
+      context_json: {
+        event_type: 'absorption_scan',
+        competitors_scanned: scanned.length,
+        plays_generated: playsGenerated.length
+      },
+      timestamp: new Date().toISOString()
+    });
+
+    level = "info";
+    message = `Absorption Scan: ${scanned.length} competitors scanned, ${playsGenerated.length} plays generated`;
+    data = {
       competitors_scanned: scanned.length,
-      plays_generated: playsGenerated.length
-    },
-    timestamp: new Date().toISOString()
-  });
+      plays_generated: playsGenerated.length,
+      high_priority_targets: competitors.filter(c => (c.absorption_priority_score || 0) >= 70).length
+    };
 
-  return Response.json({
-    success: true,
-    competitors_scanned: scanned.length,
-    plays_generated: playsGenerated.length,
-    high_priority_targets: competitors.filter(c => (c.absorption_priority_score || 0) >= 70).length
-  });
+    return Response.json({ level, message, status, data });
+    
+  } catch (error) {
+    level = "error";
+    message = `Scan failed: ${error.message}`;
+    status = "error";
+    data = { error: error.message };
+    return Response.json({ level, message, status, data }, { status: 500 });
+  }
 }
 
 function generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerability, acquisitionProbability) {
   const plays = [];
   const baseCapital = (competitor.estimated_arr || 100000) * 0.1;
 
-  // Pricing attack if they have pricing instability
   if (churnVulnerability >= 50) {
     plays.push({
       play_type: 'pricing_attack',
@@ -159,7 +186,6 @@ function generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerabil
     });
   }
 
-  // Feature leap if feature parity is low
   if ((competitor.feature_parity_score || 50) < 70) {
     plays.push({
       play_type: 'feature_leap',
@@ -177,7 +203,6 @@ function generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerabil
     });
   }
 
-  // Acquisition offer for high probability targets
   if (acquisitionProbability >= 50 && absorptionPriority >= 70) {
     plays.push({
       play_type: 'acquisition_offer',
@@ -195,7 +220,6 @@ function generateAbsorptionPlays(competitor, absorptionPriority, churnVulnerabil
     });
   }
 
-  // Customer migration campaign
   if (churnVulnerability >= 60) {
     plays.push({
       play_type: 'customer_migration',
