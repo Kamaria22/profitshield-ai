@@ -110,6 +110,11 @@ async function runModelDriftDetection(base44) {
   // If no deployed models, return success without creating any events
   if (models.length === 0) {
     console.log('[AI Model Governance] No deployed models found - skipping drift detection');
+    await safeCreateTelemetry(base44, {
+      level: 'info',
+      message: 'AI Model Drift Detection: No deployed models found',
+      context_json: { models_checked: 0 }
+    });
     return Response.json({
       success: true,
       models_checked: 0,
@@ -127,6 +132,7 @@ async function runModelDriftDetection(base44) {
     const driftDetected = currentDrift > DRIFT_THRESHOLD;
     const biasDetected = currentBias > BIAS_THRESHOLD;
 
+    console.log(`[DEBUG] Processing model ${model.model_name}, about to update AIModelVersion`);
     // Update model with current scores
     await base44.asServiceRole.entities.AIModelVersion.update(model.id, {
       drift_score: currentDrift,
@@ -134,6 +140,7 @@ async function runModelDriftDetection(base44) {
     });
 
     if (driftDetected || biasDetected) {
+      console.log(`[DEBUG] Drift/bias detected for ${model.model_name}, about to create GovernanceAuditEvent`);
       // Log governance audit event
       await base44.asServiceRole.entities.GovernanceAuditEvent.create({
         event_type: driftDetected ? 'anomaly_detected' : 'compliance_check',
@@ -146,6 +153,7 @@ async function runModelDriftDetection(base44) {
         compliance_frameworks: ['AI_GOVERNANCE'],
         requires_review: true
       });
+      console.log(`[DEBUG] GovernanceAuditEvent created successfully`);
 
       driftEvents.push({
         model_name: model.model_name,
