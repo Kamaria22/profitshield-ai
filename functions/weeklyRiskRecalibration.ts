@@ -1,24 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-/**
- * Weekly Risk Recalibration Scheduled Job
- * 
- * This function is designed to be run weekly via automation.
- * It triggers the adaptive learning engine to:
- * 1. Recalibrate tenant-specific risk models
- * 2. Update cross-merchant signals
- * 3. Calculate ROI metrics for all tenants
- * 4. Update global moat metrics
- */
-
 Deno.serve(async (req) => {
+  let level = "info";
+  let message = "Initializing";
+  let status = "success";
+  let data = {};
+
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
     
-    // Admin only for scheduled jobs
-    if (user?.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch (e) {
+      user = null;
+    }
+    
+    if (user && user.role !== 'admin') {
+      level = "error";
+      message = "Admin access required";
+      status = "error";
+      return Response.json({ level, message, status, data }, { status: 403 });
     }
 
     const results = {
@@ -120,19 +122,31 @@ Deno.serve(async (req) => {
     results.finished_at = new Date().toISOString();
     results.success = results.errors.length === 0;
 
-    // Log to audit
-    await base44.asServiceRole.entities.AuditLog.create({
-      tenant_id: 'system',
-      user_email: 'system@profitshield.ai',
-      action_type: 'sync_completed',
-      entity_type: 'WeeklyRecalibration',
-      details: results
-    });
+    // Log to audit with required fields
+    try {
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: 'system',
+        performed_by: 'system@profitshield.ai',
+        action: 'weekly_risk_recalibration',
+        entity_type: 'WeeklyRecalibration',
+        description: 'Weekly risk model recalibration completed',
+        changes: results
+      });
+    } catch (auditErr) {
+      results.errors.push({ step: 'audit_log', error: auditErr.message });
+    }
 
-    return Response.json(results);
+    level = results.success ? "info" : "warn";
+    message = `Recalibration: ${results.steps.length} steps completed, ${results.errors.length} errors`;
+    data = results;
+
+    return Response.json({ level, message, status, data });
 
   } catch (error) {
-    console.error('Weekly recalibration error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    level = "error";
+    message = `Execution failed: ${error.message}`;
+    status = "error";
+    data = { error: error.message };
+    return Response.json({ level, message, status, data }, { status: 500 });
   }
 });
