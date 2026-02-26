@@ -1,144 +1,237 @@
 import React, { useState, useEffect } from 'react';
+import { Download, Monitor, Smartphone, Globe, Zap, Shield, Check, Apple, Play, QrCode } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import HolographicCard from '@/components/quantum/HolographicCard';
 import QuantumButton from '@/components/quantum/QuantumButton';
+import AppStoreButtons from '@/components/mobile/AppStoreButtons';
+import { detectDevice, getRecommendedDownload } from '@/components/mobile/DeviceDetector';
 import { Badge } from '@/components/ui/badge';
-import { Monitor, Download, Check, Smartphone, Zap } from 'lucide-react';
 
 export default function DownloadPage() {
-  const [os, setOs] = useState('unknown');
-  const [installed, setInstalled] = useState(false);
+  const [device, setDevice] = useState(null);
+  const [recommended, setRecommended] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
-    // Detect OS
-    const platform = navigator.platform.toLowerCase();
-    if (platform.includes('mac')) setOs('macos');
-    else if (platform.includes('win')) setOs('windows');
-    else if (platform.includes('linux')) setOs('linux');
+    setDevice(detectDevice());
+    setRecommended(getRecommendedDownload());
 
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true);
-    }
+    // Capture PWA install prompt
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const handleInstall = () => {
-    // Trigger PWA install if available
-    if (window.deferredPrompt) {
-      window.deferredPrompt.prompt();
-    } else {
-      alert('Install instructions: Click the install button in your browser address bar');
+  const handlePWAInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        console.log('PWA installed');
+      }
+      setDeferredPrompt(null);
     }
   };
 
+  const features = [
+    { icon: Shield, text: 'Real-time fraud protection on the go' },
+    { icon: Zap, text: 'Instant push notifications' },
+    { icon: Globe, text: 'Full offline functionality' },
+    { icon: Monitor, text: 'Seamless sync across all devices' }
+  ];
+
+  const isPWAInstalled = device?.isPWAInstalled;
+
   return (
-    <div className="min-h-screen bg-slate-950 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
-            <Monitor className="w-10 h-10 text-white" />
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 rounded-full mb-6 animate-pulse">
+            <Smartphone className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm text-cyan-400 font-medium">Available on All Platforms</span>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-4">
-            ProfitShield Desktop
+          <h1 className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 mb-6">
+            Download ProfitShield
           </h1>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-            Install ProfitShield AI as a desktop app for faster access, offline support, and native performance
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+            Take your business intelligence everywhere. Install ProfitShield on mobile, desktop, or web.
           </p>
         </div>
 
-        {installed && (
-          <div className="mb-8 text-center">
-            <Badge className="bg-emerald-500/20 text-emerald-400 px-4 py-2">
+        {isPWAInstalled && (
+          <div className="text-center mb-8">
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 px-4 py-2">
               <Check className="w-4 h-4 mr-2" />
-              Already Installed
+              App Already Installed
             </Badge>
           </div>
         )}
 
-        {/* Installation */}
-        <HolographicCard glow scanline className="p-8 mb-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Install for {os === 'macos' ? 'macOS' : os === 'windows' ? 'Windows' : os === 'linux' ? 'Linux' : 'Your Platform'}
+        {/* Recommended Download - Smart detection */}
+        {recommended && !isPWAInstalled && (
+          <HolographicCard glow scanline className="mb-12 p-8 text-center">
+            <Badge className="mb-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-400 border-cyan-500/30 animate-pulse">
+              ⚡ Recommended for {device?.isIOS ? 'iOS' : device?.isAndroid ? 'Android' : device?.isMacOS ? 'macOS' : device?.isWindows ? 'Windows' : 'Your Device'}
+            </Badge>
+            <h2 className="text-3xl font-bold text-white mb-6">
+              {recommended.label}
             </h2>
-            <p className="text-slate-400 mb-6">
-              One-click installation, no download required
-            </p>
-            <QuantumButton
-              size="lg"
-              onClick={handleInstall}
-              icon={Download}
-              disabled={installed}
-            >
-              {installed ? 'Already Installed' : 'Install Now'}
-            </QuantumButton>
-          </div>
-        </HolographicCard>
+            {(device?.isIOS || device?.isAndroid) ? (
+              <AppStoreButtons />
+            ) : (
+              <QuantumButton
+                size="lg"
+                onClick={handlePWAInstall}
+                icon={Download}
+                className="mx-auto"
+              >
+                Install Desktop App
+              </QuantumButton>
+            )}
+          </HolographicCard>
+        )}
 
-        {/* Instructions */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <HolographicCard className="p-6">
+        {/* Platform Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
+          {/* iOS */}
+          <HolographicCard className="p-6 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                <span className="text-2xl font-bold text-cyan-400">1</span>
+              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                <Apple className="w-8 h-8 text-cyan-400" />
               </div>
-              <h3 className="font-bold text-white mb-2">Chrome / Edge</h3>
-              <p className="text-sm text-slate-400">
-                Click the install icon in the address bar or use the button above
+              <h3 className="text-xl font-bold text-white mb-2">iOS App</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                iPhone & iPad
               </p>
+              <QuantumButton
+                onClick={() => window.open('https://apps.apple.com/app/profitshield', '_blank')}
+                className="w-full"
+                size="sm"
+              >
+                <Apple className="w-4 h-4 mr-2" />
+                App Store
+              </QuantumButton>
             </div>
           </HolographicCard>
 
-          <HolographicCard className="p-6">
+          {/* Android */}
+          <HolographicCard className="p-6 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                <span className="text-2xl font-bold text-purple-400">2</span>
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                <Play className="w-8 h-8 text-emerald-400" />
               </div>
-              <h3 className="font-bold text-white mb-2">Safari (macOS)</h3>
-              <p className="text-sm text-slate-400">
-                Click Share → Add to Dock for desktop access
+              <h3 className="text-xl font-bold text-white mb-2">Android App</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                All Android Devices
               </p>
+              <QuantumButton
+                onClick={() => window.open('https://play.google.com/store/apps/details?id=com.profitshield.app', '_blank')}
+                className="w-full"
+                size="sm"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Google Play
+              </QuantumButton>
             </div>
           </HolographicCard>
 
-          <HolographicCard className="p-6">
+          {/* Desktop */}
+          <HolographicCard className="p-6 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                <span className="text-2xl font-bold text-emerald-400">3</span>
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                <Monitor className="w-8 h-8 text-purple-400" />
               </div>
-              <h3 className="font-bold text-white mb-2">Mobile</h3>
-              <p className="text-sm text-slate-400">
-                Add to Home Screen for app-like experience
+              <h3 className="text-xl font-bold text-white mb-2">Desktop App</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                Windows, Mac, Linux
               </p>
+              <QuantumButton 
+                className="w-full"
+                size="sm"
+                onClick={handlePWAInstall}
+                disabled={!deferredPrompt && !isPWAInstalled}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isPWAInstalled ? 'Installed' : 'Install'}
+              </QuantumButton>
             </div>
           </HolographicCard>
         </div>
 
-        {/* Features */}
-        <HolographicCard glow className="p-8">
-          <h2 className="text-2xl font-bold text-cyan-400 mb-6">Desktop Features</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              { icon: Zap, title: 'Lightning Fast', desc: 'Native performance with instant loading' },
-              { icon: Monitor, title: 'Desktop Native', desc: 'Dedicated app window with OS integration' },
-              { icon: Download, title: 'Offline Ready', desc: 'Access your data even without internet' },
-              { icon: Smartphone, title: 'Seamless Sync', desc: 'Continue where you left off on any device' }
-            ].map((feature, i) => {
+        {/* Features Grid */}
+        <HolographicCard glow className="p-8 mb-12">
+          <h2 className="text-2xl font-bold text-center text-cyan-400 mb-8">
+            Why Download ProfitShield?
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map((feature, i) => {
               const Icon = feature.icon;
               return (
-                <div key={i} className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-5 h-5 text-cyan-400" />
+                <div key={i} className="text-center group">
+                  <div className="w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:bg-cyan-500/20 transition-colors">
+                    <Icon className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-white mb-1">{feature.title}</h3>
-                    <p className="text-sm text-slate-400">{feature.desc}</p>
-                  </div>
+                  <p className="text-sm text-slate-300">{feature.text}</p>
                 </div>
               );
             })}
           </div>
         </HolographicCard>
+
+        {/* QR Code & Mobile Instructions */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <HolographicCard scanline className="p-8">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-white mb-4 flex items-center justify-center gap-2">
+                <QrCode className="w-5 h-5 text-cyan-400" />
+                Scan to Download
+              </h3>
+              <div className="w-48 h-48 bg-gradient-to-br from-white to-slate-100 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-2xl">
+                <div className="text-slate-400 text-sm">QR Code</div>
+              </div>
+              <p className="text-sm text-slate-400">
+                Scan with your phone's camera to install instantly
+              </p>
+            </div>
+          </HolographicCard>
+
+          <HolographicCard className="p-8">
+            <h3 className="text-xl font-bold text-white mb-4">Quick Install Guide</h3>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-cyan-400">1</span>
+                </div>
+                <div>
+                  <p className="text-white font-medium">Chrome / Edge</p>
+                  <p className="text-sm text-slate-400">Click install icon in address bar</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-purple-400">2</span>
+                </div>
+                <div>
+                  <p className="text-white font-medium">Safari (Mac)</p>
+                  <p className="text-sm text-slate-400">Share → Add to Dock</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-emerald-400">3</span>
+                </div>
+                <div>
+                  <p className="text-white font-medium">Mobile</p>
+                  <p className="text-sm text-slate-400">Add to Home Screen from browser menu</p>
+                </div>
+              </div>
+            </div>
+          </HolographicCard>
+        </div>
       </div>
     </div>
   );
