@@ -169,8 +169,17 @@ async function runModelDriftDetection(base44) {
     }
   }
 
-  // Log to console instead of database to avoid entity creation errors
-  console.log(`[AI Model Governance] Drift Detection Complete: ${models.length} models checked, ${driftEvents.length} drift events, ${retrainingProposals.length} retraining proposals`);
+  // Log telemetry with safe defaults
+  await safeCreateTelemetry(base44, {
+    level: 'info',
+    message: `AI Model Drift Detection complete: ${models.length} models checked, ${driftEvents.length} drift events detected`,
+    context_json: {
+      models_checked: models.length,
+      drift_events: driftEvents.length,
+      retraining_proposals: retrainingProposals.length,
+      overall_health: driftEvents.length === 0 ? 'healthy' : driftEvents.length <= 2 ? 'warning' : 'critical'
+    }
+  });
 
   return Response.json({
     success: true,
