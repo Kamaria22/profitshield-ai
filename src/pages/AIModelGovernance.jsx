@@ -11,6 +11,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, RefreshCw, Activity, History, Play, Lightbulb } from 'lucide-react';
 import ModelExplainabilityPanel from '@/components/ai/ModelExplainabilityPanel';
 import RetrainingWorkflowPanel from '@/components/ai/RetrainingWorkflowPanel';
+import ModelRegistryPanel from '@/components/ai/ModelRegistryPanel';
 
 export default function AIModelGovernance() {
   const resolver = usePlatformResolver();
@@ -90,6 +91,33 @@ export default function AIModelGovernance() {
       console.error('Failed to load explainability:', error);
     }
   };
+
+  // Deploy model mutation
+  const deployModelMutation = useMutation({
+    mutationFn: async (modelId) => {
+      const { data } = await base44.functions.invoke('automatedModelDeployment', {
+        model_id: modelId,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['aiModels']);
+      queryClient.invalidateQueries(['governanceAudit']);
+    },
+  });
+
+  // Check performance mutation
+  const checkPerformanceMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await base44.functions.invoke('modelPerformanceMonitor', {
+        action: 'check_performance',
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['governanceAudit']);
+    },
+  });
 
   // Calculate summary statistics
   const deployedModels = models.filter(m => m.is_deployed).length;
@@ -233,6 +261,7 @@ export default function AIModelGovernance() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="registry">Registry</TabsTrigger>
           <TabsTrigger value="models">Models</TabsTrigger>
           <TabsTrigger value="drift">Drift Trends</TabsTrigger>
           <TabsTrigger value="retraining">Retraining</TabsTrigger>
@@ -243,6 +272,20 @@ export default function AIModelGovernance() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              onClick={() => checkPerformanceMutation.mutate()}
+              disabled={checkPerformanceMutation.isLoading}
+            >
+              {checkPerformanceMutation.isLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Activity className="w-4 h-4 mr-2" />
+              )}
+              Check All Models Performance
+            </Button>
+          </div>
           {retrainingProposals.length > 0 && (
             <Alert className="border-amber-300 bg-amber-50">
               <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -311,6 +354,11 @@ export default function AIModelGovernance() {
           </div>
         </TabsContent>
 
+        {/* Registry Tab */}
+        <TabsContent value="registry" className="space-y-4">
+          <ModelRegistryPanel tenantId={tenantId} />
+        </TabsContent>
+
         {/* Models Tab */}
         <TabsContent value="models" className="space-y-4">
           <div className="grid gap-4">
@@ -343,6 +391,15 @@ export default function AIModelGovernance() {
                         <Lightbulb className="w-4 h-4 mr-2" />
                         Explain
                       </Button>
+                      {!model.is_deployed && model.compliance_status === 'approved' && (
+                        <Button 
+                          size="sm"
+                          onClick={() => deployModelMutation.mutate(model.id)}
+                          disabled={deployModelMutation.isLoading}
+                        >
+                          Deploy
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
