@@ -77,13 +77,13 @@ const navItems = [
   { name: 'Risk Intelligence', page: 'Intelligence', icon: Shield, permission: 'risk_rules_view' },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
-  { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
   { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
   { name: 'Founder AI', page: 'FounderDashboard', icon: Brain, permission: 'settings_manage', adminOnly: true },
+  { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 

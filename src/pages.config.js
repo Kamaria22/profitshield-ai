@@ -52,8 +52,10 @@ import AIModelGovernance from './pages/AIModelGovernance';
 import Achievements from './pages/Achievements';
 import Alerts from './pages/Alerts';
 import AuditLogs from './pages/AuditLogs';
+import Billing from './pages/Billing';
 import Customers from './pages/Customers';
 import DataCompliance from './pages/DataCompliance';
+import Download from './pages/Download';
 import FounderDashboard from './pages/FounderDashboard';
 import Home from './pages/Home';
 import Install from './pages/Install';
@@ -73,8 +75,6 @@ import ShopifyCallback from './pages/ShopifyCallback';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
-import Billing from './pages/Billing';
-import Download from './pages/Download';
 import __Layout from './Layout.jsx';
 
 
@@ -84,8 +84,10 @@ export const PAGES = {
     "Achievements": Achievements,
     "Alerts": Alerts,
     "AuditLogs": AuditLogs,
+    "Billing": Billing,
     "Customers": Customers,
     "DataCompliance": DataCompliance,
+    "Download": Download,
     "FounderDashboard": FounderDashboard,
     "Home": Home,
     "Install": Install,
@@ -105,8 +107,6 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
-    "Billing": Billing,
-    "Download": Download,
 }
 
 export const pagesConfig = {
