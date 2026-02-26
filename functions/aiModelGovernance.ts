@@ -1,28 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Safe telemetry logging helper (inlined to avoid import issues)
-async function safeLogTelemetry(base44, data = {}) {
-  const safeData = {
-    level: data.level || 'info',
-    message: data.message || 'No message provided',
-    timestamp: data.timestamp || new Date().toISOString(),
-    ...data
-  };
-  
-  const validLevels = ['info', 'warn', 'error', 'invariant'];
-  if (!validLevels.includes(safeData.level)) {
-    safeData.context_json = safeData.context_json || {};
-    safeData.context_json.invalid_level = safeData.level;
-    safeData.level = 'info';
-  }
-  
-  try {
-    return await base44.entities.ClientTelemetry.create(safeData);
-  } catch (error) {
-    console.error('[SafeLog] Failed to create telemetry:', error.message);
-  }
-}
-
 // Thresholds for model deployment safety
 const DRIFT_THRESHOLD = 15;
 const BIAS_THRESHOLD = 20;
