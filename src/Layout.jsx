@@ -10,6 +10,7 @@ import SecurityHardeningLayer from '@/components/security/SecurityHardeningLayer
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
+import MobileAppBanner from '@/components/mobile/MobileAppBanner';
 import { maskEmail } from '@/components/utils/safeLog';
 import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
 import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
@@ -653,6 +654,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* PWA Install Prompt */}
       {activeUser && <InstallPrompt userId={activeUser.id} />}
+      
+      {/* Mobile App Banner */}
+      <MobileAppBanner />
       
       {/* Offline Indicator */}
       <OfflineIndicator />
