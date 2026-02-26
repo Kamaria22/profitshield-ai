@@ -72,6 +72,7 @@ import ShopifyCallback from './pages/ShopifyCallback';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
+import AIModelGovernance from './pages/AIModelGovernance';
 import __Layout from './Layout.jsx';
 
 
@@ -101,6 +102,7 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
+    "AIModelGovernance": AIModelGovernance,
 }
 
 export const pagesConfig = {
