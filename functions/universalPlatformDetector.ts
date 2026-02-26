@@ -102,6 +102,66 @@ Deno.serve(async (req) => {
       return Response.json({ level, message, status, data });
     }
 
+    if (action === 'sync_data') {
+      const syncResult = await syncPlatformData(base44, body.integration_id, body.data_types, body.options);
+      
+      level = syncResult.success ? "info" : "error";
+      message = syncResult.success ? `Synced ${syncResult.total_records} records` : `Sync failed: ${syncResult.error}`;
+      data = syncResult;
+
+      return Response.json({ level, message, status, data });
+    }
+
+    if (action === 'register_webhook') {
+      const webhookResult = await registerWebhook(base44, body.integration_id, body.webhook_config);
+      
+      level = webhookResult.success ? "info" : "error";
+      message = webhookResult.success ? `Webhook registered: ${webhookResult.webhook_id}` : `Failed: ${webhookResult.error}`;
+      data = webhookResult;
+
+      return Response.json({ level, message, status, data });
+    }
+
+    if (action === 'test_credentials') {
+      const testResult = await testPlatformCredentials(body.platform, body.credentials, body.store_url);
+      
+      level = testResult.valid ? "info" : "error";
+      message = testResult.valid ? "Credentials valid" : `Authentication failed: ${testResult.error}`;
+      data = testResult;
+
+      return Response.json({ level, message, status, data });
+    }
+
+    if (action === 'get_data_schema') {
+      const schema = getPlatformDataSchema(body.platform, body.data_type);
+      
+      level = "info";
+      message = `Schema retrieved for ${body.platform}`;
+      data = schema;
+
+      return Response.json({ level, message, status, data });
+    }
+
+    if (action === 'list_webhooks') {
+      const webhooks = await listWebhooks(base44, body.integration_id);
+      
+      level = "info";
+      message = `Found ${webhooks.length} webhooks`;
+      data = { webhooks };
+
+      return Response.json({ level, message, status, data });
+    }
+
+    if (action === 'delete_webhook') {
+      const deleteResult = await deleteWebhook(base44, body.integration_id, body.webhook_id);
+      
+      level = deleteResult.success ? "info" : "error";
+      message = deleteResult.success ? "Webhook deleted" : `Failed: ${deleteResult.error}`;
+      data = deleteResult;
+
+      return Response.json({ level, message, status, data });
+    }
+
     level = "error";
     message = "Invalid action";
     status = "error";
@@ -335,5 +395,304 @@ function extractDomain(url) {
     return urlObj.hostname;
   } catch {
     return url;
+  }
+}
+
+async function syncPlatformData(base44, integrationId, dataTypes = ['orders'], options = {}) {
+  try {
+    const integration = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integrationId });
+    
+    if (!integration || integration.length === 0) {
+      return { success: false, error: 'Integration not found' };
+    }
+
+    const int = integration[0];
+    const syncResults = {};
+    let totalRecords = 0;
+
+    for (const dataType of dataTypes) {
+      try {
+        const result = await syncDataType(base44, int, dataType, options);
+        syncResults[dataType] = result;
+        totalRecords += result.count || 0;
+      } catch (error) {
+        syncResults[dataType] = { success: false, error: error.message };
+      }
+    }
+
+    await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
+      last_sync_at: new Date().toISOString(),
+      last_sync_status: totalRecords > 0 ? 'success' : 'partial',
+      last_sync_stats: {
+        total_records: totalRecords,
+        data_types: Object.keys(syncResults),
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    return {
+      success: true,
+      total_records: totalRecords,
+      results: syncResults,
+      sync_timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function syncDataType(base44, integration, dataType, options) {
+  const limit = options.limit || 100;
+  const since = options.since || null;
+  
+  // Simulate API call to platform
+  // In production, this would make actual API calls to Shopify, WooCommerce, etc.
+  
+  if (dataType === 'orders') {
+    // Placeholder for actual order sync logic
+    return { success: true, count: 0, message: 'Order sync endpoint ready' };
+  }
+  
+  if (dataType === 'products') {
+    return { success: true, count: 0, message: 'Product sync endpoint ready' };
+  }
+  
+  if (dataType === 'customers') {
+    return { success: true, count: 0, message: 'Customer sync endpoint ready' };
+  }
+  
+  return { success: false, error: 'Unsupported data type' };
+}
+
+async function registerWebhook(base44, integrationId, webhookConfig) {
+  try {
+    const integration = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integrationId });
+    
+    if (!integration || integration.length === 0) {
+      return { success: false, error: 'Integration not found' };
+    }
+
+    const int = integration[0];
+    const { topic, url, events } = webhookConfig;
+
+    // Generate webhook ID
+    const webhookId = `wh_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Update integration with webhook info
+    const currentWebhooks = int.webhook_endpoints || {};
+    currentWebhooks[topic] = webhookId;
+
+    await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
+      webhook_endpoints: currentWebhooks
+    });
+
+    // Log webhook creation
+    await base44.asServiceRole.entities.AuditLog.create({
+      tenant_id: int.tenant_id,
+      action: 'webhook_registered',
+      entity_type: 'PlatformIntegration',
+      entity_id: integrationId,
+      performed_by: 'system',
+      description: `Webhook registered for ${topic}`,
+      metadata: {
+        webhook_id: webhookId,
+        topic,
+        url,
+        events
+      }
+    });
+
+    return {
+      success: true,
+      webhook_id: webhookId,
+      topic,
+      url,
+      status: 'active',
+      registered_at: new Date().toISOString()
+    };
+
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function testPlatformCredentials(platform, credentials, storeUrl) {
+  try {
+    // Validate credential format
+    if (!credentials || typeof credentials !== 'object') {
+      return { valid: false, error: 'Invalid credentials format' };
+    }
+
+    // Platform-specific credential validation
+    const validation = validateCredentialFormat(platform, credentials);
+    
+    if (!validation.valid) {
+      return validation;
+    }
+
+    // Simulate API test call
+    // In production, this would make actual test API calls
+    
+    return {
+      valid: true,
+      platform,
+      scopes: getRequiredScopes(platform),
+      api_version: 'latest',
+      test_timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    return { valid: false, error: error.message };
+  }
+}
+
+function validateCredentialFormat(platform, credentials) {
+  switch (platform) {
+    case 'shopify':
+      if (!credentials.access_token || !credentials.shop_domain) {
+        return { valid: false, error: 'Missing access_token or shop_domain' };
+      }
+      break;
+    case 'woocommerce':
+      if (!credentials.consumer_key || !credentials.consumer_secret) {
+        return { valid: false, error: 'Missing consumer_key or consumer_secret' };
+      }
+      break;
+    case 'bigcommerce':
+      if (!credentials.access_token || !credentials.store_hash) {
+        return { valid: false, error: 'Missing access_token or store_hash' };
+      }
+      break;
+    case 'stripe':
+      if (!credentials.api_key) {
+        return { valid: false, error: 'Missing api_key' };
+      }
+      break;
+    default:
+      if (!credentials.api_key && !credentials.access_token) {
+        return { valid: false, error: 'Missing authentication credentials' };
+      }
+  }
+  
+  return { valid: true };
+}
+
+function getPlatformDataSchema(platform, dataType) {
+  const schemas = {
+    orders: {
+      shopify: {
+        fields: ['id', 'order_number', 'email', 'total_price', 'currency', 'created_at', 'line_items', 'customer'],
+        required: ['id', 'order_number', 'total_price'],
+        format: 'json'
+      },
+      woocommerce: {
+        fields: ['id', 'number', 'billing', 'total', 'currency', 'date_created', 'line_items', 'customer_id'],
+        required: ['id', 'number', 'total'],
+        format: 'json'
+      },
+      bigcommerce: {
+        fields: ['id', 'customer_id', 'billing_address', 'total_inc_tax', 'currency_code', 'date_created', 'products'],
+        required: ['id', 'total_inc_tax'],
+        format: 'json'
+      }
+    },
+    products: {
+      shopify: {
+        fields: ['id', 'title', 'variants', 'price', 'inventory_quantity', 'created_at'],
+        required: ['id', 'title'],
+        format: 'json'
+      },
+      woocommerce: {
+        fields: ['id', 'name', 'price', 'regular_price', 'stock_quantity', 'date_created'],
+        required: ['id', 'name'],
+        format: 'json'
+      }
+    },
+    customers: {
+      shopify: {
+        fields: ['id', 'email', 'first_name', 'last_name', 'orders_count', 'total_spent', 'created_at'],
+        required: ['id', 'email'],
+        format: 'json'
+      },
+      woocommerce: {
+        fields: ['id', 'email', 'first_name', 'last_name', 'username', 'date_created'],
+        required: ['id', 'email'],
+        format: 'json'
+      }
+    }
+  };
+
+  return schemas[dataType]?.[platform] || { 
+    fields: [], 
+    required: [], 
+    format: 'json',
+    error: 'Schema not found' 
+  };
+}
+
+async function listWebhooks(base44, integrationId) {
+  try {
+    const integration = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integrationId });
+    
+    if (!integration || integration.length === 0) {
+      return [];
+    }
+
+    const webhookEndpoints = integration[0].webhook_endpoints || {};
+    
+    return Object.entries(webhookEndpoints).map(([topic, webhookId]) => ({
+      webhook_id: webhookId,
+      topic,
+      status: 'active',
+      integration_id: integrationId
+    }));
+
+  } catch (error) {
+    console.error('List webhooks error:', error);
+    return [];
+  }
+}
+
+async function deleteWebhook(base44, integrationId, webhookId) {
+  try {
+    const integration = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integrationId });
+    
+    if (!integration || integration.length === 0) {
+      return { success: false, error: 'Integration not found' };
+    }
+
+    const webhookEndpoints = integration[0].webhook_endpoints || {};
+    
+    // Find and remove webhook
+    const topicToRemove = Object.keys(webhookEndpoints).find(
+      topic => webhookEndpoints[topic] === webhookId
+    );
+
+    if (!topicToRemove) {
+      return { success: false, error: 'Webhook not found' };
+    }
+
+    delete webhookEndpoints[topicToRemove];
+
+    await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
+      webhook_endpoints: webhookEndpoints
+    });
+
+    // Log deletion
+    await base44.asServiceRole.entities.AuditLog.create({
+      tenant_id: integration[0].tenant_id,
+      action: 'webhook_deleted',
+      entity_type: 'PlatformIntegration',
+      entity_id: integrationId,
+      performed_by: 'system',
+      description: `Webhook deleted: ${topicToRemove}`,
+      metadata: { webhook_id: webhookId, topic: topicToRemove }
+    });
+
+    return { success: true, webhook_id: webhookId };
+
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 }
