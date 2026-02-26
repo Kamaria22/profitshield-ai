@@ -1,5 +1,57 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// INSTRUMENTATION: Track last entity write attempt
+let lastEntityWrite = { entityName: null, operation: null, payloadKeys: [], hasLevel: false, hasMessage: false };
+
+// Instrumented entity wrapper - logs all writes
+function instrumentEntityWrite(base44) {
+  const originalProxy = new Proxy(base44.asServiceRole.entities, {
+    get(target, entityName) {
+      if (typeof entityName !== 'string') return target[entityName];
+      
+      const originalEntity = target[entityName];
+      return new Proxy(originalEntity, {
+        get(entityTarget, method) {
+          if (method !== 'create' && method !== 'update' && method !== 'insert') {
+            return entityTarget[method];
+          }
+          
+          return async function(...args) {
+            const payload = args[method === 'update' ? 1 : 0];
+            const payloadKeys = payload ? Object.keys(payload) : [];
+            const hasLevel = payload && 'level' in payload;
+            const hasMessage = payload && 'message' in payload;
+            
+            lastEntityWrite = {
+              entityName,
+              operation: method,
+              payloadKeys,
+              hasLevel,
+              hasMessage,
+              timestamp: new Date().toISOString()
+            };
+            
+            console.log(`[INSTRUMENT] ${method} ${entityName}:`, {
+              keys: payloadKeys,
+              hasLevel,
+              hasMessage
+            });
+            
+            try {
+              return await entityTarget[method](...args);
+            } catch (error) {
+              console.error(`[INSTRUMENT] FAILED ${method} ${entityName}:`, error.message);
+              throw error;
+            }
+          };
+        }
+      });
+    }
+  });
+  
+  return { ...base44, asServiceRole: { ...base44.asServiceRole, entities: originalProxy } };
+}
+
 // Safe logging helper with guaranteed defaults
 async function safeCreateTelemetry(base44, data = {}) {
   const validLevels = ['info', 'warn', 'error', 'invariant'];
@@ -14,7 +66,6 @@ async function safeCreateTelemetry(base44, data = {}) {
     return await base44.asServiceRole.entities.ClientTelemetry.create(safeData);
   } catch (error) {
     console.error('[SafeLog] Telemetry creation failed:', error.message);
-    // Don't throw - logging failure shouldn't break the job
     return null;
   }
 }
@@ -41,9 +92,12 @@ const DEMOGRAPHIC_SEGMENTS = [
 ];
 
 Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
+  let base44 = createClientFromRequest(req);
   
   try {
+    // INSTRUMENT: Wrap all entity writes for debugging
+    base44 = instrumentEntityWrite(base44);
+    
     // Allow scheduled automations (no user) to proceed
     const user = await base44.auth.me().catch(() => null);
     
@@ -88,6 +142,13 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
+    // CAPTURE: Log detailed error with last entity write attempt
+    console.error('[ERROR] AI Model Governance failed:', {
+      error: error.message,
+      stack: error.stack,
+      lastEntityWrite: lastEntityWrite
+    });
+    
     // Log error with safe defaults - prevents scheduled job from failing
     await safeCreateTelemetry(base44, {
       level: 'error',
@@ -95,10 +156,14 @@ Deno.serve(async (req) => {
       context_json: {
         action: 'error_handler',
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
+        lastEntityWrite: lastEntityWrite
       }
     });
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ 
+      error: error.message,
+      lastEntityWrite: lastEntityWrite 
+    }, { status: 500 });
   }
 });
 
