@@ -1,5 +1,24 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// Safe logging helper with guaranteed defaults
+async function safeCreateTelemetry(base44, data = {}) {
+  const validLevels = ['info', 'warn', 'error', 'invariant'];
+  const safeData = {
+    level: (data.level && validLevels.includes(data.level)) ? data.level : 'info',
+    message: (data.message && String(data.message).trim()) ? String(data.message).trim() : 'AI Model Governance event',
+    timestamp: data.timestamp || new Date().toISOString(),
+    ...data
+  };
+  
+  try {
+    return await base44.asServiceRole.entities.ClientTelemetry.create(safeData);
+  } catch (error) {
+    console.error('[SafeLog] Telemetry creation failed:', error.message);
+    // Don't throw - logging failure shouldn't break the job
+    return null;
+  }
+}
+
 // Thresholds for model deployment safety
 const DRIFT_THRESHOLD = 15;
 const BIAS_THRESHOLD = 20;
