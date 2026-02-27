@@ -58,6 +58,8 @@ import RiskModelConfig from '@/components/settings/RiskModelConfig';
 import RoleManagement from '@/components/settings/RoleManagement';
 import DataExportPanel from '@/components/settings/DataExportPanel';
 import DemoVideoGenerator from '@/components/settings/DemoVideoGeneratorFixed';
+import BiometricSettings from '@/components/settings/BiometricSettings';
+import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
@@ -327,12 +329,16 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="costs">Costs</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-1">
+            <Fingerprint className="w-3 h-3" />
+            Security
+          </TabsTrigger>
           {user?.email === 'rohan.a.roberts@gmail.com' && (
             <TabsTrigger value="users">
               <Users className="w-4 h-4 mr-2" />
@@ -588,6 +594,19 @@ export default function Settings() {
         {/* Data Export Tab */}
         <TabsContent value="export" className="mt-6">
           <DataExportPanel tenantId={tenantId} />
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Manage authentication and access security</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <BiometricSettings />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Users Tab - Owner Only */}
