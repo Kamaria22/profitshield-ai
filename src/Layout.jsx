@@ -49,8 +49,10 @@ import {
   Gift,
   CreditCard,
   Video,
-  Download
+  Download,
+  Lock
 } from 'lucide-react';
+import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -84,6 +86,7 @@ const navItems = [
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
   { name: 'Founder AI', page: 'FounderDashboard', icon: Brain, permission: 'settings_manage', adminOnly: true },
   { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
+  { name: 'App Listing', page: 'AppStoreListing', icon: Store, permission: 'settings_manage', adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
