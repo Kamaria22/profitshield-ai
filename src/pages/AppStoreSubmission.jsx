@@ -192,7 +192,7 @@ export default function AppStoreSubmission() {
               detail="Generate using /AppIconGenerator or Figma export"
             />
             <Item
-              label="Screenshots (iPhone 6.7\", 5.5\", iPad, Pixel)"
+              label={'Screenshots (iPhone 6.7", 5.5", iPad, Pixel)'}
               ok={checks?.screenshotsGenerated}
               warn={!checks?.screenshotsGenerated}
               detail="Capture using Chrome DevTools device emulation at required resolutions"
