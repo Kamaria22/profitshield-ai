@@ -81,6 +81,9 @@ import CookiePolicy from './pages/CookiePolicy';
 import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import AppStoreListing from './pages/AppStoreListing';
 import NativeBuildGuide from './pages/NativeBuildGuide';
+import AppStoreSubmission from './pages/AppStoreSubmission';
+import NativeHealth from './pages/NativeHealth';
+import PerformanceAudit from './pages/PerformanceAudit';
 import __Layout from './Layout.jsx';
 
 
@@ -119,6 +122,9 @@ export const PAGES = {
     "DataProcessingAgreement": DataProcessingAgreement,
     "AppStoreListing": AppStoreListing,
     "NativeBuildGuide": NativeBuildGuide,
+    "AppStoreSubmission": AppStoreSubmission,
+    "NativeHealth": NativeHealth,
+    "PerformanceAudit": PerformanceAudit,
 }
 
 export const pagesConfig = {
