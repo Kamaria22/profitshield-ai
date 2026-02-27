@@ -75,6 +75,10 @@ import ShopifyCallback from './pages/ShopifyCallback';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import VideoJobs from './pages/VideoJobs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import CookiePolicy from './pages/CookiePolicy';
+import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import __Layout from './Layout.jsx';
 
 
@@ -107,6 +111,10 @@ export const PAGES = {
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "VideoJobs": VideoJobs,
+    "PrivacyPolicy": PrivacyPolicy,
+    "TermsOfService": TermsOfService,
+    "CookiePolicy": CookiePolicy,
+    "DataProcessingAgreement": DataProcessingAgreement,
 }
 
 export const pagesConfig = {
