@@ -510,6 +510,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             })}
           </nav>
 
+          {/* Legal Footer Links */}
+          <div className="px-4 py-2 flex flex-wrap gap-x-3 border-t border-slate-100">
+            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors">Privacy</Link>
+            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors">Terms</Link>
+            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors">Cookies</Link>
+          </div>
+
           {/* User Menu */}
           {activeUser && (
             <div className="p-4 border-t border-slate-200">
