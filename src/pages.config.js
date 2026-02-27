@@ -79,6 +79,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy';
 import DataProcessingAgreement from './pages/DataProcessingAgreement';
+import AppStoreListing from './pages/AppStoreListing';
 import __Layout from './Layout.jsx';
 
 
@@ -115,6 +116,7 @@ export const PAGES = {
     "TermsOfService": TermsOfService,
     "CookiePolicy": CookiePolicy,
     "DataProcessingAgreement": DataProcessingAgreement,
+    "AppStoreListing": AppStoreListing,
 }
 
 export const pagesConfig = {
