@@ -34,9 +34,9 @@ export default function MobileAppBanner() {
 
   const handleDownload = () => {
     if (platform === 'ios') {
-      window.location.href = 'https://apps.apple.com/app/profitshield'; // Replace with actual
+      window.location.href = 'https://apps.apple.com/app/profitshield-ai/id6741820887';
     } else if (platform === 'android') {
-      window.location.href = 'https://play.google.com/store/apps/details?id=com.profitshield.app'; // Replace with actual
+      window.location.href = 'https://play.google.com/store/apps/details?id=ai.profitshield.app';
     }
   };
 

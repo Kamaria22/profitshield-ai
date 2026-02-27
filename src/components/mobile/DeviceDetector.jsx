@@ -27,7 +27,7 @@ export const getRecommendedDownload = () => {
       type: 'ios',
       label: 'Download from App Store',
       icon: 'apple',
-      url: 'https://apps.apple.com/app/profitshield',
+      url: 'https://apps.apple.com/app/profitshield-ai/id6741820887',
       priority: 1
     };
   }
@@ -37,7 +37,7 @@ export const getRecommendedDownload = () => {
       type: 'android',
       label: 'Get it on Google Play',
       icon: 'play',
-      url: 'https://play.google.com/store/apps/details?id=com.profitshield.app',
+      url: 'https://play.google.com/store/apps/details?id=ai.profitshield.app',
       priority: 1
     };
   }
@@ -74,7 +74,5 @@ export const openDeepLink = (path = '') => {
   }, 2000);
   
   window.location.href = deepLink;
-  
-  // Clear timeout if app opened successfully
   window.addEventListener('blur', () => clearTimeout(timeout));
 };

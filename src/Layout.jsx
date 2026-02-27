@@ -663,6 +663,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       
       {/* Offline Indicator */}
       <OfflineIndicator />
+
+      {/* Deep Link Handler */}
+      <DeepLinkHandler />
     </div>
   );
 }
