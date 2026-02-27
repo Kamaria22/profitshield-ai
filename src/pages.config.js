@@ -80,6 +80,7 @@ import TermsOfService from './pages/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy';
 import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import AppStoreListing from './pages/AppStoreListing';
+import NativeBuildGuide from './pages/NativeBuildGuide';
 import __Layout from './Layout.jsx';
 
 
@@ -117,6 +118,7 @@ export const PAGES = {
     "CookiePolicy": CookiePolicy,
     "DataProcessingAgreement": DataProcessingAgreement,
     "AppStoreListing": AppStoreListing,
+    "NativeBuildGuide": NativeBuildGuide,
 }
 
 export const pagesConfig = {
