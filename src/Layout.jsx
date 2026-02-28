@@ -586,6 +586,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Upgrade Button */}
+            {activeUser && <UpgradeButton userId={activeUser.id} />}
+
             {/* Desktop Download */}
             <Link to={createPageUrl('Download', location.search)}>
               <Button 
