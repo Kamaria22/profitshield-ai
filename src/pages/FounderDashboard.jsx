@@ -37,6 +37,7 @@ import {
   Settings
 } from 'lucide-react';
 
+import ProductionReadinessBanner from '@/components/founder/ProductionReadinessBanner';
 import AutopilotStatusPanel from '@/components/autopilot/AutopilotStatusPanel';
 import DecisionQueue from '@/components/autopilot/DecisionQueue';
 import DataFlywheelViz from '@/components/autopilot/DataFlywheelViz';

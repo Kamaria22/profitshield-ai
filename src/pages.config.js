@@ -51,20 +51,28 @@ import AIInsights from './pages/AIInsights';
 import AIModelGovernance from './pages/AIModelGovernance';
 import Achievements from './pages/Achievements';
 import Alerts from './pages/Alerts';
+import AppStoreListing from './pages/AppStoreListing';
+import AppStoreSubmission from './pages/AppStoreSubmission';
 import AuditLogs from './pages/AuditLogs';
 import Billing from './pages/Billing';
+import CookiePolicy from './pages/CookiePolicy';
 import Customers from './pages/Customers';
 import DataCompliance from './pages/DataCompliance';
+import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import Download from './pages/Download';
 import FounderDashboard from './pages/FounderDashboard';
 import Home from './pages/Home';
 import Install from './pages/Install';
 import Integrations from './pages/Integrations';
 import Intelligence from './pages/Intelligence';
+import NativeBuildGuide from './pages/NativeBuildGuide';
+import NativeHealth from './pages/NativeHealth';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
+import PerformanceAudit from './pages/PerformanceAudit';
 import PnLAnalytics from './pages/PnLAnalytics';
 import Pricing from './pages/Pricing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import Products from './pages/Products';
 import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
@@ -74,16 +82,8 @@ import Shipping from './pages/Shipping';
 import ShopifyCallback from './pages/ShopifyCallback';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
-import VideoJobs from './pages/VideoJobs';
-import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
-import CookiePolicy from './pages/CookiePolicy';
-import DataProcessingAgreement from './pages/DataProcessingAgreement';
-import AppStoreListing from './pages/AppStoreListing';
-import NativeBuildGuide from './pages/NativeBuildGuide';
-import AppStoreSubmission from './pages/AppStoreSubmission';
-import NativeHealth from './pages/NativeHealth';
-import PerformanceAudit from './pages/PerformanceAudit';
+import VideoJobs from './pages/VideoJobs';
 import __Layout from './Layout.jsx';
 
 
@@ -92,20 +92,28 @@ export const PAGES = {
     "AIModelGovernance": AIModelGovernance,
     "Achievements": Achievements,
     "Alerts": Alerts,
+    "AppStoreListing": AppStoreListing,
+    "AppStoreSubmission": AppStoreSubmission,
     "AuditLogs": AuditLogs,
     "Billing": Billing,
+    "CookiePolicy": CookiePolicy,
     "Customers": Customers,
     "DataCompliance": DataCompliance,
+    "DataProcessingAgreement": DataProcessingAgreement,
     "Download": Download,
     "FounderDashboard": FounderDashboard,
     "Home": Home,
     "Install": Install,
     "Integrations": Integrations,
     "Intelligence": Intelligence,
+    "NativeBuildGuide": NativeBuildGuide,
+    "NativeHealth": NativeHealth,
     "Onboarding": Onboarding,
     "Orders": Orders,
+    "PerformanceAudit": PerformanceAudit,
     "PnLAnalytics": PnLAnalytics,
     "Pricing": Pricing,
+    "PrivacyPolicy": PrivacyPolicy,
     "Products": Products,
     "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
@@ -115,16 +123,8 @@ export const PAGES = {
     "ShopifyCallback": ShopifyCallback,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
-    "VideoJobs": VideoJobs,
-    "PrivacyPolicy": PrivacyPolicy,
     "TermsOfService": TermsOfService,
-    "CookiePolicy": CookiePolicy,
-    "DataProcessingAgreement": DataProcessingAgreement,
-    "AppStoreListing": AppStoreListing,
-    "NativeBuildGuide": NativeBuildGuide,
-    "AppStoreSubmission": AppStoreSubmission,
-    "NativeHealth": NativeHealth,
-    "PerformanceAudit": PerformanceAudit,
+    "VideoJobs": VideoJobs,
 }
 
 export const pagesConfig = {
