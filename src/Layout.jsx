@@ -640,7 +640,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="p-4 lg:p-6 min-h-screen bg-slate-950">
           {showMissingContextBanner && (
             <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
               <p className="font-medium mb-1">No Store Connected</p>
