@@ -58,7 +58,7 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -120,41 +120,32 @@ function TrialExpiredOverlay({ onSubscribe }) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4"
     >
-      <Card className="max-w-md w-full shadow-2xl">
-        <CardHeader className="text-center pb-2">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-red-600" />
-          </div>
-          <CardTitle className="text-2xl">Trial Expired</CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <p className="text-slate-600">
-            Your 14-day free trial has ended. Subscribe now to continue protecting your profits.
-          </p>
-          
-          <div className="bg-slate-50 rounded-lg p-4">
-            <p className="text-sm text-slate-500 mb-2">Your data is safe!</p>
-            <p className="text-xs text-slate-400">
-              Everything will be restored immediately when you subscribe.
-            </p>
-          </div>
-
-          <Button 
-            onClick={onSubscribe}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
-            size="lg"
-          >
-            <CreditCard className="w-5 h-5 mr-2" />
-            Subscribe Now
-          </Button>
-
-          <p className="text-xs text-slate-400">
-            Plans start at $29/month
-          </p>
-        </CardContent>
-      </Card>
+      <div className="max-w-md w-full rounded-2xl border border-white/10 p-8 text-center"
+        style={{ background: 'rgba(15,20,40,0.9)', boxShadow: '0 0 60px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.6)' }}>
+        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-6"
+          style={{ boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}>
+          <Lock className="w-8 h-8 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-3">Trial Expired</h2>
+        <p className="text-slate-400 mb-6">
+          Your 14-day free trial has ended. Subscribe to continue protecting your profits.
+        </p>
+        <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/5">
+          <p className="text-sm text-slate-300 mb-1">Your data is safe</p>
+          <p className="text-xs text-slate-500">Everything restores instantly on subscription.</p>
+        </div>
+        <Button
+          onClick={onSubscribe}
+          className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white border-0"
+          size="lg"
+        >
+          <CreditCard className="w-5 h-5 mr-2" />
+          Subscribe Now
+        </Button>
+        <p className="text-xs text-slate-600 mt-4">Plans from $49/month</p>
+      </div>
     </motion.div>
   );
 }
