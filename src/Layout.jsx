@@ -410,17 +410,21 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Command Palette */}
+      <CommandPalette />
+
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/70 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-slate-200
+        fixed top-0 left-0 z-50 h-full w-64
+        bg-slate-950/95 backdrop-blur-2xl border-r border-white/5
         transform transition-transform duration-200 ease-in-out
         lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
