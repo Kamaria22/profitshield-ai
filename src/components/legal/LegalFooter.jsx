@@ -15,7 +15,7 @@ export default function LegalFooter() {
           <Link to={createPageUrl('DataProcessingAgreement')} className="hover:text-emerald-600 transition-colors">DPA</Link>
           <a href="mailto:support@profitshield.ai" className="hover:text-emerald-600 transition-colors">Support</a>
           <button
-            onClick={() => { try { localStorage.removeItem('ps_cookie_consent_v1'); window.location.reload(); } catch(e) {} }}
+            onClick={() => window.dispatchEvent(new CustomEvent('ps:manage-cookies'))}
             className="hover:text-emerald-600 transition-colors"
           >
             Manage Cookies

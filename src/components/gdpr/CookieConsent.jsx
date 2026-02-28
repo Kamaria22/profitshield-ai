@@ -31,11 +31,19 @@ export default function CookieConsent() {
   const [prefs, setPrefs] = useState({ analytics: false, marketing: false });
 
   useEffect(() => {
-    // Small delay so app renders first
+    // Show on first visit
     const t = setTimeout(() => {
       if (!hasConsented()) setVisible(true);
     }, 800);
-    return () => clearTimeout(t);
+
+    // Allow "Manage Cookies" link to reopen modal via custom event
+    const handler = () => { setVisible(true); setExpanded(true); };
+    window.addEventListener('ps:manage-cookies', handler);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('ps:manage-cookies', handler);
+    };
   }, []);
 
   const save = (analytics, marketing) => {
