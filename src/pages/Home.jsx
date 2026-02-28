@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
+import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
 
 // Critical above-the-fold components - loaded immediately
@@ -252,6 +253,8 @@ export default function Home() {
 
         {/* Main Grid */}
         <div className="flex-1 p-4 lg:p-6 overflow-auto">
+          <WelcomeChecklist />
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
