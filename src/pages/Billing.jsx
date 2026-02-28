@@ -14,48 +14,56 @@ const PLANS = [
     name: 'Starter',
     monthly_price: 49,
     yearly_price: 490,
+    yearly_monthly_equiv: 41,
     icon: Zap,
     color: 'from-cyan-500 to-blue-500',
     features: [
-      'Up to 1,000 orders/month',
-      'Full order history (90 days)',
-      'Basic fraud detection',
-      'Export reports',
-      'Email support'
+      'Up to 500 orders/month',
+      'Full profit analytics',
+      'Advanced risk scoring',
+      'Email + push alerts',
+      'Two-way Shopify sync',
+      '5 custom risk rules',
+      'Standard support'
     ]
   },
   {
     code: 'GROWTH',
     name: 'Growth',
-    monthly_price: 149,
-    yearly_price: 1490,
+    monthly_price: 99,
+    yearly_price: 990,
+    yearly_monthly_equiv: 83,
     icon: Rocket,
     color: 'from-purple-500 to-pink-500',
     highlight: true,
     features: [
-      'Up to 10,000 orders/month',
-      'Full history (1 year)',
-      'Advanced risk engine',
-      'Multi-store (5 stores)',
-      'Automation rules',
-      'Priority support'
+      'Up to 2,500 orders/month',
+      'AI fraud detection',
+      'All notification channels',
+      'Up to 3 store connections',
+      '25 custom risk rules',
+      'Full API access',
+      'Priority support',
+      'Churn prediction'
     ]
   },
   {
     code: 'PRO',
     name: 'Pro',
-    monthly_price: 399,
-    yearly_price: 3990,
+    monthly_price: 199,
+    yearly_price: 1990,
+    yearly_monthly_equiv: 166,
     icon: Crown,
     color: 'from-amber-500 to-orange-500',
     features: [
-      'Unlimited orders',
-      'Unlimited history',
-      'Neural fraud detection',
-      'Unlimited stores',
-      'API access',
-      'White-label ready',
-      '24/7 priority support'
+      'Up to 10,000 orders/month',
+      'AI fraud ring detection',
+      'SMS + WhatsApp alerts',
+      'Unlimited store connections',
+      'Real-time Shopify sync',
+      'Unlimited risk rules',
+      'Webhooks + full API',
+      'Dedicated support'
     ]
   }
 ];
@@ -67,6 +75,22 @@ export default function Billing() {
   const user = resolver.user;
   const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState('monthly');
+
+  // Check which price IDs are configured
+  const { data: stripeHealth } = useQuery({
+    queryKey: ['stripe-health'],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('stripeCheckout', { action: 'ping' });
+      return res.data || {};
+    },
+    staleTime: 60000,
+  });
+
+  const isPlanAvailable = (planCode) => {
+    if (!stripeHealth) return true; // optimistic while loading
+    const key = `${planCode}_${billingCycle}`;
+    return !(stripeHealth.missing_price_ids || []).includes(key);
+  };
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', tenantId],
