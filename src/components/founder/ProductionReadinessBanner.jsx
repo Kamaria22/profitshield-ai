@@ -29,9 +29,12 @@ export default function ProductionReadinessBanner() {
       // Capacitor config file check (can't truly verify at runtime without native)
       const nativeConfig = true; // capacitor.config.ts exists
 
-      // Stripe live — we test by calling a lightweight endpoint
-      // We set this to warn (not fail) since it might be test mode intentionally
-      const stripeLive = false; // Conservative: flag as needing STRIPE_SECRET_KEY
+      // Stripe live — test by calling ping endpoint
+      let stripeLive = false;
+      try {
+        const res = await base44.functions.invoke('stripeCheckout', { action: 'ping' });
+        stripeLive = res?.data?.stripe_live === true;
+      } catch {}
 
       setChecks({ cookieConsent, legalPages, biometric, nativeConfig, stripeLive, pushOptional: true });
     })();
@@ -77,8 +80,9 @@ export default function ProductionReadinessBanner() {
         {[
           { label: 'Cookie Consent', ok: checks.cookieConsent },
           { label: 'Legal Pages', ok: checks.legalPages },
-          { label: 'Native Config', ok: checks.nativeConfig },
+          { label: 'Native Config', ok: checks.nativeConfig, warn: true },
           { label: 'Stripe Live', ok: checks.stripeLive, warn: true },
+          { label: 'Push (Optional)', ok: false, warn: true },
           { label: 'Biometric Auth', ok: checks.biometric, warn: true },
         ].map(item => (
           <div key={item.label} className="flex items-center gap-1.5 text-xs">
