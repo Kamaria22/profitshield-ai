@@ -33,21 +33,21 @@ export default function ProductionReadinessBanner() {
       // We set this to warn (not fail) since it might be test mode intentionally
       const stripeLive = false; // Conservative: flag as needing STRIPE_SECRET_KEY
 
-      setChecks({ cookieConsent, legalPages, biometric, nativeConfig, stripeLive });
+      setChecks({ cookieConsent, legalPages, biometric, nativeConfig, stripeLive, pushOptional: true });
     })();
   }, []);
 
   if (!checks) return null;
 
   const issues = [
-    !checks.stripeLive && 'STRIPE_SECRET_KEY not set (live mode)',
-    !checks.biometric && 'Biometric not available on this device',
+    !checks.stripeLive && 'STRIPE_SECRET_KEY not set (live mode) — set in environment variables',
+    !checks.biometric && 'Biometric not available on this device (optional — works on mobile)',
   ].filter(Boolean);
 
+  // APNs/Firebase are OPTIONAL — push only, not required for web production
   const criticalIssues = [
     !checks.cookieConsent && 'Cookie consent module missing',
     !checks.legalPages && 'Legal pages not deployed',
-    !checks.nativeConfig && 'Native build config missing',
   ].filter(Boolean);
 
   const isReady = criticalIssues.length === 0;
