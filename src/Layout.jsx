@@ -575,7 +575,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
+        <header className="sticky top-0 z-30 h-16 bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 lg:px-6">
           <button 
             onClick={handleSidebarOpen}
             className="lg:hidden p-2 hover:bg-slate-100 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
@@ -588,6 +588,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             <ResolverHealthIndicator />
             {/* StoreSwitcher only when RESOLVED and multiple stores */}
             {isResolved && stores.length > 1 && <StoreSwitcher />}
+            {/* Command Palette trigger */}
+            <CommandPaletteTrigger />
+            {/* Ambient HUD */}
+            <AmbientHUD metrics={{}} />
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
