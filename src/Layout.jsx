@@ -452,36 +452,54 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           {/* Store Info - only when resolved */}
           {isResolved && storeDisplayName ? (
             <div className="px-4 py-3 border-b border-white/5">
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
-              <p className="text-sm font-medium text-slate-900 truncate">
+              <p className="text-xs text-slate-500 uppercase tracking-wide tracking-widest mb-1">Store</p>
+              <p className="text-sm font-semibold text-slate-100 truncate" style={{textShadow:'0 0 12px rgba(129,140,248,0.3)'}}>
                 {storeDisplayName}
               </p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                 {platformDisplay && (
-                  <Badge variant="outline" className="text-xs capitalize">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+                    style={{
+                      background: 'rgba(149,196,105,0.15)',
+                      border: '1px solid rgba(149,196,105,0.35)',
+                      color: '#a8d982',
+                      textShadow: '0 0 8px rgba(149,196,105,0.4)'
+                    }}>
                     {platformDisplay}
-                  </Badge>
+                  </span>
                 )}
                 {subscriptionTier && (
-                  <Badge variant="outline" className="text-xs capitalize">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+                    style={{
+                      background: 'rgba(251,191,36,0.12)',
+                      border: '1px solid rgba(251,191,36,0.3)',
+                      color: '#fcd34d',
+                      textShadow: '0 0 8px rgba(251,191,36,0.35)'
+                    }}>
                     {subscriptionTier}
-                  </Badge>
+                  </span>
                 )}
                 {profitScore && (
-                  <Badge className="text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                    <TrendingUp className="w-3 h-3 mr-1" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium"
+                    style={{
+                      background: 'rgba(52,211,153,0.12)',
+                      border: '1px solid rgba(52,211,153,0.3)',
+                      color: '#6ee7b7',
+                      textShadow: '0 0 8px rgba(52,211,153,0.35)'
+                    }}>
+                    <TrendingUp className="w-3 h-3" />
                     {profitScore}
-                  </Badge>
+                  </span>
                 )}
               </div>
             </div>
           ) : !isResolved && (
-            <div className="px-4 py-3 border-b border-slate-200">
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Store</p>
+            <div className="px-4 py-3 border-b border-white/5">
+              <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Store</p>
               <p className="text-sm text-slate-500">No store selected</p>
               <Link 
                 to={createPageUrl('Integrations', location.search)}
-                className="text-xs text-emerald-600 hover:underline mt-1 inline-flex items-center gap-1"
+                className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 inline-flex items-center gap-1 transition-colors"
               >
                 <Store className="w-3 h-3" />
                 Connect Store
