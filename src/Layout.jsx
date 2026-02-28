@@ -55,6 +55,8 @@ import {
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import CookieConsent from '@/components/gdpr/CookieConsent';
 import UpgradeButton from '@/components/subscription/UpgradeButton';
+import CommandPalette, { CommandPaletteTrigger } from '@/components/ui/CommandPalette';
+import AmbientHUD from '@/components/dashboard/AmbientHUD';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
