@@ -241,6 +241,11 @@ export default function Billing() {
               <div className="mb-6">
                 <span className="text-4xl font-bold text-cyan-400">${price}</span>
                 <span className="text-slate-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                {billingCycle === 'yearly' && (
+                  <p className="text-xs text-emerald-400 mt-1">
+                    ~${plan.yearly_monthly_equiv}/mo · 2 months free
+                  </p>
+                )}
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -252,15 +257,21 @@ export default function Billing() {
                 ))}
               </ul>
 
-              <QuantumButton
-                variant={plan.highlight ? 'primary' : 'default'}
-                className="w-full"
-                onClick={() => checkoutMutation.mutate(plan.code)}
-                loading={checkoutMutation.isPending}
-                disabled={isCurrentPlan}
-              >
-                {isCurrentPlan ? 'Current Plan' : 'Upgrade'}
-              </QuantumButton>
+              {!isPlanAvailable(plan.code) ? (
+                <div className="w-full text-center text-xs text-amber-400 border border-amber-500/30 rounded-lg py-2 px-3 bg-amber-500/10">
+                  Plan temporarily unavailable
+                </div>
+              ) : (
+                <QuantumButton
+                  variant={plan.highlight ? 'primary' : 'default'}
+                  className="w-full"
+                  onClick={() => checkoutMutation.mutate(plan.code)}
+                  loading={checkoutMutation.isPending}
+                  disabled={isCurrentPlan}
+                >
+                  {isCurrentPlan ? 'Current Plan' : 'Upgrade'}
+                </QuantumButton>
+              )}
             </HolographicCard>
           );
         })}
