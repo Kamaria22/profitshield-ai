@@ -411,7 +411,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-950">
       {/* Command Palette */}
       <CommandPalette />
 
