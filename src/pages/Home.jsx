@@ -192,7 +192,7 @@ export default function Home() {
   if (tenantLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 rounded-lg bg-emerald-500 animate-pulse" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 animate-pulse" style={{boxShadow:'0 0 25px rgba(99,102,241,0.4)'}} />
       </div>
     );
   }
@@ -202,13 +202,14 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center max-w-md">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-500 flex items-center justify-center mx-auto mb-6"
+            style={{boxShadow:'0 0 40px rgba(99,102,241,0.4)'}}>
             <Sparkles className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">Welcome to ProfitShield AI</h2>
-          <p className="text-slate-500 mb-6">Connect your store to unlock intelligent profit protection</p>
+          <h2 className="text-2xl font-bold text-white mb-3">Welcome to ProfitShield AI</h2>
+          <p className="text-slate-400 mb-6">Connect your store to unlock autonomous profit intelligence</p>
           <Link to={createPageUrl('Onboarding')}>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 px-8 py-6 text-lg rounded-xl">
+            <Button className="bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white px-8 py-6 text-lg rounded-xl border-0">
               <Store className="w-5 h-5 mr-2" />
               Connect Store
             </Button>
@@ -218,13 +219,12 @@ export default function Home() {
     );
   }
 
-  // Skip skeleton - render immediately with empty state
   const showDashboard = !summaryLoading || dashboardSummary;
 
   if (!showDashboard) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 rounded-lg bg-emerald-500 animate-pulse" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 animate-pulse" style={{boxShadow:'0 0 25px rgba(99,102,241,0.4)'}} />
       </div>
     );
   }
@@ -257,8 +257,8 @@ export default function Home() {
 
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-              <p className="text-sm text-slate-500">Monitor your business performance</p>
+              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+              <p className="text-sm text-slate-500">Autonomous profit intelligence · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
             </div>
             {resolver?.user?.id && (
               <Suspense fallback={null}>
