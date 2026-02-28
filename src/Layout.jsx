@@ -675,6 +675,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* Deep Link Handler */}
       <DeepLinkHandler />
+
+      {/* GDPR Cookie Consent */}
+      <CookieConsent />
     </div>
   );
 }

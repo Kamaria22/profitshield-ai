@@ -273,6 +273,9 @@ export default function FounderDashboard() {
         </div>
       </div>
 
+      {/* Production Readiness Banner */}
+      <ProductionReadinessBanner />
+
       {/* Ask FounderAI */}
       <Card>
         <CardContent className="p-4">
