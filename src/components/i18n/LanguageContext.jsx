@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { staticTranslate } from './translations';
 
 // Supported languages with native names
 export const SUPPORTED_LANGUAGES = [
@@ -82,7 +83,11 @@ export function LanguageProvider({ children }) {
   const t = (text) => {
     if (language === 'en') return text;
     
-    // Return text immediately, translate in background
+    // Check static dictionary first (instant, no API call)
+    const staticResult = staticTranslate(text, language);
+    if (staticResult !== text) return staticResult;
+    
+    // Fall back to cache then async translation
     const cacheKey = `${text}:${language}`;
     if (translationCache[cacheKey]) {
       return translationCache[cacheKey];

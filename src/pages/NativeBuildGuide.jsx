@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import CapacitorSetupGuide from '@/components/appstore/CapacitorSetupGuide';
+import AutomatedBuildRunner from '@/components/appstore/AutomatedBuildRunner';
 import { base44 } from '@/api/base44Client';
 
 export default function NativeBuildGuide() {
@@ -19,5 +19,9 @@ export default function NativeBuildGuide() {
     );
   }
 
-  return <CapacitorSetupGuide />;
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <AutomatedBuildRunner />
+    </div>
+  );
 }
