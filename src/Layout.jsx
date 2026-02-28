@@ -382,10 +382,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   // Loading state
   if (status === RESOLVER_STATUS.RESOLVING) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-500">Loading...</p>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mx-auto mb-4 animate-pulse" style={{boxShadow:'0 0 30px rgba(99,102,241,0.4)'}}>
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-slate-500 text-sm">Initializing ProfitShield AI...</p>
         </div>
       </div>
     );
