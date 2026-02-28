@@ -642,14 +642,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         {/* Page content */}
         <main className="p-4 lg:p-6 min-h-screen bg-slate-950">
           {showMissingContextBanner && (
-            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
-              <p className="font-medium mb-1">No Store Connected</p>
-              <p>Please connect a store to continue.</p>
-              <Button 
-                size="sm" 
-                className="mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
+              <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
+              <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
+              <Button
+                size="sm"
+                className="mt-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30"
                 onClick={() => navigate(createPageUrl('Integrations', location.search))}
-                aria-label="Go to integrations to connect store"
               >
                 Connect Store
               </Button>
