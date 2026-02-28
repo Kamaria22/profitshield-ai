@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import CookieConsent from '@/components/gdpr/CookieConsent';
+import UpgradeButton from '@/components/subscription/UpgradeButton';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -82,6 +83,7 @@ const navItems = [
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
   { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
+  { name: 'Billing & Plan', page: 'Billing', icon: CreditCard, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
