@@ -487,8 +487,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
 
-          {/* Navigation - keyboard accessible with focus states */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" role="navigation" aria-label="Main navigation">
             {filteredNavItems.map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
@@ -500,18 +500,17 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                   className={`
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-all duration-150
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2
-                    ${isActive 
-                      ? 'bg-emerald-50 text-emerald-700' 
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ${isActive
+                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
                     }
                   `}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} aria-hidden="true" />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} aria-hidden="true" />
                   {item.name}
                   {item.page === 'Alerts' && pendingAlerts > 0 && (
-                    <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
+                    <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
                       {pendingAlerts}
                     </Badge>
                   )}
