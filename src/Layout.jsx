@@ -96,7 +96,7 @@ const navItems = [
   { name: 'Support Inbox', page: 'SupportInbox', icon: Inbox, permission: 'settings_manage', adminOnly: true },
   { name: 'Founder AI', page: 'FounderDashboard', icon: Brain, permission: 'settings_manage', adminOnly: true },
   { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
-  { name: 'App Listing', page: 'AppStoreListing', icon: Store, permission: 'settings_manage', adminOnly: true },
+  { name: 'App Listing', page: 'AppStoreListing', icon: Store, permission: 'settings_manage', adminOnly: true, adminBadge: true },
   { name: 'Build Guide', page: 'NativeBuildGuide', icon: Download, permission: 'settings_manage', adminOnly: true },
   { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
