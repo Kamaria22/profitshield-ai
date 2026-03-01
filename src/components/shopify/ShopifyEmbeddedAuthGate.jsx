@@ -7,6 +7,8 @@
  * 
  * It exchanges the session token server-side, gets back a verified tenant identity,
  * and stores it so the platform resolver can use it immediately.
+ * 
+ * Also injects frame-ancestors CSP meta tag so Shopify Admin can embed us.
  */
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -17,6 +19,21 @@ import { Shield, Loader2, ExternalLink } from 'lucide-react';
 
 const SHOPIFY_AUTH_KEY = 'shopify_embedded_auth';
 const AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Inject CSP frame-ancestors meta tag so Shopify Admin can embed us.
+// This runs once at module load (client side) — supplementary to server headers.
+function injectShopifyFrameAncestors() {
+  if (typeof document === 'undefined') return;
+  const id = '__shopify_csp';
+  if (document.getElementById(id)) return;
+  const meta = document.createElement('meta');
+  meta.id = id;
+  meta.httpEquiv = 'Content-Security-Policy';
+  meta.content = "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'";
+  document.head.appendChild(meta);
+}
+
+injectShopifyFrameAncestors();
 
 function isEmbeddedContext() {
   if (typeof window === 'undefined') return false;
