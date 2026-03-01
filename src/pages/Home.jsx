@@ -22,6 +22,8 @@ import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
 import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
 import LazyPanel, { PanelSkeleton } from '../components/dashboard/LazyPanel';
+import PredictiveOverviewBar from '../components/dashboard/PredictiveOverviewBar';
+import AutonomousInsightEngine from '../components/dashboard/AutonomousInsightEngine';
 
 // Heavy panels - lazy loaded with IntersectionObserver
 const RiskCommandPanel = lazy(() => import('../components/dashboard/panels/RiskCommandPanel'));

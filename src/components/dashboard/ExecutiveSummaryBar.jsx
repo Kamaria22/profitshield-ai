@@ -126,22 +126,25 @@ export default function ExecutiveSummaryBar({
 }
 
 function MetricChip({ label, value, suffix = '', trend, color = 'slate', dotColor }) {
-  const colors = {
-    emerald: 'text-emerald-700',
-    amber: 'text-amber-700',
-    red: 'text-red-600',
-    slate: 'text-slate-700'
+  const colorMap = {
+    emerald: '#34d399',
+    amber: '#fbbf24',
+    red: '#f87171',
+    slate: '#94a3b8',
   };
+  const col = colorMap[color] || colorMap.slate;
 
   return (
     <div className="flex items-center gap-2">
-      {dotColor && <div className={`w-2 h-2 rounded-full ${dotColor}`} />}
+      {dotColor && (
+        <div className="w-2 h-2 rounded-full" style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
+      )}
       <div className="text-center">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className={`font-semibold text-sm ${colors[color]}`}>
+        <p className="text-[10px] text-slate-500">{label}</p>
+        <p className="font-semibold text-sm" style={{ color: col, textShadow: `0 0 8px ${col}60` }}>
           {value}{suffix}
           {trend && (
-            <TrendingUp className={`w-3 h-3 inline ml-1 ${trend === 'up' ? 'text-emerald-500' : 'text-red-500 rotate-180'}`} />
+            <TrendingUp className={`w-3 h-3 inline ml-1 ${trend === 'up' ? 'text-emerald-400' : 'text-red-400 rotate-180'}`} />
           )}
         </p>
       </div>
