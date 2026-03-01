@@ -556,7 +556,9 @@ export function usePlatformResolver() {
     trace.finishedAt = Date.now();
     trace.chosenBy = chosenBy;
     
-    trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, finalStatus === RESOLVER_STATUS.RESOLVED, null));
+    if (!isEmbeddedShortCircuit) {
+      trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, finalStatus === RESOLVER_STATUS.RESOLVED, null));
+    }
     
     // Ensure availableStores is always an array
     const safeStores = Array.isArray(availableStores) ? availableStores : [];
