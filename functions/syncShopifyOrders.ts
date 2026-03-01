@@ -355,12 +355,42 @@ Deno.serve(async (req) => {
         platform_data: orderData
       };
       
+      let savedOrder;
       if (existingOrders.length > 0) {
-        await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
+        savedOrder = await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
         updated++;
       } else {
-        await base44.asServiceRole.entities.Order.create(orderRecord);
+        savedOrder = await base44.asServiceRole.entities.Order.create(orderRecord);
         created++;
+      }
+
+      // Send email notifications for matching risk rules (if notification enabled)
+      if (riskData.risk_level === 'high' || riskData.recommended_action !== 'none') {
+        const notifyRules = customRules.filter(r => r.notification && r.is_active);
+        for (const rule of notifyRules) {
+          if (evaluateCustomRule(rule, orderData, parseFloat(orderData.total_price || 0), !orderData.customer || orderData.customer.orders_count <= 1, orderData.discount_codes?.length || 0)) {
+            try {
+              const tenantSettingsList = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id });
+              const notifyEmail = tenantSettingsList[0]?.notification_email;
+              if (notifyEmail) {
+                await base44.asServiceRole.functions.invoke('aiRuleAssistant', {
+                  action: 'notify',
+                  tenant_id: tenant.id,
+                  rule_name: rule.name,
+                  order_number: orderData.order_number?.toString() || orderData.name,
+                  order_value: orderData.total_price,
+                  risk_score: riskData.fraud_score,
+                  triggered_action: riskData.recommended_action,
+                  email: notifyEmail,
+                  conditions_matched: riskData.risk_reasons
+                });
+              }
+            } catch (notifyErr) {
+              console.warn('[syncShopifyOrders] Notification failed:', notifyErr.message);
+            }
+            break; // Only one notification per order
+          }
+        }
       }
     }
     
