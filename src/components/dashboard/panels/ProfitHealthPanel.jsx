@@ -26,7 +26,7 @@ export default function ProfitHealthPanel({ metrics = {}, loading = false }) {
       <div className="space-y-3">
         {/* Primary Metric */}
         <div>
-          <p className="text-2xl font-bold text-emerald-700">
+          <p className="text-2xl font-bold" style={{ color: profit >= 0 ? '#34d399' : '#f87171', textShadow: `0 0 16px ${profit >= 0 ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)'}` }}>
             {formatMoney(profit)}
           </p>
           <p className="text-xs text-slate-500">Net Profit (30d)</p>
@@ -34,29 +34,28 @@ export default function ProfitHealthPanel({ metrics = {}, loading = false }) {
 
         {/* Secondary Metrics */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-slate-50 rounded-lg p-2">
-            <p className="text-sm font-semibold text-slate-800">{formatMoney(revenue)}</p>
+          <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-sm font-semibold text-slate-200">{formatMoney(revenue)}</p>
             <p className="text-[10px] text-slate-500">Revenue</p>
           </div>
-          <div className={`rounded-lg p-2 ${margin >= 20 ? 'bg-emerald-50' : margin >= 0 ? 'bg-amber-50' : 'bg-red-50'}`}>
+          <div className="rounded-lg p-2" style={{
+            background: margin >= 20 ? 'rgba(52,211,153,0.08)' : margin >= 0 ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)',
+            border: `1px solid ${margin >= 20 ? 'rgba(52,211,153,0.2)' : margin >= 0 ? 'rgba(251,191,36,0.2)' : 'rgba(248,113,113,0.2)'}`
+          }}>
             <div className="flex items-center gap-1">
-              <p className={`text-sm font-semibold ${margin >= 20 ? 'text-emerald-700' : margin >= 0 ? 'text-amber-700' : 'text-red-700'}`}>
+              <p className="text-sm font-semibold" style={{ color: margin >= 20 ? '#34d399' : margin >= 0 ? '#fbbf24' : '#f87171' }}>
                 {margin.toFixed(1)}%
               </p>
-              {margin >= 0 ? (
-                <TrendingUp className="w-3 h-3 text-emerald-500" />
-              ) : (
-                <TrendingDown className="w-3 h-3 text-red-500" />
-              )}
+              {margin >= 0 ? <TrendingUp className="w-3 h-3 text-emerald-400" /> : <TrendingDown className="w-3 h-3 text-red-400" />}
             </div>
             <p className="text-[10px] text-slate-500">Margin</p>
           </div>
         </div>
 
-        {/* Mini Sparkline placeholder */}
-        <div className="h-6 bg-gradient-to-r from-emerald-100 to-emerald-50 rounded flex items-end px-1 gap-0.5">
+        {/* Mini Sparkline */}
+        <div className="h-6 rounded flex items-end px-1 gap-0.5" style={{ background: 'rgba(52,211,153,0.05)' }}>
           {[40, 60, 45, 70, 55, 80, 75].map((h, i) => (
-            <div key={i} className="flex-1 bg-emerald-400 rounded-t" style={{ height: `${h}%` }} />
+            <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: `rgba(52,211,153,${0.3 + i * 0.07})` }} />
           ))}
         </div>
       </div>
