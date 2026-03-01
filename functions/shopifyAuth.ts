@@ -225,11 +225,13 @@ Deno.serve(async (req) => {
       });
       
       return Response.json({ 
-        success: true, 
+        success: true,
+        auto_provisioned: true,
+        context: 'shopify_install',
         tenant_id: tenant.id,
         shop_domain: shopDomain,
         shop_name: shopData.name || shopDomain,
-        redirect_url: `/Onboarding?shop=${shopDomain}&platform=shopify`
+        redirect_url: `/Home?shop=${shopDomain}&platform=shopify`
       });
     }
     
