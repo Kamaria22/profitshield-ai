@@ -77,8 +77,6 @@ function setCachedAuth(data) {
 export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
   const embedded = isEmbeddedContext();
   const [phase, setPhase] = useState(embedded ? 'authenticating' : 'done');
-  // Log entry immediately when embedded
-  useEffect(() => { if (embedded) logEmbeddedEntry(); }, []);
   const [error, setError] = useState(null);
   const [installData, setInstallData] = useState(null); // { shopDomain, host }
   const [authCtx, setAuthCtx] = useState(null); // { tenantId, integrationId, shopDomain, isNew }
