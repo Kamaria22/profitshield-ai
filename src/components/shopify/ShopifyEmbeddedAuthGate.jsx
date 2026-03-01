@@ -183,6 +183,21 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     }
   }
 
+  // Brand-new merchant onboarding
+  if (phase === 'onboarding' && authCtx) {
+    return (
+      <ShopifyOnboarding
+        tenantId={authCtx.tenantId}
+        integrationId={authCtx.integrationId}
+        shopDomain={authCtx.shopDomain}
+        onComplete={() => {
+          onAuthenticated?.(authCtx);
+          setPhase('done');
+        }}
+      />
+    );
+  }
+
   if (phase === 'install_required') {
     const { shopDomain, host } = installData || {};
     const installUrl = `/install?shop=${shopDomain}${host ? `&host=${host}` : ''}`;
