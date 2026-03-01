@@ -180,28 +180,35 @@ Deno.serve(async (req) => {
         });
       }
       
-      // CRITICAL: Link user to tenant safely (idempotent)
+      // CRITICAL: Auto-provision — Shopify install ALWAYS grants owner role, no manual approval.
       if (user) {
-        console.log('[shopifyAuth] Linking user to tenant:', { userId: user.id, tenantId: tenant.id });
+        console.log('[shopifyAuth] Auto-provisioning user as owner for shop:', shopDomain);
         
-        // Only update if tenant_id is not set or if it's null
         const currentTenantId = user.tenant_id;
-        const currentRole = user.role || 'user';
-        
-        if (!currentTenantId) {
-          // Set tenant_id and upgrade to owner if role is currently 'user'
-          const updates = { tenant_id: tenant.id };
-          if (currentRole === 'user') {
-            updates.role = 'owner';
-          }
-          
+        const currentRole = (user.role || '').toLowerCase();
+
+        // Always ensure the installing user is owner of their tenant.
+        // Never require manual approval for Shopify OAuth installs.
+        const updates = {};
+        if (!currentTenantId || currentTenantId === tenant.id) {
+          updates.tenant_id = tenant.id;
+        }
+        // Upgrade role to owner unless already admin/owner
+        if (currentRole !== 'admin' && currentRole !== 'owner') {
+          updates.role = 'owner';
+        }
+
+        if (Object.keys(updates).length > 0) {
           await base44.auth.updateMe(updates);
-          console.log('[shopifyAuth] User linked as owner:', updates);
-        } else if (currentTenantId !== tenant.id) {
-          console.warn('[shopifyAuth] User already linked to different tenant:', currentTenantId);
+          console.log('[shopifyAuth] User auto-provisioned:', updates);
         }
       } else {
-        console.log('[shopifyAuth] No authenticated user - will link on next login');
+        // No authenticated user yet — store pending provision so it runs on next login
+        console.log('[shopifyAuth] No authenticated user — storing pending provision for shop:', shopDomain);
+        await base44.asServiceRole.entities.Tenant.update(tenant.id, {
+          pending_owner_email: null, // cleared once claimed
+          pending_provision: true
+        });
       }
       
       // Register webhooks
