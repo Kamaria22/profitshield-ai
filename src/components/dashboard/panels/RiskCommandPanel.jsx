@@ -25,23 +25,24 @@ export default function RiskCommandPanel({ metrics = {}, loading = false }) {
         {/* Risk Scores */}
         <div className="grid grid-cols-3 gap-2">
           <div className="text-center">
-            <p className={`text-lg font-bold ${fraudScore > 50 ? 'text-red-600' : 'text-emerald-600'}`}>
+            <p className="text-lg font-bold" style={{ color: fraudScore > 50 ? '#f87171' : '#34d399', textShadow: `0 0 10px ${fraudScore > 50 ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'}` }}>
               {fraudScore}
             </p>
             <p className="text-[10px] text-slate-500">Fraud</p>
           </div>
           <div className="text-center">
-            <Badge className={`text-[10px] ${
-              chargebackRisk === 'High' ? 'bg-red-100 text-red-700' :
-              chargebackRisk === 'Medium' ? 'bg-amber-100 text-amber-700' :
-              'bg-emerald-100 text-emerald-700'
-            }`}>
+            <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-md"
+              style={chargebackRisk === 'High'
+                ? { background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', color: '#fca5a5' }
+                : chargebackRisk === 'Medium'
+                ? { background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', color: '#fcd34d' }
+                : { background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', color: '#6ee7b7' }}>
               {chargebackRisk}
-            </Badge>
+            </span>
             <p className="text-[10px] text-slate-500 mt-1">Chargeback</p>
           </div>
           <div className="text-center">
-            <p className={`text-lg font-bold ${negMargin > 5 ? 'text-amber-600' : 'text-slate-600'}`}>
+            <p className="text-lg font-bold" style={{ color: negMargin > 5 ? '#fbbf24' : '#64748b' }}>
               {negMargin}
             </p>
             <p className="text-[10px] text-slate-500">At Risk</p>
@@ -49,10 +50,12 @@ export default function RiskCommandPanel({ metrics = {}, loading = false }) {
         </div>
 
         {/* Top Risk Alert */}
-        <div className={`p-2 rounded-lg text-xs ${highRisk > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
+        <div className="p-2 rounded-lg text-xs" style={highRisk > 0
+          ? { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }
+          : { background: 'rgba(255,255,255,0.03)' }}>
           <div className="flex items-start gap-2">
-            {highRisk > 0 && <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />}
-            <p className={highRisk > 0 ? 'text-amber-700' : 'text-slate-500'}>
+            {highRisk > 0 && <AlertTriangle className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />}
+            <p className={highRisk > 0 ? 'text-amber-300' : 'text-slate-500'}>
               {topRisk}
             </p>
           </div>
