@@ -217,7 +217,24 @@ Deno.serve(async (req) => {
       }, 200);
     }
 
-    const tenant = tenants[0];
+    let tenant = tenants[0];
+
+    // AUTO-PROVISION TRIAL on first open if billing fields are missing
+    if (!tenant.trial_started_at) {
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      await base44.entities.Tenant.update(tenant.id, {
+        trial_started_at: now.toISOString(),
+        trial_ends_at: trialEnd.toISOString(),
+        plan_status: 'trial',
+        subscription_tier: 'trial',
+        status: 'active'
+      });
+      tenant.trial_started_at = now.toISOString();
+      tenant.trial_ends_at = trialEnd.toISOString();
+      tenant.plan_status = 'trial';
+      console.log(`[shopifySessionExchange] Auto-provisioned 14-day trial for tenant=${tenant.id}`);
+    }
 
     // Get primary connected integration (service-role)
     const integrations = await base44.entities.PlatformIntegration.filter({
@@ -228,12 +245,19 @@ Deno.serve(async (req) => {
 
     const integration = integrations[0] || null;
 
-    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'}`);
-
     // is_new_tenant = true triggers the guided onboarding flow on first open
     const isNewTenant = !tenant.onboarding_completed;
 
-    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'} is_new=${isNewTenant}`);
+    // Compute billing state for frontend (no extra round-trip needed)
+    const now = new Date();
+    const trialEnds = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
+    const trialExpired = tenant.subscription_tier === 'trial' && trialEnds && now >= trialEnds;
+    const createdAt = tenant.created_date ? new Date(tenant.created_date).getTime() : null;
+    const inGraceWindow = createdAt && (Date.now() - createdAt) < 15 * 60 * 1000;
+    const inReviewWindow = tenant.review_mode_enabled ||
+      (createdAt && (Date.now() - createdAt) < 7 * 24 * 60 * 60 * 1000);
+
+    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'} is_new=${isNewTenant} trial_expired=${trialExpired}`);
 
     // Return authenticated context — frontend persists this to skip Base44 login
     return jsonResponse({
@@ -245,6 +269,15 @@ Deno.serve(async (req) => {
       platform: 'shopify',
       shopify_authenticated: true,
       is_new_tenant: isNewTenant,
+      billing: {
+        plan_status: tenant.plan_status || 'trial',
+        subscription_tier: tenant.subscription_tier || 'trial',
+        trial_started_at: tenant.trial_started_at,
+        trial_ends_at: tenant.trial_ends_at,
+        trial_expired: trialExpired,
+        in_grace_window: inGraceWindow,
+        review_mode: inReviewWindow
+      }
     });
 
   } catch (error) {
