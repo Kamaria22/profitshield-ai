@@ -136,13 +136,16 @@ function jsonResponse(body, status = 200) {
   return Response.json(body, { status, headers: embeddedHeaders() });
 }
 
-// Service-role client — no user session required
-let serviceClient = null;
-function getServiceClient() {
-  if (!serviceClient) {
-    serviceClient = createClient({ serviceRoleKey: Deno.env.get('BASE44_SERVICE_ROLE_KEY') || '' });
-  }
-  return serviceClient;
+// Build a request that looks unauthenticated (no Authorization header)
+// so createClientFromRequest gives us a base client, then we use asServiceRole.
+function makeUnauthenticatedReq(originalReq) {
+  const headers = new Headers(originalReq.headers);
+  headers.delete('authorization');
+  headers.delete('Authorization');
+  return new Request(originalReq.url, {
+    method: originalReq.method,
+    headers,
+  });
 }
 
 Deno.serve(async (req) => {
