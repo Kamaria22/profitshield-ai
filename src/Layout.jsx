@@ -119,6 +119,13 @@ const navItems = [
 // Bypass layout for these pages (public-facing or special flow)
 const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore', 'Pricing'];
 
+// Detect Shopify embedded from URL — used to short-circuit auth walls
+function detectEmbedded() {
+  if (typeof window === 'undefined') return false;
+  const p = new URLSearchParams(window.location.search);
+  return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+}
+
 // Safe admin check
 function isUserAdmin(user) {
   if (!user) return false;
