@@ -84,6 +84,20 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Tenant not found' }, { status: 404 });
     }
 
+    // AUTO-PROVISION TRIAL if trial_start_at is missing (covers first-open race condition)
+    if (!tenant.trial_started_at) {
+      const trialEnd = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      await base44.asServiceRole.entities.Tenant.update(tenant.id, {
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: trialEnd.toISOString(),
+        subscription_tier: 'trial',
+        status: 'active'
+      });
+      // Re-fetch updated tenant
+      const refreshed = await base44.asServiceRole.entities.Tenant.filter({ id: tenant.id });
+      if (refreshed[0]) Object.assign(tenant, refreshed[0]);
+    }
+
     // CHECK ACCESS
     if (action === 'check_access') {
       const accessResult = checkAccess(tenant, feature);
@@ -93,6 +107,45 @@ Deno.serve(async (req) => {
     // GET SUBSCRIPTION STATUS
     if (action === 'get_status') {
       const status = getSubscriptionStatus(tenant);
+      return Response.json({ success: true, ...status });
+    }
+
+    // ADMIN: RESET TRIAL
+    if (action === 'admin_reset_trial') {
+      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      const trialEnd = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      await base44.asServiceRole.entities.Tenant.update(tenant.id, {
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: trialEnd.toISOString(),
+        subscription_tier: 'trial',
+        status: 'active',
+        review_mode_enabled: false
+      });
+      return Response.json({ success: true, trial_ends_at: trialEnd.toISOString() });
+    }
+
+    // ADMIN: SET REVIEW MODE
+    if (action === 'admin_set_review_mode') {
+      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      await base44.asServiceRole.entities.Tenant.update(tenant.id, {
+        review_mode_enabled: !!body.enabled
+      });
+      return Response.json({ success: true, review_mode_enabled: !!body.enabled });
+    }
+
+    // ADMIN: FORCE BILLING RESYNC
+    if (action === 'admin_force_billing_resync') {
+      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      await base44.asServiceRole.entities.Tenant.update(tenant.id, {
+        last_billing_sync_at: null
+      });
+      return Response.json({ success: true, message: 'Billing resync triggered — next check_access will re-evaluate.' });
+    }
+
+    // RESTORE ACCESS (billing resync check — merchant-facing)
+    if (action === 'restore_access') {
+      const status = getSubscriptionStatus(tenant);
+      // Re-check and potentially auto-provision trial
       return Response.json({ success: true, ...status });
     }
 
