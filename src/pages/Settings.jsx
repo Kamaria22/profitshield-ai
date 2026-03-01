@@ -52,6 +52,7 @@ import {
 import { toast } from 'sonner';
 
 import CostMappingTable from '@/components/settings/CostMappingTable';
+import ShopifyIntegrationPanel from '@/components/settings/ShopifyIntegrationPanel';
 import CustomRiskRulesManager from '@/components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '@/components/alerts/ProfitAlertRulesManager';
 import RiskModelConfig from '@/components/settings/RiskModelConfig';

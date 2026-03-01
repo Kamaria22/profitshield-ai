@@ -81,12 +81,12 @@ import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import ShopifyCallback from './pages/ShopifyCallback';
+import ShopifyOnboarding from './pages/ShopifyOnboarding';
 import SupportInbox from './pages/SupportInbox';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import ShopifyOnboarding from './pages/ShopifyOnboarding';
 import __Layout from './Layout.jsx';
 
 
@@ -125,12 +125,12 @@ export const PAGES = {
     "Settings": Settings,
     "Shipping": Shipping,
     "ShopifyCallback": ShopifyCallback,
+    "ShopifyOnboarding": ShopifyOnboarding,
     "SupportInbox": SupportInbox,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "ShopifyOnboarding": ShopifyOnboarding,
 }
 
 export const pagesConfig = {
