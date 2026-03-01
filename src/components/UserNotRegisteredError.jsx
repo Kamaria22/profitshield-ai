@@ -9,27 +9,28 @@ import { base44 } from '@/api/base44Client';
  * This screen only shows for non-Shopify direct signups pending manual approval.
  */
 const UserNotRegisteredError = () => {
-  // If user arrived via Shopify OAuth (?shop= or ?hmac=), auto-redirect to login
-  // so the provision flow can complete rather than showing this error.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const shop = params.get('shop');
-    const hmac = params.get('hmac');
-    if (shop || hmac) {
-      // Shopify install flow — redirect to login which will re-trigger provisioning
-      base44.auth.redirectToLogin(window.location.href);
-    }
-  }, []);
-
   const params = new URLSearchParams(window.location.search);
-  const isShopifyFlow = params.get('shop') || params.get('hmac') || params.get('embedded');
+  const isShopifyFlow = !!(params.get('shop') || params.get('hmac') || params.get('embedded'));
 
-  // For Shopify flows show a loading screen instead of "Access Restricted"
+  // For ANY Shopify context: never show "Access Restricted".
+  // The ShopifyEmbeddedAuthGate handles identity — if we land here it's a
+  // transient state while the session token exchange is in-flight.
+  useEffect(() => {
+    if (isShopifyFlow) {
+      // Give the gate a moment, then hard-reload the current URL so the
+      // ShopifyEmbeddedAuthGate re-runs with a fresh session token.
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isShopifyFlow]);
+
   if (isShopifyFlow) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950">
         <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-slate-400 text-sm">Setting up your account...</p>
+        <p className="text-slate-400 text-sm">Authenticating with Shopify...</p>
       </div>
     );
   }
