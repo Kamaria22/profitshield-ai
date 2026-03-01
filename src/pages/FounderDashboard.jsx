@@ -393,6 +393,7 @@ export default function FounderDashboard() {
           <TabsTrigger value="ai-evolution">AI Evolution</TabsTrigger>
           <TabsTrigger value="fortress">Data Fortress</TabsTrigger>
           <TabsTrigger value="capital">Capital</TabsTrigger>
+          <TabsTrigger value="billing-admin">Billing Admin</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
