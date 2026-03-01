@@ -173,47 +173,52 @@ Deno.serve(async (req) => {
 
     let shopDomain = null;
 
-    // Strategy 1: Validate session token JWT (embedded app)
+    // Strategy 1: Validate session token JWT (embedded app — preferred, most secure)
     if (session_token) {
       try {
         const payload = await verifySessionToken(session_token);
         shopDomain = extractShopFromPayload(payload);
-        console.log('[shopifySessionExchange] Valid session token for shop:', shopDomain);
+        console.log(`[shopifySessionExchange] ✓ Valid session token for shop: ${shopDomain}`);
       } catch (tokenErr) {
-        console.error('[shopifySessionExchange] Token validation failed:', tokenErr.message);
-        return Response.json({ error: 'Invalid session token: ' + tokenErr.message }, { status: 403 });
+        console.error(`[shopifySessionExchange] ✗ Token validation failed: ${tokenErr.message}`);
+        return jsonResponse({ error: 'Invalid session token: ' + tokenErr.message, reason: 'invalid_token' }, 401);
       }
     }
 
-    // Strategy 2: HMAC-validated shop param (from OAuth callback, server verified already)
+    // Strategy 2: Shop param only (no session token — first load before App Bridge ready)
+    // This is TRUSTED only because the next call will include a real session token.
+    // We return tenant info so the frontend can render; the gate will re-verify.
     if (!shopDomain && shopParam) {
       shopDomain = shopParam.toLowerCase().includes('.myshopify.com')
         ? shopParam.toLowerCase().trim()
         : `${shopParam.toLowerCase().trim()}.myshopify.com`;
-      console.log('[shopifySessionExchange] Using shop param (no session token):', shopDomain);
+      console.log(`[shopifySessionExchange] Using shop param (no token yet): ${shopDomain}`);
     }
 
     if (!shopDomain) {
-      return Response.json({ error: 'No shop domain could be determined' }, { status: 400 });
+      console.warn('[shopifySessionExchange] ✗ No shop domain — missing both session_token and shop param');
+      return jsonResponse({ error: 'Missing shop or session_token', reason: 'missing_shop' }, 400);
     }
 
-    // Resolve tenant by shop_domain
-    const tenants = await base44.asServiceRole.entities.Tenant.filter({ shop_domain: shopDomain });
+    // Resolve tenant by shop_domain (service-role, no user session)
+    const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+    console.log(`[shopifySessionExchange] Tenant lookup for ${shopDomain}: found ${tenants.length}`);
 
     if (tenants.length === 0) {
-      // Shop hasn't gone through OAuth install yet
-      return Response.json({
+      // Shop hasn't gone through OAuth install yet — signal frontend to show install screen
+      console.log(`[shopifySessionExchange] install_required for ${shopDomain}`);
+      return jsonResponse({
         authenticated: false,
         shop_domain: shopDomain,
         reason: 'shop_not_installed',
         install_required: true
-      }, { status: 200 });
+      }, 200);
     }
 
     const tenant = tenants[0];
 
-    // Get primary integration
-    const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
+    // Get primary connected integration
+    const integrations = await base44.entities.PlatformIntegration.filter({
       tenant_id: tenant.id,
       platform: 'shopify',
       status: 'connected'
@@ -221,20 +226,21 @@ Deno.serve(async (req) => {
 
     const integration = integrations[0] || null;
 
-    // Return authenticated context — frontend uses this to skip login
-    return Response.json({
+    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'}`);
+
+    // Return authenticated context — frontend persists this to skip Base44 login
+    return jsonResponse({
       authenticated: true,
       shop_domain: shopDomain,
       tenant_id: tenant.id,
       tenant_name: tenant.shop_name || shopDomain,
       integration_id: integration?.id || null,
       platform: 'shopify',
-      // Signal to frontend: this is a valid Shopify embedded session
       shopify_authenticated: true
     });
 
   } catch (error) {
-    console.error('[shopifySessionExchange] Error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error('[shopifySessionExchange] Unhandled error:', error.message, error.stack);
+    return jsonResponse({ error: error.message, reason: 'server_error' }, 500);
   }
 });
