@@ -711,6 +711,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         search={location.search}
       />
 
+      {/* Floating Help Button */}
+      <HelpButton />
+
       {/* PWA Install Prompt */}
       {activeUser && <InstallPrompt userId={activeUser.id} />}
       
