@@ -59,6 +59,8 @@ import RoleManagement from '@/components/settings/RoleManagement';
 import DataExportPanel from '@/components/settings/DataExportPanel';
 import DemoVideoGenerator from '@/components/settings/DemoVideoGeneratorFixed';
 import BiometricSettings from '@/components/settings/BiometricSettings';
+import ShopifySubmitButton from '@/components/appstore/ShopifySubmitButton';
+import ScreenshotGenerator from '@/components/appstore/ScreenshotGenerator';
 import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
