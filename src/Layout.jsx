@@ -55,6 +55,7 @@ import {
   Inbox
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
+import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import CookieConsent from '@/components/gdpr/CookieConsent';
 import UpgradeButton from '@/components/subscription/UpgradeButton';
 import CommandPalette, { CommandPaletteTrigger } from '@/components/ui/CommandPalette';
