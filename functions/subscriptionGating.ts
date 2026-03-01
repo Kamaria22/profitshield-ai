@@ -244,18 +244,71 @@ function checkAccess(tenant, feature) {
   const tier = tenant.subscription_tier || 'trial';
   const tierConfig = TIER_FEATURES[tier] || TIER_FEATURES.trial;
   const status = getSubscriptionStatus(tenant);
+  const now = Date.now();
 
-  // Check if trial expired
+  // GRACE WINDOW: new tenant within 15 minutes — never block (billing sync lag)
+  const createdAt = tenant.created_date ? new Date(tenant.created_date).getTime() : null;
+  const inGraceWindow = createdAt && (now - createdAt) < BILLING_SYNC_GRACE_MINUTES * 60 * 1000;
+  if (inGraceWindow) {
+    return {
+      allowed: true,
+      reason: 'grace_window',
+      grace_window: true,
+      message: 'Verifying subscription…',
+      trial_days_remaining: TRIAL_DAYS
+    };
+  }
+
+  // REVIEW MODE: first 7 days after install OR explicit flag
+  const isReviewMode = tenant.review_mode_enabled ||
+    (createdAt && (now - createdAt) < REVIEW_MODE_DAYS * 24 * 60 * 60 * 1000);
+
+  // If trial_end_at is null — treat as active trial (billing fields still initializing)
+  if (!tenant.trial_ends_at && tier === 'trial') {
+    return {
+      allowed: true,
+      reason: 'trial_initializing',
+      message: 'Verifying subscription…',
+      grace_window: true,
+      trial_days_remaining: TRIAL_DAYS
+    };
+  }
+
+  // TRIAL EXPIRED check — only if now > trial_end_at (strict, timezone-safe)
   if (status.trial_expired) {
+    if (isReviewMode) {
+      // Reviewers and first-week installs get read-only access with a banner
+      return {
+        allowed: true,
+        reason: 'review_mode',
+        review_mode: true,
+        message: 'Review mode — subscription required to enable protection actions',
+        upgrade_required: false
+      };
+    }
     return {
       allowed: false,
       reason: 'trial_expired',
-      message: 'Your trial has expired. Please subscribe to continue.',
+      message: 'Your 14-day trial has ended. Subscribe to continue protecting your profits.',
       upgrade_required: true
     };
   }
 
-  // Check if account is locked
+  // PAID plans with past_due beyond 3-day grace
+  const planStatus = tenant.plan_status;
+  if (planStatus === 'canceled' || planStatus === 'expired') {
+    if (isReviewMode) {
+      return { allowed: true, reason: 'review_mode', review_mode: true };
+    }
+    return {
+      allowed: false,
+      reason: 'subscription_ended',
+      message: 'Your subscription has ended. Please renew to continue.',
+      upgrade_required: true
+    };
+  }
+
+  // Check if account is hard-locked (legacy path)
   if (tenant.status !== 'active') {
     return {
       allowed: false,
