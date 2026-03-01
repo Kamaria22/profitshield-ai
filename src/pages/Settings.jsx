@@ -331,7 +331,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="costs">Costs</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
@@ -351,6 +351,12 @@ export default function Settings() {
             <TabsTrigger value="demo-video" className="flex items-center gap-2">
               <Film className="w-4 h-4" />
               Demo Video
+            </TabsTrigger>
+          )}
+          {(user?.role === 'admin' || user?.role === 'owner') && (
+            <TabsTrigger value="app-store" className="flex items-center gap-2">
+              <Store className="w-3 h-3" />
+              App Store
             </TabsTrigger>
           )}
         </TabsList>
