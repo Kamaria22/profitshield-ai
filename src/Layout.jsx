@@ -804,9 +804,12 @@ export default function Layout({ children, currentPageName }) {
       <LanguageProvider>
         <PermissionsProvider>
           <NotificationProvider>
-            <LayoutWithProviders currentPageName={currentPageName}>
-              {children}
-            </LayoutWithProviders>
+            {/* Shopify embedded auth must run BEFORE any login check */}
+            <ShopifyEmbeddedAuthGate>
+              <LayoutWithProviders currentPageName={currentPageName}>
+                {children}
+              </LayoutWithProviders>
+            </ShopifyEmbeddedAuthGate>
           </NotificationProvider>
         </PermissionsProvider>
       </LanguageProvider>
