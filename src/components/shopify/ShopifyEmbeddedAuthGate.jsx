@@ -113,8 +113,10 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       });
 
       if (data?.install_required) {
-        // Shop hasn't completed OAuth — redirect to install flow
-        window.location.href = `/install?shop=${shopDomain}`;
+        // Shop hasn't completed OAuth — show install screen with top-level redirect
+        const p = new URLSearchParams(window.location.search);
+        setInstallData({ shopDomain, host: p.get('host') });
+        setPhase('install_required');
         return;
       }
 
