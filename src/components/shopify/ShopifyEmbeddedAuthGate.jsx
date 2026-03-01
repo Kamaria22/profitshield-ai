@@ -142,7 +142,6 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       }
 
       if (!data?.authenticated) {
-        logEmbeddedEntry({ reason: data?.reason || 'auth_failed', status: 401 });
         setError(data?.error || 'Shopify authentication failed');
         setPhase('error');
         return;
