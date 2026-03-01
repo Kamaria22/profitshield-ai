@@ -154,6 +154,13 @@ export default function CustomRiskRulesManager({ tenantId }) {
     setFormData(emptyRule);
   };
 
+  const handleAIApplyRule = (ruleData) => {
+    setEditingRule(null);
+    setFormData({ ...emptyRule, ...ruleData });
+    setShowAI(false);
+    setIsDialogOpen(true);
+  };
+
   const addCondition = () => {
     setFormData({
       ...formData,
