@@ -382,11 +382,11 @@ export default function CustomRiskRulesManager({ tenantId }) {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
           </div>
-          </div>
-          </CardHeader>
-          <CardContent>
+        </div>
+      </CardHeader>
+      <CardContent>
         {showAI && (
           <div className="mb-5">
             <AIRuleAssistant
