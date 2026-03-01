@@ -243,14 +243,14 @@ export default function PnLAnalytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">P&L Analytics</h1>
-          <p className="text-slate-500">Comprehensive profit and loss analysis</p>
+          <h1 className="text-2xl font-bold text-slate-100">P&L Analytics</h1>
+          <p className="text-slate-400">Comprehensive profit and loss analysis</p>
         </div>
         <div className="flex items-center gap-3">
           {/* Date Preset Selector */}
           <Select value={datePreset} onValueChange={handleDatePresetChange}>
-            <SelectTrigger className="w-40">
-              <CalendarIcon className="w-4 h-4 mr-2" />
+            <SelectTrigger className="w-40 bg-white/5 border-white/10 text-slate-200">
+              <CalendarIcon className="w-4 h-4 mr-2 text-slate-400" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -263,7 +263,7 @@ export default function PnLAnalytics() {
 
           {/* Granularity Selector */}
           <Select value={granularity} onValueChange={setGranularity}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32 bg-white/5 border-white/10 text-slate-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -283,10 +283,10 @@ export default function PnLAnalytics() {
       </div>
 
       {/* Date Range Display */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
-        <CalendarIcon className="w-4 h-4" />
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <CalendarIcon className="w-4 h-4 text-slate-500" />
         {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
-        <Badge variant="outline" className="ml-2">
+        <Badge variant="outline" className="ml-2 border-white/15 text-slate-400">
           {orders.length} orders
         </Badge>
       </div>
