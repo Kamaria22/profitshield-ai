@@ -225,11 +225,8 @@ ProfitShield AI Autonomous Support System`
     const userMessage = input.trim();
     setInput('');
     
-    setMessages(prev => [...prev, {
-      role: 'user',
-      content: userMessage,
-      timestamp: new Date()
-    }]);
+    const userMsg = { role: 'user', content: userMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
 
     setIsLoading(true);
 
