@@ -1,28 +1,33 @@
 /**
  * ShopifyEmbeddedAuthGate
- * 
- * When the app is opened inside Shopify Admin (embedded=1 or ?shop= + ?host=),
- * this gate uses the Shopify App Bridge session token as the identity proof —
- * NO Google login, NO manual approval, NO redirect.
- * 
- * It exchanges the session token server-side, gets back a verified tenant identity,
- * and stores it so the platform resolver can use it immediately.
- * 
- * Also injects frame-ancestors CSP meta tag so Shopify Admin can embed us.
+ *
+ * FIRST RENDER PATH in embedded mode. When URL has shop= + (host= or embedded=1),
+ * this gate takes FULL control — no Base44 login, no auth redirect, ever.
+ *
+ * Authentication flow:
+ *   1. Check sessionStorage cache (5 min TTL)
+ *   2. Get Shopify App Bridge session token
+ *   3. Exchange via shopifySessionExchange (PUBLIC endpoint — no Base44 session needed)
+ *   4. Persist tenant context → platform resolver uses it immediately
+ *   5. Render children (app shell) or onboarding
+ *
+ * On ANY failure: show Shopify-branded error with Retry + Reinstall — NEVER Base44 login.
  */
 
 import React, { useEffect, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
-import { Shield, Loader2, ExternalLink } from 'lucide-react';
+import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
+
+// ─── Constants ──────────────────────────────────────────────────────────────
 
 const SHOPIFY_AUTH_KEY = 'shopify_embedded_auth';
 const AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-// Inject CSP frame-ancestors meta tag so Shopify Admin can embed us.
-// This runs once at module load (client side) — supplementary to server headers.
+// ─── CSP injection ───────────────────────────────────────────────────────────
+
 function injectShopifyFrameAncestors() {
   if (typeof document === 'undefined') return;
   const id = '__shopify_csp';
@@ -33,10 +38,11 @@ function injectShopifyFrameAncestors() {
   meta.content = "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'";
   document.head.appendChild(meta);
 }
-
 injectShopifyFrameAncestors();
 
-function isEmbeddedContext() {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+export function isEmbeddedContext() {
   if (typeof window === 'undefined') return false;
   const p = new URLSearchParams(window.location.search);
   return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
@@ -47,7 +53,9 @@ function getShopParam() {
   const p = new URLSearchParams(window.location.search);
   const shop = p.get('shop');
   if (!shop) return null;
-  return shop.toLowerCase().includes('.myshopify.com') ? shop.toLowerCase() : `${shop.toLowerCase()}.myshopify.com`;
+  return shop.toLowerCase().includes('.myshopify.com')
+    ? shop.toLowerCase()
+    : `${shop.toLowerCase()}.myshopify.com`;
 }
 
 function getCachedAuth() {
@@ -69,119 +77,135 @@ function setCachedAuth(data) {
   } catch {}
 }
 
+export function clearEmbeddedAuthCache() {
+  try { sessionStorage.removeItem(SHOPIFY_AUTH_KEY); } catch {}
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 /**
  * Props:
- *   children: rendered when auth is complete or not in embedded context
- *   onAuthenticated(ctx): called with { tenantId, integrationId, shopDomain, platform }
+ *   children       – rendered when auth complete or not in embedded context
+ *   onAuthenticated(ctx) – called with { tenantId, integrationId, shopDomain, platform }
  */
 export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
   const embedded = isEmbeddedContext();
+
+  // phases: 'authenticating' | 'done' | 'install_required' | 'onboarding' | 'error'
   const [phase, setPhase] = useState(embedded ? 'authenticating' : 'done');
   const [error, setError] = useState(null);
-  const [installData, setInstallData] = useState(null); // { shopDomain, host }
-  const [authCtx, setAuthCtx] = useState(null); // { tenantId, integrationId, shopDomain, isNew }
-  const attempted = useRef(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [installData, setInstallData] = useState(null);
+  const [authCtx, setAuthCtx] = useState(null);
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    if (!embedded || attempted.current) return;
-    attempted.current = true;
+    if (!embedded) return;
+    runAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, retryCount]);
 
-    // Check session cache first
-    const cached = getCachedAuth();
-    if (cached?.authenticated && cached?.tenant_id) {
-      persistContext({
-        platform: 'shopify',
-        storeKey: cached.shop_domain,
-        tenantId: cached.tenant_id,
-        integrationId: cached.integration_id,
-        shop: cached.shop_domain,
-      });
-      onAuthenticated?.({
-        tenantId: cached.tenant_id,
-        integrationId: cached.integration_id,
-        shopDomain: cached.shop_domain,
-        platform: 'shopify',
-      });
-      setPhase('done');
-      return;
-    }
+  async function runAuth() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPhase('authenticating');
+    setError(null);
 
-    authenticate();
-  }, [embedded]);
-
-  async function authenticate() {
     try {
-      const shopDomain = getShopParam();
-      if (!shopDomain) {
-        setPhase('done');
+      // ── 1. Cache check ────────────────────────────────────────────────────
+      const cached = getCachedAuth();
+      if (cached?.authenticated && cached?.tenant_id) {
+        applyAuth(cached);
+        inFlight.current = false;
         return;
       }
 
-      // Try to get App Bridge session token (works when fully embedded)
+      // ── 2. Get shop ───────────────────────────────────────────────────────
+      const shopDomain = getShopParam();
+      if (!shopDomain) {
+        // Not actually embedded — fall through to normal app
+        setPhase('done');
+        inFlight.current = false;
+        return;
+      }
+
+      // ── 3. App Bridge session token ───────────────────────────────────────
       let sessionToken = null;
       try {
         sessionToken = await getFreshAppBridgeToken({ force: true });
       } catch (e) {
         console.warn('[ShopifyEmbeddedAuthGate] App Bridge token failed:', e.message);
+        // Continue — shopifySessionExchange accepts shop-only fallback
       }
 
-      // Exchange session token (or fall back to shop param alone)
-      // shopifySessionExchange is PUBLIC — it does not require a Base44 session.
-      console.log(`[ShopifyEmbeddedAuthGate] Calling shopifySessionExchange shop=${shopDomain} has_token=${!!sessionToken}`);
+      // ── 4. Exchange (PUBLIC endpoint — no Base44 session required) ────────
+      console.log(`[ShopifyEmbeddedAuthGate] Exchanging: shop=${shopDomain} has_token=${!!sessionToken}`);
       const { data } = await base44.functions.invoke('shopifySessionExchange', {
         session_token: sessionToken || undefined,
         shop: shopDomain,
       });
-      console.log(`[ShopifyEmbeddedAuthGate] Exchange result:`, data?.authenticated, data?.reason || '');
+      console.log(`[ShopifyEmbeddedAuthGate] Result: authenticated=${data?.authenticated} reason=${data?.reason || '-'}`);
 
+      // ── 5. Handle responses ───────────────────────────────────────────────
       if (data?.install_required) {
         const p = new URLSearchParams(window.location.search);
         setInstallData({ shopDomain, host: p.get('host') });
         setPhase('install_required');
+        inFlight.current = false;
         return;
       }
 
       if (!data?.authenticated) {
-        setError(data?.error || 'Shopify authentication failed');
-        setPhase('error');
-        return;
+        throw new Error(data?.error || 'Shopify session exchange returned unauthenticated');
       }
 
-      // Cache and persist
+      // ── 6. Persist + proceed ──────────────────────────────────────────────
       setCachedAuth(data);
-      persistContext({
-        platform: 'shopify',
-        storeKey: data.shop_domain,
-        tenantId: data.tenant_id,
-        integrationId: data.integration_id,
-        shop: data.shop_domain,
-      });
-
-      const ctx = {
-        tenantId: data.tenant_id,
-        integrationId: data.integration_id,
-        shopDomain: data.shop_domain,
-        platform: 'shopify',
-        isNew: !!data.is_new_tenant,
-      };
-
-      setAuthCtx(ctx);
-
-      // If brand new merchant, show onboarding before calling onAuthenticated
-      if (data.is_new_tenant) {
-        setPhase('onboarding');
-        return;
-      }
-
-      onAuthenticated?.(ctx);
-      setPhase('done');
+      applyAuth(data);
     } catch (err) {
-      console.error('[ShopifyEmbeddedAuthGate] Error:', err.message);
-      setPhase('done');
+      console.error('[ShopifyEmbeddedAuthGate] Auth error:', err.message);
+      setError(err.message || 'Authentication failed');
+      setPhase('error');
+    } finally {
+      inFlight.current = false;
     }
   }
 
-  // Brand-new merchant onboarding
+  function applyAuth(data) {
+    persistContext({
+      platform: 'shopify',
+      storeKey: data.shop_domain,
+      tenantId: data.tenant_id,
+      integrationId: data.integration_id,
+      shop: data.shop_domain,
+    });
+
+    const ctx = {
+      tenantId: data.tenant_id,
+      integrationId: data.integration_id,
+      shopDomain: data.shop_domain,
+      platform: 'shopify',
+      isNew: !!data.is_new_tenant,
+    };
+
+    setAuthCtx(ctx);
+
+    if (data.is_new_tenant) {
+      setPhase('onboarding');
+      return;
+    }
+
+    onAuthenticated?.(ctx);
+    setPhase('done');
+  }
+
+  function handleRetry() {
+    clearEmbeddedAuthCache();
+    inFlight.current = false;
+    setRetryCount(c => c + 1);
+  }
+
+  // ── Render: onboarding ────────────────────────────────────────────────────
   if (phase === 'onboarding' && authCtx) {
     return (
       <ShopifyOnboarding
@@ -196,49 +220,37 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     );
   }
 
+  // ── Render: install required ──────────────────────────────────────────────
   if (phase === 'install_required') {
     const { shopDomain, host } = installData || {};
     const installUrl = `/install?shop=${shopDomain}${host ? `&host=${host}` : ''}`;
 
-    const handleCompleteInstall = () => {
-      // Must break out of Shopify iframe
-      const target = window.top || window;
-      target.location.href = installUrl;
-    };
-
     return (
       <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
-          {/* Shopify-green icon */}
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
             style={{ background: '#008060' }}>
             <Shield className="w-8 h-8 text-white" />
           </div>
-
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            Complete Your Installation
-          </h1>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Complete Your Installation</h1>
           <p className="text-gray-500 text-sm mb-6">
             ProfitShield needs to finish connecting to <strong>{shopDomain}</strong>. This only takes a few seconds.
           </p>
-
           <button
-            onClick={handleCompleteInstall}
+            onClick={() => { const t = window.top || window; t.location.href = installUrl; }}
             className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-white text-sm transition-opacity hover:opacity-90"
             style={{ background: '#008060' }}
           >
             <ExternalLink className="w-4 h-4" />
             Complete Installation
           </button>
-
-          <p className="text-xs text-gray-400 mt-4">
-            You'll be redirected to Shopify to authorize the app.
-          </p>
+          <p className="text-xs text-gray-400 mt-4">You'll be redirected to Shopify to authorize the app.</p>
         </div>
       </div>
     );
   }
 
+  // ── Render: authenticating ────────────────────────────────────────────────
   if (phase === 'authenticating') {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -254,22 +266,50 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     );
   }
 
+  // ── Render: error (Shopify-branded — NEVER Base44 login) ─────────────────
   if (phase === 'error') {
+    const shopDomain = getShopParam();
+    const reinstallUrl = `/install?shop=${shopDomain || ''}`;
+
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center max-w-sm px-4">
-          <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-6 h-6 text-red-400" />
+      <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 bg-red-50">
+            <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <p className="text-slate-200 font-semibold mb-2">Authentication Failed</p>
-          <p className="text-slate-400 text-sm">{error}</p>
-          <p className="text-slate-500 text-xs mt-4">
-            Please reinstall ProfitShield from the Shopify App Store.
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Connection Error</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            ProfitShield couldn't connect to your Shopify store. This is usually a temporary issue.
           </p>
+          {error && (
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 mb-6 font-mono text-left break-all">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleRetry}
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-white text-sm transition-opacity hover:opacity-90"
+              style={{ background: '#008060' }}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry Connection
+            </button>
+            {shopDomain && (
+              <button
+                onClick={() => { const t = window.top || window; t.location.href = reinstallUrl; }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Reinstall / Reconnect
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
+  // ── Render: done (or non-embedded) ───────────────────────────────────────
   return <>{children}</>;
 }
