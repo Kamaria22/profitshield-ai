@@ -373,6 +373,42 @@ export function usePlatformResolver() {
     if (isStale()) return;
     
     // =====================
+    // SHOPIFY INSTALL AUTO-PROVISION: If shop param present but no integration found yet,
+    // attempt to resolve via Tenant.shop_domain directly (handles race condition right after OAuth).
+    // Never gate Shopify users with approval screens.
+    // =====================
+    if (!integration && urlParams.shop) {
+      const normalizedShop = urlParams.shop.toLowerCase().includes('.myshopify.com')
+        ? urlParams.shop.toLowerCase().trim()
+        : `${urlParams.shop.toLowerCase().trim()}.myshopify.com`;
+      
+      try {
+        const matchingTenants = await base44.entities.Tenant.filter({ shop_domain: normalizedShop });
+        if (matchingTenants.length > 0) {
+          const shopTenant = matchingTenants[0];
+          // Try to find or create integration
+          const shopIntegrations = await base44.entities.PlatformIntegration.filter({
+            tenant_id: shopTenant.id,
+            platform: 'shopify'
+          });
+          
+          if (shopIntegrations.length > 0) {
+            integration = shopIntegrations.find(i => i.status === 'connected') || shopIntegrations[0];
+            platform = 'shopify';
+            storeKey = normalizedShop;
+            integrationId = integration.id;
+            tenantId = shopTenant.id;
+            tenant = shopTenant;
+            chosenBy = 'shopify_install_auto';
+            trace.steps.push(traceStep('shopify_install_resolve', { tenant_id: shopTenant.id, integration_id: integration.id }, true, 'Resolved via shop_domain (post-OAuth)'));
+          }
+        }
+      } catch (e) {
+        trace.steps.push(traceStep('shopify_install_resolve', { error: e.message }, false, 'Auto-resolve failed'));
+      }
+    }
+
+    // =====================
     // P3/P4: User Tenant Fallback
     // =====================
     if (!integration && user?.tenant_id) {
