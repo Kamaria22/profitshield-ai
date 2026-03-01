@@ -107,11 +107,11 @@ export default function Tasks() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ClipboardList className="w-7 h-7 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <ClipboardList className="w-7 h-7 text-emerald-400" />
             Tasks
           </h1>
-          <p className="text-slate-500 mt-1">Manage and track action items across your store</p>
+          <p className="text-slate-400 mt-1">Manage and track action items across your store</p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -121,47 +121,47 @@ export default function Tasks() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:border-amber-300 transition-colors" onClick={() => setFilters({ ...filters, status: 'pending' })}>
+        <Card className="glass-card border-white/5 cursor-pointer transition-colors" onClick={() => setFilters({ ...filters, status: 'pending' })}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Pending</p>
-                <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                <p className="text-sm text-slate-400">Pending</p>
+                <p className="text-2xl font-bold text-amber-400">{stats.pending}</p>
               </div>
-              <Clock className="w-8 h-8 text-amber-200" />
+              <Clock className="w-8 h-8 text-amber-500/20" />
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setFilters({ ...filters, status: 'in_progress' })}>
+        <Card className="glass-card border-white/5 cursor-pointer transition-colors" onClick={() => setFilters({ ...filters, status: 'in_progress' })}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.in_progress}</p>
+                <p className="text-sm text-slate-400">In Progress</p>
+                <p className="text-2xl font-bold text-blue-400">{stats.in_progress}</p>
               </div>
-              <Loader2 className="w-8 h-8 text-blue-200" />
+              <Loader2 className="w-8 h-8 text-blue-500/20" />
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => setFilters({ ...filters, status: 'completed' })}>
+        <Card className="glass-card border-white/5 cursor-pointer transition-colors" onClick={() => setFilters({ ...filters, status: 'completed' })}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Completed</p>
-                <p className="text-2xl font-bold text-emerald-600">{stats.completed}</p>
+                <p className="text-sm text-slate-400">Completed</p>
+                <p className="text-2xl font-bold text-emerald-400">{stats.completed}</p>
               </div>
-              <CheckCircle2 className="w-8 h-8 text-emerald-200" />
+              <CheckCircle2 className="w-8 h-8 text-emerald-500/20" />
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-red-300 transition-colors" onClick={() => setFilters({ ...filters, status: 'all' })}>
+        <Card className="glass-card border-white/5 cursor-pointer transition-colors" onClick={() => setFilters({ ...filters, status: 'all' })}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                <p className="text-sm text-slate-400">Overdue</p>
+                <p className="text-2xl font-bold text-red-400">{stats.overdue}</p>
               </div>
-              <AlertCircle className="w-8 h-8 text-red-200" />
+              <AlertCircle className="w-8 h-8 text-red-500/20" />
             </div>
           </CardContent>
         </Card>

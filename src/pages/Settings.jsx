@@ -154,16 +154,16 @@ function UsersList() {
   return (
     <div className="space-y-3">
       {users.map((user) => (
-        <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+        <div key={user.id} className="flex items-center justify-between p-4 rounded-lg" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'}}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-slate-600">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)'}}>
+              <span className="text-sm font-medium text-white">
                 {(user.full_name || user.email || 'U').charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <p className="font-medium text-slate-900">{user.full_name || user.email}</p>
-              <p className="text-sm text-slate-500">{user.email}</p>
+              <p className="font-medium text-slate-100">{user.full_name || user.email}</p>
+              <p className="text-sm text-slate-400">{user.email}</p>
             </div>
           </div>
           <Badge variant="outline" className="capitalize">
@@ -405,12 +405,12 @@ export default function Settings() {
               </div>
               
               {!tokenStatus?.hasToken && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-4 rounded-lg" style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.25)'}}>
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5" />
                     <div>
-                      <p className="font-medium text-red-900">Shopify Connection Required</p>
-                      <p className="text-sm text-red-700 mt-1">
+                      <p className="font-medium text-red-300">Shopify Connection Required</p>
+                      <p className="text-sm text-red-400/80 mt-1">
                         Your Shopify access token is missing or expired. Click "Connect Shopify" to authorize and start syncing orders.
                       </p>
                     </div>
@@ -612,13 +612,13 @@ export default function Settings() {
         {/* Users Tab - Owner Only */}
         {user?.email === 'rohan.a.roberts@gmail.com' && (
           <TabsContent value="users" className="mt-6 space-y-6">
-            <Card className="border-blue-200 bg-blue-50">
+            <Card className="border-blue-500/20" style={{background:'rgba(59,130,246,0.08)'}}>
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <Shield className="w-5 h-5 text-blue-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-blue-900">Access Requests</p>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <p className="font-medium text-blue-300">Access Requests</p>
+                    <p className="text-sm text-blue-400/80 mt-1">
                       When users request access, you'll receive an email notification. 
                       Invite them below to grant access to ProfitShield.
                     </p>
