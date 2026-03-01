@@ -551,20 +551,31 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             <div className="p-4 border-t border-white/5">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors">
-                    <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-slate-600">
+                  <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)', boxShadow:'0 0 12px rgba(99,102,241,0.35)'}}>
+                      <span className="text-sm font-semibold text-white">
                         {(activeUser.full_name || activeUser.email || 'U').charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div className="flex-1 text-left min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
+                      <p className="text-sm font-semibold text-slate-100 truncate">
                         {activeUser.full_name || 'User'}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{activeUser.email || ''}</p>
-                      {role && <p className="text-xs text-emerald-600 capitalize">{role}</p>}
+                      {role && (
+                        <span className="inline-block text-xs font-medium px-1.5 py-0 rounded mt-0.5 capitalize"
+                          style={{
+                            background:'rgba(99,102,241,0.18)',
+                            border:'1px solid rgba(129,140,248,0.35)',
+                            color:'#a5b4fc',
+                            textShadow:'0 0 8px rgba(129,140,248,0.5)'
+                          }}>
+                          {role}
+                        </span>
+                      )}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
