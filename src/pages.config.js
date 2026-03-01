@@ -60,6 +60,7 @@ import Customers from './pages/Customers';
 import DataCompliance from './pages/DataCompliance';
 import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import Download from './pages/Download';
+import Embedded from './pages/Embedded';
 import FounderDashboard from './pages/FounderDashboard';
 import HelpCenter from './pages/HelpCenter';
 import Home from './pages/Home';
@@ -87,7 +88,6 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import Embedded from './pages/Embedded';
 import __Layout from './Layout.jsx';
 
 
@@ -105,6 +105,7 @@ export const PAGES = {
     "DataCompliance": DataCompliance,
     "DataProcessingAgreement": DataProcessingAgreement,
     "Download": Download,
+    "Embedded": Embedded,
     "FounderDashboard": FounderDashboard,
     "HelpCenter": HelpCenter,
     "Home": Home,
@@ -132,7 +133,6 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "Embedded": Embedded,
 }
 
 export const pagesConfig = {
