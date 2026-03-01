@@ -151,8 +151,8 @@ export default function Shipping() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Shipping Analysis</h1>
-          <p className="text-slate-500">Track shipping costs vs revenue</p>
+          <h1 className="text-2xl font-bold text-slate-100">Shipping Analysis</h1>
+          <p className="text-slate-400">Track shipping costs vs revenue</p>
         </div>
         <Select value={dateRange} onValueChange={setDateRange}>
           <SelectTrigger className="w-40">

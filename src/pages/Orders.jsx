@@ -397,7 +397,7 @@ export default function Orders() {
           value={filters.dateRange} 
           onValueChange={(v) => setFilters({ ...filters, dateRange: v })}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40 bg-white/5 border-white/10 text-slate-200">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
