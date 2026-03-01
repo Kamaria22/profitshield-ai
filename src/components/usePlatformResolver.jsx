@@ -239,8 +239,9 @@ export function usePlatformResolver() {
     
     // =====================
     // STEP 4: Lookup Integration
+    // (Skipped in Shopify embedded short-circuit — tenantId already set)
     // =====================
-    if (platform && storeKey) {
+    if (platform && storeKey && !(chosenBy === 'shopify_embedded_persisted' && tenantId)) {
       try {
         const integrations = await base44.entities.PlatformIntegration.filter({
           platform,
