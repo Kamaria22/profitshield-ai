@@ -76,6 +76,7 @@ How can I help you today?`,
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -107,10 +108,52 @@ How can I help you today?`,
     return 'general';
   };
 
+  // Save/update conversation record for the owner inbox
+  const saveConversation = async (allMessages, opts = {}) => {
+    try {
+      const user = await base44.auth.me().catch(() => null);
+      const msgPayload = allMessages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+        sender_name: m.role === 'user' ? (user?.full_name || user?.email || 'User') : 'AI Support'
+      }));
+
+      if (conversationId) {
+        await base44.entities.SupportConversation.update(conversationId, {
+          messages: msgPayload,
+          status: opts.status || undefined,
+          ai_resolution: opts.ai_resolution || undefined,
+          auto_fix_triggered: opts.auto_fix_triggered || undefined,
+          needs_owner_attention: opts.needs_owner_attention || undefined,
+          owner_notified_at: opts.needs_owner_attention ? new Date().toISOString() : undefined,
+          issue_summary: opts.issue_summary || undefined,
+          issue_type: opts.issue_type || undefined,
+          priority: opts.priority || undefined,
+        });
+      } else {
+        const conv = await base44.entities.SupportConversation.create({
+          tenant_id: tenantId || 'unknown',
+          user_email: user?.email || null,
+          user_name: user?.full_name || null,
+          messages: msgPayload,
+          status: opts.status || 'open',
+          issue_type: opts.issue_type || 'general',
+          issue_summary: opts.issue_summary || allMessages.find(m => m.role === 'user')?.content?.slice(0, 120) || 'Support chat',
+          auto_fix_triggered: opts.auto_fix_triggered || false,
+          needs_owner_attention: opts.needs_owner_attention || false,
+          priority: opts.priority || 'medium',
+        });
+        setConversationId(conv.id);
+      }
+    } catch (e) {
+      console.error('Failed to save conversation:', e);
+    }
+  };
+
   const triggerAutonomousFix = async (issueDescription, isCritical = false) => {
     setIsFixing(true);
     
-    // Log the issue for the autonomous system
     try {
       await base44.entities.Task.create({
         tenant_id: tenantId,
@@ -134,7 +177,6 @@ How can I help you today?`,
         is_auto_generated: true
       });
 
-      // For critical issues, also escalate to owner via email
       if (isCritical) {
         await escalateToOwner(issueDescription, tenantId);
       }
