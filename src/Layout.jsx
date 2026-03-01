@@ -333,7 +333,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Memoized nav items
-  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin);
+  const userRole = activeUser?.role || activeUser?.app_role || 'user';
+  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin, userRole);
   
   // Memoized handlers
   const handleLogoutMemo = useCallback(() => {
