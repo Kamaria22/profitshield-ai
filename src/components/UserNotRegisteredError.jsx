@@ -1,6 +1,39 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 
+/**
+ * UserNotRegisteredError
+ * 
+ * IMPORTANT: Shopify installs NEVER hit this screen.
+ * The auto-provision logic in shopifyAuth assigns owner role immediately.
+ * This screen only shows for non-Shopify direct signups pending manual approval.
+ */
 const UserNotRegisteredError = () => {
+  // If user arrived via Shopify OAuth (?shop= or ?hmac=), auto-redirect to login
+  // so the provision flow can complete rather than showing this error.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shop = params.get('shop');
+    const hmac = params.get('hmac');
+    if (shop || hmac) {
+      // Shopify install flow — redirect to login which will re-trigger provisioning
+      base44.auth.redirectToLogin(window.location.href);
+    }
+  }, []);
+
+  const params = new URLSearchParams(window.location.search);
+  const isShopifyFlow = params.get('shop') || params.get('hmac') || params.get('embedded');
+
+  // For Shopify flows show a loading screen instead of "Access Restricted"
+  if (isShopifyFlow) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950">
+        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-slate-400 text-sm">Setting up your account...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-white to-slate-50">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-lg border border-slate-100">
