@@ -1081,6 +1081,11 @@ export default function FounderDashboard() {
         <TabsContent value="capital" className="mt-4">
           <CapitalReadinessPanel />
         </TabsContent>
+
+        {/* Billing Admin Tab */}
+        <TabsContent value="billing-admin" className="mt-4">
+          <BillingAdminPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
