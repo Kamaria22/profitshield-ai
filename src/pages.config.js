@@ -87,6 +87,7 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
+import Embedded from './pages/Embedded';
 import __Layout from './Layout.jsx';
 
 
@@ -131,6 +132,7 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
+    "Embedded": Embedded,
 }
 
 export const pagesConfig = {
