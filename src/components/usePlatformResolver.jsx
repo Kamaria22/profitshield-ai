@@ -519,8 +519,16 @@ export function usePlatformResolver() {
     // FINAL DECISION
     // =====================
     let finalStatus;
+
+    // Shopify embedded short-circuit: tenantId was set from persisted context,
+    // integration lookup was skipped. Treat as RESOLVED if we have tenantId.
+    const isEmbeddedShortCircuit = chosenBy === 'shopify_embedded_persisted' && tenantId;
     
-    if (integration && integration.status === 'connected') {
+    if (isEmbeddedShortCircuit) {
+      finalStatus = RESOLVER_STATUS.RESOLVED;
+      reason = 'shopify_embedded_shortcircuit';
+      trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, true, 'Embedded short-circuit resolved'));
+    } else if (integration && integration.status === 'connected') {
       finalStatus = RESOLVER_STATUS.RESOLVED;
       reason = reason || 'resolved';
       
