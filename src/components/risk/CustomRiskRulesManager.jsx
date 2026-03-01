@@ -383,9 +383,10 @@ export default function CustomRiskRulesManager({ tenantId }) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
+          </div>
+          </div>
+          </CardHeader>
+          <CardContent>
         {isLoading ? (
           <div className="text-center py-8 text-slate-500">Loading rules...</div>
         ) : rules.length === 0 ? (
