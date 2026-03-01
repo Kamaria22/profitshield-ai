@@ -31,12 +31,14 @@ import {
   Zap,
   GripVertical,
   Pencil,
-  Store
+  Store,
+  Brain
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ShopifyActionsConfig from '../alerts/ShopifyActionsConfig';
+import AIRuleAssistant from './AIRuleAssistant';
 
 const fieldOptions = [
   { value: 'order_value', label: 'Order Value ($)' },
