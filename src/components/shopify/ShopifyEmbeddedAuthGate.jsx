@@ -158,13 +158,23 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
         shop: data.shop_domain,
       });
 
-      onAuthenticated?.({
+      const ctx = {
         tenantId: data.tenant_id,
         integrationId: data.integration_id,
         shopDomain: data.shop_domain,
         platform: 'shopify',
-      });
+        isNew: !!data.is_new_tenant,
+      };
 
+      setAuthCtx(ctx);
+
+      // If brand new merchant, show onboarding before calling onAuthenticated
+      if (data.is_new_tenant) {
+        setPhase('onboarding');
+        return;
+      }
+
+      onAuthenticated?.(ctx);
       setPhase('done');
     } catch (err) {
       console.error('[ShopifyEmbeddedAuthGate] Error:', err);
