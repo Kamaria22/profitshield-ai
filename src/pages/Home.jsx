@@ -339,6 +339,12 @@ export default function Home() {
             {/* Side Rail - Lazy loaded */}
             <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
               <div className="sticky top-0 space-y-4">
+                {/* Autonomous Insight Engine - always visible */}
+                <AutonomousInsightEngine
+                  metrics={metrics}
+                  alerts={dashboardSummary?.alerts || []}
+                  profitLeaks={profitLeaks}
+                />
                 <Suspense fallback={<PanelSkeleton />}>
                   <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
                 </Suspense>
