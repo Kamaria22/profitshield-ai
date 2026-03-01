@@ -8,12 +8,27 @@ import { createPageUrl } from '@/components/platformContext';
 /**
  * RouteGuard — wraps a page to enforce admin + context access rules.
  * Usage: <RouteGuard pageName="AppStoreListing">...</RouteGuard>
+ *
+ * IMPORTANT: In Shopify embedded context (shop= + host= or embedded=1),
+ * RouteGuard is fully bypassed. Auth is handled by ShopifyEmbeddedAuthGate.
  */
+function isShopifyEmbedded() {
+  if (typeof window === 'undefined') return false;
+  const p = new URLSearchParams(window.location.search);
+  return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+}
+
 export default function RouteGuard({ pageName, children }) {
   const [status, setStatus] = useState('checking'); // checking | allowed | denied
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Bypass all auth gating for Shopify embedded — ShopifyEmbeddedAuthGate handles it
+    if (isShopifyEmbedded()) {
+      setStatus('allowed');
+      return;
+    }
+
     base44.auth.me()
       .then(user => {
         const role = user?.role || user?.app_role || 'user';
