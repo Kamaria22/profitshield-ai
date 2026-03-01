@@ -51,7 +51,8 @@ import {
   Video,
   Download,
   Lock,
-  HelpCircle
+  HelpCircle,
+  Inbox
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import CookieConsent from '@/components/gdpr/CookieConsent';
