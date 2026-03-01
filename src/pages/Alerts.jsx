@@ -183,14 +183,14 @@ export default function Alerts() {
   if (!canQuery || status === RESOLVER_STATUS.ERROR) {
     return (
       <div className="space-y-6">
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="py-8">
             <div className="flex flex-col items-center text-center">
-              <div className="p-3 bg-amber-100 rounded-full mb-4">
-                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              <div className="p-3 bg-amber-500/15 rounded-full mb-4">
+                <AlertTriangle className="w-8 h-8 text-amber-400" />
               </div>
-              <h2 className="text-xl font-semibold text-slate-900 mb-2">No Store Connected</h2>
-              <p className="text-slate-600 mb-4 max-w-md">
+              <h2 className="text-xl font-semibold text-slate-100 mb-2">No Store Connected</h2>
+              <p className="text-slate-400 mb-4 max-w-md">
                 Connect your store to view alerts.
               </p>
               <Link to={createPageUrl('Integrations', location.search)}>
@@ -215,8 +215,8 @@ export default function Alerts() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Alerts</h1>
-          <p className="text-slate-500">Monitor and respond to profit protection alerts</p>
+          <h1 className="text-2xl font-bold text-slate-100">Alerts</h1>
+          <p className="text-slate-400">Monitor and respond to profit protection alerts</p>
         </div>
         {counts.highPriority > 0 && (
           <Badge className="bg-red-100 text-red-700 hover:bg-red-100 px-3 py-1.5 w-fit">
@@ -396,7 +396,7 @@ export default function Alerts() {
 
       {/* Results count */}
       <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>Showing {filteredAlerts.length} of {alerts.length} alerts</span>
+        <span className="text-slate-400">Showing {filteredAlerts.length} of {alerts.length} alerts</span>
       </div>
 
       {/* Alerts List */}
@@ -419,10 +419,10 @@ export default function Alerts() {
       ) : filteredAlerts.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
-            <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-              <CheckCircle className="w-6 h-6 text-emerald-600" />
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+              <CheckCircle className="w-6 h-6 text-emerald-400" />
             </div>
-            <p className="text-slate-600 font-medium">
+            <p className="text-slate-300 font-medium">
               {activeTab === 'pending' ? 'No pending alerts' : 'No alerts found'}
             </p>
             <p className="text-sm text-slate-500 mt-1">
