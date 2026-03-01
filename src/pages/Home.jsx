@@ -269,6 +269,9 @@ export default function Home() {
             )}
           </div>
 
+          {/* Predictive Intelligence Overview */}
+          <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
+
           <div className="flex gap-6 h-full">
             <div className="flex-1 min-w-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
