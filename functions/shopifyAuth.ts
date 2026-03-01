@@ -93,17 +93,20 @@ Deno.serve(async (req) => {
         console.log('[shopifyAuth] Updated existing tenant:', tenant.id);
       } else {
         // Create new tenant
+        const now = new Date();
+        const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
         tenant = await base44.asServiceRole.entities.Tenant.create({
           shop_domain: shopDomain,
           shop_name: shopData.name || shopDomain,
           platform: 'shopify',
           status: 'active',
           subscription_tier: 'trial',
+          plan_status: 'trial',
           monthly_order_limit: 100,
           orders_this_month: 0,
           onboarding_completed: false,
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          trial_started_at: new Date().toISOString(),
+          trial_started_at: now.toISOString(),
+          trial_ends_at: trialEnd.toISOString(),
           currency: shopData.currency || 'USD',
           webhook_secret: crypto.randomUUID()
         });
