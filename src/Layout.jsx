@@ -284,7 +284,7 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
 });
 
 // Memoized nav items filtering
-const useFilteredNavItems = (hasPermission, isAdmin) => {
+const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
   return useMemo(() => {
     return navItems.filter(item => {
       // Permission check
@@ -295,9 +295,13 @@ const useFilteredNavItems = (hasPermission, isAdmin) => {
       if (item.adminOnly && !isAdmin) {
         return false;
       }
+      // APP_CONTEXT + role guard: internal-only pages hidden in shopify_public OR for non-admins
+      if (!canAccessPage(item.page, userRole || 'user', APP_CONTEXT)) {
+        return false;
+      }
       return true;
     });
-  }, [hasPermission, isAdmin]);
+  }, [hasPermission, isAdmin, userRole]);
 };
 
 function LayoutContent({ children, currentPageName, resolver = {} }) {
