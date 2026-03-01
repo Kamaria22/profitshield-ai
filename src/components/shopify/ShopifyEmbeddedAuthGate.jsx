@@ -176,8 +176,7 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       onAuthenticated?.(ctx);
       setPhase('done');
     } catch (err) {
-      console.error('[ShopifyEmbeddedAuthGate] Error:', err);
-      // Non-fatal — let app continue, platform resolver will handle
+      console.error('[ShopifyEmbeddedAuthGate] Error:', err.message);
       setPhase('done');
     }
   }
