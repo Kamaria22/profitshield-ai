@@ -381,25 +381,36 @@ function getSubscriptionStatus(tenant) {
   const tier = tenant.subscription_tier || 'trial';
   const trialStarted = tenant.trial_started_at ? new Date(tenant.trial_started_at) : null;
   const trialEnds = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
-  
+
   const now = new Date();
+  const isPaid = ['starter', 'growth', 'pro', 'enterprise'].includes(tier);
+
+  // Trial expired ONLY if: tier=trial AND trial_ends_at is set AND now >= trial_ends_at
   const isInTrial = tier === 'trial' && trialEnds && now < trialEnds;
   const trialExpired = tier === 'trial' && trialEnds && now >= trialEnds;
-  
+
   let daysRemaining = 0;
   if (trialEnds && now < trialEnds) {
     daysRemaining = Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   }
 
+  // Review mode: first 7 days after install or explicit flag
+  const createdAt = tenant.created_date ? new Date(tenant.created_date).getTime() : null;
+  const isReviewMode = tenant.review_mode_enabled ||
+    (createdAt && (Date.now() - createdAt) < REVIEW_MODE_DAYS * 24 * 60 * 60 * 1000);
+
   return {
     tier,
+    plan_status: tenant.plan_status || (isPaid ? 'active' : (trialExpired ? 'expired' : 'trial')),
     is_trial: tier === 'trial',
     is_in_trial: isInTrial,
     trial_expired: trialExpired,
     trial_started_at: tenant.trial_started_at,
     trial_ends_at: tenant.trial_ends_at,
     days_remaining: daysRemaining,
-    is_paid: ['starter', 'growth', 'pro', 'enterprise'].includes(tier),
+    is_paid: isPaid,
+    review_mode: isReviewMode,
+    review_mode_enabled: !!tenant.review_mode_enabled,
     features: TIER_FEATURES[tier]?.features || [],
     order_limit: TIER_FEATURES[tier]?.orders_per_month || 100,
     orders_used: tenant.orders_this_month || 0
