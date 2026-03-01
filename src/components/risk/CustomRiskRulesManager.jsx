@@ -213,7 +213,16 @@ export default function CustomRiskRulesManager({ tenantId }) {
               Define rules to automatically flag or adjust risk scores for orders
             </CardDescription>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAI(v => !v)}
+              className={`gap-2 text-sm ${showAI ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300' : ''}`}
+            >
+              <Brain className="w-4 h-4" />
+              AI Assistant
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => openDialog()} className="gap-2">
                 <Plus className="w-4 h-4" />
