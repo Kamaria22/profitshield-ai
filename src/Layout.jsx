@@ -57,6 +57,7 @@ import CookieConsent from '@/components/gdpr/CookieConsent';
 import UpgradeButton from '@/components/subscription/UpgradeButton';
 import CommandPalette, { CommandPaletteTrigger } from '@/components/ui/CommandPalette';
 import AmbientHUD from '@/components/dashboard/AmbientHUD';
+import HelpButton from '@/components/help/HelpButton';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -93,6 +94,7 @@ const navItems = [
   { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
   { name: 'App Listing', page: 'AppStoreListing', icon: Store, permission: 'settings_manage', adminOnly: true },
   { name: 'Build Guide', page: 'NativeBuildGuide', icon: Download, permission: 'settings_manage', adminOnly: true },
+  { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
