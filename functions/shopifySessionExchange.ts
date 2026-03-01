@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Missing shop or session_token', reason: 'missing_shop' }, 400);
     }
 
-    // Resolve tenant by shop_domain (service-role, no user session)
+    // Resolve tenant by shop_domain (service-role, no user session required)
     const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
     console.log(`[shopifySessionExchange] Tenant lookup for ${shopDomain}: found ${tenants.length}`);
 
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
 
     const tenant = tenants[0];
 
-    // Get primary connected integration
+    // Get primary connected integration (service-role)
     const integrations = await base44.entities.PlatformIntegration.filter({
       tenant_id: tenant.id,
       platform: 'shopify',
