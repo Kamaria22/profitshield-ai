@@ -373,9 +373,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     }
   }, [isResolved, authTenantId, loadAlerts]);
 
-  // Safe redirect to SelectStore
+  // Safe redirect to SelectStore — NEVER redirect Shopify install flows
   useEffect(() => {
-    if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore') {
+    const urlParams = new URLSearchParams(location.search);
+    const isShopifyInstall = urlParams.get('shop') || urlParams.get('hmac') || urlParams.get('embedded');
+    
+    if (status === RESOLVER_STATUS.NEEDS_SELECTION && currentPageName !== 'SelectStore' && !isShopifyInstall) {
       const returnPath = encodeURIComponent(currentPageName || 'Home');
       const base = createPageUrl('SelectStore', location.search);
       const joiner = base.includes('?') ? '&' : '?';
