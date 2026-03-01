@@ -119,21 +119,57 @@ function extractShopFromPayload(payload) {
   return shop;
 }
 
+// Shopify-safe response headers — allow embedding in Shopify Admin
+function embeddedHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    // Allow Shopify to embed us in an iframe
+    'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com",
+    // Explicitly remove DENY so Shopify admin can embed
+    'X-Frame-Options': 'ALLOWALL',
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return Response.json(body, { status, headers: embeddedHeaders() });
+}
+
+// Service-role client — no user session required
+let serviceClient = null;
+function getServiceClient() {
+  if (!serviceClient) {
+    serviceClient = createClient({ serviceRoleKey: Deno.env.get('BASE44_SERVICE_ROLE_KEY') || '' });
+  }
+  return serviceClient;
+}
+
 Deno.serve(async (req) => {
-  // CORS for Shopify embedded context
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      }
-    });
+    return new Response(null, { status: 204, headers: embeddedHeaders() });
   }
 
   try {
-    const base44 = createClientFromRequest(req);
-    const { session_token, shop: shopParam } = await req.json();
+    // PUBLIC ENDPOINT — use service-role client, NOT createClientFromRequest
+    // This means no Base44 session is needed to call this function.
+    const base44 = getServiceClient();
+
+    let bodyText = '';
+    try {
+      bodyText = await req.text();
+    } catch { bodyText = '{}'; }
+
+    let body = {};
+    try { body = JSON.parse(bodyText || '{}'); } catch { body = {}; }
+
+    const { session_token, shop: shopParam } = body;
+
+    console.log(`[shopifySessionExchange] path=${path} shop=${shopParam || '(none)'} has_token=${!!session_token}`);
 
     let shopDomain = null;
 
