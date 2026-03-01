@@ -16,7 +16,7 @@
  *   - Returns 200 with install_required:true if shop not installed yet.
  */
 
-import { createClient } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
 const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
