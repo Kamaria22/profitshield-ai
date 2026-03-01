@@ -57,6 +57,19 @@ import {
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import ShopifyEmbeddedAuthGate from '@/components/shopify/ShopifyEmbeddedAuthGate';
+
+// Debug: log embedded entry decisions at the React layer
+(function logEmbeddedEntry() {
+  if (typeof window === 'undefined') return;
+  const p = new URLSearchParams(window.location.search);
+  const shop = p.get('shop');
+  const embedded = p.get('embedded');
+  if (shop || embedded) {
+    console.log(
+      `[ProfitShield Layout] ALLOWED embedded entry — shop=${shop || '-'} embedded=${embedded || '-'} path=${window.location.pathname}`
+    );
+  }
+})();
 import CookieConsent from '@/components/gdpr/CookieConsent';
 import UpgradeButton from '@/components/subscription/UpgradeButton';
 import CommandPalette, { CommandPaletteTrigger } from '@/components/ui/CommandPalette';
