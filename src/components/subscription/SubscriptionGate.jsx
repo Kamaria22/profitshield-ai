@@ -63,16 +63,67 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
     );
   }
 
-  // If access is allowed, render children
-  if (status?.allowed !== false && !status?.trial_expired && !status?.upgrade_required) {
-    return <>{children}</>;
+  // GRACE WINDOW or billing still initializing — show banner but allow access
+  if (status?.grace_window || status?.reason === 'grace_window' || status?.reason === 'trial_initializing') {
+    return (
+      <>
+        <GraceWindowBanner />
+        {children}
+      </>
+    );
   }
 
-  // Trial expired state
-  if (status?.trial_expired || status?.reason === 'trial_expired') {
+  // REVIEW MODE — allow access with informational banner
+  if (status?.reason === 'review_mode' || (status?.allowed && status?.review_mode)) {
+    return (
+      <>
+        <ReviewModeBanner />
+        {children}
+      </>
+    );
+  }
+
+  // If access is allowed, render children (with optional trial banner)
+  if (status?.allowed !== false) {
+    return (
+      <>
+        {status?.is_in_trial && status?.days_remaining <= 7 && (
+          <TrialBanner 
+            daysRemaining={status.days_remaining}
+            onSubscribe={() => navigate(createPageUrl('Pricing'))}
+          />
+        )}
+        {children}
+      </>
+    );
+  }
+
+  // TRIAL EXPIRED — hard paywall
+  if (status?.reason === 'trial_expired' || status?.reason === 'subscription_ended') {
     return (
       <TrialExpiredOverlay 
-        onSubscribe={() => navigate(createPageUrl('Pricing'))}
+        reason={status.reason}
+        onSubscribe={() => {
+          // Open Stripe checkout in top window so it works from Shopify embedded iframe
+          const pricingUrl = createPageUrl('Pricing');
+          if (window.top && window.top !== window) {
+            window.top.location.href = pricingUrl;
+          } else {
+            navigate(pricingUrl);
+          }
+        }}
+        onRestore={async () => {
+          setLoading(true);
+          try {
+            const res = await base44.functions.invoke('subscriptionGating', {
+              tenant_id: tenant.id,
+              action: 'restore_access'
+            });
+            setStatus(res.data);
+          } finally {
+            setLoading(false);
+          }
+        }}
       />
     );
   }
@@ -101,18 +152,8 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
     );
   }
 
-  // Default: render children with potential trial banner
-  return (
-    <>
-      {status?.is_in_trial && status?.days_remaining <= 7 && (
-        <TrialBanner 
-          daysRemaining={status.days_remaining}
-          onSubscribe={() => navigate(createPageUrl('Pricing'))}
-        />
-      )}
-      {children}
-    </>
-  );
+  // Default fallback — allow access
+  return <>{children}</>;
 }
 
 function TrialExpiredOverlay({ onSubscribe }) {
