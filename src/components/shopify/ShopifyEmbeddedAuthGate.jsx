@@ -124,10 +124,13 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       }
 
       // Exchange session token (or fall back to shop param alone)
+      // shopifySessionExchange is PUBLIC — it does not require a Base44 session.
+      console.log(`[ShopifyEmbeddedAuthGate] Calling shopifySessionExchange shop=${shopDomain} has_token=${!!sessionToken}`);
       const { data } = await base44.functions.invoke('shopifySessionExchange', {
         session_token: sessionToken || undefined,
         shop: shopDomain,
       });
+      console.log(`[ShopifyEmbeddedAuthGate] Exchange result:`, data?.authenticated, data?.reason || '');
 
       if (data?.install_required) {
         // Shop hasn't completed OAuth — show install screen with top-level redirect
