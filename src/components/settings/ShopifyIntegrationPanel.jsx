@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
+import TwoWaySyncPanel from '@/components/shopify/TwoWaySyncPanel';
 
 function isEmbedded() {
   if (typeof window === 'undefined') return false;
