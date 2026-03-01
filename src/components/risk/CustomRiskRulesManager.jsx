@@ -86,6 +86,7 @@ export default function CustomRiskRulesManager({ tenantId }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [formData, setFormData] = useState(emptyRule);
+  const [showAI, setShowAI] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: rules = [], isLoading } = useQuery({
