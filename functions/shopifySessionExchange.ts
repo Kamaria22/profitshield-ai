@@ -17,18 +17,37 @@ const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
 const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
 
 /**
- * Verify Shopify session token JWT (HS256, signed with SHOPIFY_API_SECRET)
- * Returns decoded payload or throws.
+ * base64url decode helper
+ */
+function base64urlDecode(str) {
+  // Convert base64url → base64
+  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+  return atob(padded);
+}
+
+/**
+ * Verify Shopify session token JWT (HS256, signed with SHOPIFY_API_SECRET).
+ * 
+ * Validates:
+ *  - Signature (HMAC-SHA256)
+ *  - aud === SHOPIFY_API_KEY
+ *  - iss === "https://{shop}" (extracted from dest claim)
+ *  - exp not expired
+ *  - nbf not in future (if present)
+ * 
+ * Returns decoded payload or throws with a descriptive message.
  */
 async function verifySessionToken(token) {
   if (!SHOPIFY_API_SECRET) throw new Error('SHOPIFY_API_SECRET not configured');
+  if (!SHOPIFY_API_KEY) throw new Error('SHOPIFY_API_KEY not configured');
 
   const parts = token.split('.');
-  if (parts.length !== 3) throw new Error('Invalid JWT format');
+  if (parts.length !== 3) throw new Error('Invalid JWT format: expected 3 parts');
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
-  // Verify signature
+  // --- 1. Verify HMAC-SHA256 signature ---
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -38,24 +57,44 @@ async function verifySessionToken(token) {
     ['verify']
   );
 
-  const data = encoder.encode(`${headerB64}.${payloadB64}`);
-  const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  const signingInput = encoder.encode(`${headerB64}.${payloadB64}`);
+  const sigBytes = Uint8Array.from(base64urlDecode(signatureB64), c => c.charCodeAt(0));
 
-  const valid = await crypto.subtle.verify('HMAC', key, signature, data);
+  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, signingInput);
   if (!valid) throw new Error('Invalid token signature');
 
-  // Decode payload
-  const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
-  const payload = JSON.parse(payloadJson);
+  // --- 2. Decode payload ---
+  let payload;
+  try {
+    payload = JSON.parse(base64urlDecode(payloadB64));
+  } catch {
+    throw new Error('Malformed JWT payload');
+  }
 
-  // Check expiry
   const now = Math.floor(Date.now() / 1000);
-  if (payload.exp && payload.exp < now) throw new Error('Session token expired');
-  if (payload.nbf && payload.nbf > now) throw new Error('Session token not yet valid');
 
-  // Verify audience (iss and dest contain the shop)
-  if (payload.aud && payload.aud !== SHOPIFY_API_KEY) {
-    throw new Error('Invalid token audience');
+  // --- 3. Validate exp ---
+  if (!payload.exp) throw new Error('Missing exp claim');
+  if (payload.exp < now) throw new Error(`Session token expired (exp=${payload.exp}, now=${now})`);
+
+  // --- 4. Validate nbf (if present) ---
+  if (payload.nbf && payload.nbf > now) {
+    throw new Error(`Session token not yet valid (nbf=${payload.nbf}, now=${now})`);
+  }
+
+  // --- 5. Validate aud === SHOPIFY_API_KEY ---
+  const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (!aud.includes(SHOPIFY_API_KEY)) {
+    throw new Error(`Invalid aud claim: expected ${SHOPIFY_API_KEY}, got ${JSON.stringify(payload.aud)}`);
+  }
+
+  // --- 6. Validate iss === "https://{shop}" ---
+  // Shopify sets iss = "https://mystore.myshopify.com/admin"
+  // and dest = "https://mystore.myshopify.com"
+  const shop = extractShopFromPayload(payload);
+  const expectedIssPrefix = `https://${shop}`;
+  if (!payload.iss || !payload.iss.startsWith(expectedIssPrefix)) {
+    throw new Error(`Invalid iss claim: expected prefix ${expectedIssPrefix}, got ${payload.iss}`);
   }
 
   return payload;
@@ -64,12 +103,12 @@ async function verifySessionToken(token) {
 /**
  * Extract shop domain from session token payload.
  * Shopify puts it in `dest` as "https://mystore.myshopify.com"
+ * Falls back to parsing `iss`.
  */
 function extractShopFromPayload(payload) {
-  const dest = payload.dest || payload.iss || '';
-  // dest = "https://mystore.myshopify.com"
-  const match = dest.match(/https?:\/\/([^\/]+)/);
-  if (!match) throw new Error('Cannot extract shop from token');
+  const source = payload.dest || payload.iss || '';
+  const match = source.match(/https?:\/\/([^\/]+)/);
+  if (!match) throw new Error('Cannot extract shop domain from token claims');
   let shop = match[1].toLowerCase().trim();
   if (!shop.includes('.myshopify.com')) shop = `${shop}.myshopify.com`;
   return shop;
