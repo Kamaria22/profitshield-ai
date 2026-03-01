@@ -50,7 +50,8 @@ import {
   CreditCard,
   Video,
   Download,
-  Lock
+  Lock,
+  HelpCircle
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import CookieConsent from '@/components/gdpr/CookieConsent';
