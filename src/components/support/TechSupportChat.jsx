@@ -293,12 +293,27 @@ Respond helpfully and professionally. Be concise but thorough.`;
         }
       }
 
-      setMessages(prev => [...prev, {
+      const newAssistantMsg = {
         role: 'assistant',
         content: aiResponse,
         timestamp: new Date(),
         isFixing: needsFix
-      }]);
+      };
+
+      const updatedMessages = [...messages, { role: 'user', content: userMessage, timestamp: new Date() }, newAssistantMsg];
+
+      setMessages(prev => [...prev, newAssistantMsg]);
+
+      // Persist to SupportConversation entity for owner inbox
+      await saveConversation(updatedMessages, {
+        issue_type: issueType,
+        issue_summary: response.issue_summary || userMessage.slice(0, 120),
+        auto_fix_triggered: needsFix,
+        needs_owner_attention: needsOwnerEscalation,
+        priority: needsOwnerEscalation ? 'critical' : issueType === 'technical' ? 'high' : 'medium',
+        status: needsOwnerEscalation ? 'escalated' : needsFix ? 'open' : 'open',
+        ai_resolution: needsFix ? `Auto-fix triggered for: ${response.issue_summary || userMessage.slice(0, 100)}` : null,
+      });
 
     } catch (error) {
       console.error('Support chat error:', error);
