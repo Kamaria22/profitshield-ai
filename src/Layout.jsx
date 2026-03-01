@@ -414,7 +414,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     return <>{children}</>;
   }
 
-  // Loading state
+  // In embedded mode, hold the loading screen while gate is authenticating.
+  // This prevents any auth redirect or login screen from flashing.
+  const isEmbedded = detectEmbedded();
   if (status === RESOLVER_STATUS.RESOLVING) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -422,10 +424,20 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mx-auto mb-4 animate-pulse" style={{boxShadow:'0 0 30px rgba(99,102,241,0.4)'}}>
             <Shield className="w-6 h-6 text-white" />
           </div>
-          <p className="text-slate-500 text-sm">Initializing ProfitShield AI...</p>
+          <p className="text-slate-500 text-sm">
+            {isEmbedded ? 'Connecting to Shopify...' : 'Initializing ProfitShield AI...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // In embedded mode with ERROR/NEEDS_SELECTION, still render the app shell.
+  // The ShopifyEmbeddedAuthGate has already handled any auth errors with its
+  // Shopify-branded UI. Don't redirect to login or SelectStore.
+  if (isEmbedded && (status === RESOLVER_STATUS.ERROR || status === RESOLVER_STATUS.NEEDS_SELECTION)) {
+    // Suppress the NEEDS_SELECTION redirect (handled in useEffect below via isShopifyInstall check)
+    // Just fall through to render the app shell with the available context.
   }
 
   // Only show banner on pages that actually require store data
