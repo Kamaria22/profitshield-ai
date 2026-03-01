@@ -176,10 +176,10 @@ export default function Customers() {
             </Button>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-2xl font-bold text-slate-100">
               {selectedSegment ? selectedSegment.name : 'Customer Segments'}
             </h1>
-            <p className="text-slate-500">
+            <p className="text-slate-400">
               {selectedSegment 
                 ? `${displayedCustomers.length} customers in this segment`
                 : 'Segment and analyze your customer base'
@@ -197,54 +197,54 @@ export default function Customers() {
       {/* Summary Stats */}
       {!selectedSegment && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card className="glass-card border-white/5">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-100 rounded-lg">
-                  <Users className="w-5 h-5 text-indigo-600" />
+                <div className="p-2 rounded-lg" style={{background:'rgba(99,102,241,0.15)'}}>
+                  <Users className="w-5 h-5 text-indigo-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{summaryStats.totalCustomers}</p>
-                  <p className="text-sm text-slate-500">Total Customers</p>
+                  <p className="text-2xl font-bold text-slate-100">{summaryStats.totalCustomers}</p>
+                  <p className="text-sm text-slate-400">Total Customers</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="glass-card border-white/5">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-emerald-600" />
+                <div className="p-2 rounded-lg" style={{background:'rgba(52,211,153,0.12)'}}>
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{formatCurrency(summaryStats.totalRevenue)}</p>
-                  <p className="text-sm text-slate-500">Total Revenue</p>
+                  <p className="text-2xl font-bold text-slate-100">{formatCurrency(summaryStats.totalRevenue)}</p>
+                  <p className="text-sm text-slate-400">Total Revenue</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="glass-card border-white/5">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-100 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-teal-600" />
+                <div className="p-2 rounded-lg" style={{background:'rgba(45,212,191,0.12)'}}>
+                  <TrendingUp className="w-5 h-5 text-teal-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{formatCurrency(summaryStats.totalProfit)}</p>
-                  <p className="text-sm text-slate-500">Total Profit</p>
+                  <p className="text-2xl font-bold text-slate-100">{formatCurrency(summaryStats.totalProfit)}</p>
+                  <p className="text-sm text-slate-400">Total Profit</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="glass-card border-white/5">
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                <div className="p-2 rounded-lg" style={{background:'rgba(248,113,113,0.12)'}}>
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{summaryStats.highRiskCount}</p>
-                  <p className="text-sm text-slate-500">High Risk</p>
+                  <p className="text-2xl font-bold text-slate-100">{summaryStats.highRiskCount}</p>
+                  <p className="text-sm text-slate-400">High Risk</p>
                 </div>
               </div>
             </CardContent>

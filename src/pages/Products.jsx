@@ -166,76 +166,76 @@ export default function Products() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Products</h1>
-        <p className="text-slate-500">Analyze profitability by product and SKU</p>
+        <h1 className="text-2xl font-bold text-slate-100">Products</h1>
+        <p className="text-slate-400">Analyze profitability by product and SKU</p>
       </div>
 
       {/* Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Products</p>
-                <p className="text-2xl font-bold text-slate-900">{products.length}</p>
+                <p className="text-sm text-slate-400">Total Products</p>
+                <p className="text-2xl font-bold text-slate-100">{products.length}</p>
               </div>
-              <Package className="w-8 h-8 text-slate-200" />
+              <Package className="w-8 h-8 text-slate-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Revenue</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-sm text-slate-400">Total Revenue</p>
+                <p className="text-2xl font-bold text-slate-100">
                   ${stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
-              <TrendingUp className="w-8 h-8 text-blue-200" />
+              <TrendingUp className="w-8 h-8 text-blue-500/30" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Profit</p>
-                <p className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className="text-sm text-slate-400">Total Profit</p>
+                <p className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   ${stats.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
               {stats.totalProfit >= 0 ? (
-                <TrendingUp className="w-8 h-8 text-emerald-200" />
+                <TrendingUp className="w-8 h-8 text-emerald-500/30" />
               ) : (
-                <TrendingDown className="w-8 h-8 text-red-200" />
+                <TrendingDown className="w-8 h-8 text-red-500/30" />
               )}
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Unprofitable</p>
-                <p className={`text-2xl font-bold ${stats.unprofitableCount > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                <p className="text-sm text-slate-400">Unprofitable</p>
+                <p className={`text-2xl font-bold ${stats.unprofitableCount > 0 ? 'text-red-400' : 'text-slate-100'}`}>
                   {stats.unprofitableCount}
                 </p>
               </div>
-              <AlertTriangle className={`w-8 h-8 ${stats.unprofitableCount > 0 ? 'text-red-200' : 'text-slate-200'}`} />
+              <AlertTriangle className={`w-8 h-8 ${stats.unprofitableCount > 0 ? 'text-red-500/30' : 'text-slate-600'}`} />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">High Return Rate</p>
-                <p className={`text-2xl font-bold ${stats.highReturnCount > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                <p className="text-sm text-slate-400">High Return Rate</p>
+                <p className={`text-2xl font-bold ${stats.highReturnCount > 0 ? 'text-amber-400' : 'text-slate-100'}`}>
                   {stats.highReturnCount}
                 </p>
               </div>
-              <Package className={`w-8 h-8 ${stats.highReturnCount > 0 ? 'text-amber-200' : 'text-slate-200'}`} />
+              <Package className={`w-8 h-8 ${stats.highReturnCount > 0 ? 'text-amber-500/30' : 'text-slate-600'}`} />
             </div>
           </CardContent>
         </Card>

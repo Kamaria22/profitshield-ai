@@ -321,11 +321,11 @@ export default function Settings() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-          <SettingsIcon className="w-8 h-8 text-emerald-600" />
+        <h1 className="text-3xl font-bold text-slate-100 flex items-center gap-2">
+          <SettingsIcon className="w-8 h-8 text-emerald-400" />
           Settings
         </h1>
-        <p className="text-slate-500 mt-1">Manage your account, integrations, and preferences</p>
+        <p className="text-slate-400 mt-1">Manage your account, integrations, and preferences</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -361,18 +361,18 @@ export default function Settings() {
               <CardDescription>Manage your Shopify store connection</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 rounded-lg" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'}}>
                 <div className="flex items-center gap-3">
                   {tokenStatus?.hasToken ? (
-                    <CheckCircle className="w-6 h-6 text-emerald-600" />
+                    <CheckCircle className="w-6 h-6 text-emerald-400" />
                   ) : (
-                    <XCircle className="w-6 h-6 text-red-600" />
+                    <XCircle className="w-6 h-6 text-red-400" />
                   )}
                   <div>
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-slate-100">
                       {shopDomain || 'Unknown Store'}
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-400">
                       {tokenStatus?.hasToken 
                         ? 'Connected and syncing orders' 
                         : 'Not connected - orders will not sync'}
@@ -426,10 +426,10 @@ export default function Settings() {
               <CardDescription>Control what data is displayed in the app</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 rounded-lg" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'}}>
                 <div>
-                  <p className="font-medium">Demo Mode (Show Sample Data)</p>
-                  <p className="text-sm text-slate-500">
+                  <p className="font-medium text-slate-100">Demo Mode (Show Sample Data)</p>
+                  <p className="text-sm text-slate-400">
                     When enabled, shows sample/demo orders alongside real data. 
                     Disable to see only real Shopify-synced orders.
                   </p>
@@ -440,12 +440,12 @@ export default function Settings() {
                 />
               </div>
               
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="p-4 rounded-lg" style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)'}}>
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-amber-900">Demo Mode is {settings?.demo_mode !== false ? 'ON' : 'OFF'}</p>
-                    <p className="text-sm text-amber-700 mt-1">
+                    <p className="font-medium text-amber-300">Demo Mode is {settings?.demo_mode !== false ? 'ON' : 'OFF'}</p>
+                    <p className="text-sm text-amber-400/80 mt-1">
                       {settings?.demo_mode !== false 
                         ? 'Sample data is included in your views. Turn off to see only real orders from Shopify.'
                         : 'Only real Shopify-synced orders are shown. Turn on to include demo data for testing.'}
