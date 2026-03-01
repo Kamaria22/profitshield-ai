@@ -41,11 +41,11 @@ export default function ShopifyCallback() {
       if (data?.success) {
         setStatus('success');
         
-        // Redirect to onboarding with shop context
+        // Auto-provisioned — go straight to dashboard, no approval gate
         setTimeout(() => {
-          const onboardingUrl = createPageUrl('Onboarding', `?shop=${shop}&platform=shopify`);
-          window.location.href = onboardingUrl;
-        }, 1000);
+          const homeUrl = createPageUrl('Home', `?shop=${shop}&platform=shopify`);
+          window.location.href = homeUrl;
+        }, 800);
       } else {
         setError(data?.error || 'Installation failed');
         setStatus('error');

@@ -81,11 +81,11 @@ import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import ShopifyCallback from './pages/ShopifyCallback';
+import SupportInbox from './pages/SupportInbox';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import SupportInbox from './pages/SupportInbox';
 import __Layout from './Layout.jsx';
 
 
@@ -124,11 +124,11 @@ export const PAGES = {
     "Settings": Settings,
     "Shipping": Shipping,
     "ShopifyCallback": ShopifyCallback,
+    "SupportInbox": SupportInbox,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "SupportInbox": SupportInbox,
 }
 
 export const pagesConfig = {
