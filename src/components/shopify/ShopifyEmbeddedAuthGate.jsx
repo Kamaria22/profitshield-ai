@@ -151,6 +151,49 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     }
   }
 
+  if (phase === 'install_required') {
+    const { shopDomain, host } = installData || {};
+    const installUrl = `/install?shop=${shopDomain}${host ? `&host=${host}` : ''}`;
+
+    const handleCompleteInstall = () => {
+      // Must break out of Shopify iframe
+      const target = window.top || window;
+      target.location.href = installUrl;
+    };
+
+    return (
+      <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
+          {/* Shopify-green icon */}
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+            style={{ background: '#008060' }}>
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            Complete Your Installation
+          </h1>
+          <p className="text-gray-500 text-sm mb-6">
+            ProfitShield needs to finish connecting to <strong>{shopDomain}</strong>. This only takes a few seconds.
+          </p>
+
+          <button
+            onClick={handleCompleteInstall}
+            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-white text-sm transition-opacity hover:opacity-90"
+            style={{ background: '#008060' }}
+          >
+            <ExternalLink className="w-4 h-4" />
+            Complete Installation
+          </button>
+
+          <p className="text-xs text-gray-400 mt-4">
+            You'll be redirected to Shopify to authorize the app.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === 'authenticating') {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
