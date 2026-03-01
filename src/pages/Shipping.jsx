@@ -155,7 +155,7 @@ export default function Shipping() {
           <p className="text-slate-400">Track shipping costs vs revenue</p>
         </div>
         <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40 bg-white/5 border-white/10 text-slate-200">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -168,74 +168,74 @@ export default function Shipping() {
 
       {/* Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Shipping Charged</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-sm text-slate-400">Shipping Charged</p>
+                <p className="text-2xl font-bold text-slate-100">
                   ${metrics.totalShippingCharged.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-blue-200" />
+              <DollarSign className="w-8 h-8 text-blue-500/30" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Actual Shipping Cost</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-sm text-slate-400">Actual Shipping Cost</p>
+                <p className="text-2xl font-bold text-slate-100">
                   ${metrics.totalShippingCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
-              <Truck className="w-8 h-8 text-slate-200" />
+              <Truck className="w-8 h-8 text-slate-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Shipping Profit</p>
-                <p className={`text-2xl font-bold ${metrics.shippingProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className="text-sm text-slate-400">Shipping Profit</p>
+                <p className={`text-2xl font-bold ${metrics.shippingProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   ${metrics.shippingProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
               {metrics.shippingProfit >= 0 ? (
-                <TrendingUp className="w-8 h-8 text-emerald-200" />
+                <TrendingUp className="w-8 h-8 text-emerald-500/30" />
               ) : (
-                <TrendingDown className="w-8 h-8 text-red-200" />
+                <TrendingDown className="w-8 h-8 text-red-500/30" />
               )}
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Orders at Loss</p>
-                <p className={`text-2xl font-bold ${metrics.lossOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                <p className="text-sm text-slate-400">Orders at Loss</p>
+                <p className={`text-2xl font-bold ${metrics.lossOrders > 0 ? 'text-red-400' : 'text-slate-100'}`}>
                   {metrics.lossOrders}
                 </p>
               </div>
-              <AlertTriangle className={`w-8 h-8 ${metrics.lossOrders > 0 ? 'text-red-200' : 'text-slate-200'}`} />
+              <AlertTriangle className={`w-8 h-8 ${metrics.lossOrders > 0 ? 'text-red-500/30' : 'text-slate-600'}`} />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Chart */}
-      <Card>
+      <Card className="glass-card border-white/5">
         <CardHeader>
-          <CardTitle>Shipping Revenue vs Cost</CardTitle>
+          <CardTitle className="text-slate-200">Shipping Revenue vs Cost</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis 
                   dataKey="date" 
                   axisLine={false}
@@ -250,7 +250,7 @@ export default function Shipping() {
                 />
                 <Tooltip 
                   formatter={(value) => [`$${value.toFixed(2)}`, '']}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15,20,40,0.9)', color: '#e2e8f0' }}
                 />
                 <Legend iconType="circle" iconSize={8} />
                 <Bar dataKey="charged" name="Charged to Customer" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -263,10 +263,10 @@ export default function Shipping() {
 
       {/* Shipping Loss Orders */}
       {shippingLossOrders.length > 0 && (
-        <Card>
+        <Card className="glass-card border-white/5">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-slate-200">
                 <AlertTriangle className="w-5 h-5 text-red-500" />
                 Orders with Shipping Loss
               </CardTitle>
@@ -292,7 +292,7 @@ export default function Shipping() {
                   return (
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">#{order.order_number}</TableCell>
-                      <TableCell className="text-slate-500">
+                      <TableCell className="text-slate-400">
                         {order.order_date ? format(new Date(order.order_date), 'MMM d, yyyy') : '-'}
                       </TableCell>
                       <TableCell className="text-right">
@@ -301,7 +301,7 @@ export default function Shipping() {
                       <TableCell className="text-right">
                         ${(order.shipping_cost || 0).toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-red-600">
+                      <TableCell className="text-right font-semibold text-red-400">
                         -${loss.toFixed(2)}
                       </TableCell>
                     </TableRow>
