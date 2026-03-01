@@ -540,6 +540,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} aria-hidden="true" />
                   {item.name}
+                  {item.adminBadge && (
+                    <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                      style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(129,140,248,0.35)', color: '#a5b4fc' }}>
+                      ADMIN
+                    </span>
+                  )}
                   {item.page === 'Alerts' && pendingAlerts > 0 && (
                     <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
                       {pendingAlerts}
