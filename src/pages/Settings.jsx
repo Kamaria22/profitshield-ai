@@ -671,6 +671,14 @@ export default function Settings() {
             </Suspense>
           </TabsContent>
         )}
+
+        {/* App Store Tab - Admin Only */}
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+          <TabsContent value="app-store" className="mt-6 space-y-6">
+            <ShopifySubmitButton />
+            <ScreenshotGenerator />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
