@@ -254,8 +254,8 @@ export default function Products() {
         </div>
 
         <Select value={profitFilter} onValueChange={setProfitFilter}>
-          <SelectTrigger className="w-44">
-            <Filter className="w-4 h-4 mr-2" />
+          <SelectTrigger className="w-44 bg-white/5 border-white/10 text-slate-200">
+            <Filter className="w-4 h-4 mr-2 text-slate-400" />
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
@@ -269,7 +269,7 @@ export default function Products() {
         </Select>
 
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-48 bg-white/5 border-white/10 text-slate-200">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
