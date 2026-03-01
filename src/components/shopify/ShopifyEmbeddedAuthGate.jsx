@@ -60,6 +60,7 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
   const embedded = isEmbeddedContext();
   const [phase, setPhase] = useState(embedded ? 'authenticating' : 'done');
   const [error, setError] = useState(null);
+  const [installData, setInstallData] = useState(null); // { shopDomain, host }
   const attempted = useRef(false);
 
   useEffect(() => {
