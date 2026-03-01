@@ -170,7 +170,7 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       console.log(`[ShopifyEmbeddedAuthGate] Exchange result:`, data?.authenticated, data?.reason || '');
 
       if (data?.install_required) {
-        // Shop hasn't completed OAuth — show install screen with top-level redirect
+        logEmbeddedEntry({ reason: 'shop_not_installed', status: 200 });
         const p = new URLSearchParams(window.location.search);
         setInstallData({ shopDomain, host: p.get('host') });
         setPhase('install_required');
@@ -178,6 +178,7 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       }
 
       if (!data?.authenticated) {
+        logEmbeddedEntry({ reason: data?.reason || 'auth_failed', status: 401 });
         setError(data?.error || 'Shopify authentication failed');
         setPhase('error');
         return;
