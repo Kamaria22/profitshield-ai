@@ -131,6 +131,25 @@ export function PermissionsProvider({ children }) {
   }, []);
 
   const loadUserPermissions = async () => {
+    // In Shopify embedded mode, Base44 auth.me() will 403 — skip it entirely.
+    // The ShopifyEmbeddedAuthGate is the identity source; grant admin-level perms.
+    const isEmbedded = (() => {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+      } catch { return false; }
+    })();
+
+    if (isEmbedded) {
+      setState({
+        user: null,
+        permissions: DEFAULT_ROLE_PERMISSIONS.admin,
+        role: 'admin',
+        loading: false
+      });
+      return;
+    }
+
     try {
       const user = await base44.auth.me();
       if (!user) {
