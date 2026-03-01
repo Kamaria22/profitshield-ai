@@ -1,17 +1,22 @@
 /**
- * Shopify Session Token Exchange
+ * Shopify Session Token Exchange — PUBLIC ENDPOINT
  * 
- * Called from the embedded app BEFORE any Base44 auth check.
- * 1. Validates the Shopify App Bridge JWT (session token).
+ * This function is intentionally PUBLIC (no Base44 session required).
+ * It is called from the embedded app BEFORE any Base44 auth check.
+ * 
+ * 1. Validates the Shopify App Bridge JWT (session token) — this IS the auth.
  * 2. Extracts shop domain from the token.
- * 3. Looks up or auto-provisions the tenant.
- * 4. Returns a merchant identity payload the frontend can use to skip login.
+ * 3. Looks up the tenant via service-role (no user session needed).
+ * 4. Returns a merchant identity payload the frontend uses to skip login.
  * 
- * Security: Only valid JWTs signed by our SHOPIFY_API_SECRET are accepted.
- * A 403 is returned for invalid/expired tokens.
+ * Security model:
+ *   - Only valid JWTs signed by SHOPIFY_API_SECRET are accepted.
+ *   - Uses asServiceRole for all DB access (never requires a Base44 user session).
+ *   - Returns 401/403 ONLY for invalid/expired/missing token.
+ *   - Returns 200 with install_required:true if shop not installed yet.
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClient } from 'npm:@base44/sdk@0.8.6';
 
 const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
 const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
