@@ -387,6 +387,15 @@ export default function CustomRiskRulesManager({ tenantId }) {
           </div>
           </CardHeader>
           <CardContent>
+        {showAI && (
+          <div className="mb-5">
+            <AIRuleAssistant
+              tenantId={tenantId}
+              onApplyRule={handleAIApplyRule}
+              onClose={() => setShowAI(false)}
+            />
+          </div>
+        )}
         {isLoading ? (
           <div className="text-center py-8 text-slate-500">Loading rules...</div>
         ) : rules.length === 0 ? (
