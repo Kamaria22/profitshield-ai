@@ -135,7 +135,6 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       console.log(`[ShopifyEmbeddedAuthGate] Exchange result:`, data?.authenticated, data?.reason || '');
 
       if (data?.install_required) {
-        logEmbeddedEntry({ reason: 'shop_not_installed', status: 200 });
         const p = new URLSearchParams(window.location.search);
         setInstallData({ shopDomain, host: p.get('host') });
         setPhase('install_required');
