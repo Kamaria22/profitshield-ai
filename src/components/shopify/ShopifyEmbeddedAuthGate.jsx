@@ -36,39 +36,6 @@ function injectShopifyFrameAncestors() {
 
 injectShopifyFrameAncestors();
 
-/**
- * Fire a diagnostic log to the server for every embedded entry.
- * Also used to report any 403s that were caught client-side.
- * Non-blocking, never throws.
- */
-function logEmbeddedEntry({ reason = null, status = null } = {}) {
-  try {
-    const p = new URLSearchParams(window.location.search);
-    const shop = p.get('shop');
-    const host = p.get('host');
-    const embedded = p.get('embedded');
-    if (!shop) return;
-
-    const payload = {
-      shop,
-      host:      host      || null,
-      embedded:  embedded  || null,
-      path:      window.location.pathname + window.location.search,
-      referer:   document.referrer || null,
-      userAgent: navigator.userAgent || null,
-      reason:    reason    || null,
-      status:    status    || null,
-    };
-
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/embeddedentryguard', blob);
-    } else {
-      fetch('/embeddedentryguard', { method: 'POST', body: blob, keepalive: true }).catch(() => {});
-    }
-  } catch (_) {}
-}
-
 function isEmbeddedContext() {
   if (typeof window === 'undefined') return false;
   const p = new URLSearchParams(window.location.search);
