@@ -13,7 +13,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, ExternalLink } from 'lucide-react';
 
 const SHOPIFY_AUTH_KEY = 'shopify_embedded_auth';
 const AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
