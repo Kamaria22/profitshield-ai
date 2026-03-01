@@ -4,9 +4,23 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * SUBSCRIPTION GATING SYSTEM
  * Controls access to features based on subscription tier and trial status
  * Handles 14-day trial period enforcement
+ *
+ * TRIAL LOGIC:
+ * - New tenants always get 14 days from install.
+ * - If trial_end_at is null, treat as active trial (billing fields still syncing).
+ * - "Trial expired" only fires when now > trial_end_at (never on first open).
+ *
+ * REVIEW MODE:
+ * - Tenants within first 7 days of install OR flagged review_mode_enabled=true
+ *   get read-only access with a banner instead of a hard paywall.
+ *
+ * GRACE WINDOW:
+ * - If tenant was created in the last 15 minutes, never block (billing sync lag).
  */
 
 const TRIAL_DAYS = 14;
+const BILLING_SYNC_GRACE_MINUTES = 15;
+const REVIEW_MODE_DAYS = 7;
 
 const TIER_FEATURES = {
   trial: {
