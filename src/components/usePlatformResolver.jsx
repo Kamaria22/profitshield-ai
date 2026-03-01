@@ -167,13 +167,29 @@ export function usePlatformResolver() {
     trace.steps.push(traceStep(TRACE_STEP.PARSE_PERSISTED, { ...persisted, isExpired }, !isExpired || !persisted.persistedAt, isExpired ? 'Context expired (TTL)' : null));
     
     // =====================
-    // STEP 3: Authenticate User
+    // SHOPIFY EMBEDDED SHORT-CIRCUIT
+    // When running inside Shopify Admin iframe with persisted context from ShopifyEmbeddedAuthGate,
+    // skip Base44 auth entirely — the session token exchange IS the authentication.
     // =====================
-    try {
-      user = await base44.auth.me();
-      trace.steps.push(traceStep(TRACE_STEP.AUTH_USER, { email: user?.email, tenant_id: user?.tenant_id }, true, null));
-    } catch (e) {
-      trace.steps.push(traceStep(TRACE_STEP.AUTH_USER, { error: e.message }, false, 'No authenticated user'));
+    const isShopifyEmbedded = !!(urlParams.shop && (urlParams.host || urlParams.embedded === '1'));
+    if (isShopifyEmbedded && hasValidContext(persisted) && persisted.tenantId) {
+      // Fast path: resolve directly from persisted Shopify context
+      platform = 'shopify';
+      storeKey = persisted.storeKey || urlParams.storeKey;
+      tenantId = persisted.tenantId;
+      integrationId = persisted.integrationId;
+      chosenBy = 'shopify_embedded_persisted';
+      trace.steps.push(traceStep('shopify_embedded_shortcircuit', { tenantId, storeKey }, true, 'Shopify embedded: skipping Base44 auth'));
+    } else {
+      // =====================
+      // STEP 3: Authenticate User (non-embedded only)
+      // =====================
+      try {
+        user = await base44.auth.me();
+        trace.steps.push(traceStep(TRACE_STEP.AUTH_USER, { email: user?.email, tenant_id: user?.tenant_id }, true, null));
+      } catch (e) {
+        trace.steps.push(traceStep(TRACE_STEP.AUTH_USER, { error: e.message }, false, 'No authenticated user'));
+      }
     }
     
     if (isStale()) return;
