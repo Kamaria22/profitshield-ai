@@ -156,7 +156,8 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
   return <>{children}</>;
 }
 
-function TrialExpiredOverlay({ onSubscribe }) {
+function TrialExpiredOverlay({ onSubscribe, onRestore, reason }) {
+  const [restoring, setRestoring] = React.useState(false);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -169,9 +170,13 @@ function TrialExpiredOverlay({ onSubscribe }) {
           style={{ boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}>
           <Lock className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-3">Trial Expired</h2>
+        <h2 className="text-2xl font-bold text-white mb-3">
+          {reason === 'subscription_ended' ? 'Subscription Ended' : 'Trial Expired'}
+        </h2>
         <p className="text-slate-400 mb-6">
-          Your 14-day free trial has ended. Subscribe to continue protecting your profits.
+          {reason === 'subscription_ended'
+            ? 'Your subscription has ended. Renew to continue protecting your profits.'
+            : 'Your 14-day free trial has ended. Subscribe to continue protecting your profits.'}
         </p>
         <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/5">
           <p className="text-sm text-slate-300 mb-1">Your data is safe</p>
@@ -179,15 +184,41 @@ function TrialExpiredOverlay({ onSubscribe }) {
         </div>
         <Button
           onClick={onSubscribe}
-          className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white border-0"
+          className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white border-0 mb-3"
           size="lg"
         >
           <CreditCard className="w-5 h-5 mr-2" />
           Subscribe Now
         </Button>
+        <Button
+          onClick={async () => { setRestoring(true); await onRestore?.(); setRestoring(false); }}
+          variant="ghost"
+          className="w-full text-slate-400 hover:text-white"
+          disabled={restoring}
+        >
+          {restoring ? 'Checking…' : 'Restore Access (already subscribed?)'}
+        </Button>
         <p className="text-xs text-slate-600 mt-4">Plans from $49/month</p>
       </div>
     </motion.div>
+  );
+}
+
+function GraceWindowBanner() {
+  return (
+    <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm">
+      <div className="animate-spin w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full flex-shrink-0" />
+      <span>Verifying subscription… You'll have full access in a moment.</span>
+    </div>
+  );
+}
+
+function ReviewModeBanner() {
+  return (
+    <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+      <Shield className="w-4 h-4 flex-shrink-0" />
+      <span>Review mode — subscription required to enable protection actions.</span>
+    </div>
   );
 }
 
