@@ -158,9 +158,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // PUBLIC ENDPOINT — use service-role client, NOT createClientFromRequest
-    // This means no Base44 session is needed to call this function.
-    const base44 = getServiceClient();
+    // PUBLIC ENDPOINT — use asServiceRole so no Base44 user session is required.
+    const base44 = createClientFromRequest(req).asServiceRole;
 
     let bodyText = '';
     try {
