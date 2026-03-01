@@ -84,6 +84,7 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
+import HelpCenter from './pages/HelpCenter';
 import __Layout from './Layout.jsx';
 
 
@@ -125,6 +126,7 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
+    "HelpCenter": HelpCenter,
 }
 
 export const pagesConfig = {
