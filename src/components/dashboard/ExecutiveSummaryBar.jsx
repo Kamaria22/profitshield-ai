@@ -43,43 +43,50 @@ export default function ExecutiveSummaryBar({
                     riskLevel === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500';
 
   return (
-    <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
+    <div className="bg-slate-950/80 backdrop-blur-xl border-b border-white/5 px-4 py-2.5 sticky top-0 z-20">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Left: Store Info */}
-        <div className="flex items-center gap-3">
+        {/* Left: Store Identity */}
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-900 truncate max-w-[150px]">
+            <span className="font-semibold text-slate-100 truncate max-w-[150px]" style={{ textShadow: '0 0 12px rgba(129,140,248,0.3)' }}>
               {tenant?.shop_name || 'My Store'}
             </span>
-            <Badge variant="outline" className="text-xs capitalize">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
+              style={{ background: 'rgba(149,196,105,0.12)', border: '1px solid rgba(149,196,105,0.3)', color: '#a8d982', textShadow: '0 0 8px rgba(149,196,105,0.4)' }}>
               {tenant?.platform || 'shopify'}
-            </Badge>
+            </span>
           </div>
-          <div className="h-4 w-px bg-slate-200" />
-          <Badge className={`text-xs ${tier === 'trial' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-            {tier === 'trial' ? `Trial • ${trialDays}d left` : tier}
-          </Badge>
+          <div className="h-4 w-px bg-white/8" />
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
+            style={tier === 'trial'
+              ? { background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.28)', color: '#fcd34d', textShadow: '0 0 8px rgba(251,191,36,0.35)' }
+              : { background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', color: '#6ee7b7', textShadow: '0 0 8px rgba(52,211,153,0.35)' }}>
+            {tier === 'trial' ? `Trial · ${trialDays}d` : tier}
+          </span>
           {isDemo && (
-            <Badge className="bg-blue-100 text-blue-700 text-xs">Demo</Badge>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
+              style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.3)', color: '#a5b4fc' }}>
+              Demo
+            </span>
           )}
         </div>
 
-        {/* Center: Key Metrics */}
-        <div className="flex items-center gap-6">
-          <MetricChip 
-            label="Net Profit" 
+        {/* Center: Metrics */}
+        <div className="flex items-center gap-5">
+          <MetricChip
+            label="Net Profit"
             value={`$${totalProfit >= 1000 ? `${(totalProfit / 1000).toFixed(1)}k` : totalProfit.toFixed(0)}`}
             trend={totalProfit >= 0 ? 'up' : 'down'}
             color={totalProfit >= 0 ? 'emerald' : 'red'}
           />
-          <MetricChip 
-            label="Integrity" 
+          <MetricChip
+            label="Integrity"
             value={profitScore}
             suffix="/100"
             color={profitScore >= 70 ? 'emerald' : profitScore >= 40 ? 'amber' : 'red'}
           />
-          <MetricChip 
-            label="Risk" 
+          <MetricChip
+            label="Risk"
             value={riskLevel}
             dotColor={riskColor}
           />
@@ -88,9 +95,10 @@ export default function ExecutiveSummaryBar({
         {/* Right: Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button size="sm" className="gap-2 text-xs h-8 border-0"
+              style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.25)', color: '#a5b4fc' }}>
               Actions
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
