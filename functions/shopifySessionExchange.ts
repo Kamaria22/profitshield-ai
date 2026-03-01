@@ -230,6 +230,11 @@ Deno.serve(async (req) => {
 
     console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'}`);
 
+    // is_new_tenant = true triggers the guided onboarding flow on first open
+    const isNewTenant = !tenant.onboarding_completed;
+
+    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'} is_new=${isNewTenant}`);
+
     // Return authenticated context — frontend persists this to skip Base44 login
     return jsonResponse({
       authenticated: true,
@@ -238,7 +243,8 @@ Deno.serve(async (req) => {
       tenant_name: tenant.shop_name || shopDomain,
       integration_id: integration?.id || null,
       platform: 'shopify',
-      shopify_authenticated: true
+      shopify_authenticated: true,
+      is_new_tenant: isNewTenant,
     });
 
   } catch (error) {
