@@ -40,11 +40,14 @@ export default function ShopifyCallback() {
 
       if (data?.success) {
         setStatus('success');
-        
-        // Auto-provisioned — go straight to dashboard, no approval gate
+
+        // Redirect back into the Shopify embedded context.
+        // Use window.top to break out of any iframe and load the embedded app URL.
         setTimeout(() => {
-          const homeUrl = createPageUrl('Home', `?shop=${shop}&platform=shopify`);
-          window.location.href = homeUrl;
+          const host = urlParams.get('host');
+          const embeddedUrl = `/?shop=${shop}&platform=shopify${host ? `&host=${host}&embedded=1` : ''}`;
+          const target = window.top || window;
+          target.location.href = embeddedUrl;
         }, 800);
       } else {
         setError(data?.error || 'Installation failed');
