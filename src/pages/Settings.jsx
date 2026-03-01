@@ -475,6 +475,15 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* Shopify Integration Tab */}
+        <TabsContent value="shopify" className="mt-6">
+          <ShopifyIntegrationPanel
+            tenantId={tenantId}
+            shopDomain={shopDomain}
+            resolver={resolver}
+          />
+        </TabsContent>
+
         {/* Costs Tab */}
         <TabsContent value="costs" className="mt-6 space-y-6">
           <CostMappingTable tenantId={tenantId} costMappings={costMappings} isLoading={costsLoading} />
