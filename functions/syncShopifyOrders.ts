@@ -294,10 +294,24 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Failed to decrypt access token. Please reconnect your store.' }, { status: 500 });
     }
     
-    console.log('[syncShopifyOrders] Fetching orders from Shopify for:', tenant.shop_domain);
+    // Get integration record
+    const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
+      tenant_id: tenant.id,
+      platform: 'shopify'
+    });
+    const integration = integrations[0] || null;
+    const integrationId = integration?.id || null;
+
+    console.log('[syncShopifyOrders] Fetching orders from Shopify for:', tenant.shop_domain, 'days:', days);
     
-    // Fetch recent orders from Shopify
-    const shopifyUrl = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?status=any&limit=50`;
+    // Paginate through orders (up to 5 pages = 250*5 = 1250 orders)
+    const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
+    let allOrders = [];
+    let pageUrl = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
+    let pageCount = 0;
+
+    while (pageUrl && pageCount < 5) {
+      const shopifyUrl = pageUrl;
     const shopifyRes = await fetch(shopifyUrl, {
       headers: {
         'X-Shopify-Access-Token': accessToken,
