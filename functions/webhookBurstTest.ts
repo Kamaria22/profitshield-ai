@@ -170,6 +170,9 @@ Deno.serve(async (req) => {
       // Throttle between waves to stay under platform rate limits (~5 req/s safe)
       const WAVE_DELAY_MS = 300;
 
+      // Use service-role client for all DB ops
+      const db = base44.asServiceRole;
+
       // Process in batches of `workers`
       const startAll = Date.now();
       for (let offset = 0; offset < queue.length; offset += workers) {
@@ -177,7 +180,7 @@ Deno.serve(async (req) => {
         const waveResults = await Promise.allSettled(
           wave.map(async (payload) => {
             const t0 = Date.now();
-            const result = await processOrderLocally(base44, tenant_id, payload);
+            const result = await processOrderLocally(db, tenant_id, payload);
             const elapsed = Date.now() - t0;
             if (elapsed > TIMEOUT_MS) results.timeouts++;
             return result;
