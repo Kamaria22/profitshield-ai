@@ -312,21 +312,36 @@ Deno.serve(async (req) => {
 
     while (pageUrl && pageCount < 5) {
       const shopifyUrl = pageUrl;
-    const shopifyRes = await fetch(shopifyUrl, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json'
+      const shopifyRes = await fetch(shopifyUrl, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!shopifyRes.ok) {
+        const errorText = await shopifyRes.text();
+        console.error('[syncShopifyOrders] Shopify API error:', shopifyRes.status, errorText);
+        if (pageCount === 0) {
+          return Response.json({ error: `Shopify API error: ${shopifyRes.status}: ${errorText}` }, { status: 500 });
+        }
+        break; // Partial sync OK if first page succeeded
       }
-    });
-    
-    if (!shopifyRes.ok) {
-      const errorText = await shopifyRes.text();
-      console.error('[syncShopifyOrders] Shopify API error:', shopifyRes.status, errorText);
-      return Response.json({ error: `Shopify API error: ${shopifyRes.status}` }, { status: 500 });
+      
+      const pageData = await shopifyRes.json();
+      const pageOrders = pageData.orders || [];
+      allOrders = allOrders.concat(pageOrders);
+      console.log(`[syncShopifyOrders] Page ${pageCount + 1}: fetched ${pageOrders.length} orders (total: ${allOrders.length})`);
+
+      // Check for next page via Link header
+      const linkHeader = shopifyRes.headers.get('link') || '';
+      const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+      pageUrl = nextMatch ? nextMatch[1] : null;
+      pageCount++;
     }
-    
-    const { orders: shopifyOrders } = await shopifyRes.json();
-    console.log('[syncShopifyOrders] Fetched orders from Shopify:', shopifyOrders.length);
+
+    const shopifyOrders = allOrders;
+    console.log('[syncShopifyOrders] Total orders fetched from Shopify:', shopifyOrders.length);
     
     // Get cost mappings, settings, and custom risk rules
     const [costMappings, settingsData, customRules] = await Promise.all([
