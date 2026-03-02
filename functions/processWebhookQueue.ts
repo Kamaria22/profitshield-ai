@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
         const payload = job.payload;
 
         if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
-          await processOrderJob(db, tenant, payload);
+          await processOrderJob(db, tenant, payload, job);
         } else if (topic === 'refunds/create') {
           await processRefundJob(db, tenant, payload);
         } else {
