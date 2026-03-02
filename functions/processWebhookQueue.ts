@@ -189,6 +189,71 @@ async function processRefundJob(db, tenant, payload) {
   }
 }
 
+// ─── Process products/update ─────────────────────────────────────────────────
+async function processProductUpdateJob(db, tenant, payload) {
+  const productId = payload.id?.toString();
+  if (!productId) return;
+
+  const existing = await db.entities.Product.filter({
+    tenant_id: tenant.id,
+    platform_product_id: productId
+  });
+
+  const variants = (payload.variants || []).map(v => ({
+    variant_id: v.id?.toString(),
+    title: v.title,
+    sku: v.sku,
+    price: parseFloat(v.price || 0),
+    inventory_quantity: v.inventory_quantity ?? null,
+    compare_at_price: v.compare_at_price ? parseFloat(v.compare_at_price) : null
+  }));
+
+  const rec = {
+    tenant_id: tenant.id,
+    platform_product_id: productId,
+    title: payload.title,
+    handle: payload.handle,
+    product_type: payload.product_type,
+    vendor: payload.vendor,
+    status: payload.status || 'active',
+    tags: typeof payload.tags === 'string' ? payload.tags.split(',').map(t => t.trim()).filter(Boolean) : (payload.tags || []),
+    variants,
+    images: (payload.images || []).map(img => img.src),
+    updated_at_platform: payload.updated_at
+  };
+
+  if (existing.length > 0) {
+    console.log(`[processProductUpdateJob] Updating product ${productId} for tenant ${tenant.id}`);
+    await db.entities.Product.update(existing[0].id, rec);
+  } else {
+    console.log(`[processProductUpdateJob] Creating product ${productId} for tenant ${tenant.id}`);
+    await db.entities.Product.create(rec);
+  }
+}
+
+// ─── Process orders/cancelled ─────────────────────────────────────────────────
+async function processOrderCancelledJob(db, tenant, payload) {
+  const platformOrderId = payload.id?.toString();
+  if (!platformOrderId) return;
+
+  const existing = await db.entities.Order.filter({
+    tenant_id: tenant.id,
+    platform_order_id: platformOrderId
+  });
+
+  if (existing.length > 0) {
+    console.log(`[processOrderCancelledJob] Marking order ${platformOrderId} cancelled for tenant ${tenant.id}`);
+    await db.entities.Order.update(existing[0].id, {
+      status: 'cancelled',
+      fulfillment_status: payload.fulfillment_status || existing[0].fulfillment_status,
+      cancelled_at: payload.cancelled_at || new Date().toISOString(),
+      cancel_reason: payload.cancel_reason || null
+    });
+  } else {
+    console.log(`[processOrderCancelledJob] Order ${platformOrderId} not found locally — skipping cancellation`);
+  }
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   try {
