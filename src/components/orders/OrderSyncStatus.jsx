@@ -63,7 +63,12 @@ export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
       onSynced?.();
     },
     onError: (err) => {
-      toast.error(`Sync failed: ${err.message}`);
+      // Token missing = need re-auth, guide the user
+      if (err.message?.toLowerCase().includes('token') || err.message?.toLowerCase().includes('reconnect')) {
+        toast.error('No Shopify token found. Please reconnect your store via Integrations → re-authenticate.', { duration: 6000 });
+      } else {
+        toast.error(`Sync failed: ${err.message}`);
+      }
     },
   });
 
