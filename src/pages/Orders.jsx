@@ -315,7 +315,7 @@ export default function Orders() {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Orders</h1>
           <p className="text-slate-400">
@@ -325,6 +325,11 @@ export default function Orders() {
             )}
           </p>
         </div>
+        <OrderSyncStatus
+          tenantId={resolverCheck.tenantId}
+          integrationId={resolverCheck.integrationId}
+          onSynced={() => queryClient.invalidateQueries({ queryKey: ordersQueryKey })}
+        />
       </div>
 
       {/* Stats Bar */}
