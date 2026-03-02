@@ -1088,6 +1088,11 @@ export default function FounderDashboard() {
         <TabsContent value="billing-admin" className="mt-4">
           <BillingAdminPanel />
         </TabsContent>
+
+        {/* Shopify Debug Tab */}
+        <TabsContent value="shopify-debug" className="mt-4">
+          <ShopifyDebugPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
