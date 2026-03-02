@@ -458,8 +458,16 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const subscriptionTier = isResolved && resolver.tenant?.subscription_tier ? resolver.tenant.subscription_tier : null;
   const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 
+  // Shopify App Bridge nav — only in embedded context, after resolver resolves
+  const isEmbedded = detectEmbedded();
+
   return (
     <div className="min-h-screen bg-slate-950">
+      {/* Shopify App Bridge Navigation Menu */}
+      {isEmbedded && isResolved && (
+        <ShopifyNavMenu isAdmin={isAdmin} />
+      )}
+
       {/* Command Palette */}
       <CommandPalette />
 
