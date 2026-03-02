@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
             results[r.value.status] = (results[r.value.status] || 0) + 1;
           } else {
             results.errors++;
-            console.error('[burstTest] wave error:', r.reason?.message);
+            console.error('[burstTest] wave error:', r.reason?.message, r.reason?.stack);
           }
         }
 
