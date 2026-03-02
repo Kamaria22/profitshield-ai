@@ -128,19 +128,80 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
 
   const handleReconnect = async () => {
     setReconnecting(true);
+    setConnectionStatus(null);
     try {
       const result = await callSettingsApi({ action: 'reconnect', tenant_id: tenantId, shop: shopDomain });
       if (result?.install_url) {
-        // Break out of Shopify iframe for OAuth
-        const target = window.top || window;
-        target.location.href = result.install_url;
+        const oauthUrl = result.install_url;
+        const embedded = isEmbedded();
+
+        console.log('[ShopifyIntegrationPanel] OAuth start — url:', oauthUrl,
+          '| embedded:', embedded,
+          '| shopDomain:', shopDomain);
+
+        // Embedded: use App Bridge Redirect to break out of iframe properly
+        if (embedded) {
+          try {
+            const { Redirect } = await import('@shopify/app-bridge/actions');
+            const { default: createApp } = await import('@shopify/app-bridge');
+            const urlParams = new URLSearchParams(window.location.search);
+            const app = createApp({
+              apiKey: window.__SHOPIFY_API_KEY__ || '',
+              host: urlParams.get('host') || '',
+            });
+            const redirect = Redirect.create(app);
+            console.log('[ShopifyIntegrationPanel] Using App Bridge Redirect');
+            redirect.dispatch(Redirect.Action.REMOTE, oauthUrl);
+            return;
+          } catch (bridgeErr) {
+            console.warn('[ShopifyIntegrationPanel] App Bridge failed, falling back to window.top:', bridgeErr.message);
+          }
+        }
+
+        // Non-embedded or App Bridge fallback: redirect top window
+        try {
+          if (window.top && window.top !== window) {
+            console.log('[ShopifyIntegrationPanel] Redirecting window.top to OAuth URL');
+            window.top.location.href = oauthUrl;
+          } else {
+            console.log('[ShopifyIntegrationPanel] Redirecting window.location to OAuth URL');
+            window.location.href = oauthUrl;
+          }
+        } catch (_) {
+          // Cross-origin restriction — show modal with "open new tab"
+          console.warn('[ShopifyIntegrationPanel] window.top inaccessible — showing new-tab modal');
+          setPendingOAuthUrl(oauthUrl);
+          setShowNewTabModal(true);
+          setReconnecting(false);
+        }
       } else {
         toast.error('Failed to get installation URL');
+        setReconnecting(false);
       }
     } catch (e) {
       toast.error('Reconnect failed: ' + e.message);
-    } finally {
       setReconnecting(false);
+    }
+  };
+
+  const handleCheckConnection = async () => {
+    if (!tenantId) return;
+    try {
+      const result = await callSettingsApi({ action: 'get', tenant_id: tenantId });
+      const status = result?.integration?.status;
+      const tokenId = result?.integration?.token_id;
+      const connected = status === 'connected' && !!tokenId;
+      console.log('[ShopifyIntegrationPanel] Connection check — status:', status, '| token_id:', tokenId, '| connected:', connected);
+      setConnectionStatus(connected ? 'connected' : 'failed');
+      if (connected) {
+        toast.success('Shopify connected ✅');
+        queryClient.invalidateQueries({ queryKey: ['shopifyIntegrationPanel', tenantId] });
+      } else {
+        toast.error('Shopify not connected ❌ — token may be missing');
+      }
+    } catch (e) {
+      setConnectionStatus('failed');
+      toast.error('Connection check failed: ' + e.message);
     }
   };
 
