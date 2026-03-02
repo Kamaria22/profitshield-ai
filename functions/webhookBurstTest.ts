@@ -40,6 +40,23 @@ function idempotencyKey(tenantId, topic, eventId) {
   return `${tenantId}:${topic}:${eventId}`;
 }
 
+// Retry-aware DB call: retries up to 4x on 429 with exponential backoff
+async function withRetry(fn, maxAttempts = 4) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const is429 = e?.message?.includes('Rate limit') || e?.status === 429;
+      if (is429 && attempt < maxAttempts - 1) {
+        const delay = 500 * Math.pow(2, attempt) + Math.random() * 200;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 // Lightweight HMAC-less order processing (no external calls — pure logic test)
 async function processOrderLocally(db, tenantId, orderPayload, seen) {
   const platformOrderId = orderPayload.id.toString();
@@ -51,11 +68,11 @@ async function processOrderLocally(db, tenantId, orderPayload, seen) {
   }
   seen.add(key);
 
-  // Upsert order row — check for existing first to avoid duplicate rows
-  const existingOrders = await db.entities.Order.filter({
+  // Upsert order row with retry on 429
+  const existingOrders = await withRetry(() => db.entities.Order.filter({
     tenant_id: tenantId,
     platform_order_id: platformOrderId
-  });
+  }));
 
   const revenue = parseFloat(orderPayload.total_price);
   const cogs = revenue * 0.4;   // fixed 40% COGS for deterministic test
@@ -75,10 +92,10 @@ async function processOrderLocally(db, tenantId, orderPayload, seen) {
   };
 
   if (existingOrders.length > 0) {
-    await db.entities.Order.update(existingOrders[0].id, orderRecord);
+    await withRetry(() => db.entities.Order.update(existingOrders[0].id, orderRecord));
     return { status: 'updated', platformOrderId };
   } else {
-    await db.entities.Order.create(orderRecord);
+    await withRetry(() => db.entities.Order.create(orderRecord));
     return { status: 'created', platformOrderId };
   }
 }
