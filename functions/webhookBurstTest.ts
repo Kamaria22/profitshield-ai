@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
       const totalElapsedMs = Date.now() - startAll;
 
       // ── Drift validation: fetch what was actually written ──────────────────
-      const writtenOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id });
+      const writtenOrders = await db.entities.Order.filter({ tenant_id });
       const burstWritten = writtenOrders.filter(o => o.platform_order_id?.startsWith(`burst_${batchId}_`));
 
       let actualRevenue = 0;
