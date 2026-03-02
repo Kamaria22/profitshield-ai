@@ -3,7 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 /**
  * SUBSCRIPTION GATING SYSTEM
  * Controls access to features based on subscription tier and trial status
- * Handles 14-day trial period enforcement
+ * Handles 30-day trial period enforcement
  *
  * TRIAL LOGIC:
  * - New tenants always get 14 days from install.
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
           subject: '⚠️ Your ProfitShield Trial Has Ended',
           body: `Hi,
 
-Your 14-day ProfitShield trial has ended. Your account has been temporarily locked.
+Your 30-day ProfitShield trial has ended. Your account has been temporarily locked.
 
 To continue protecting your profits and accessing all features, please subscribe to a plan:
 
@@ -289,7 +289,7 @@ function checkAccess(tenant, feature) {
     return {
       allowed: false,
       reason: 'trial_expired',
-      message: 'Your 14-day trial has ended. Subscribe to continue protecting your profits.',
+      message: 'Your 30-day trial has ended. Subscribe to continue protecting your profits.',
       upgrade_required: true
     };
   }
