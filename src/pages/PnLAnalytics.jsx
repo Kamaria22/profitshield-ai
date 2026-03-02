@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
