@@ -219,6 +219,34 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
   return (
     <div className="space-y-6">
 
+      {/* ── New Tab Modal (iframe fallback) ── */}
+      <Dialog open={showNewTabModal} onOpenChange={setShowNewTabModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-indigo-400" />
+              Open Shopify Authorization
+            </DialogTitle>
+            <DialogDescription>
+              The Shopify authorization page must be opened outside this frame. Click below to continue in a new tab.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setShowNewTabModal(false)}>Cancel</Button>
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700 gap-2"
+              onClick={() => {
+                window.open(pendingOAuthUrl, '_blank', 'noopener,noreferrer');
+                setShowNewTabModal(false);
+              }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Continue in new tab
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Connection Status ── */}
       <Card>
         <CardHeader>
@@ -249,26 +277,56 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
                   Active
                 </Badge>
               )}
-              <Button
-                variant="outline"
-                onClick={handleReconnect}
-                disabled={reconnecting}
-                className="gap-2"
-              >
-                {reconnecting
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</>
-                  : <><ExternalLink className="w-4 h-4" /> Re-authenticate</>}
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  variant="outline"
+                  onClick={handleReconnect}
+                  disabled={reconnecting}
+                  className="gap-2"
+                >
+                  {reconnecting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</>
+                    : <><Lock className="w-4 h-4" /> Connect Shopify (opens securely)</>}
+                </Button>
+                <p className="text-xs text-slate-500">This will open a secure Shopify authorization page.</p>
+              </div>
             </div>
           </div>
+
+          {/* Post-OAuth connection check indicator */}
+          {connectionStatus && (
+            <div className={`p-3 rounded-lg flex items-center gap-3 ${connectionStatus === 'connected'
+              ? 'bg-emerald-500/10 border border-emerald-500/25'
+              : 'bg-red-500/10 border border-red-500/25'}`}>
+              {connectionStatus === 'connected'
+                ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                : <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
+              <p className={`text-sm font-medium ${connectionStatus === 'connected' ? 'text-emerald-300' : 'text-red-300'}`}>
+                {connectionStatus === 'connected' ? 'Connected ✅ — token verified and saved.' : 'Not connected ❌ — token may be missing or expired.'}
+              </p>
+              <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => setConnectionStatus(null)}>
+                Dismiss
+              </Button>
+            </div>
+          )}
 
           {!isConnected && (
             <div className="p-3 rounded-lg flex items-start gap-3"
               style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
               <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <p className="text-sm text-red-300">
-                Your Shopify access token is missing or expired. Click Re-authenticate to reconnect.
-              </p>
+              <div className="flex-1">
+                <p className="text-sm text-red-300">
+                  Your Shopify access token is missing or expired. Click "Connect Shopify" to reconnect.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-slate-400 hover:text-slate-200 shrink-0"
+                onClick={handleCheckConnection}
+              >
+                Check connection
+              </Button>
             </div>
           )}
         </CardContent>
