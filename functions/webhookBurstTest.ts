@@ -139,6 +139,19 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, deleted_orders: deleted, deleted_events: testEvents.length });
     }
 
+    // ── SINGLE SMOKE TEST ────────────────────────────────────────────────────
+    if (action === 'smoke_test') {
+      const db = base44.asServiceRole;
+      const batchId = 'smoke';
+      const p = makeOrderPayload(0, batchId);
+      try {
+        const r = await processOrderLocally(db, tenant_id, p);
+        return Response.json({ success: true, result: r });
+      } catch (e) {
+        return Response.json({ success: false, error: e.message, stack: e.stack });
+      }
+    }
+
     // ── RUN BURST TEST ────────────────────────────────────────────────────────
     if (action === 'run_burst_test') {
       const batchId = Date.now().toString(36);
