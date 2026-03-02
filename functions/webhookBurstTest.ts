@@ -41,18 +41,18 @@ function idempotencyKey(tenantId, topic, eventId) {
 }
 
 // Lightweight HMAC-less order processing (no external calls — pure logic test)
-async function processOrderLocally(base44, tenantId, orderPayload) {
+async function processOrderLocally(db, tenantId, orderPayload) {
   const platformOrderId = orderPayload.id.toString();
 
   // Idempotency: check for existing WebhookEvent
   const key = idempotencyKey(tenantId, 'orders/create', platformOrderId);
-  const existing = await base44.asServiceRole.entities.WebhookEvent.filter({ idempotency_key: key });
+  const existing = await db.entities.WebhookEvent.filter({ idempotency_key: key });
   if (existing.length > 0) {
     return { status: 'duplicate', key };
   }
 
   // Record webhook event (idempotency anchor)
-  await base44.asServiceRole.entities.WebhookEvent.create({
+  await db.entities.WebhookEvent.create({
     tenant_id: tenantId,
     topic: 'orders/create',
     event_id: platformOrderId,
@@ -63,7 +63,7 @@ async function processOrderLocally(base44, tenantId, orderPayload) {
   });
 
   // Upsert order row — check for existing first to avoid duplicate rows
-  const existingOrders = await base44.asServiceRole.entities.Order.filter({
+  const existingOrders = await db.entities.Order.filter({
     tenant_id: tenantId,
     platform_order_id: platformOrderId
   });
@@ -83,14 +83,14 @@ async function processOrderLocally(base44, tenantId, orderPayload) {
     total_cogs: cogs,
     net_profit: netProfit,
     margin_pct: (netProfit / revenue) * 100,
-    burst_batch_id: orderPayload.id.split('_')[1] || 'unknown'   // tag for cleanup
+    burst_tag: `burst_${orderPayload.id.split('_')[1] || 'unknown'}`
   };
 
   if (existingOrders.length > 0) {
-    await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
+    await db.entities.Order.update(existingOrders[0].id, orderRecord);
     return { status: 'updated', platformOrderId };
   } else {
-    await base44.asServiceRole.entities.Order.create(orderRecord);
+    await db.entities.Order.create(orderRecord);
     return { status: 'created', platformOrderId };
   }
 }
