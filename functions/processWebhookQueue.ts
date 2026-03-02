@@ -95,8 +95,19 @@ async function processOrderJob(db, tenant, payload) {
     platform_order_id: payload.id.toString()
   });
 
+  // Resolve integration_id for this job
+  let integrationId = job.integration_id || null;
+  if (!integrationId) {
+    try {
+      const integrations = await db.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
+      integrationId = integrations[0]?.id || null;
+    } catch (_) {}
+  }
+
   const rec = {
     tenant_id: tenant.id,
+    integration_id: integrationId,
+    shop_domain: tenant.shop_domain,
     platform_order_id: payload.id.toString(),
     order_number: payload.order_number?.toString() || payload.name,
     customer_email: payload.email,
@@ -104,12 +115,15 @@ async function processOrderJob(db, tenant, payload) {
       ? `${payload.customer.first_name} ${payload.customer.last_name || ''}`.trim()
       : payload.shipping_address?.name,
     order_date: payload.created_at,
-    status: mapStatus(payload),
+    processed_at: payload.processed_at || payload.created_at,
+    financial_status: payload.financial_status,
     fulfillment_status: payload.fulfillment_status || 'unfulfilled',
+    status: mapStatus(payload),
     billing_address: payload.billing_address,
     shipping_address: payload.shipping_address,
     discount_codes: payload.discount_codes?.map(d => d.code) || [],
     is_first_order: !payload.customer || payload.customer.orders_count <= 1,
+    is_demo: false,
     ...profitData,
     ...riskData,
     platform_data: payload
