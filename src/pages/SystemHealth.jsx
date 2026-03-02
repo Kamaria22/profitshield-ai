@@ -102,6 +102,30 @@ export default function SystemHealth() {
         <AutonomousHealthDashboard tenantId={queryFilter.tenant_id} />
       )}
 
+      {/* ADMIN-ONLY: Security + Queue Observability */}
+      {isAdmin && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Lock className="w-3 h-3" />
+            <span className="font-medium">Admin-Only Section</span> — Webhook security, queue metrics, and audit tools
+          </div>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <WebhookSecurityPanel />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Database className="w-4 h-4 text-slate-600" />
+                  Queue Observability
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <QueueObservabilityPanel tenantId={canQuery ? queryFilter.tenant_id : null} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* Overview Cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
