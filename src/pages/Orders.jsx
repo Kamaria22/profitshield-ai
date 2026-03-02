@@ -7,7 +7,6 @@ import { subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { invariant } from '@/components/utils/invariant';
 import { 
-  Search, 
   Download,
   SlidersHorizontal,
   X,
@@ -17,7 +16,6 @@ import {
   Store,
   AlertTriangle
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
