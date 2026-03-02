@@ -38,6 +38,7 @@ export default function PnLAnalytics() {
   const { tenantId, status } = usePlatformResolver();
   const { hasPermission } = usePermissions();
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
+  const queryClient = useQueryClient();
   
   const [datePreset, setDatePreset] = useState('30d');
   const [dateRange, setDateRange] = useState(DATE_PRESETS[2].getDates());
