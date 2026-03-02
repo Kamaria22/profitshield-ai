@@ -167,6 +167,8 @@ Deno.serve(async (req) => {
 
       const results = { created: 0, updated: 0, duplicate: 0, errors: 0, timeouts: 0 };
       const TIMEOUT_MS = 8000; // 8s per item considered a timeout
+      // Throttle between waves to stay under platform rate limits (~5 req/s safe)
+      const WAVE_DELAY_MS = 300;
 
       // Process in batches of `workers`
       const startAll = Date.now();
@@ -189,6 +191,11 @@ Deno.serve(async (req) => {
             results.errors++;
             console.error('[burstTest] wave error:', r.reason?.message);
           }
+        }
+
+        // Throttle between waves
+        if (offset + workers < queue.length) {
+          await new Promise(res => setTimeout(res, WAVE_DELAY_MS));
         }
       }
 
