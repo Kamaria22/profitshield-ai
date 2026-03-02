@@ -68,6 +68,9 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
   const [autoCancelThreshold, setAutoCancelThreshold] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null); // 'connected' | 'failed' | null
+  const [showNewTabModal, setShowNewTabModal] = useState(false);
+  const [pendingOAuthUrl, setPendingOAuthUrl] = useState(null);
 
   // Hydrate local state once data loads
   useEffect(() => {
