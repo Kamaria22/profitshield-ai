@@ -81,7 +81,7 @@ function mapStatus(order) {
 }
 
 // ─── Process a single order job ──────────────────────────────────────────────
-async function processOrderJob(db, tenant, payload) {
+async function processOrderJob(db, tenant, payload, job) {
   const [costMappings, settingsData] = await Promise.all([
     db.entities.CostMapping.filter({ tenant_id: tenant.id }),
     db.entities.TenantSettings.filter({ tenant_id: tenant.id })
