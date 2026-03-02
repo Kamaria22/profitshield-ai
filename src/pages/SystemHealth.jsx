@@ -25,6 +25,14 @@ import {
 } from 'lucide-react';
 
 export default function SystemHealth() {
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(u => setUserRole(u?.role)).catch(() => {});
+  }, []);
+
+  const isAdmin = userRole === 'admin';
+
   // SINGLE SOURCE OF TRUTH: Platform Resolver
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
