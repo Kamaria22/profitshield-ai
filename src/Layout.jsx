@@ -57,6 +57,7 @@ import {
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import ShopifyEmbeddedAuthGate from '@/components/shopify/ShopifyEmbeddedAuthGate';
+import ShopifyNavMenu from '@/components/shopify/ShopifyNavMenu';
 
 // Debug: log embedded entry decisions at the React layer
 (function logEmbeddedEntry() {
