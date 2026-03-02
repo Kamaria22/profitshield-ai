@@ -41,13 +41,10 @@ export default function ShopifyCallback() {
       if (data?.success) {
         setStatus('success');
 
-        // Redirect back into the Shopify embedded context.
-        // Use window.top to break out of any iframe and load the embedded app URL.
+        // Use the redirect_url returned by the backend — always points to embedded admin context
         setTimeout(() => {
-          const host = urlParams.get('host');
-          const embeddedUrl = `/?shop=${shop}&platform=shopify${host ? `&host=${host}&embedded=1` : ''}`;
           const target = window.top || window;
-          target.location.href = embeddedUrl;
+          target.location.href = data.redirect_url;
         }, 800);
       } else {
         setError(data?.error || 'Installation failed');
