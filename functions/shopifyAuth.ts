@@ -16,9 +16,11 @@ Deno.serve(async (req) => {
       }
       
       const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-      const appUrl = Deno.env.get('APP_URL') || req.headers.get('origin') || 'https://profitshield.base44.app';
-      const redirectUri = `${appUrl}/ShopifyCallback`;
+      // ALWAYS use the whitelisted redirect URI — must match Shopify Dev Dashboard exactly
+      const redirectUri = 'https://profit-shield-ai.base44.app/auth/callback';
       const nonce = crypto.randomUUID();
+
+      console.log(`[shopifyAuth] install redirect_uri = ${redirectUri}`);
       
       const installUrl = `https://${shopDomain}/admin/oauth/authorize?` + new URLSearchParams({
         client_id: SHOPIFY_API_KEY,
