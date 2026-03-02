@@ -172,9 +172,9 @@ Deno.serve(async (req) => {
       }
 
       const results = { created: 0, updated: 0, duplicate: 0, errors: 0, timeouts: 0 };
-      const TIMEOUT_MS = 8000; // 8s per item considered a timeout
-      // Throttle between waves to stay under platform rate limits (~5 req/s safe)
-      const WAVE_DELAY_MS = 300;
+      const TIMEOUT_MS = 30000; // 30s per item considered a timeout
+      // Throttle between waves to stay under platform rate limits (~2 req/s safe)
+      const WAVE_DELAY_MS = 600;
 
       // Use service-role client for all DB ops
       const db = base44.asServiceRole;
