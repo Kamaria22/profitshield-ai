@@ -279,22 +279,46 @@ async function encryptToken(token) {
   return btoa(String.fromCharCode(...combined));
 }
 
-async function registerWebhooks(shopDomain, accessToken, webhookSecret) {
-  const webhookUrl = `${Deno.env.get('APP_URL') || 'https://app.base44.com'}/api/functions/shopifyWebhook`;
+async function registerWebhooks(shopDomain, accessToken, integrationId, db) {
+  const appUrl = Deno.env.get('APP_URL') || 'https://app.base44.com';
+  const webhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
   
   const topics = [
     'orders/create',
     'orders/updated', 
     'orders/paid',
-    'orders/fulfilled',
     'orders/cancelled',
     'refunds/create',
     'app/uninstalled'
   ];
+
+  // First, delete any existing webhooks pointing to our URL to avoid duplicates
+  try {
+    const existingRes = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+      headers: { 'X-Shopify-Access-Token': accessToken }
+    });
+    if (existingRes.ok) {
+      const { webhooks } = await existingRes.json();
+      for (const wh of (webhooks || [])) {
+        if (wh.address === webhookUrl) {
+          await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks/${wh.id}.json`, {
+            method: 'DELETE',
+            headers: { 'X-Shopify-Access-Token': accessToken }
+          });
+          console.log(`[registerWebhooks] Deleted existing webhook ${wh.id} for topic ${wh.topic}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[registerWebhooks] Could not clean up old webhooks:', e.message);
+  }
   
+  const registeredIds = {};
+  const errors = [];
+
   for (const topic of topics) {
     try {
-      await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+      const res = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -308,8 +332,32 @@ async function registerWebhooks(shopDomain, accessToken, webhookSecret) {
           }
         })
       });
+      const data = await res.json();
+      if (data.webhook?.id) {
+        registeredIds[topic.replace('/', '_')] = data.webhook.id.toString();
+        console.log(`[registerWebhooks] Registered ${topic} → webhook id ${data.webhook.id}`);
+      } else {
+        console.error(`[registerWebhooks] Failed to register ${topic}:`, JSON.stringify(data));
+        errors.push({ topic, error: JSON.stringify(data) });
+      }
     } catch (e) {
-      console.error(`Failed to register webhook ${topic}:`, e);
+      console.error(`[registerWebhooks] Exception for ${topic}:`, e.message);
+      errors.push({ topic, error: e.message });
     }
   }
+
+  // Store registered webhook IDs on the integration record
+  if (integrationId && db) {
+    try {
+      await db.entities.PlatformIntegration.update(integrationId, {
+        webhook_endpoints: registeredIds,
+        last_connected_at: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('[registerWebhooks] Could not save webhook IDs:', e.message);
+    }
+  }
+
+  console.log(`[registerWebhooks] Done. Registered: ${Object.keys(registeredIds).length}/${topics.length}. Errors: ${errors.length}`);
+  return { registered: registeredIds, errors };
 }
