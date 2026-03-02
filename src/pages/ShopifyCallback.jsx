@@ -29,6 +29,7 @@ export default function ShopifyCallback() {
       }
 
       setStatus('exchanging');
+      console.log('[ShopifyCallback] OAuth callback received — shop:', shop);
 
       // Exchange code for access token
       const { data } = await base44.functions.invoke('shopifyAuth', {
@@ -39,19 +40,38 @@ export default function ShopifyCallback() {
       });
 
       if (data?.success) {
+        // Verify token was actually saved
+        const tokenSaved = !!(data.tenant_id);
+        console.log('[ShopifyCallback] callback success — tenant_id:', data.tenant_id,
+          '| shop_domain:', data.shop_domain,
+          '| token_saved:', tokenSaved);
+
         setStatus('success');
 
-        // Use the redirect_url returned by the backend — always points to embedded admin context
+        // Always redirect the top-level window out of any iframe
         setTimeout(() => {
-          const target = window.top || window;
-          target.location.href = data.redirect_url;
+          const redirectUrl = data.redirect_url;
+          console.log('[ShopifyCallback] Redirecting top window to:', redirectUrl);
+          try {
+            if (window.top && window.top !== window) {
+              window.top.location.href = redirectUrl;
+            } else {
+              window.location.href = redirectUrl;
+            }
+          } catch (_) {
+            // Cross-origin iframe — open new tab as fallback
+            console.warn('[ShopifyCallback] window.top inaccessible, opening new tab');
+            window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+          }
         }, 800);
       } else {
-        setError(data?.error || 'Installation failed');
+        const errMsg = data?.error || 'Installation failed';
+        console.error('[ShopifyCallback] callback failure — shop:', shop, '| error:', errMsg);
+        setError(errMsg);
         setStatus('error');
       }
     } catch (err) {
-      console.error('Callback error:', err);
+      console.error('[ShopifyCallback] Exception during callback:', err.message);
       setError(err.message || 'Failed to complete installation');
       setStatus('error');
     }

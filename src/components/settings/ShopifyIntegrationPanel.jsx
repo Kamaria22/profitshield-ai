@@ -18,11 +18,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
   CheckCircle, XCircle, RefreshCw, Store, AlertTriangle,
-  Shield, Zap, Tag, FileText, ArrowUpDown, Clock, ExternalLink, Loader2,
+  Shield, Zap, Tag, FileText, ArrowUpDown, Clock, ExternalLink, Loader2, Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
