@@ -201,14 +201,46 @@ Deno.serve(async (req) => {
     const tenant = tenants[0];
     console.log('[shopifyWebhook] Resolved tenant_id:', tenant.id, 'shop_name:', tenant.shop_name);
     
-    // Verify HMAC if webhook secret is set
-    if (tenant.webhook_secret && hmacHeader) {
-      const isValid = await verifyShopifyWebhook(body, hmacHeader, tenant.webhook_secret);
-      if (!isValid) {
-        console.error('Invalid webhook signature');
-        return Response.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    // FAIL-CLOSED HMAC enforcement — no secret = reject
+    if (!tenant.webhook_secret) {
+      console.error('[shopifyWebhook] SECURITY: Missing webhook_secret for tenant:', tenant.id, '— fail closed');
+      // Log security event
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: tenant.id,
+        action: 'webhook_hmac_missing_secret',
+        entity_type: 'tenant',
+        entity_id: tenant.id,
+        performed_by: 'system',
+        description: `Webhook rejected — tenant has no webhook_secret configured (fail-closed). Shop: ${shopDomain}`,
+        severity: 'critical',
+        category: 'security',
+        metadata: { shop_domain: shopDomain, topic, hmac_present: !!hmacHeader }
+      }).catch(() => {});
+      return Response.json({ error: 'Webhook secret not configured' }, { status: 401 });
     }
+
+    if (!hmacHeader) {
+      console.error('[shopifyWebhook] SECURITY: Missing HMAC header for tenant:', tenant.id, '— fail closed');
+      return Response.json({ error: 'Missing HMAC signature' }, { status: 401 });
+    }
+
+    const isValid = await verifyShopifyWebhook(body, hmacHeader, tenant.webhook_secret);
+    if (!isValid) {
+      console.error('[shopifyWebhook] SECURITY: Invalid HMAC signature for tenant:', tenant.id, 'shop:', shopDomain);
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: tenant.id,
+        action: 'webhook_hmac_invalid',
+        entity_type: 'tenant',
+        entity_id: tenant.id,
+        performed_by: 'system',
+        description: `Invalid HMAC signature rejected. Shop: ${shopDomain}, Topic: ${topic}`,
+        severity: 'high',
+        category: 'security',
+        metadata: { shop_domain: shopDomain, topic }
+      }).catch(() => {});
+      return Response.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+    console.log('[shopifyWebhook] HMAC verified OK for tenant:', tenant.id);
     
     const payload = JSON.parse(body);
     const eventId = webhookId || payload.id?.toString() || Date.now().toString();
