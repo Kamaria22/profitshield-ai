@@ -59,15 +59,28 @@ export default function PnLAnalytics() {
         return isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to });
       });
     },
-    enabled: !!tenantId && !tenantLoading
+    enabled: !!tenantId && !tenantLoading,
+    staleTime: 0,
+    refetchInterval: 30000, // refetch every 30s
   });
 
   // Fetch products for segmentation
   const { data: products = [] } = useQuery({
     queryKey: ['pnl-products', tenantId],
     queryFn: () => base44.entities.Product.filter({ tenant_id: tenantId }),
-    enabled: !!tenantId && !tenantLoading
+    enabled: !!tenantId && !tenantLoading,
+    staleTime: 0,
+    refetchInterval: 60000,
   });
+
+  // Real-time subscription: invalidate query when orders change
+  useEffect(() => {
+    if (!tenantId) return;
+    const unsubscribe = base44.entities.Order.subscribe((event) => {
+      queryClient.invalidateQueries({ queryKey: ['pnl-orders', tenantId] });
+    });
+    return unsubscribe;
+  }, [tenantId, queryClient]);
 
   // Calculate P&L metrics
   const metrics = useMemo(() => {
