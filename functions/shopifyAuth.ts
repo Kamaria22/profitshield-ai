@@ -214,8 +214,21 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Register webhooks
-      await registerWebhooks(shopDomain, access_token, tenant.webhook_secret);
+      // Register webhooks — pass integration.id so we can store the webhook IDs
+      const webhookResult = await registerWebhooks(shopDomain, access_token, integration.id, base44.asServiceRole);
+      
+      // Audit log for webhook registration
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: tenant.id,
+        action: webhookResult.errors.length === 0 ? 'webhook_register_success' : 'webhook_register_partial',
+        entity_type: 'platform_integration',
+        entity_id: integration.id,
+        performed_by: user?.email || 'system',
+        description: `Webhook registration: ${Object.keys(webhookResult.registered).length} registered, ${webhookResult.errors.length} failed. URL: ${Deno.env.get('APP_URL')}/api/functions/shopifyWebhook`,
+        severity: webhookResult.errors.length > 0 ? 'medium' : 'low',
+        category: 'integration',
+        metadata: { registered: webhookResult.registered, errors: webhookResult.errors }
+      }).catch(() => {});
       
       // Create audit log
       await base44.asServiceRole.entities.AuditLog.create({
