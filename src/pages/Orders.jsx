@@ -135,16 +135,17 @@ export default function Orders() {
     
     let result = [...orders];
 
-    // Demo mode filter
-    const demoMode = tenantSettings?.demo_mode !== false;
-    if (!demoMode) {
-      result = result.filter(o => o.platform_order_id && o.is_demo !== true);
-    }
+    // Demo mode filter: only exclude demo orders when demo_mode is explicitly false
+    // Never filter out real orders (those with platform_order_id)
+    result = result.filter(o => o.is_demo !== true || o.platform_order_id);
 
-    // Date range filter
-    const days = parseInt(filters.dateRange);
+    // Date range filter — use a large window to ensure real orders show
+    const days = parseInt(filters.dateRange) || 90;
     const startDate = subDays(new Date(), days);
-    result = result.filter(o => o.order_date && new Date(o.order_date) >= startDate);
+    result = result.filter(o => {
+      if (!o.order_date) return true; // include orders without date
+      return new Date(o.order_date) >= startDate;
+    });
 
     // Search
     if (searchTerm) {
