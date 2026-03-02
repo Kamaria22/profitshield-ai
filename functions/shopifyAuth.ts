@@ -307,10 +307,11 @@ async function registerWebhooks(shopDomain, accessToken, integrationId, db) {
   
   const topics = [
     'orders/create',
-    'orders/updated', 
+    'orders/updated',
     'orders/paid',
     'orders/cancelled',
     'refunds/create',
+    'products/update',
     'app/uninstalled'
   ];
 
