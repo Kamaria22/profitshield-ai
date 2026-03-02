@@ -147,8 +147,8 @@ Deno.serve(async (req) => {
     // ── RUN BURST TEST ────────────────────────────────────────────────────────
     if (action === 'run_burst_test') {
       const batchId = Date.now().toString(36);
-      const totalOrders = Math.min(burst_size, 200); // cap per invocation to stay within rate limits
-      const workers = Math.min(concurrency, 3); // conservative concurrency to avoid 429s
+      const totalOrders = Math.min(burst_size, 50); // cap per invocation; higher volumes use the async queue architecture
+      const workers = Math.min(concurrency, 2); // max 2 parallel to avoid 429s in test environment
 
       // Pre-compute expected totals for drift validation
       let expectedRevenue = 0;
