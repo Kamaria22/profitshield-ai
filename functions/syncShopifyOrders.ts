@@ -297,9 +297,15 @@ Deno.serve(async (req) => {
       );
       
       accessToken = new TextDecoder().decode(decrypted);
-    } catch (e) {
-      console.error('Token decryption failed:', e);
-      return Response.json({ error: 'Failed to decrypt access token. Please reconnect your store.' }, { status: 500 });
+    } catch (decryptErr) {
+      // Fallback: token may be stored as plain base64 (when ENCRYPTION_KEY was unset at install time)
+      console.warn('[syncShopifyOrders] AES decrypt failed, trying base64 fallback:', decryptErr.message);
+      try {
+        accessToken = atob(encryptedToken);
+      } catch (e2) {
+        console.error('[syncShopifyOrders] All decryption strategies failed:', e2.message);
+        return Response.json({ error: 'Failed to decrypt access token. Please reconnect your store.' }, { status: 500 });
+      }
     }
     
     // Get integration record
