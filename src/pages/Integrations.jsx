@@ -254,6 +254,16 @@ export default function Integrations() {
 
   const registerWebhooksMutation = useMutation({
     mutationFn: async (integrationId) => {
+      const integration = integrations.find(i => i.id === integrationId);
+      // For Shopify, use the dedicated OAuth-aware webhook registrar
+      if (integration?.platform === 'shopify') {
+        const result = await base44.functions.invoke('registerShopifyWebhooks', {
+          integration_id: integrationId
+        });
+        if (result.data?.error) throw new Error(result.data.error);
+        return result.data;
+      }
+      // Fallback for other platforms
       const webhookBaseUrl = window.location.origin.replace('app.', 'api.');
       const result = await base44.functions.invoke('platformConnector', {
         action: 'register_webhooks',
@@ -269,7 +279,11 @@ export default function Integrations() {
       toast.success(`Registered ${successCount} webhooks${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
     },
     onError: (error) => {
-      toast.error(`Webhook registration failed: ${error.message}`);
+      if (error.message?.toLowerCase().includes('token') || error.message?.toLowerCase().includes('authenticate')) {
+        toast.error('No Shopify token found. Please re-authenticate via the OAuth install flow.', { duration: 6000 });
+      } else {
+        toast.error(`Webhook registration failed: ${error.message}`);
+      }
     }
   });
 
