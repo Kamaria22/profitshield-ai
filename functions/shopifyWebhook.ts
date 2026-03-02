@@ -267,25 +267,33 @@ Deno.serve(async (req) => {
       status: 'processing'
     });
     
-    // Process based on topic
-    if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
-      console.log('[shopifyWebhook] Processing order:', payload.id);
-      await processOrder(base44, tenant, payload);
-    } else if (topic === 'refunds/create') {
-      console.log('[shopifyWebhook] Processing refund:', payload.id);
-      await processRefund(base44, tenant, payload);
-    } else if (topic === 'app/uninstalled') {
-      console.log('[shopifyWebhook] Processing uninstall for tenant:', tenant.id);
+    // ASYNC ARCHITECTURE: Enqueue for processing; ACK immediately for fast response
+    // app/uninstalled is handled inline (no profit compute needed, must be immediate)
+    if (topic === 'app/uninstalled') {
+      console.log('[shopifyWebhook] Processing uninstall inline for tenant:', tenant.id);
       await handleUninstall(base44, tenant);
+      await base44.asServiceRole.entities.WebhookEvent.update(event.id, {
+        status: 'processed',
+        processed_at: new Date().toISOString()
+      });
+    } else {
+      // Enqueue to WebhookQueue for async processing (orders, refunds, etc.)
+      await base44.asServiceRole.entities.WebhookQueue.create({
+        tenant_id: tenant.id,
+        event_type: topic,
+        platform: 'shopify',
+        idempotency_key: idempotencyKey,
+        payload,
+        status: 'pending'
+      }).catch(err => console.warn('[shopifyWebhook] Queue enqueue warning:', err.message));
+
+      await base44.asServiceRole.entities.WebhookEvent.update(event.id, {
+        status: 'queued',
+        processed_at: new Date().toISOString()
+      });
     }
     
-    // Mark event as processed
-    await base44.asServiceRole.entities.WebhookEvent.update(event.id, {
-      status: 'processed',
-      processed_at: new Date().toISOString()
-    });
-    
-    console.log('[shopifyWebhook] Successfully processed:', topic);
+    console.log('[shopifyWebhook] ACK sent for:', topic, 'tenant:', tenant.id);
     return Response.json({ status: 'ok', tenant_id: tenant.id });
     
   } catch (error) {
