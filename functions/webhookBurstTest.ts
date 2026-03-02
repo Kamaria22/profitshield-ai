@@ -161,6 +161,8 @@ Deno.serve(async (req) => {
 
       // Use service-role client for all DB ops
       const db = base44.asServiceRole;
+      // In-memory seen set for duplicate simulation across the burst
+      const seen = new Set();
 
       // Process in batches of `workers`
       const startAll = Date.now();
@@ -169,7 +171,7 @@ Deno.serve(async (req) => {
         const waveResults = await Promise.allSettled(
           wave.map(async (payload) => {
             const t0 = Date.now();
-            const result = await processOrderLocally(db, tenant_id, payload);
+            const result = await processOrderLocally(db, tenant_id, payload, seen);
             const elapsed = Date.now() - t0;
             if (elapsed > TIMEOUT_MS) results.timeouts++;
             return result;
