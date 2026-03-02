@@ -278,14 +278,38 @@ Deno.serve(async (req) => {
       });
     } else {
       // Enqueue to WebhookQueue for async processing (orders, refunds, etc.)
+      // integration_id resolved from tenant's primary integration
+      let integrationId = null;
+      try {
+        const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
+          tenant_id: tenant.id,
+          platform: 'shopify'
+        });
+        integrationId = integrations[0]?.id || null;
+      } catch (_) {}
+
       await base44.asServiceRole.entities.WebhookQueue.create({
         tenant_id: tenant.id,
+        integration_id: integrationId,
         event_type: topic,
         platform: 'shopify',
         idempotency_key: idempotencyKey,
         payload,
         status: 'pending'
       }).catch(err => console.warn('[shopifyWebhook] Queue enqueue warning:', err.message));
+
+      // AuditLog — observable ingestion
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: tenant.id,
+        action: 'webhook_queued',
+        entity_type: 'webhook_queue',
+        entity_id: idempotencyKey,
+        performed_by: 'system',
+        description: `Webhook enqueued: ${topic} for ${shopDomain}`,
+        severity: 'low',
+        category: 'integration',
+        metadata: { shop_domain: shopDomain, topic, event_id: eventId, integration_id: integrationId }
+      }).catch(() => {});
 
       await base44.asServiceRole.entities.WebhookEvent.update(event.id, {
         status: 'queued',
