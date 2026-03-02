@@ -126,19 +126,21 @@ Deno.serve(async (req) => {
     // ── CLEANUP ──────────────────────────────────────────────────────────────
     if (action === 'cleanup') {
       const db = base44.asServiceRole;
-      // Delete all burst test orders and webhook events for this tenant
-      const burstOrders = await db.entities.Order.filter({ tenant_id });
+      // Delete all burst test orders - with retry to handle rate limits
+      const burstOrders = await withRetry(() => db.entities.Order.filter({ tenant_id }));
       const testOrders = burstOrders.filter(o => o.platform_order_id?.startsWith('burst_'));
       let deleted = 0;
       for (const o of testOrders) {
-        await db.entities.Order.delete(o.id);
+        await withRetry(() => db.entities.Order.delete(o.id));
         deleted++;
+        // Small throttle to avoid 429 during bulk delete
+        if (deleted % 5 === 0) await new Promise(r => setTimeout(r, 500));
       }
 
-      const burstEvents = await db.entities.WebhookEvent.filter({ tenant_id });
+      const burstEvents = await withRetry(() => db.entities.WebhookEvent.filter({ tenant_id }));
       const testEvents = burstEvents.filter(e => e.event_id?.startsWith('burst_'));
       for (const e of testEvents) {
-        await db.entities.WebhookEvent.delete(e.id);
+        await withRetry(() => db.entities.WebhookEvent.delete(e.id));
       }
 
       return Response.json({ success: true, deleted_orders: deleted, deleted_events: testEvents.length });
