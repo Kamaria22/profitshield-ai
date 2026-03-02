@@ -120,19 +120,20 @@ Deno.serve(async (req) => {
 
     // ── CLEANUP ──────────────────────────────────────────────────────────────
     if (action === 'cleanup') {
+      const db = base44.asServiceRole;
       // Delete all burst test orders and webhook events for this tenant
-      const burstOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id });
+      const burstOrders = await db.entities.Order.filter({ tenant_id });
       const testOrders = burstOrders.filter(o => o.platform_order_id?.startsWith('burst_'));
       let deleted = 0;
       for (const o of testOrders) {
-        await base44.asServiceRole.entities.Order.delete(o.id);
+        await db.entities.Order.delete(o.id);
         deleted++;
       }
 
-      const burstEvents = await base44.asServiceRole.entities.WebhookEvent.filter({ tenant_id });
+      const burstEvents = await db.entities.WebhookEvent.filter({ tenant_id });
       const testEvents = burstEvents.filter(e => e.event_id?.startsWith('burst_'));
       for (const e of testEvents) {
-        await base44.asServiceRole.entities.WebhookEvent.delete(e.id);
+        await db.entities.WebhookEvent.delete(e.id);
       }
 
       return Response.json({ success: true, deleted_orders: deleted, deleted_events: testEvents.length });
