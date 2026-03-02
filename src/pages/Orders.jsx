@@ -530,9 +530,35 @@ export default function Orders() {
           </SheetContent>
         </Sheet>
 
-        <Button variant="outline" className="gap-2">
+        <Button 
+          variant="outline" 
+          className="gap-2"
+          onClick={() => {
+            const headers = ['Order #','Date','Customer','Email','Revenue','Net Profit','Margin %','Risk Level','Risk Score','Status'];
+            const rows = filteredOrders.map(o => [
+              o.order_number || '',
+              o.order_date ? new Date(o.order_date).toLocaleDateString() : '',
+              o.customer_name || '',
+              o.customer_email || '',
+              o.total_revenue?.toFixed(2) || '0.00',
+              o.net_profit?.toFixed(2) || '0.00',
+              o.margin_pct?.toFixed(1) || '0.0',
+              o.risk_level || '',
+              o.fraud_score ?? '',
+              o.status || ''
+            ]);
+            const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
           <Download className="w-4 h-4" />
-          Export
+          Export CSV
         </Button>
       </div>
 
