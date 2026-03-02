@@ -41,26 +41,15 @@ function idempotencyKey(tenantId, topic, eventId) {
 }
 
 // Lightweight HMAC-less order processing (no external calls — pure logic test)
-async function processOrderLocally(db, tenantId, orderPayload) {
+async function processOrderLocally(db, tenantId, orderPayload, seen) {
   const platformOrderId = orderPayload.id.toString();
 
-  // Idempotency: check for existing WebhookEvent
+  // In-process dedup (simulates idempotency key check)
   const key = idempotencyKey(tenantId, 'orders/create', platformOrderId);
-  const existing = await db.entities.WebhookEvent.filter({ idempotency_key: key });
-  if (existing.length > 0) {
+  if (seen.has(key)) {
     return { status: 'duplicate', key };
   }
-
-  // Record webhook event (idempotency anchor)
-  await db.entities.WebhookEvent.create({
-    tenant_id: tenantId,
-    topic: 'orders/create',
-    event_id: platformOrderId,
-    idempotency_key: key,
-    payload: { id: platformOrderId },
-    status: 'processed',
-    processed_at: new Date().toISOString()
-  });
+  seen.add(key);
 
   // Upsert order row — check for existing first to avoid duplicate rows
   const existingOrders = await db.entities.Order.filter({
@@ -82,8 +71,7 @@ async function processOrderLocally(db, tenantId, orderPayload) {
     total_revenue: revenue,
     total_cogs: cogs,
     net_profit: netProfit,
-    margin_pct: (netProfit / revenue) * 100,
-    burst_tag: `burst_${orderPayload.id.split('_')[1] || 'unknown'}`
+    margin_pct: (netProfit / revenue) * 100
   };
 
   if (existingOrders.length > 0) {
