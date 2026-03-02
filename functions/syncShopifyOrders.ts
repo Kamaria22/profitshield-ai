@@ -365,6 +365,8 @@ Deno.serve(async (req) => {
       
       const orderRecord = {
         tenant_id: tenant.id,
+        integration_id: integrationId,
+        shop_domain: tenant.shop_domain,
         platform_order_id: orderData.id.toString(),
         order_number: orderData.order_number?.toString() || orderData.name,
         customer_email: orderData.email,
@@ -372,13 +374,15 @@ Deno.serve(async (req) => {
           ? `${orderData.customer.first_name} ${orderData.customer.last_name || ''}`
           : orderData.shipping_address?.name,
         order_date: orderData.created_at,
+        processed_at: orderData.processed_at || orderData.created_at,
+        financial_status: orderData.financial_status,
         status: mapOrderStatus(orderData),
         fulfillment_status: orderData.fulfillment_status || 'unfulfilled',
         billing_address: orderData.billing_address,
         shipping_address: orderData.shipping_address,
         discount_codes: orderData.discount_codes?.map(d => d.code) || [],
         is_first_order: !orderData.customer || orderData.customer.orders_count <= 1,
-        is_demo: false, // Real Shopify order, not demo data
+        is_demo: false,
         ...profitData,
         ...riskData,
         platform_data: orderData
