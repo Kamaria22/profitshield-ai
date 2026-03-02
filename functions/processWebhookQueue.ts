@@ -248,6 +248,10 @@ Deno.serve(async (req) => {
           await processOrderJob(db, tenant, payload, job);
         } else if (topic === 'refunds/create') {
           await processRefundJob(db, tenant, payload);
+        } else if (topic === 'products/update') {
+          await processProductUpdateJob(db, tenant, payload);
+        } else if (topic === 'orders/cancelled') {
+          await processOrderCancelledJob(db, tenant, payload);
         } else {
           console.log(`[processWebhookQueue] Unhandled topic: ${topic} — marking complete`);
         }

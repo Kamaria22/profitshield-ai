@@ -10,6 +10,7 @@ const TOPICS = [
   'orders/paid',
   'orders/cancelled',
   'refunds/create',
+  'products/update',
   'app/uninstalled'
 ];
 
