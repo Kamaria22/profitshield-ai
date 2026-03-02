@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
     // AUTO-PROVISION TRIAL on first open if billing fields are missing
     if (!tenant.trial_started_at) {
       const now = new Date();
-      const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       await base44.entities.Tenant.update(tenant.id, {
         trial_started_at: now.toISOString(),
         trial_ends_at: trialEnd.toISOString(),

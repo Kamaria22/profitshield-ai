@@ -18,7 +18,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * - If tenant was created in the last 15 minutes, never block (billing sync lag).
  */
 
-const TRIAL_DAYS = 14;
+const TRIAL_DAYS = 30;
 const BILLING_SYNC_GRACE_MINUTES = 15;
 const REVIEW_MODE_DAYS = 7;
 

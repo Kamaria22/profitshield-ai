@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       } else {
         // Create new tenant
         const now = new Date();
-        const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+        const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         tenant = await base44.asServiceRole.entities.Tenant.create({
           shop_domain: shopDomain,
           shop_name: shopData.name || shopDomain,
