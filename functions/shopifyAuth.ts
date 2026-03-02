@@ -242,6 +242,13 @@ Deno.serve(async (req) => {
         metadata: { shop_domain: shopDomain }
       });
       
+      // Build post-install redirect back into embedded context
+      const storeSlug = shopDomain.replace('.myshopify.com', '');
+      const hostEncoded = Buffer.from(`${storeSlug}.myshopify.com/admin`).toString('base64');
+      const postInstallUrl = `https://admin.shopify.com/store/${storeSlug}/apps/profitshield-ai?shop=${shopDomain}&host=${hostEncoded}&embedded=1`;
+
+      console.log(`[shopifyAuth] callback complete — redirecting to embedded context: ${postInstallUrl}`);
+
       return Response.json({ 
         success: true,
         auto_provisioned: true,
@@ -249,7 +256,7 @@ Deno.serve(async (req) => {
         tenant_id: tenant.id,
         shop_domain: shopDomain,
         shop_name: shopData.name || shopDomain,
-        redirect_url: `/Home?shop=${shopDomain}&platform=shopify`
+        redirect_url: postInstallUrl
       });
     }
     
