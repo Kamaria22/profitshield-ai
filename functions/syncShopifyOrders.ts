@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const { tenant_id } = await req.json();
+    const { tenant_id, days = 30 } = await req.json();
     
     if (!tenant_id) {
       return Response.json({ error: 'Missing tenant_id' }, { status: 400 });
