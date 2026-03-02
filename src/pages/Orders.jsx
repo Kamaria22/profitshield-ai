@@ -39,6 +39,7 @@ import { createPageUrl } from '@/components/platformContext';
 
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderDetailPanel from '../components/orders/OrderDetailPanel';
+import OrderSearchBox from '../components/orders/OrderSearchBox';
 import DebugBanner from '../components/DebugBanner';
 
 export default function Orders() {
