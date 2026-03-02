@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AutonomousHealthDashboard from '@/components/health/AutonomousHealthDashboard';
 import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import { base44 } from '@/api/base44Client';
@@ -7,6 +7,8 @@ import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import WebhookSecurityPanel from '@/components/admin/WebhookSecurityPanel';
+import QueueObservabilityPanel from '@/components/admin/QueueObservabilityPanel';
 import {
   Activity,
   Server,
@@ -17,7 +19,9 @@ import {
   Clock,
   TrendingUp,
   Zap,
-  Database
+  Database,
+  Shield,
+  Lock
 } from 'lucide-react';
 
 export default function SystemHealth() {
