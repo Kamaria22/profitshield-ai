@@ -58,6 +58,7 @@ import SimulationLab from '@/components/empire/SimulationLab';
 import IPOReadinessPanel from '@/components/empire/IPOReadinessPanel';
 import FounderControlPanel from '@/components/empire/FounderControlPanel';
 import BillingAdminPanel from '@/components/subscription/BillingAdminPanel';
+import ShopifyDebugPanel from '@/components/admin/ShopifyDebugPanel';
 import AbsorptionRadarPanel from '@/components/supremacy/AbsorptionRadarPanel';
 import AIEvolutionPanel from '@/components/supremacy/AIEvolutionPanel';
 import DataFortressPanel from '@/components/supremacy/DataFortressPanel';
