@@ -211,6 +211,26 @@ export default function Integrations() {
 
   const syncMutation = useMutation({
     mutationFn: async ({ integration_id, job_type }) => {
+      // Find the integration to get tenant_id and platform
+      const integration = integrations.find(i => i.id === integration_id);
+      if (!integration) throw new Error('Integration not found');
+      
+      // For Shopify, use syncShopifyOrders directly (has OAuth token decryption)
+      if (integration.platform === 'shopify') {
+        const result = await base44.functions.invoke('syncShopifyOrders', {
+          tenant_id: integration.tenant_id,
+          days: job_type === 'full_sync' ? 365 : 30
+        });
+        if (result.data?.error) throw new Error(result.data.error);
+        return {
+          results: {
+            orders_created: result.data?.createdCount ?? result.data?.created ?? 0,
+            orders_updated: result.data?.updatedCount ?? result.data?.updated ?? 0
+          }
+        };
+      }
+      
+      // Fallback for other platforms
       const result = await base44.functions.invoke('syncEngine', {
         action: 'start_sync',
         integration_id,
@@ -224,7 +244,11 @@ export default function Integrations() {
       toast.success(`Sync completed: ${data.results?.orders_created || 0} new, ${data.results?.orders_updated || 0} updated`);
     },
     onError: (error) => {
-      toast.error(`Sync failed: ${error.message}`);
+      if (error.message?.toLowerCase().includes('token') || error.message?.toLowerCase().includes('reconnect')) {
+        toast.error('No Shopify token found. Please re-authenticate your store via the OAuth flow.', { duration: 6000 });
+      } else {
+        toast.error(`Sync failed: ${error.message}`);
+      }
     }
   });
 
