@@ -250,15 +250,23 @@ Deno.serve(async (req) => {
     }
     const tenant = tenants[0];
     
-    // Get OAuth token
-    const tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
+    // Get OAuth token — try is_valid=true first, fall back to any token for this tenant/platform
+    let tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
       tenant_id: tenant.id, 
       platform: 'shopify',
       is_valid: true 
     });
+
+    if (tokens.length === 0) {
+      // Fallback: try without is_valid filter (token may exist but flag not set)
+      tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
+        tenant_id: tenant.id, 
+        platform: 'shopify'
+      });
+    }
     
     if (tokens.length === 0) {
-      return Response.json({ error: 'No valid Shopify token found. Please reconnect your store.' }, { status: 400 });
+      return Response.json({ error: 'No Shopify token found. Please reconnect your store via OAuth.' }, { status: 400 });
     }
     
     // Decrypt access token using AES-GCM (matches encryption in shopifyAuth)
