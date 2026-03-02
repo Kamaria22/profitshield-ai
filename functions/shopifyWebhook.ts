@@ -268,7 +268,8 @@ Deno.serve(async (req) => {
     });
     
     // ASYNC ARCHITECTURE: Enqueue for processing; ACK immediately for fast response
-    // app/uninstalled is handled inline (no profit compute needed, must be immediate)
+    // app/uninstalled is handled inline. All other supported topics go to queue:
+    // orders/create, orders/updated, orders/paid, orders/cancelled, refunds/create, products/update
     if (topic === 'app/uninstalled') {
       console.log('[shopifyWebhook] Processing uninstall inline for tenant:', tenant.id);
       await handleUninstall(base44, tenant);
