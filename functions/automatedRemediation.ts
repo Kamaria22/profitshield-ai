@@ -443,166 +443,173 @@ Deno.serve(async (req) => {
     const action = payload.action || null;
 
     // ═══════════════════════════════════════════════════════════════
-    // COMPREHENSIVE DEBUG MODE — reveals actual UI payload shape
+    // RECURSIVE EXTRACTOR for Automation Runner payload
+    // Searches payload.data, payload.event, payload.automation, payload.old_data
+    // for Alert IDs in known locations
     // ═══════════════════════════════════════════════════════════════
-    if (action === "debug_payload") {
-      // Collect ALL possible ID candidates
-      const alertIdCandidates = {
-        "payload.alert?.id": payload.alert?.id,
-        "payload.alert_id": payload.alert_id,
-        "payload.id": payload.id,
-        "payload.entity_id": payload.entity_id,
-        "payload.record?.id": payload.record?.id,
-        "payload.row?.id": payload.row?.id,
-        "payload.record?._id": payload.record?._id,
-        "payload.row?._id": payload.row?._id,
-        "payload.record?.record_id": payload.record?.record_id,
-        "payload.row?.record_id": payload.row?.record_id,
-      };
 
-      const tenantIdCandidates = {
-        "payload.tenant_id": payload.tenant_id,
-        "payload.alert?.tenant_id": payload.alert?.tenant_id,
-        "payload.record?.tenant_id": payload.record?.tenant_id,
-        "payload.row?.tenant_id": payload.row?.tenant_id,
-      };
-
-      return Response.json({
-        mode: "debug_payload",
-        timestamp: new Date().toISOString(),
-        
-        payloadKeys: Object.keys(payload),
-        payloadSample: {
-          action: payload.action,
-          has_alert: !!payload.alert,
-          has_record: !!payload.record,
-          has_row: !!payload.row,
-        },
-        
-        recordShape: payload.record ? Object.keys(payload.record) : null,
-        recordSample: payload.record ? {
-          id: payload.record.id,
-          alert_type: payload.record.alert_type,
-          title: payload.record.title,
-        } : null,
-        
-        rowShape: payload.row ? Object.keys(payload.row) : null,
-        rowSample: payload.row ? {
-          id: payload.row.id,
-          alert_type: payload.row.alert_type,
-          title: payload.row.title,
-        } : null,
-        
-        alertShape: payload.alert ? Object.keys(payload.alert) : null,
-        alertSample: payload.alert ? {
-          id: payload.alert.id,
-          alert_type: payload.alert.alert_type,
-          title: payload.alert.title,
-        } : null,
-
-        alertIdCandidates,
-        tenantIdCandidates,
-        firstValidAlertId: Object.values(alertIdCandidates).find(v => !!v),
-        firstValidTenantId: Object.values(tenantIdCandidates).find(v => !!v),
-      });
+    function isValidBase44Id(val) {
+      if (!val || typeof val !== "string") return false;
+      // Base44 IDs are typically 24 hex chars
+      return /^[a-f0-9]{24}$/.test(val);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // ROBUST ALERT RESOLUTION with multiple strategies
-    // ═══════════════════════════════════════════════════════════════
-    
-    // Strategy 1: Extract alertData if provided directly
-    let alertData =
-      payload.alert ||
-      payload.record ||
-      payload.row ||
-      null;
+    function extractCandidateIds(obj, depth = 0) {
+      if (depth > 5 || !obj || typeof obj !== "object") return [];
+      
+      const candidates = [];
+      const idKeys = ["id", "alert_id", "entity_id", "record_id", "row_id", "selected_id", "primaryKey", "pk"];
+      const dataKeys = ["record", "row", "entity", "selectedRecord", "selected", "input", "context", "args"];
 
-    // Strategy 2: Extract ID from all candidate paths
-    const alertIdCandidates = [
-      payload.alert?.id,
-      payload.alert_id,
-      payload.id,
-      payload.entity_id,
-      payload.record?.id,
-      payload.row?.id,
-      payload.record?._id,
-      payload.row?._id,
-      payload.record?.record_id,
-      payload.row?.record_id,
-    ];
-    const alertId = alertIdCandidates.find(v => !!v) || null;
+      // Check direct ID keys
+      for (const key of idKeys) {
+        const val = obj[key];
+        if (isValidBase44Id(val)) {
+          candidates.push(val);
+        }
+      }
 
+      // Check nested data structures
+      for (const key of dataKeys) {
+        const nested = obj[key];
+        if (nested && typeof nested === "object") {
+          if (nested.id && isValidBase44Id(nested.id)) {
+            candidates.push(nested.id);
+          }
+          // Recurse deeper
+          const subCandidates = extractCandidateIds(nested, depth + 1);
+          candidates.push(...subCandidates);
+        }
+      }
+
+      // Check arrays
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          if (item && typeof item === "object") {
+            if (item.id && isValidBase44Id(item.id)) {
+              candidates.push(item.id);
+            }
+          }
+        }
+      }
+
+      return candidates;
+    }
+
+    // Collect candidate IDs from all potential sources
+    const payloadDataCandidates = extractCandidateIds(payload.data || {});
+    const payloadEventCandidates = extractCandidateIds(payload.event || {});
+    const payloadAutomationCandidates = extractCandidateIds(payload.automation || {});
+    const payloadOldDataCandidates = extractCandidateIds(payload.old_data || {});
+
+    const allAlertIdCandidates = [
+      ...new Set([
+        payload.alert_id,
+        payload.id,
+        payload.entity_id,
+        ...payloadDataCandidates,
+        ...payloadEventCandidates,
+        ...payloadAutomationCandidates,
+        ...payloadOldDataCandidates,
+      ])
+    ].filter(v => !!v);
+
+    // Extract tenant IDs
     const tenantIdCandidates = [
       payload.tenant_id,
-      payload.alert?.tenant_id,
-      payload.record?.tenant_id,
-      payload.row?.tenant_id,
-    ];
-    const tenantId = tenantIdCandidates.find(v => !!v) || null;
+      payload.data?.tenant_id,
+      payload.event?.tenant_id,
+      payload.automation?.tenant_id,
+      payload.old_data?.tenant_id,
+      payload.data?.alert?.tenant_id,
+      payload.data?.record?.tenant_id,
+      payload.data?.selected?.tenant_id,
+    ].filter(v => !!v);
 
-    console.log(`[automatedRemediation] Alert resolution: alertId=${alertId} tenantId=${tenantId} hasDirectAlert=${!!alertData}`);
+    console.log(`[automatedRemediation] Extracted alert ID candidates: ${allAlertIdCandidates.length}`, allAlertIdCandidates.slice(0, 3));
+    console.log(`[automatedRemediation] Extracted tenant ID candidates: ${tenantIdCandidates.length}`, tenantIdCandidates.slice(0, 2));
 
-    // Strategy 3: If alert object not directly provided, fetch it
-    if (!alertData && alertId) {
-      try {
-        console.log(`[automatedRemediation] Attempting filter lookup for alertId=${alertId}`);
-        const alerts = await db.Alert.filter({ id: alertId });
-        alertData = alerts?.[0] || null;
-        if (alertData) console.log(`[automatedRemediation] ✓ Found alert via filter: ${alertData.id}`);
-      } catch (e) {
-        console.warn(`[automatedRemediation] Filter lookup failed: ${e.message}`);
-        alertData = null;
+    // ═══════════════════════════════════════════════════════════════
+    // ATTEMPT RESOLUTION
+    // ═══════════════════════════════════════════════════════════════
+
+    let alertData = null;
+    const attemptedLookups = [];
+
+    // First, check if alert object is directly provided
+    if (payload.alert && payload.alert.id) {
+      alertData = payload.alert;
+      console.log(`[automatedRemediation] ✓ Using directly provided alert object: ${alertData.id}`);
+    } else if (payload.data?.alert && payload.data.alert.id) {
+      alertData = payload.data.alert;
+      console.log(`[automatedRemediation] ✓ Using alert from payload.data.alert: ${alertData.id}`);
+    } else if (payload.data?.record && payload.data.record.id) {
+      // Check if the record IS an alert
+      if (payload.data.record.alert_type || payload.data.record.type === "Alert") {
+        alertData = payload.data.record;
+        console.log(`[automatedRemediation] ✓ Using alert from payload.data.record: ${alertData.id}`);
       }
-
-      // Strategy 4: Fallback to get() if it exists
-      if (!alertData && typeof db.Alert.get === "function") {
-        try {
-          console.log(`[automatedRemediation] Attempting get() lookup for alertId=${alertId}`);
-          alertData = await db.Alert.get(alertId);
-          if (alertData) console.log(`[automatedRemediation] ✓ Found alert via get(): ${alertData.id}`);
-        } catch (e) {
-          console.warn(`[automatedRemediation] get() lookup failed: ${e.message}`);
-          alertData = null;
-        }
+    } else if (payload.data?.selected && payload.data.selected.id) {
+      if (payload.data.selected.alert_type) {
+        alertData = payload.data.selected;
+        console.log(`[automatedRemediation] ✓ Using alert from payload.data.selected: ${alertData.id}`);
       }
+    }
 
-      // Strategy 5: If still not found with tenantId, try combined filter
-      if (!alertData && tenantId && alertId) {
+    // If not found directly, try each candidate ID via filter()
+    if (!alertData && allAlertIdCandidates.length > 0) {
+      for (const candidateId of allAlertIdCandidates) {
         try {
-          console.log(`[automatedRemediation] Attempting combined filter for alertId=${alertId} + tenantId=${tenantId}`);
-          const alerts = await db.Alert.filter({ id: alertId, tenant_id: tenantId });
-          alertData = alerts?.[0] || null;
-          if (alertData) console.log(`[automatedRemediation] ✓ Found alert via combined filter`);
+          const alerts = await db.Alert.filter({ id: candidateId });
+          if (alerts && alerts.length > 0) {
+            alertData = alerts[0];
+            attemptedLookups.push({ id: candidateId, found: true });
+            console.log(`[automatedRemediation] ✓ Resolved alert via filter: ${alertData.id}`);
+            break;
+          }
+          attemptedLookups.push({ id: candidateId, found: false });
         } catch (e) {
-          console.warn(`[automatedRemediation] Combined filter failed: ${e.message}`);
-          alertData = null;
+          console.warn(`[automatedRemediation] Filter lookup failed for ${candidateId}: ${e.message}`);
+          attemptedLookups.push({ id: candidateId, found: false, error: e.message });
         }
       }
     }
 
-    // If still not found → detailed 404 with debug info
+    // If still not found, try with tenant_id constraint
+    if (!alertData && allAlertIdCandidates.length > 0 && tenantIdCandidates.length > 0) {
+      for (const candidateId of allAlertIdCandidates.slice(0, 3)) {
+        for (const tenantId of tenantIdCandidates.slice(0, 2)) {
+          try {
+            const alerts = await db.Alert.filter({ id: candidateId, tenant_id: tenantId });
+            if (alerts && alerts.length > 0) {
+              alertData = alerts[0];
+              console.log(`[automatedRemediation] ✓ Resolved alert via tenant-filtered search: ${alertData.id}`);
+              break;
+            }
+          } catch (e) {
+            // Silent
+          }
+        }
+        if (alertData) break;
+      }
+    }
+
+    // If still not found → detailed 404
     if (!alertData) {
       const debugInfo = {
-        message: "Could not resolve alert from payload",
-        lookedFor: alertId,
-        tenantId: tenantId,
+        message: "Could not resolve alert from Automation Runner payload",
         payloadKeys: Object.keys(payload),
-        recordId: payload.record?.id,
-        rowId: payload.row?.id,
-        alertIdCandidates: {
-          "payload.alert?.id": payload.alert?.id,
-          "payload.alert_id": payload.alert_id,
-          "payload.id": payload.id,
-          "payload.record?.id": payload.record?.id,
-          "payload.row?.id": payload.row?.id,
+        topLevelDataKeys: Object.keys(payload.data || {}),
+        candidateIds: allAlertIdCandidates.slice(0, 10),
+        candidateTenantIds: tenantIdCandidates,
+        attemptedLookups,
+        sources: {
+          payloadDataCandidates: payloadDataCandidates.length,
+          payloadEventCandidates: payloadEventCandidates.length,
+          payloadAutomationCandidates: payloadAutomationCandidates.length,
+          payloadOldDataCandidates: payloadOldDataCandidates.length,
         },
-        tenantIdCandidates: {
-          "payload.tenant_id": payload.tenant_id,
-          "payload.alert?.tenant_id": payload.alert?.tenant_id,
-          "payload.record?.tenant_id": payload.record?.tenant_id,
-        },
-        nextStep: "Run with action=debug_payload to see the exact payload shape from your Automation UI"
+        nextStep: "Verify alert was actually selected in the Automation UI and check that candidateIds are not empty."
       };
 
       console.error(`[automatedRemediation] Alert resolution failed:`, JSON.stringify(debugInfo, null, 2));
@@ -611,7 +618,7 @@ Deno.serve(async (req) => {
         await db.AuditLog.create({
           action: "remediation_failed_alert_not_found",
           entity_type: "Alert",
-          entity_id: alertId || null,
+          entity_id: null,
           details: debugInfo,
           timestamp: new Date().toISOString()
         });
