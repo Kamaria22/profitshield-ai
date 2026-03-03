@@ -142,22 +142,21 @@ Deno.serve(async (req) => {
   // ─────────────────────────────────────────────────────────────
   let proofRowId = null;
   try {
-    if (db.AutomationInvocationProof?.create) {
-      const proof = await db.AutomationInvocationProof.create({
-        proof_id: crypto.randomUUID(),
-        function_name: FUNCTION_NAME,
-        live_id: LIVE_ID,
-        invoked_via: invokedVia,
-        received_at: timestamp,
-        event_entity_id: isValidId(getByPath(payload, "event.entity_id")) ? getByPath(payload, "event.entity_id") : null,
-        resolved_alert_id: resolution.alertId,
-        payload_keys: payloadKeys,
-        raw_payload_snippet: safeSnippet(payload, 2000),
-      });
-      proofRowId = proof?.id || null;
-    }
-  } catch {
-    // ignore proof failures
+    const proof = await db.AutomationInvocationProof.create({
+      proof_id: crypto.randomUUID(),
+      function_name: FUNCTION_NAME,
+      live_id: LIVE_ID,
+      invoked_via: invokedVia,
+      received_at: timestamp,
+      event_entity_id: isValidId(getByPath(payload, "event.entity_id")) ? getByPath(payload, "event.entity_id") : null,
+      resolved_alert_id: resolution.alertId,
+      payload_keys: payloadKeys,
+      raw_payload_snippet: safeSnippet(payload, 2000),
+    });
+    proofRowId = proof?.id || null;
+  } catch (proofErr) {
+    // Proof write failed — log but don't block
+    console.error("[alertNotifications] Proof write error:", proofErr?.message);
   }
 
   // PROVE LIVE (for you to run manually)
