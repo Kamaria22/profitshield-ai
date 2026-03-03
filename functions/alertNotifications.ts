@@ -220,7 +220,8 @@ Deno.serve(async (req) => {
         invocation_detected: true,
         detected_invocation_source_keys: payloadKeys,
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 200
       }, { status: 200 });
     }
     
@@ -250,7 +251,8 @@ Deno.serve(async (req) => {
           test_alert_id: testAlert.id,
           notification_sent: sent,
           timestamp,
-          elapsed_ms: Date.now() - startMs
+          elapsed_ms: Date.now() - startMs,
+          status_code: 200
         }, { status: 200 });
       } catch (e) {
         return Response.json({
@@ -359,7 +361,8 @@ Deno.serve(async (req) => {
           sent,
           dead_lettered: deadLettered,
           timestamp,
-          elapsed_ms: Date.now() - startMs
+          elapsed_ms: Date.now() - startMs,
+          status_code: 200
         }, { status: 200 });
       } catch (e) {
         return Response.json({
@@ -370,7 +373,8 @@ Deno.serve(async (req) => {
           action: 'process_queue',
           error: e.message,
           timestamp,
-          elapsed_ms: Date.now() - startMs
+          elapsed_ms: Date.now() - startMs,
+          status_code: 500
         }, { status: 500 });
       }
     }
@@ -398,7 +402,8 @@ Deno.serve(async (req) => {
         payloadKeys,
         error: 'Alert ID not resolved (deferred to queue)',
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 202
       }, { status: 202 });
     }
 
@@ -423,7 +428,8 @@ Deno.serve(async (req) => {
         deferred: false,
         payloadKeys,
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 200
       }, { status: 200 });
     }
 
@@ -465,7 +471,8 @@ Deno.serve(async (req) => {
         queued_id: queueEntry.id,
         payloadKeys,
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 202
       }, { status: 202 });
     } catch (queueError) {
       // Queue failed - still return 202 to not fail automation, NEVER 404
@@ -484,7 +491,8 @@ Deno.serve(async (req) => {
         payloadKeys,
         queue_error: queueError.message,
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 202
       }, { status: 202 });
     }
 
@@ -497,7 +505,8 @@ Deno.serve(async (req) => {
       function_name: FUNCTION_NAME,
       error: error.message,
       timestamp,
-      elapsed_ms: Date.now() - startMs
+      elapsed_ms: Date.now() - startMs,
+      status_code: 500
     }, { status: 500 });
   }
 });
