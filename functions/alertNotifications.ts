@@ -170,6 +170,7 @@ async function sendNotification(base44, alert, tenantId, resolvedSource) {
 
 Deno.serve(async (req) => {
   const startMs = Date.now();
+  const timestamp = new Date().toISOString();
   
   try {
     const base44 = createClientFromRequest(req);
@@ -185,6 +186,22 @@ Deno.serve(async (req) => {
     const payloadKeys = Object.keys(payload);
     const eventKeys = payload.event ? Object.keys(payload.event) : [];
     const dataKeys = payload.data ? Object.keys(payload.data) : [];
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // PROVE LIVE: Return handler metadata (no action processing)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (action === 'prove_live') {
+      return Response.json({
+        ok: true,
+        version: VERSION,
+        handler_file: HANDLER_FILE,
+        function_name: FUNCTION_NAME,
+        invocation_detected: true,
+        detected_invocation_source_keys: payloadKeys,
+        timestamp,
+        elapsed_ms: Date.now() - startMs
+      }, { status: 200 });
+    }
     
     // ───────────────────────────────────────────────────
     // SELF TEST: Create alert, send notification, prove it works
