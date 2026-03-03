@@ -67,21 +67,35 @@ Deno.serve(async (req) => {
     if (!tokens.length) return Response.json({ error: 'No Shopify token found. Please re-authenticate.' }, { status: 400 });
 
     const accessToken = await decryptToken(tokens[0].encrypted_access_token);
-    const shopDomain = integration.store_key || integration.store_url.replace('https://', '');
+    const shopDomain = integration.store_key || integration.store_url?.replace('https://', '');
 
-    // Delete existing webhooks pointing to our URL
+    // Verify API is reachable BEFORE attempting registration
+    const scopeCheck = await fetch(`https://${shopDomain}/admin/oauth/access_scopes.json`, {
+      headers: { 'X-Shopify-Access-Token': accessToken }
+    });
+    if (!scopeCheck.ok) {
+      // Mark token invalid
+      await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
+      await base44.asServiceRole.entities.PlatformIntegration.update(integration_id, { status: 'disconnected' }).catch(() => {});
+      return Response.json({
+        error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth first.`,
+        needs_reconnect: true
+      }, { status: 400 });
+    }
+
+    // Delete ALL stale webhooks (including wrong-domain ones)
     try {
-      const listRes = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+      const listRes = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json?limit=250`, {
         headers: { 'X-Shopify-Access-Token': accessToken }
       });
       if (listRes.ok) {
         const { webhooks } = await listRes.json();
         for (const wh of (webhooks || [])) {
-          if (wh.address === WEBHOOK_URL) {
-            await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks/${wh.id}.json`, {
+          if (STALE_ENDPOINTS.some(ep => wh.address.includes('shopifyWebhook'))) {
+            await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks/${wh.id}.json`, {
               method: 'DELETE',
               headers: { 'X-Shopify-Access-Token': accessToken }
-            });
+            }).catch(() => {});
           }
         }
       }
@@ -95,7 +109,7 @@ Deno.serve(async (req) => {
 
     for (const topic of TOPICS) {
       try {
-        const res = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+        const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
           body: JSON.stringify({ webhook: { topic, address: WEBHOOK_URL, format: 'json' } })
