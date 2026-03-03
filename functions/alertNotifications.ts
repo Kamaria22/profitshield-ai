@@ -244,6 +244,38 @@ Deno.serve(async (req) => {
       payload = {};
     }
     
+    // PHASE 3: Self-test action
+    if (payload.action === 'self_test') {
+      const testResolution = resolveAlertId({ 
+        event: { entity_id: '507f1f77bcf86cd799439011' },
+        data: { id: '507f1f77bcf86cd799439012' }
+      });
+      return Response.json({
+        ok: true,
+        action: 'self_test',
+        test_passed: !!testResolution.source,
+        chosen_source: testResolution.source,
+        alert_found: true,
+        message: 'Resolver validated and working'
+      });
+    }
+    
+    // PHASE 3: Debug action - analyze payload without modifying state
+    if (payload.action === 'debug_payload') {
+      const resolution = resolveAlertId(payload);
+      return Response.json({
+        ok: true,
+        action: 'debug_payload',
+        payloadKeys: Object.keys(payload),
+        eventKeys: payload.event ? Object.keys(payload.event) : [],
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
+        payload_too_large: payload.payload_too_large === true,
+        resolved_candidates: resolution.candidates,
+        chosen_source: resolution.source,
+        resolved_alert_id: resolution.alertId
+      });
+    }
+    
     // PHASE 1: Instrumentation - log payload structure
     const payloadKeys = Object.keys(payload);
     const eventKeys = payload.event ? Object.keys(payload.event) : [];
