@@ -576,7 +576,7 @@ async function debugSignals(base44, tenantId, user) {
 // ─────────────────────────────────────────────
 
 async function getAtRiskTenants(base44) {
-  const db = base44.asServiceRole;
+  const db = getDbClient(base44);
 
   const predictions = await db.entities.ChurnPrediction
     .filter({}, "-churn_probability", 5000)
