@@ -297,6 +297,41 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
     factors.push({ factor: 'low_engagement', weight: 10, current_value: recentActivity, threshold: 5, trend: 'declining' });
   }
 
+  // ── 6. SUPPORT & CUSTOMER HEALTH (0-25 pts) ────────────────────────
+  // Support ticket volume and resolution time
+  const recentSupportTickets = supportConversations.filter(s => {
+    const t = new Date(s.created_date || 0).getTime();
+    return t > d30ago;
+  });
+
+  const openTickets = recentSupportTickets.filter(s => s.status === 'open' || s.status === 'pending').length;
+  const avgResolutionTime = calculateAvgResolutionTime(recentSupportTickets);
+  
+  // Escalated or unresolved tickets indicate customer frustration
+  if (openTickets >= 5) {
+    churnScore += 15;
+    factors.push({ factor: 'high_unresolved_tickets', weight: 15, current_value: openTickets, threshold: 5, trend: 'increasing' });
+  } else if (openTickets >= 2) {
+    churnScore += 8;
+    factors.push({ factor: 'moderate_ticket_volume', weight: 8, current_value: openTickets, threshold: 2, trend: 'increasing' });
+  }
+
+  // Slow resolution time (>7 days avg) suggests support quality issues
+  if (avgResolutionTime > 7) {
+    churnScore += 10;
+    factors.push({ factor: 'slow_ticket_resolution', weight: 10, current_value: Math.round(avgResolutionTime), threshold: 7, trend: 'declining' });
+  } else if (avgResolutionTime > 3) {
+    churnScore += 5;
+    factors.push({ factor: 'moderate_resolution_time', weight: 5, current_value: Math.round(avgResolutionTime), threshold: 3, trend: 'declining' });
+  }
+
+  // High recent support volume (lots of tickets) relative to tenant age suggests issues
+  const ticketDensity = recentSupportTickets.length / Math.max(1, Math.floor(daysSinceCreation / 30));
+  if (ticketDensity > 5) {
+    churnScore += 8;
+    factors.push({ factor: 'high_support_volume', weight: 8, current_value: Math.round(ticketDensity * 10) / 10, threshold: 5, trend: 'increasing' });
+  }
+
   // ── 6. NEW CUSTOMER BONUS (reduce score if onboarding_completed recently) ──
   const daysSinceCreation = Math.floor((nowMs - new Date(tenant.created_date || now).getTime()) / DAY);
   if (daysSinceCreation <= 7 && tenant.onboarding_completed) {
