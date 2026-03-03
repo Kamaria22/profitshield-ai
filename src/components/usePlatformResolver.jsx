@@ -168,18 +168,58 @@ export function usePlatformResolver() {
     
     // =====================
     // SHOPIFY EMBEDDED SHORT-CIRCUIT
-    // When running inside Shopify Admin iframe with persisted context from ShopifyEmbeddedAuthGate,
-    // skip Base44 auth entirely — the session token exchange IS the authentication.
+    // When running inside Shopify Admin iframe, derive context from URL params first,
+    // then persisted context. Never requires Base44 auth session.
     // =====================
     const isShopifyEmbedded = !!(urlParams.shop && (urlParams.host || urlParams.embedded === '1'));
+    const embeddedShop = isShopifyEmbedded
+      ? (urlParams.shop?.toLowerCase().includes('.myshopify.com')
+          ? urlParams.shop.toLowerCase()
+          : urlParams.shop ? `${urlParams.shop.toLowerCase()}.myshopify.com` : null)
+      : null;
+
+    trace.steps.push(traceStep('embedded_detection', {
+      isShopifyEmbedded,
+      shop: embeddedShop,
+      host: urlParams.host || null,
+      has_persisted: hasValidContext(persisted) && !!persisted.tenantId
+    }, true, isShopifyEmbedded ? 'Embedded context detected from URL' : 'Not embedded'));
+
     if (isShopifyEmbedded && hasValidContext(persisted) && persisted.tenantId) {
-      // Fast path: resolve directly from persisted Shopify context
+      // Fast path: resolve directly from persisted Shopify context (preferred — no extra API call)
       platform = 'shopify';
-      storeKey = persisted.storeKey || urlParams.storeKey;
+      storeKey = persisted.storeKey || embeddedShop;
       tenantId = persisted.tenantId;
       integrationId = persisted.integrationId;
       chosenBy = 'shopify_embedded_persisted';
-      trace.steps.push(traceStep('shopify_embedded_shortcircuit', { tenantId, storeKey }, true, 'Shopify embedded: skipping Base44 auth'));
+      trace.steps.push(traceStep('shopify_embedded_shortcircuit', { tenantId, storeKey }, true, 'Shopify embedded: resolved from persisted context'));
+    } else if (isShopifyEmbedded && embeddedShop) {
+      // No persisted context — derive from URL + session exchange (works on fresh load / cache miss)
+      trace.steps.push(traceStep('shopify_embedded_no_persist', { shop: embeddedShop }, null, 'Embedded: no persisted context — attempting session exchange'));
+      try {
+        const { data: exchangeData } = await base44.functions.invoke('shopifySessionExchange', {
+          shop: embeddedShop
+        });
+        if (exchangeData?.authenticated && exchangeData?.tenant_id) {
+          platform = 'shopify';
+          storeKey = exchangeData.shop_domain || embeddedShop;
+          tenantId = exchangeData.tenant_id;
+          integrationId = exchangeData.integration_id || null;
+          chosenBy = 'shopify_embedded_exchange';
+          // Persist for future fast-path
+          const { persistContext: pc } = await import('@/components/platformContext');
+          pc({ platform: 'shopify', storeKey, tenantId, integrationId, shop: storeKey });
+          trace.steps.push(traceStep('shopify_embedded_exchange', { tenantId, storeKey, auto_healed: exchangeData.auto_healed }, true, 'Embedded: resolved via session exchange'));
+        } else if (exchangeData?.install_required) {
+          trace.steps.push(traceStep('shopify_embedded_exchange', { install_required: true }, false, 'Embedded: install required'));
+          // Let the gate handle this — don't error the resolver
+        } else {
+          trace.steps.push(traceStep('shopify_embedded_exchange', { reason: exchangeData?.reason }, false, 'Embedded: exchange returned unauthenticated'));
+        }
+      } catch (exErr) {
+        trace.steps.push(traceStep('shopify_embedded_exchange', { error: exErr.message }, false, 'Embedded: session exchange exception'));
+      }
+      // Skip Base44 auth regardless of result — in embedded mode never redirect to login
     } else {
       // =====================
       // STEP 3: Authenticate User (non-embedded only)
