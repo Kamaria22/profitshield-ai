@@ -707,7 +707,16 @@ Deno.serve(async (req) => {
       },
     }).catch(() => {});
 
-    return Response.json(results);
+    return Response.json({
+      ...results,
+      resolved_alert_id: alertData.id,
+      resolved_tenant_id: tId,
+      updated_fields: {
+        remediation_started: true,
+        remediation_started_at: results.automatic_actions?.length > 0 ? nowIso() : undefined,
+        status: "in_progress"
+      }
+    });
   } catch (error) {
     console.error("Automated remediation error:", error);
     return Response.json({ error: error?.message || "Unknown error" }, { status: 500 });
