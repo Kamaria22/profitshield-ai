@@ -310,6 +310,7 @@ Deno.serve(async (req) => {
     // DEBUG_PAYLOAD: Analyze payload, attempt lookup, return proof
     if (payload.action === 'debug_payload') {
       const resolution = resolveAlertId(payload);
+      const automationKeys = payload.automation ? Object.keys(payload.automation) : [];
       
       let hits = [];
       if (resolution.alertId) {
@@ -320,19 +321,29 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Extract selected record candidates explicitly
+      const selectedRecordCandidates = {
+        'data.selected.id': payload?.data?.selected?.id,
+        'data.selectedRecord.id': payload?.data?.selectedRecord?.id,
+        'data.record.id': payload?.data?.record?.id,
+        'data.id': payload?.data?.id
+      };
+
       return Response.json({
         ok: true,
         version: VERSION,
         action: 'debug_payload',
         payloadKeys,
+        automationKeys,
         eventKeys,
         dataKeys,
         payload_too_large: payloadTooLarge,
+        selected_record_id_candidates: selectedRecordCandidates,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_count: hits.length,
         looked_for_id: resolution.alertId,
-        candidates: resolution.candidates,
+        all_candidates: resolution.candidates,
         elapsed_ms: Date.now() - startMs
       });
     }
