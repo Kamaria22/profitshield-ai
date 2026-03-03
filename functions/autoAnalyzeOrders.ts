@@ -338,7 +338,7 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     fraud_score: Math.min(100, Math.max(0, Math.round(fraudScore))),
     return_score: Math.min(100, Math.max(0, Math.round(returnScore))),
     chargeback_score: Math.min(100, Math.max(0, Math.round(chargebackScore))),
-    combined_score: combinedScore,
+    combined_score: Math.round(effectiveScore),
     risk_level: riskLevel,
     risk_reasons: riskFactors,
     recommended_action: recommendedAction,
