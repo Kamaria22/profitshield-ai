@@ -230,32 +230,27 @@ Deno.serve(async (req) => {
       }, { status: 404 });
     }
 
-    // Get tenant data with timeout
+    // Get tenant data and settings with timeout (parallel for performance)
+    const tId = tenant_id;
     let tenant = null;
-    const tId = tenant_id || alertData.tenant_id;
-    if (tId) {
-      try {
-        const [foundTenant] = await withTimeout(
-          Promise.resolve(base44.asServiceRole.entities.Tenant.filter({ id: tId }, '-updated_date', 1)),
-          2000
-        );
-        tenant = foundTenant;
-      } catch (e) {
-        console.warn('[alertNotifications] tenant fetch failed:', e.message);
-      }
-    }
-
-    // Get tenant settings with timeout
     let settings = null;
+
     if (tId) {
       try {
-        const [foundSettings] = await withTimeout(
-          Promise.resolve(base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tId }, '-updated_date', 1)),
-          2000
-        );
-        settings = foundSettings;
+        const [tenantResult, settingsResult] = await Promise.all([
+          withTimeout(
+            Promise.resolve(base44.asServiceRole.entities.Tenant.filter({ id: tId }, '-updated_date', 1)),
+            2000
+          ).catch(() => [null]),
+          withTimeout(
+            Promise.resolve(base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tId }, '-updated_date', 1)),
+            2000
+          ).catch(() => [null])
+        ]);
+        tenant = tenantResult?.[0] || null;
+        settings = settingsResult?.[0] || null;
       } catch (e) {
-        console.warn('[alertNotifications] settings fetch failed:', e.message);
+        console.warn('[alertNotifications] fetch failed:', e.message);
       }
     }
 
