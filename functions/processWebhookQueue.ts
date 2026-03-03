@@ -343,18 +343,43 @@ Deno.serve(async (req) => {
 
       } catch (err) {
         const retries = (job.retry_count || 0) + 1;
-        console.error(`[processWebhookQueue] Job ${job.id} failed (attempt ${retries}):`, err.message);
+        const errorClass = classifyError(err);
+        console.error(`[processWebhookQueue] Job ${job.id} failed (attempt ${retries}, ${errorClass}):`, err.message);
 
-        if (retries >= MAX_RETRIES) {
+        const deadLetter = retries >= MAX_RETRIES || errorClass === 'permanent';
+
+        if (deadLetter) {
+          const reason = errorClass === 'permanent'
+            ? `[permanent] ${err.message}`
+            : `[max retries exhausted after ${retries} attempts] ${err.message}`;
           await db.entities.WebhookQueue.update(job.id, {
             status: 'dead_letter',
             retry_count: retries,
-            error_message: err.message,
+            error_message: reason,
             last_attempt_at: nowIso
           });
           stats.dead_lettered++;
+
+          // Emit an audit trail entry so dead-letters are visible without digging into queue
+          await db.entities.AuditLog.create({
+            tenant_id: job.tenant_id,
+            action: 'webhook_dead_lettered',
+            entity_type: 'webhook_queue',
+            entity_id: job.id,
+            performed_by: 'system',
+            description: `Webhook job dead-lettered after ${retries} attempts (topic: ${job.event_type}): ${err.message}`,
+            severity: 'medium',
+            category: 'integration',
+            is_auto_action: true,
+            metadata: {
+              event_type: job.event_type,
+              retry_count: retries,
+              error_class: errorClass,
+              idempotency_key: job.idempotency_key
+            }
+          }).catch(() => {});
         } else {
-          // Exponential backoff: 30s * 2^retries
+          // Exponential backoff: 30s, 60s, 120s, 240s, 480s
           const backoffMs = 30000 * Math.pow(2, retries - 1);
           const nextAttempt = new Date(Date.now() + backoffMs).toISOString();
           await db.entities.WebhookQueue.update(job.id, {
