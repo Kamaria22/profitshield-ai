@@ -220,32 +220,55 @@ Deno.serve(async (req) => {
       payload = {};
     }
     
-    // Priority 1: Explicit alert data in payload
-    let alertData = payload.alert || payload.data;
-    let tenant_id = payload.tenant_id;
-
-    // Priority 2: If alertData exists, use its tenant_id
-    if (alertData && !tenant_id) {
-      tenant_id = alertData.tenant_id;
+    // Extract alert ID from automation payload
+    // Base44 entity automations provide: { event: { type, entity_name, entity_id }, data: {...alert}, old_data: null }
+    const alertId = payload.event?.entity_id || payload.data?.id || payload.alert_id;
+    
+    if (!alertId) {
+      return Response.json({ 
+        error: 'Alert ID not found in payload',
+        payloadKeys: Object.keys(payload),
+        eventKeys: payload.event ? Object.keys(payload.event) : [],
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
+        elapsed_ms: Date.now() - startMs
+      }, { status: 400 });
     }
 
-    // DEBUG: Log what we found
-    console.log('[alertNotifications] payload extraction:', {
-      hasAlert: !!alertData,
-      alertId: alertData?.id,
-      tenantId: tenant_id,
-      dataKeys: payload.data ? Object.keys(payload.data) : []
-    });
+    // Load the full alert from database (data field may be null if payload_too_large)
+    let alertData = null;
+    if (payload.payload_too_large) {
+      // Fetch alert by ID when payload was too large
+      try {
+        const alerts = await withTimeout(
+          Promise.resolve(base44.asServiceRole.entities.Alert.filter({ id: alertId }, '-updated_date', 1)),
+          2000
+        );
+        alertData = Array.isArray(alerts) ? alerts[0] : null;
+      } catch (e) {
+        console.warn('[alertNotifications] failed to fetch alert:', e.message);
+      }
+    } else {
+      // Use inline alert data from payload
+      alertData = payload.data;
+    }
 
-    // Validate we have alert data
     if (!alertData || !alertData.id) {
       return Response.json({ 
-        error: 'Alert not found',
-        payloadKeys: Object.keys(payload),
-        dataKeys: payload.data ? Object.keys(payload.data) : [],
-        hasData: !!payload.data,
+        error: 'Alert not found or inaccessible',
+        resolved_alert_id: alertId,
+        payload_too_large: payload.payload_too_large,
         elapsed_ms: Date.now() - startMs
       }, { status: 404 });
+    }
+
+    // Extract tenant ID
+    let tenant_id = alertData.tenant_id || payload.tenant_id;
+    if (!tenant_id) {
+      return Response.json({ 
+        error: 'Tenant ID not found',
+        resolved_alert_id: alertId,
+        elapsed_ms: Date.now() - startMs
+      }, { status: 400 });
     }
 
     // Get tenant data and settings with timeout (parallel for performance)
