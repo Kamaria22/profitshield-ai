@@ -310,7 +310,11 @@ Deno.serve(async (req) => {
       });
     }
     
-    return Response.json({ error: 'Invalid action' }, { status: 400 });
+    return Response.json({ 
+      error: 'Invalid action', 
+      received_action: rawAction, 
+      allowed_actions: ALLOWED_ACTIONS 
+    }, { status: 400 });
     
   } catch (error) {
     console.error('Auth error:', error);
