@@ -99,8 +99,8 @@ async function generateInstallUrl(shop) {
 async function handleCallback(base44, body) {
   const { code, hmac, shop, state } = body;
 
-  if (!code || !hmac || !shop) {
-    return Response.json({ error: 'Missing OAuth parameters' }, { status: 400 });
+  if (!code || !shop) {
+    return Response.json({ error: 'Missing OAuth code or shop parameter' }, { status: 400 });
   }
 
   // Verify HMAC signature (basic validation — production should use crypto)
@@ -110,7 +110,7 @@ async function handleCallback(base44, body) {
     // Exchange code for access token
     const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
     const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || '';
-    const appUrl = Deno.env.get('APP_URL') || 'https://app.profitshield.ai';
+    const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 
     if (!apiKey || !apiSecret) {
       return Response.json({ error: 'Shopify credentials not configured' }, { status: 500 });
