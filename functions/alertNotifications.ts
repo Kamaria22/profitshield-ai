@@ -245,19 +245,33 @@ Deno.serve(async (req) => {
       }, { status: 404 });
     }
 
-    // Get tenant data
+    // Get tenant data with timeout
     let tenant = null;
     const tId = tenant_id || alertData.tenant_id;
     if (tId) {
-      const tenants = await base44.asServiceRole.entities.Tenant.filter({ id: tId });
-      tenant = tenants[0];
+      try {
+        const [foundTenant] = await withTimeout(
+          Promise.resolve(base44.asServiceRole.entities.Tenant.filter({ id: tId }, '-updated_date', 1)),
+          2000
+        );
+        tenant = foundTenant;
+      } catch (e) {
+        console.warn('[alertNotifications] tenant fetch failed:', e.message);
+      }
     }
 
-    // Get tenant settings for notification preferences
+    // Get tenant settings with timeout
     let settings = null;
     if (tId) {
-      const settingsRecords = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tId });
-      settings = settingsRecords[0];
+      try {
+        const [foundSettings] = await withTimeout(
+          Promise.resolve(base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tId }, '-updated_date', 1)),
+          2000
+        );
+        settings = foundSettings;
+      } catch (e) {
+        console.warn('[alertNotifications] settings fetch failed:', e.message);
+      }
     }
 
     // Check if notifications are enabled (unless forced)
