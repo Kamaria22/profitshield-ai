@@ -246,9 +246,8 @@ Deno.serve(async (req) => {
     let integration = integrationsList[0] || null;
     let autoHealed = false;
 
-    // AUTO-HEAL: If no connected integration but we have a session token (embedded valid), 
-    // try to find a disconnected one and verify token is still valid.
-    if (!integration && session_token) {
+    // AUTO-HEAL: If no connected integration, try to find a disconnected one and verify token.
+    if (!integration) {
       const anyIntegrations = await base44.entities.PlatformIntegration.filter({
         tenant_id: tenant.id,
         platform: 'shopify'
@@ -258,14 +257,31 @@ Deno.serve(async (req) => {
       if (disconnected) {
         // Check if we have a valid token for this shop
         const tokens = await base44.entities.OAuthToken.filter({ tenant_id: tenant.id, platform: 'shopify' });
-        const token = tokens.find(t => t.is_valid !== false) || tokens[0] || null;
+        const token = tokens[0] || null;
 
         if (token?.encrypted_access_token) {
-          // Quick token validity check via access_scopes
+          // Inline decrypt (no local imports allowed in Deno deploy)
+          let accessToken = null;
           try {
-            const { decryptToken: dt } = await import('./shopifyConfig.js');
-            const accessToken = await dt(token.encrypted_access_token);
-            if (accessToken) {
+            const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
+            if (ENCRYPTION_KEY) {
+              const combined = Uint8Array.from(atob(token.encrypted_access_token), c => c.charCodeAt(0));
+              const iv = combined.slice(0, 12);
+              const enc = combined.slice(12);
+              const encoder = new TextEncoder();
+              const keyData = encoder.encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
+              const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+              const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+              accessToken = new TextDecoder().decode(decrypted);
+            } else {
+              accessToken = atob(token.encrypted_access_token);
+            }
+          } catch {
+            try { accessToken = atob(token.encrypted_access_token); } catch { accessToken = null; }
+          }
+
+          if (accessToken) {
+            try {
               const scopeRes = await fetch(`https://${shopDomain}/admin/oauth/access_scopes.json`, {
                 headers: { 'X-Shopify-Access-Token': accessToken }
               });
@@ -273,19 +289,20 @@ Deno.serve(async (req) => {
                 // Token is valid — auto-heal the integration status
                 await base44.entities.PlatformIntegration.update(disconnected.id, {
                   status: 'connected',
-                  last_connected_at: new Date().toISOString(),
-                  metadata: { ...(disconnected.metadata || {}), auto_healed_at: new Date().toISOString() }
+                  last_connected_at: new Date().toISOString()
                 });
-                if (token.is_valid === false) {
-                  await base44.entities.OAuthToken.update(token.id, { is_valid: true });
-                }
+                await base44.entities.OAuthToken.update(token.id, { is_valid: true });
                 integration = { ...disconnected, status: 'connected' };
                 autoHealed = true;
                 console.log(`[shopifySessionExchange] ✅ Auto-healed integration ${disconnected.id} for tenant ${tenant.id}`);
+              } else {
+                console.log(`[shopifySessionExchange] Token invalid (${scopeRes.status}) for ${shopDomain} — needs reauth`);
+                // Mark token as invalid so DiagnoseFixPanel shows reconnect button
+                await base44.entities.OAuthToken.update(token.id, { is_valid: false });
               }
+            } catch (healErr) {
+              console.warn('[shopifySessionExchange] Auto-heal check failed:', healErr.message);
             }
-          } catch (healErr) {
-            console.warn('[shopifySessionExchange] Auto-heal check failed:', healErr.message);
           }
         }
       }
