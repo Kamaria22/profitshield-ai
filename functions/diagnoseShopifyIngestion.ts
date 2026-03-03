@@ -317,6 +317,8 @@ Deno.serve(async (req) => {
     const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || '';
     const tokenLastChars = accessToken ? `...${accessToken.slice(-6)}` : null;
 
+    console.log(`[diagnoseShopifyIngestion] Diagnostic complete — shop=${normalized} health=${issues.length === 0 ? 'healthy' : issues.length <= 1 ? 'degraded' : 'critical'} issues=${issues.length}`);
+
     return Response.json({
       checked_at: new Date().toISOString(),
       shop_domain: normalized,
@@ -372,6 +374,7 @@ Deno.serve(async (req) => {
         app_url_env: Deno.env.get('APP_URL') || '(not set)',
         webhook_endpoint_in_use: expectedWebhookUrl,
         api_version: API_VERSION,
+        canonical_webhook_url: config.webhookEndpoint
       },
 
       issues_found: issues,
