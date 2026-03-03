@@ -288,7 +288,7 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                     <Button
                       variant="outline"
                       className="flex-1 justify-start gap-2"
-                      disabled={!!actionLoading || !result.access_token_decryptable}
+                      disabled={!!actionLoading || !result.access_token_decryptable || !result.shopify_api_reachable}
                       onClick={() => runAction('fix_sync', { days: parseInt(syncDays) })}
                     >
                       {actionLoading === 'fix_sync' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4 text-blue-500" />}
