@@ -409,8 +409,7 @@ Deno.serve(async (req) => {
   }
 });
 
-// Token helpers now imported from shopifyConfig — keeping stubs for backward compat
-// decryptToken and encryptToken are re-exported from the import block at the top
+
 
 async function registerWebhooks(shopDomain, accessToken, integrationId, db) {
   const appUrl = Deno.env.get('APP_URL') || 'https://app.base44.com';
