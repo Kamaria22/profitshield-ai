@@ -137,32 +137,35 @@ function looksLikeId(v) {
   return typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
 }
 
-function deepScanForIds(obj, { depth = 6, maxNodes = 500 } = {}) {
+function deepScanForIds(obj, { depth = 4, maxNodes = 200 } = {}) {
   const found = new Set();
+  const seen = new Set();
   const stack = [{ value: obj, d: 0 }];
   let nodes = 0;
 
-  while (stack.length) {
+  while (stack.length && nodes < maxNodes) {
     const { value, d } = stack.pop();
     nodes += 1;
-    if (nodes > maxNodes) break;
 
     if (typeof value === 'string') {
-      // Extract any 24-hex substrings too
       const matches = value.match(/[a-f0-9]{24}/gi);
-      if (matches) matches.forEach(m => found.add(m));
+      if (matches) matches.forEach(m => found.add(m.toLowerCase()));
       continue;
     }
 
-    if (d >= depth) continue;
+    if (d >= depth || !value || typeof value !== 'object') continue;
+
+    const ref = Object.prototype.toString.call(value);
+    if (seen.has(ref)) continue;
+    seen.add(ref);
 
     if (Array.isArray(value)) {
-      for (const item of value) stack.push({ value: item, d: d + 1 });
-      continue;
-    }
-
-    if (isObject(value)) {
-      for (const k of Object.keys(value)) {
+      for (let i = 0; i < Math.min(value.length, 50); i++) {
+        stack.push({ value: value[i], d: d + 1 });
+      }
+    } else {
+      const keys = Object.keys(value).slice(0, 30);
+      for (const k of keys) {
         stack.push({ value: value[k], d: d + 1 });
       }
     }
