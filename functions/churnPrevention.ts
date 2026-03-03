@@ -169,7 +169,7 @@ async function predictChurn(base44) {
 //  SCORING ENGINE — pure function, fully testable
 // ─────────────────────────────────────────────
 
-function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, now }) {
+function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations, now }) {
   const factors = [];
   let churnScore = 0;
 
@@ -178,6 +178,7 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
   const d7ago = nowMs - 7 * DAY;
   const d14ago = nowMs - 14 * DAY;
   const d30ago = nowMs - 30 * DAY;
+  const d90ago = nowMs - 90 * DAY;
 
   // ── 1. TRIAL EXPIRY (0-30 pts) ──────────────────────────────
   const trialEndsAt = tenant.trial_ends_at ? new Date(tenant.trial_ends_at).getTime() : null;
