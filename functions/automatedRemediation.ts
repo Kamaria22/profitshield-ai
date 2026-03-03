@@ -423,27 +423,117 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const bodyText = await req.text().catch(() => "{}");
-    const payload = safeJsonParse(bodyText);
+    const db = base44.entities;
+
+    // Safe JSON parse
+    let bodyText = "";
+    try {
+      bodyText = await req.text();
+    } catch {
+      bodyText = "{}";
+    }
+
+    let payload = {};
+    try {
+      payload = JSON.parse(bodyText || "{}");
+    } catch {
+      payload = {};
+    }
+
+    const action = payload.action || null;
+
+    // Optional debug mode
+    if (action === "debug_payload") {
+      const derivedAlertId =
+        payload.alert?.id ||
+        payload.alert_id ||
+        payload.id ||
+        payload.entity_id ||
+        payload.record?.id ||
+        payload.row?.id ||
+        null;
+
+      const derivedTenantId =
+        payload.tenant_id ||
+        payload.alert?.tenant_id ||
+        payload.record?.tenant_id ||
+        payload.row?.tenant_id ||
+        null;
+
+      return Response.json({
+        receivedPayloadKeys: Object.keys(payload),
+        recordShape: payload.record ? Object.keys(payload.record) : null,
+        rowShape: payload.row ? Object.keys(payload.row) : null,
+        derivedAlertId,
+        derivedTenantId
+      });
+    }
+
+    // Derive alertData
+    let alertData =
+      payload.alert ||
+      payload.record ||
+      payload.row ||
+      null;
+
+    let alertId =
+      payload.alert?.id ||
+      payload.alert_id ||
+      payload.id ||
+      payload.entity_id ||
+      payload.record?.id ||
+      payload.row?.id ||
+      null;
+
+    // If alert object not directly provided, fetch it
+    if (!alertData && alertId) {
+      try {
+        const alerts = await db.Alert.filter({ id: alertId });
+        alertData = alerts?.[0] || null;
+      } catch {
+        alertData = null;
+      }
+
+      // Optional fallback if get() exists
+      if (!alertData && typeof db.Alert.get === "function") {
+        try {
+          alertData = await db.Alert.get(alertId);
+        } catch {
+          alertData = null;
+        }
+      }
+    }
+
+    // If still not found → log and return 404 with debug info
+    if (!alertData) {
+      const debugInfo = {
+        lookedFor: alertId,
+        payloadKeys: Object.keys(payload),
+        recordId: payload.record?.id || null,
+        rowId: payload.row?.id || null
+      };
+
+      try {
+        await db.AuditLog.create({
+          action: "remediation_failed_alert_not_found",
+          entity_type: "Alert",
+          entity_id: alertId || null,
+          details: debugInfo,
+          timestamp: new Date().toISOString()
+        });
+      } catch {}
+
+      return Response.json(
+        { error: "Alert not found", debug: debugInfo },
+        { status: 404 }
+      );
+    }
 
     const {
-      alert_id,
-      alert,
       tenant_id,
       execute_automatic = true,
       dry_run = false,
     } = payload || {};
-
-    const db = base44.entities;
-
-    let alertData = alert || null;
-    if (alert_id && !alertData) {
-      const alerts = await db.Alert.filter({ id: alert_id }).catch(() => []);
-      alertData = alerts?.[0] || null;
-    }
-    if (!alertData) {
-      return Response.json({ error: "Alert not found" }, { status: 404 });
-    }
 
     const tId = tenant_id || alertData.tenant_id;
     let tenant = null;
