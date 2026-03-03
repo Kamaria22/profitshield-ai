@@ -9,16 +9,25 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { order_id, tenant_id } = await req.json();
+    const { order_id, platform_order_id, tenant_id } = await req.json();
     
-    if (!order_id || !tenant_id) {
-      return Response.json({ error: 'order_id and tenant_id are required' }, { status: 400 });
+    if ((!order_id && !platform_order_id) || !tenant_id) {
+      return Response.json({ error: 'order_id (or platform_order_id) and tenant_id are required' }, { status: 400 });
     }
 
-    // Fetch the order
-    const orders = await base44.asServiceRole.entities.Order.filter({ id: order_id, tenant_id });
+    // Fetch the order — support lookup by platform_order_id for webhook-triggered calls
+    let orders = [];
+    if (order_id) {
+      orders = await base44.asServiceRole.entities.Order.filter({ id: order_id, tenant_id });
+    }
+    if (orders.length === 0 && platform_order_id) {
+      orders = await base44.asServiceRole.entities.Order.filter({ platform_order_id: String(platform_order_id), tenant_id });
+    }
+
+    // Order not yet ingested by webhook queue — skip gracefully to avoid 500s
     if (orders.length === 0) {
-      return Response.json({ error: 'Order not found' }, { status: 404 });
+      console.log(`[analyzeOrderRisk] Order not found yet (order_id=${order_id}, platform_order_id=${platform_order_id}). Skipping.`);
+      return Response.json({ skipped: true, reason: 'order_not_found_yet', order_id, platform_order_id }, { status: 200 });
     }
     const order = orders[0];
 
