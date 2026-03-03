@@ -58,6 +58,28 @@ Deno.serve(async (req) => {
       });
     }
     
+    if (action === 'registerWebhooks') {
+      // Standalone webhook registration (called from Diagnose panel)
+      if (!shop) {
+        return Response.json({ error: 'Shop domain is required' }, { status: 400 });
+      }
+      const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+
+      // Look up integration + token
+      const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ store_key: shopDomain, platform: 'shopify' });
+      if (integrations.length === 0) return Response.json({ error: 'Integration not found' }, { status: 404 });
+      const integration = integrations[0];
+
+      const tokens = await base44.asServiceRole.entities.OAuthToken.filter({ store_key: shopDomain, platform: 'shopify' });
+      if (tokens.length === 0 || !tokens[0].encrypted_access_token) {
+        return Response.json({ error: 'OAuth token not found — reconnect OAuth first' }, { status: 400 });
+      }
+
+      const accessToken = await decryptToken(tokens[0].encrypted_access_token);
+      const result = await registerWebhooks(shopDomain, accessToken, integration.id, base44.asServiceRole);
+      return Response.json({ ok: true, registered_count: Object.keys(result.registered).length, error_count: result.errors.length, registered: result.registered, errors: result.errors });
+    }
+
     if (action === 'callback') {
       // Exchange code for access token
       if (!shop || !code) {
