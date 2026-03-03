@@ -206,27 +206,43 @@ function generateSMSBody(alert, isScam) {
 }
 
 Deno.serve(async (req) => {
+  const startMs = Date.now();
   try {
     const base44 = createClientFromRequest(req);
-    const payload = await req.json();
+    const { payload } = await parseAutomationPayload(req);
     
-    const { 
-      alert_id,
-      alert,
-      tenant_id,
-      notification_channels = ['email'], // email, sms, push
-      force = false
-    } = payload;
+    // Try explicit fields first, then fall back to automation payload extraction
+    let alert_id = payload.alert_id || payload.alert?.id;
+    let alertData = payload.alert;
+    let tenant_id = payload.tenant_id;
 
-    // Get alert data
-    let alertData = alert;
+    // If no explicit alert_id, extract from automation payload
+    if (!alert_id && !alertData) {
+      const recordId = extractSelectedRecordId(payload);
+      alert_id = recordId.id;
+      tenant_id = tenant_id || extractTenantId(payload);
+    }
+
+    // Get alert data with timeout protection
     if (alert_id && !alertData) {
-      const alerts = await base44.asServiceRole.entities.Alert.filter({ id: alert_id });
-      alertData = alerts[0];
+      try {
+        const [foundAlert] = await withTimeout(
+          Promise.resolve(base44.asServiceRole.entities.Alert.filter({ id: alert_id }, '-updated_date', 1)),
+          2000
+        );
+        alertData = foundAlert;
+      } catch (e) {
+        console.error('[alertNotifications] alert fetch timeout:', e.message);
+      }
     }
 
     if (!alertData) {
-      return Response.json({ error: 'Alert not found' }, { status: 404 });
+      return Response.json({ 
+        error: 'Alert not found',
+        resolved_alert_id: alert_id,
+        resolved_tenant_id: tenant_id,
+        elapsed_ms: Date.now() - startMs
+      }, { status: 404 });
     }
 
     // Get tenant data
