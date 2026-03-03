@@ -124,7 +124,7 @@ async function handleCallback(base44, body) {
   const { code, hmac, shop, state } = body;
 
   if (!code || !shop) {
-    return Response.json({ error: 'Missing OAuth code or shop parameter' }, { status: 400 });
+    return jsonResponse({ error: 'Missing OAuth code or shop parameter' }, 400);
   }
 
   // Verify HMAC signature (basic validation — production should use crypto)
@@ -141,7 +141,7 @@ async function handleCallback(base44, body) {
     }
 
     if (!apiKey || !apiSecret) {
-      return Response.json({ error: 'Shopify credentials not configured' }, { status: 500 });
+      return jsonResponse({ error: 'Shopify credentials not configured' }, 500);
     }
 
     const normalizedShop = shop.includes('.myshopify.com') ? shop.toLowerCase() : `${shop.toLowerCase()}.myshopify.com`;
@@ -162,7 +162,7 @@ async function handleCallback(base44, body) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error(`[shopifyAuth/handleCallback] Token exchange failed (${tokenResponse.status}): ${error}`);
-      return Response.json({ error: `Token exchange failed: ${error}` }, { status: 400 });
+      return jsonResponse({ error: `Token exchange failed: ${error}` }, 400);
     }
 
     const tokenData = await tokenResponse.json();
@@ -170,7 +170,7 @@ async function handleCallback(base44, body) {
     const scopes = tokenData.scope?.split(',') || [];
 
     if (!accessToken) {
-      return Response.json({ error: 'No access token in response' }, { status: 400 });
+      return jsonResponse({ error: 'No access token in response' }, 400);
     }
 
     // Get shop info to determine tenant — use consistent API version
@@ -183,7 +183,7 @@ async function handleCallback(base44, body) {
     if (!shopResponse.ok) {
       const error = await shopResponse.text();
       console.error(`[shopifyAuth/handleCallback] Shop info fetch failed (${shopResponse.status}): ${error}`);
-      return Response.json({ error: 'Failed to fetch shop info' }, { status: 400 });
+      return jsonResponse({ error: 'Failed to fetch shop info' }, 400);
     }
 
     const shopInfo = await shopResponse.json();
@@ -193,13 +193,13 @@ async function handleCallback(base44, body) {
     console.log(`[shopifyAuth/handleCallback] Shop info retrieved — storeKey=${storeKey} shopName=${shopName}`);
 
     // Find or create tenant by shop_domain
-    const db = base44.asServiceRole;
-    let tenants = await db.entities.Tenant.filter({ shop_domain: storeKey }).catch(() => []);
+    const db = base44.entities;
+    let tenants = await db.Tenant.filter({ shop_domain: storeKey }).catch(() => []);
 
     let tenant = tenants[0];
     if (!tenant) {
       // Create new tenant
-      tenant = await db.entities.Tenant.create({
+      tenant = await db.Tenant.create({
         shop_domain: storeKey,
         shop_name: shopName,
         platform: 'shopify',
@@ -214,7 +214,7 @@ async function handleCallback(base44, body) {
     }
 
     // Find or create OAuthToken
-    let oauthTokens = await db.entities.OAuthToken.filter({
+    let oauthTokens = await db.OAuthToken.filter({
       tenant_id: tenant.id,
       platform: 'shopify',
       store_key: storeKey
@@ -224,7 +224,7 @@ async function handleCallback(base44, body) {
 
     if (oauthTokens.length > 0) {
       // Update existing token
-      await db.entities.OAuthToken.update(oauthTokens[0].id, {
+      await db.OAuthToken.update(oauthTokens[0].id, {
         encrypted_access_token: encrypted_token,
         scopes,
         is_valid: true
@@ -232,7 +232,7 @@ async function handleCallback(base44, body) {
       console.log(`[shopifyAuth/handleCallback] Updated existing OAuth token — id=${oauthTokens[0].id}`);
     } else {
       // Create new token record
-      const newToken = await db.entities.OAuthToken.create({
+      const newToken = await db.OAuthToken.create({
         tenant_id: tenant.id,
         platform: 'shopify',
         store_key: storeKey,
@@ -245,14 +245,14 @@ async function handleCallback(base44, body) {
     }
 
     // Update or create PlatformIntegration
-    let integrations = await db.entities.PlatformIntegration.filter({
+    let integrations = await db.PlatformIntegration.filter({
       tenant_id: tenant.id,
       platform: 'shopify',
       store_key: storeKey
     }).catch(() => []);
 
     if (integrations.length > 0) {
-      await db.entities.PlatformIntegration.update(integrations[0].id, {
+      await db.PlatformIntegration.update(integrations[0].id, {
         status: 'connected',
         last_connected_at: new Date().toISOString(),
         is_primary: true,
@@ -261,7 +261,7 @@ async function handleCallback(base44, body) {
       });
       console.log(`[shopifyAuth/handleCallback] Updated existing integration — id=${integrations[0].id}`);
     } else {
-      const newIntegration = await db.entities.PlatformIntegration.create({
+      const newIntegration = await db.PlatformIntegration.create({
         tenant_id: tenant.id,
         platform: 'shopify',
         store_key: storeKey,
@@ -280,7 +280,7 @@ async function handleCallback(base44, body) {
     }
 
     // Log audit event
-    await db.entities.AuditLog.create({
+    await db.AuditLog.create({
       tenant_id: tenant.id,
       action: 'shopify_oauth_authorized',
       entity_type: 'PlatformIntegration',
@@ -296,7 +296,7 @@ async function handleCallback(base44, body) {
 
     console.log(`[shopifyAuth/handleCallback] OAuth complete — redirecting to: ${redirectUrl}`);
 
-    return Response.json({
+    return jsonResponse({
       success: true,
       tenant_id: tenant.id,
       shop_domain: storeKey,
@@ -305,7 +305,7 @@ async function handleCallback(base44, body) {
       message: 'Shopify authorization successful'
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return jsonResponse({ error: error.message }, 500);
   }
 }
 
