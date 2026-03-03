@@ -313,7 +313,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate SMS body (for logging/future SMS integration)
-    if (notification_channels.includes('sms')) {
+    if (notificationChannels.includes('sms')) {
       const smsBody = generateSMSBody(alertData, isScam);
       // SMS would require Twilio or similar integration
       // For now, log the SMS that would be sent
