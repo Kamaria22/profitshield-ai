@@ -36,14 +36,15 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Shop domain is required' }, { status: 400 });
       }
       
-      const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-      // Redirect URI must be whitelisted in Shopify Partner Dashboard
-      // Go to: partners.shopify.com → App → Configuration → Allowed redirection URL(s)
-      // Add: https://profit-shield-ai.base44.app/ShopifyCallback
-      const redirectUri = 'https://profit-shield-ai.base44.app/ShopifyCallback';
+      const shopDomain = canonicalizeShopDomain(shop);
+      if (!shopDomain) return Response.json({ error: 'Invalid shop domain' }, { status: 400 });
+
+      // Always use CANONICAL redirect URI — must match Shopify Partner Dashboard whitelist exactly
+      const redirectUri = REDIRECT_URI_CANONICAL;
+      const isWhitelisted = validateRedirectWhitelist(redirectUri);
       const nonce = crypto.randomUUID();
 
-      console.log(`[shopifyAuth] ${action} → redirect_uri=${redirectUri} shop=${shopDomain}`);
+      console.log(`[shopifyAuth] ${action} → redirect_uri=${redirectUri} whitelisted=${isWhitelisted} shop=${shopDomain}`);
       
       const authorizeUrl = `https://${shopDomain}/admin/oauth/authorize?` + new URLSearchParams({
         client_id: SHOPIFY_API_KEY,
