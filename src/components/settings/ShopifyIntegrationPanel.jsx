@@ -366,16 +366,54 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
             <RefreshCw className="w-5 h-5 text-indigo-400" />
             Manual Data Sync
           </CardTitle>
-          <CardDescription>Trigger a full pull of recent orders from Shopify right now</CardDescription>
+          <CardDescription>Trigger a full pull of orders from Shopify right now</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-between">
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Select value={syncDays} onValueChange={setSyncDays}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Last 24 hours</SelectItem>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="365">Last 365 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleSync} disabled={syncing || !isConnected} className="gap-2">
+              {syncing
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing…</>
+                : <><Zap className="w-4 h-4" /> Sync Now</>}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500">Normally syncs automatically. Use this to force an immediate pull.</p>
+        </CardContent>
+      </Card>
+
+      {/* ── Webhook Reconciliation ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Webhook className="w-5 h-5 text-purple-400" />
+            Webhook Reconciliation
+          </CardTitle>
+          <CardDescription>Fix webhook drift — removes stale endpoints, registers missing topics</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4">
           <p className="text-sm text-slate-400 max-w-md">
-            Normally, orders sync automatically on the configured schedule. Use this to force an immediate sync.
+            Ensures all 7 required webhook topics point to the canonical ProfitShield endpoint. Safe to run any time.
           </p>
-          <Button onClick={handleSync} disabled={syncing || !isConnected} className="gap-2 shrink-0">
-            {syncing
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing…</>
-              : <><Zap className="w-4 h-4" /> Sync Now</>}
+          <Button
+            variant="outline"
+            onClick={handleReconcileWebhooks}
+            disabled={reconciling || !isConnected}
+            className="gap-2 shrink-0"
+          >
+            {reconciling
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Reconciling…</>
+              : <><RefreshCw className="w-4 h-4" /> Reconcile Webhooks</>}
           </Button>
         </CardContent>
       </Card>
