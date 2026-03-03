@@ -565,7 +565,8 @@ export function usePlatformResolver() {
       finalStatus = RESOLVER_STATUS.RESOLVED;
       reason = 'shopify_embedded_shortcircuit';
       trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, true, 'Embedded short-circuit resolved'));
-    } else if (integration && integration.status === 'connected') {
+    } else if (integration && (integration.status === 'connected' || (isShopifyEmbedded && tenantId && integrationId))) {
+      // In embedded mode: if we have tenantId+integrationId (even after heal), treat as resolved
       finalStatus = RESOLVER_STATUS.RESOLVED;
       reason = reason || 'resolved';
       
