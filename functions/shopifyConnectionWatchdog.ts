@@ -12,10 +12,26 @@
  * Can also be triggered manually by admin.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import {
-  APP_URL, API_VERSION, WEBHOOK_ENDPOINT_CANONICAL, REQUIRED_TOPICS,
-  canonicalizeShopDomain, decryptToken
-} from './shopifyConfig.js';
+
+const API_VERSION = '2024-10';
+const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+const WEBHOOK_ENDPOINT_CANONICAL = `${APP_URL}/api/functions/shopifyWebhook`;
+const REQUIRED_TOPICS = ['orders/create','orders/updated','orders/paid','orders/cancelled','refunds/create','products/update','app/uninstalled'];
+
+async function decryptToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  if (!key) { try { return atob(encryptedToken); } catch { return null; } }
+  try {
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const enc = combined.slice(12);
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+    return new TextDecoder().decode(decrypted);
+  } catch { try { return atob(encryptedToken); } catch { return null; } }
+}
 
 const WEBHOOK_STALE_HOURS = 24;
 const SYNC_STALE_HOURS = 2;
