@@ -1,4 +1,5 @@
 import { getCachedRemoteConfig, refreshRemoteConfig } from './remoteConfig';
+import { publishError, SUBSYSTEMS } from '@/components/selfheal/IncidentBus';
 
 function safeId() {
   return `inc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
@@ -46,6 +47,11 @@ export class HealthAgent {
       const err = event?.error;
       this.report('error', 'window.onerror', err?.stack || String(event.message || 'Unknown error'), {
         source: 'window.error',
+      });
+      publishError(err || new Error(String(event.message)), {
+        tenant_id: this.resolverContext?.tenantId,
+        url: window.location.href,
+        source: 'window.error'
       });
     });
 
@@ -104,6 +110,12 @@ export class HealthAgent {
         self.report('warn', `fetch failed: ${method} ${url}`, e?.stack, {
           source: 'fetch',
           url,
+        });
+        publishError(e, {
+          tenant_id: self.resolverContext?.tenantId,
+          url,
+          method,
+          source: 'fetch'
         });
 
         throw e;
