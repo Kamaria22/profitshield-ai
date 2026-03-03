@@ -11,7 +11,19 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const MAX_RETRIES = 5;
-const BATCH_SIZE = 20; // process up to 20 jobs per invocation
+const BATCH_SIZE = 20;
+
+// Classify errors: transient = worth retrying, permanent = dead-letter immediately
+function classifyError(err) {
+  const msg = (err?.message || '').toLowerCase();
+  if (msg.includes('timeout') || msg.includes('network') || msg.includes('econnreset') || msg.includes('503') || msg.includes('rate limit')) {
+    return 'transient';
+  }
+  if (msg.includes('not found') || msg.includes('tenant') || msg.includes('invalid') || msg.includes('unknown topic')) {
+    return 'permanent';
+  }
+  return 'transient'; // default: retry
+}
 
 // ─── Profit Calculation (mirror of shopifyWebhook) ───────────────────────────
 function calculateOrderProfit(order, costMappings, settings) {
