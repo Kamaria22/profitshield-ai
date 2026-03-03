@@ -1,8 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-const APP_URL = Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app';
+const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const WEBHOOK_URL = `${APP_URL}/api/functions/shopifyWebhook`;
 const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
+const API_VERSION = '2024-10';
+
+// All known old endpoints to clean up (including wrong domain)
+const STALE_ENDPOINTS = [
+  WEBHOOK_URL,
+  'https://profit-shield-ai.com/api/functions/shopifyWebhook',
+];
 
 const TOPICS = [
   'orders/create',
