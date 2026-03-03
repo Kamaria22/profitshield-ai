@@ -1,4 +1,10 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import {
+  parseAutomationPayload,
+  extractSelectedRecordId,
+  extractTenantId,
+  withTimeout
+} from './helpers/automationRuntime';
 
 const ALERT_TEMPLATES = {
   fraud_detected: {
