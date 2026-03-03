@@ -90,7 +90,8 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Missing shop or code' }, { status: 400 });
       }
       
-      const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+      const shopDomain = canonicalizeShopDomain(shop);
+      if (!shopDomain) return Response.json({ error: 'Invalid shop domain' }, { status: 400 });
       
       // Exchange code for token
       const tokenResponse = await fetch(`https://${shopDomain}/admin/oauth/access_token`, {
