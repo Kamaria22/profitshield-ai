@@ -523,3 +523,19 @@ Deno.serve(async (req) => {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+async function decryptAccessToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  try {
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const enc = combined.slice(12);
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode((key || '').padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    return atob(encryptedToken); // fallback
+  }
+}
