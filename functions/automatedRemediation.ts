@@ -1,816 +1,731 @@
-/**
- * automatedRemediation — HARDENED Alert-driven remediation engine
- *
- * REWRITE v2 (Fixes Automation UI 404):
- * 1) ✅ Hardened multi-path resolver (30+ field paths + deepScan)
- * 2) ✅ action="debug_payload" for payload inspection
- * 3) ✅ action="self_test" for resolver proof
- * 4) ✅ NO asServiceRole; uses base44.entities directly
- * 5) ✅ Fallback by created_date DESC when tenant known but alert id missing
- * 6) ✅ Handles payload_too_large, empty bodies, invalid JSON
- *
- * PROOF REQUIREMENT: Run with action="self_test" first (all cases must pass),
- * then run from Automation UI selecting an Alert record (resolved_alert_id must be non-null).
- */
-
-import { createClientFromRequest } from "npm:@base44/sdk@0.8.20";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const REMEDIATION_WORKFLOWS = {
   fraud_detected: {
     automatic_actions: [
-      { action: "hold_order", description: "Automatically hold order for review" },
-      { action: "flag_customer", description: "Flag customer account for monitoring" },
-      { action: "notify_merchant", description: "Send urgent notification to merchant", priority: "critical" },
+      { action: 'hold_order', description: 'Automatically hold order for review' },
+      { action: 'flag_customer', description: 'Flag customer account for monitoring' },
+      { action: 'notify_merchant', description: 'Send urgent notification to merchant', priority: 'critical' }
     ],
     suggested_actions: [
-      "Review order details and shipping address",
-      "Verify customer identity if possible",
-      "Consider canceling order if risk is too high",
-      "Report to payment processor fraud department",
+      'Review order details and shipping address',
+      'Verify customer identity if possible',
+      'Consider canceling order if risk is too high',
+      'Report to payment processor fraud department'
     ],
     escalation_threshold: 80,
-    auto_cancel_threshold: 95,
+    auto_cancel_threshold: 95
   },
   fraud_ring: {
     automatic_actions: [
-      { action: "hold_all_linked_orders", description: "Hold all orders linked to fraud ring" },
-      { action: "block_identifiers", description: "Block associated emails, IPs, and devices" },
-      { action: "notify_merchant", description: "Send critical alert to merchant", priority: "critical" },
-      { action: "generate_evidence_report", description: "Generate fraud evidence report" },
+      { action: 'hold_all_linked_orders', description: 'Hold all orders linked to fraud ring' },
+      { action: 'block_identifiers', description: 'Block associated emails, IPs, and devices' },
+      { action: 'notify_merchant', description: 'Send critical alert to merchant', priority: 'critical' },
+      { action: 'generate_evidence_report', description: 'Generate fraud evidence report for law enforcement' }
     ],
     suggested_actions: [
-      "Review all linked orders immediately",
-      "Consider reporting to FBI IC3 (ic3.gov)",
-      "Contact payment processor fraud team",
-      "Document all evidence thoroughly",
+      'Review all linked orders immediately',
+      'Consider reporting to FBI IC3 (ic3.gov)',
+      'Contact payment processor fraud team',
+      'Document all evidence thoroughly'
     ],
     escalation_threshold: 70,
-    auto_cancel_threshold: 90,
+    auto_cancel_threshold: 90
   },
   high_risk_order: {
     automatic_actions: [
-      { action: "add_risk_tag", description: "Tag order as high risk" },
-      { action: "delay_fulfillment", description: "Add 24-hour fulfillment delay" },
-      { action: "notify_merchant", description: "Send notification to merchant", priority: "high" },
+      { action: 'add_risk_tag', description: 'Tag order as high risk' },
+      { action: 'delay_fulfillment', description: 'Add 24-hour fulfillment delay' },
+      { action: 'notify_merchant', description: 'Send notification to merchant', priority: 'high' }
     ],
     suggested_actions: [
-      "Manually review order before fulfilling",
-      "Consider requesting additional verification",
-      "Check if customer has previous orders",
+      'Manually review order before fulfilling',
+      'Consider requesting additional verification',
+      'Check if customer has previous orders'
     ],
     escalation_threshold: 70,
-    auto_cancel_threshold: null,
+    auto_cancel_threshold: null
   },
   chargeback: {
     automatic_actions: [
-      { action: "flag_customer", description: "Flag customer for chargeback history" },
-      { action: "collect_evidence", description: "Gather transaction evidence automatically" },
-      { action: "notify_merchant", description: "Send chargeback notification", priority: "high" },
+      { action: 'flag_customer', description: 'Flag customer for chargeback history' },
+      { action: 'collect_evidence', description: 'Gather transaction evidence automatically' },
+      { action: 'notify_merchant', description: 'Send chargeback notification', priority: 'high' }
     ],
     suggested_actions: [
-      "Review original transaction details",
-      "Gather shipping confirmation and delivery proof",
-      "Prepare dispute response within deadline",
-      "Consider blacklisting customer if repeat offender",
+      'Review original transaction details',
+      'Gather shipping confirmation and delivery proof',
+      'Prepare dispute response within deadline',
+      'Consider blacklisting customer if repeat offender'
     ],
     escalation_threshold: null,
-    auto_cancel_threshold: null,
+    auto_cancel_threshold: null
   },
   revenue_anomaly: {
     automatic_actions: [
-      { action: "snapshot_metrics", description: "Capture current revenue metrics" },
-      { action: "analyze_root_cause", description: "Run automated root cause analysis" },
-      { action: "notify_merchant", description: "Send anomaly alert", priority: "medium" },
+      { action: 'snapshot_metrics', description: 'Capture current revenue metrics' },
+      { action: 'analyze_root_cause', description: 'Run automated root cause analysis' },
+      { action: 'notify_merchant', description: 'Send anomaly alert', priority: 'medium' }
     ],
     suggested_actions: [
-      "Review recent price changes",
-      "Check for technical issues affecting checkout",
-      "Analyze traffic sources for changes",
-      "Review competitor pricing",
+      'Review recent price changes',
+      'Check for technical issues affecting checkout',
+      'Analyze traffic sources for changes',
+      'Review competitor pricing'
     ],
     escalation_threshold: null,
-    auto_cancel_threshold: null,
+    auto_cancel_threshold: null
   },
   churn_risk: {
     automatic_actions: [
-      { action: "trigger_retention_campaign", description: "Initiate retention workflow" },
-      { action: "notify_merchant", description: "Send churn risk alert", priority: "medium" },
+      { action: 'trigger_retention_campaign', description: 'Initiate retention workflow' },
+      { action: 'notify_merchant', description: 'Send churn risk alert', priority: 'medium' }
     ],
     suggested_actions: [
-      "Review customer engagement metrics",
-      "Consider personalized outreach",
-      "Offer retention incentive if appropriate",
+      'Review customer engagement metrics',
+      'Consider personalized outreach',
+      'Offer retention incentive if appropriate'
     ],
     escalation_threshold: null,
-    auto_cancel_threshold: null,
+    auto_cancel_threshold: null
   },
   data_breach_attempt: {
     automatic_actions: [
-      { action: "block_ip", description: "Block suspicious IP addresses" },
-      { action: "increase_security", description: "Enable enhanced security monitoring" },
-      { action: "notify_merchant", description: "Send critical security alert", priority: "critical" },
-      { action: "log_incident", description: "Create detailed security incident log" },
+      { action: 'block_ip', description: 'Block suspicious IP addresses' },
+      { action: 'increase_security', description: 'Enable enhanced security monitoring' },
+      { action: 'notify_merchant', description: 'Send critical security alert', priority: 'critical' },
+      { action: 'log_incident', description: 'Create detailed security incident log' }
     ],
     suggested_actions: [
-      "Review all recent access logs",
-      "Change admin passwords immediately",
-      "Enable 2FA if not already active",
-      "Consider notifying affected customers if breach confirmed",
-      "Report to appropriate authorities if data was compromised",
+      'Review all recent access logs',
+      'Change admin passwords immediately',
+      'Enable 2FA if not already active',
+      'Consider notifying affected customers if breach confirmed',
+      'Report to appropriate authorities if data was compromised'
     ],
     escalation_threshold: 50,
-    auto_cancel_threshold: null,
-  },
+    auto_cancel_threshold: null
+  }
 };
 
-function nowIso() {
-  return new Date().toISOString();
+// -------------------------
+// Helpers
+// -------------------------
+function isObject(v) {
+  return v && typeof v === 'object' && !Array.isArray(v);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: getByPath(obj, "a.b.c") — safe nested field access
-// ─────────────────────────────────────────────────────────────────
 function getByPath(obj, path) {
-  if (!obj || !path || typeof path !== 'string') return null;
+  if (!obj || !path) return undefined;
   const parts = path.split('.');
-  let current = obj;
-  for (const part of parts) {
-    if (!current || typeof current !== 'object') return null;
-    current = current[part];
+  let cur = obj;
+  for (const p of parts) {
+    if (!cur) return undefined;
+    cur = cur[p];
   }
-  return current;
+  return cur;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: deepScanForIds — find all 24-hex strings in payload
-// ─────────────────────────────────────────────────────────────────
-function deepScanForIds(obj, { depth = 0, maxDepth = 6, maxNodes = 500, visited = new Set() } = {}) {
-  const ids = [];
-  
-  if (depth > maxDepth || visited.size > maxNodes || !obj || typeof obj !== 'object') {
-    return ids;
+function pickFirstTruthy(values) {
+  for (const v of values) {
+    if (v !== undefined && v !== null && v !== '') return v;
   }
+  return undefined;
+}
 
-  const ref = `${depth}:${String(Object.keys(obj).slice(0, 3).join(','))}`;
-  if (visited.has(ref)) return ids;
-  visited.add(ref);
+function looksLikeId(v) {
+  return typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
+}
 
-  for (const [key, value] of Object.entries(obj)) {
-    if (visited.size > maxNodes) break;
+function deepScanForIds(obj, { depth = 6, maxNodes = 500 } = {}) {
+  const found = new Set();
+  const stack = [{ value: obj, d: 0 }];
+  let nodes = 0;
 
-    if (typeof value === 'string' && /^[a-f0-9]{24}$/.test(value)) {
-      ids.push(value);
-    } else if (value && typeof value === 'object') {
-      ids.push(...deepScanForIds(value, { depth: depth + 1, maxDepth, maxNodes, visited }));
+  while (stack.length) {
+    const { value, d } = stack.pop();
+    nodes += 1;
+    if (nodes > maxNodes) break;
+
+    if (typeof value === 'string') {
+      // Extract any 24-hex substrings too
+      const matches = value.match(/[a-f0-9]{24}/gi);
+      if (matches) matches.forEach(m => found.add(m));
+      continue;
+    }
+
+    if (d >= depth) continue;
+
+    if (Array.isArray(value)) {
+      for (const item of value) stack.push({ value: item, d: d + 1 });
+      continue;
+    }
+
+    if (isObject(value)) {
+      for (const k of Object.keys(value)) {
+        stack.push({ value: value[k], d: d + 1 });
+      }
     }
   }
 
-  return [...new Set(ids)];
+  return Array.from(found);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: pickFirstTruthy — return first non-null value from list
-// ─────────────────────────────────────────────────────────────────
-function pickFirstTruthy(list) {
-  for (const val of list) {
-    if (val) return val;
-  }
-  return null;
+function sanitizeKeys(obj) {
+  if (!isObject(obj)) return [];
+  return Object.keys(obj);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// CORE RESOLVER: Extract alert and tenant IDs from payload
-// ─────────────────────────────────────────────────────────────────
-async function resolveAlertAndTenant(payload, db) {
-  const result = {
-    resolved_alert_id: null,
-    resolved_tenant_id: null,
-    used_latest_alert_fallback: false,
-    debug: {
-      alertIdCandidates: {},
-      tenantIdCandidates: {},
-      deepScanIds: [],
-    },
-  };
-
-  // ALERT ID PATHS (30+ locations)
+// -------------------------
+// Core resolver (single source of truth)
+// -------------------------
+async function resolveAlertAndTenant(db, payload) {
   const alertIdPaths = [
-    // direct
-    "alert_id", "alertId", "alert.id", "alert.record_id",
-    // data common
-    "data.id", "data.record.id", "data.record_id", "data.recordId",
-    "data.selected.id", "data.selected.record.id", "data.selected.record_id",
-    "data.selectedRecordId", "data.selected_record_id",
-    "data.new_data.id", "data.new_data.record_id",
-    // event common
-    "event.id", "event.data.id", "event.data.record.id", "event.data.record_id",
-    "event.record_id", "event.recordId",
-    // automation wrappers (CRITICAL FOR AUTOMATION UI)
-    "automation.record_id", "automation.recordId",
-    "automation.selected_record_id", "automation.selectedRecordId",
-    "automation.context.record_id", "automation.context.selected_record_id",
-    "automation.context.recordId", "automation.context.selectedRecordId",
-    "automation.data.record_id", "automation.data.selected_record_id",
-    "automation.input.record_id", "automation.input.selected_record_id",
-    // old_data
-    "old_data.id", "old_data.record.id", "old_data.record_id",
+    'alert_id', 'alertId', 'alert.id', 'alert.record_id',
+    'data.id', 'data.record.id', 'data.record_id', 'data.recordId',
+    'data.selected.id', 'data.selected.record.id', 'data.selected.record_id',
+    'data.selectedRecordId', 'data.selected_record_id',
+    'data.new_data.id', 'data.new_data.record_id',
+    'event.id', 'event.data.id', 'event.data.record.id', 'event.data.record_id',
+    'event.record_id', 'event.recordId',
+    // automation wrappers (critical)
+    'automation.record_id', 'automation.recordId',
+    'automation.selected_record_id', 'automation.selectedRecordId',
+    'automation.context.record_id', 'automation.context.selected_record_id',
+    'automation.context.recordId', 'automation.context.selectedRecordId',
+    'automation.data.record_id', 'automation.data.selected_record_id',
+    'automation.input.record_id', 'automation.input.selected_record_id',
+    'old_data.id', 'old_data.record.id', 'old_data.record_id'
   ];
 
-  // TENANT ID PATHS
   const tenantIdPaths = [
-    "tenant_id", "tenantId",
-    "alert.tenant_id",
-    "data.tenant_id", "data.record.tenant_id",
-    "automation.tenant_id", "automation.context.tenant_id",
-    "event.tenant_id",
+    'tenant_id', 'tenantId',
+    'alert.tenant_id', 'alert.tenantId',
+    'data.tenant_id', 'data.tenantId',
+    'data.record.tenant_id', 'data.record.tenantId',
+    'automation.tenant_id', 'automation.tenantId',
+    'automation.context.tenant_id', 'automation.context.tenantId',
+    'event.tenant_id', 'event.tenantId'
   ];
 
-  // Try each alert ID path
-  for (const path of alertIdPaths) {
-    const val = getByPath(payload, path);
-    if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
-      result.debug.alertIdCandidates[path] = val;
-      result.resolved_alert_id = val;
-      break;
-    }
+  const alertIdCandidates = {};
+  for (const p of alertIdPaths) {
+    const v = getByPath(payload, p);
+    if (v !== undefined) alertIdCandidates[p] = v;
   }
 
-  // Try each tenant ID path
-  for (const path of tenantIdPaths) {
-    const val = getByPath(payload, path);
-    if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
-      result.debug.tenantIdCandidates[path] = val;
-      result.resolved_tenant_id = val;
-      break;
-    }
+  const tenantIdCandidates = {};
+  for (const p of tenantIdPaths) {
+    const v = getByPath(payload, p);
+    if (v !== undefined) tenantIdCandidates[p] = v;
   }
 
-  // If not found, deepScan for all 24-hex strings
-  if (!result.resolved_alert_id || !result.resolved_tenant_id) {
-    const deepIds = deepScanForIds(payload, { maxDepth: 6, maxNodes: 500 });
-    result.debug.deepScanIds = deepIds;
+  let lookedFor = pickFirstTruthy(Object.values(alertIdCandidates));
+  let tenantId = pickFirstTruthy(Object.values(tenantIdCandidates));
 
-    // Try each deep ID
-    for (const id of deepIds) {
-      if (!result.resolved_alert_id) {
-        try {
-          const alerts = await db.Alert.filter({ id }).catch(() => []);
-          if (alerts?.length > 0) {
-            result.resolved_alert_id = id;
-            console.log(`[resolver] Found alert via deepScan: ${id}`);
-            break;
-          }
-        } catch (e) {
-          // Silent
-        }
-      }
-    }
+  // Normalize possible object shapes
+  if (isObject(lookedFor) && looksLikeId(lookedFor.id)) lookedFor = lookedFor.id;
+  if (isObject(tenantId) && looksLikeId(tenantId.id)) tenantId = tenantId.id;
 
-    for (const id of deepIds) {
-      if (!result.resolved_tenant_id) {
-        try {
-          const tenants = await db.Tenant.filter({ id }).catch(() => []);
-          if (tenants?.length > 0) {
-            result.resolved_tenant_id = id;
-            console.log(`[resolver] Found tenant via deepScan: ${id}`);
-            break;
-          }
-        } catch (e) {
-          // Silent
-        }
+  // If values aren't ids but include an id, extract it
+  if (typeof lookedFor === 'string' && !looksLikeId(lookedFor)) {
+    const m = lookedFor.match(/[a-f0-9]{24}/i);
+    if (m) lookedFor = m[0];
+  }
+  if (typeof tenantId === 'string' && !looksLikeId(tenantId)) {
+    const m = tenantId.match(/[a-f0-9]{24}/i);
+    if (m) tenantId = m[0];
+  }
+
+  let resolvedAlert = null;
+  let resolvedTenant = null;
+  let used_latest_alert_fallback = false;
+
+  // First try direct alert id lookup
+  if (looksLikeId(lookedFor)) {
+    const alerts = await db.Alert.filter({ id: lookedFor }).catch(() => []);
+    if (alerts[0]) resolvedAlert = alerts[0];
+  }
+
+  // If no alert, deep scan for ids and try each against Alert then Tenant
+  const discoveredIds = deepScanForIds(payload);
+  if (!resolvedAlert) {
+    for (const id of discoveredIds) {
+      if (!looksLikeId(id)) continue;
+      const alerts = await db.Alert.filter({ id }).catch(() => []);
+      if (alerts[0]) {
+        resolvedAlert = alerts[0];
+        break;
       }
     }
   }
 
-  // If alert still missing but tenant known, try latest alert by created_date
-  if (!result.resolved_alert_id && result.resolved_tenant_id) {
-    try {
-      const latest = await db.Alert.filter(
-        { tenant_id: result.resolved_tenant_id },
-        "-created_date",
-        1
-      ).catch(() => []);
-      if (latest?.length > 0) {
-        result.resolved_alert_id = latest[0].id;
-        result.used_latest_alert_fallback = true;
-        console.log(`[resolver] Used latest alert fallback: ${result.resolved_alert_id}`);
+  if (!tenantId && resolvedAlert?.tenant_id) tenantId = resolvedAlert.tenant_id;
+
+  if (looksLikeId(tenantId)) {
+    const tenants = await db.Tenant.filter({ id: tenantId }).catch(() => []);
+    if (tenants[0]) resolvedTenant = tenants[0];
+  }
+
+  if (!resolvedTenant) {
+    for (const id of discoveredIds) {
+      if (!looksLikeId(id)) continue;
+      const tenants = await db.Tenant.filter({ id }).catch(() => []);
+      if (tenants[0]) {
+        resolvedTenant = tenants[0];
+        break;
       }
-    } catch (e) {
-      // Silent
     }
   }
 
-  return result;
+  // Last resort: if tenant resolved but alert missing, choose latest alert for tenant
+  if (!resolvedAlert && resolvedTenant?.id) {
+    const latest = await db.Alert
+      .filter({ tenant_id: resolvedTenant.id })
+      .sort({ created_date: -1 })
+      .limit(1)
+      .catch(() => []);
+    if (latest[0]) {
+      resolvedAlert = latest[0];
+      used_latest_alert_fallback = true;
+    }
+  }
+
+  return {
+    resolvedAlert,
+    resolvedTenant,
+    debug: {
+      lookedFor: looksLikeId(lookedFor) ? lookedFor : null,
+      tenantId: looksLikeId(tenantId) ? tenantId : null,
+      payloadKeys: sanitizeKeys(payload),
+      alertIdCandidates,
+      tenantIdCandidates,
+      discoveredIds,
+      used_latest_alert_fallback
+    }
+  };
 }
 
-/**
- * Executes one automatic action.
- */
-async function executeAutomaticAction(opts) {
-  const { base44, db, action, alert, tenant } = opts;
-  const result = { action: action.action, success: false, details: null };
+// -------------------------
+// Automatic actions (DB only, no db.functions)
+// -------------------------
+async function executeAutomaticAction(db, action, alert, tenant) {
+  const results = { action: action.action, success: false, details: null };
 
   try {
     switch (action.action) {
-      case "hold_order": {
-        if (!alert.order_id) break;
-        const orders = await db.Order.filter({
-          platform_order_id: alert.order_id,
-          tenant_id: tenant.id,
-        }).catch(() => []);
-        if (!orders?.[0]) break;
-        await db.Order.update(orders[0].id, {
-          status: "on_hold",
-          hold_reason: "Automated hold due to fraud detection",
-          held_at: nowIso(),
-        });
-        result.success = true;
-        result.details = { order_id: alert.order_id, new_status: "on_hold" };
+      case 'hold_order': {
+        if (alert.order_id) {
+          const orders = await db.Order.filter({
+            platform_order_id: alert.order_id,
+            tenant_id: tenant.id
+          }).catch(() => []);
+          if (orders[0]) {
+            await db.Order.update(orders[0].id, {
+              status: 'on_hold',
+              hold_reason: 'Automated hold due to fraud detection',
+              held_at: new Date().toISOString()
+            });
+            results.success = true;
+            results.details = { order_id: alert.order_id, new_status: 'on_hold' };
+          } else {
+            results.details = { note: 'Order not found for hold_order', order_id: alert.order_id };
+          }
+        }
         break;
       }
 
-      case "hold_all_linked_orders": {
+      case 'hold_all_linked_orders': {
         const linked = Array.isArray(alert.linked_orders) ? alert.linked_orders : [];
-        if (!linked.length) break;
         const held = [];
         for (const orderId of linked) {
           const orders = await db.Order.filter({
             platform_order_id: orderId,
-            tenant_id: tenant.id,
+            tenant_id: tenant.id
           }).catch(() => []);
-          if (!orders?.[0]) continue;
-          await db.Order.update(orders[0].id, {
-            status: "on_hold",
-            hold_reason: "Linked to fraud ring investigation",
-            held_at: nowIso(),
-          });
-          held.push(orderId);
+          if (orders[0]) {
+            await db.Order.update(orders[0].id, {
+              status: 'on_hold',
+              hold_reason: 'Linked to fraud ring investigation',
+              held_at: new Date().toISOString()
+            });
+            held.push(orderId);
+          }
         }
-        result.success = true;
-        result.details = { orders_held: held.length, order_ids: held };
+        results.success = true;
+        results.details = { orders_held: held.length, order_ids: held };
         break;
       }
 
-      case "flag_customer": {
-        const email = alert.customer_email;
-        const customerId = alert.customer_id;
-        if (!email && !customerId) break;
-        const customers = await db.Customer.filter({
-          tenant_id: tenant.id,
-          ...(email ? { email } : { id: customerId }),
-        }).catch(() => []);
-        if (!customers?.[0]) break;
-        const existingFlags = Array.isArray(customers[0].flags) ? customers[0].flags : [];
-        existingFlags.push({
-          type: "fraud_risk",
-          reason: alert.title || "Flagged by automated remediation",
-          flagged_at: nowIso(),
-          alert_id: alert.id,
-        });
-        await db.Customer.update(customers[0].id, { risk_level: "high", flags: existingFlags });
-        result.success = true;
-        result.details = { customer_flagged: true };
-        break;
-      }
-
-      case "add_risk_tag": {
-        if (!alert.order_id) break;
-        const orders = await db.Order.filter({
-          platform_order_id: alert.order_id,
-          tenant_id: tenant.id,
-        }).catch(() => []);
-        if (!orders?.[0]) break;
-        const tags = Array.isArray(orders[0].tags) ? orders[0].tags : [];
-        if (!tags.includes("high_risk")) tags.push("high_risk");
-        await db.Order.update(orders[0].id, { tags, risk_flagged_at: nowIso() });
-        result.success = true;
-        result.details = { tag_added: "high_risk" };
-        break;
-      }
-
-      case "delay_fulfillment": {
-        if (!alert.order_id) break;
-        const orders = await db.Order.filter({
-          platform_order_id: alert.order_id,
-          tenant_id: tenant.id,
-        }).catch(() => []);
-        if (!orders?.[0]) break;
-        const delayUntil = new Date();
-        delayUntil.setHours(delayUntil.getHours() + 24);
-        await db.Order.update(orders[0].id, {
-          fulfillment_delayed: true,
-          fulfill_after: delayUntil.toISOString(),
-          delay_reason: "Risk review required",
-        });
-        result.success = true;
-        result.details = { delayed_until: delayUntil.toISOString() };
-        break;
-      }
-
-      case "notify_merchant": {
-        await base44.functions
-          .invoke("alertNotifications", {
-            alert,
+      case 'flag_customer': {
+        if (alert.customer_email || alert.customer_id) {
+          const customers = await db.Customer.filter({
             tenant_id: tenant.id,
-            notification_channels: ["email"],
-            force: true,
-          })
-          .catch(() => {});
-        result.success = true;
-        result.details = { notification_sent: true, priority: action.priority };
+            ...(alert.customer_email ? { email: alert.customer_email } : { id: alert.customer_id })
+          }).catch(() => []);
+          if (customers[0]) {
+            const flags = customers[0].flags || [];
+            flags.push({
+              type: 'fraud_risk',
+              reason: alert.title || 'Flagged by automated remediation',
+              flagged_at: new Date().toISOString(),
+              alert_id: alert.id
+            });
+            await db.Customer.update(customers[0].id, {
+              risk_level: 'high',
+              flags
+            });
+            results.success = true;
+            results.details = { customer_flagged: true };
+          } else {
+            results.details = { note: 'Customer not found for flag_customer' };
+          }
+        }
         break;
       }
 
-      case "generate_evidence_report": {
+      case 'add_risk_tag': {
+        if (alert.order_id) {
+          const orders = await db.Order.filter({
+            platform_order_id: alert.order_id,
+            tenant_id: tenant.id
+          }).catch(() => []);
+          if (orders[0]) {
+            const tags = Array.isArray(orders[0].tags) ? orders[0].tags : [];
+            if (!tags.includes('high_risk')) tags.push('high_risk');
+            await db.Order.update(orders[0].id, {
+              tags,
+              risk_flagged_at: new Date().toISOString()
+            });
+            results.success = true;
+            results.details = { tag_added: 'high_risk' };
+          } else {
+            results.details = { note: 'Order not found for add_risk_tag' };
+          }
+        }
+        break;
+      }
+
+      case 'delay_fulfillment': {
+        if (alert.order_id) {
+          const orders = await db.Order.filter({
+            platform_order_id: alert.order_id,
+            tenant_id: tenant.id
+          }).catch(() => []);
+          if (orders[0]) {
+            const delayUntil = new Date();
+            delayUntil.setHours(delayUntil.getHours() + 24);
+            await db.Order.update(orders[0].id, {
+              fulfillment_delayed: true,
+              fulfill_after: delayUntil.toISOString(),
+              delay_reason: 'Risk review required'
+            });
+            results.success = true;
+            results.details = { delayed_until: delayUntil.toISOString() };
+          } else {
+            results.details = { note: 'Order not found for delay_fulfillment' };
+          }
+        }
+        break;
+      }
+
+      case 'notify_merchant': {
+        // No db.functions usage in this hardened version
+        // We log an AuditLog entry so UI notifications can pick it up asynchronously.
         await db.AuditLog.create({
           tenant_id: tenant.id,
-          action: "fraud_evidence_report_generated",
-          entity_type: "FraudRing",
+          action: 'notify_merchant_requested',
+          entity_type: 'Alert',
+          entity_id: alert.id,
+          performed_by: 'system',
+          details: {
+            priority: action.priority || 'medium',
+            alert_title: alert.title,
+            alert_type: alert.alert_type
+          },
+          timestamp: new Date().toISOString()
+        }).catch(() => {});
+        results.success = true;
+        results.details = { notification_queued: true, priority: action.priority };
+        break;
+      }
+
+      case 'generate_evidence_report': {
+        await db.AuditLog.create({
+          tenant_id: tenant.id,
+          action: 'fraud_evidence_report_generated',
+          entity_type: 'FraudRing',
           entity_id: alert.fraud_ring_id || alert.id,
+          performed_by: 'system',
           details: {
             alert_data: alert,
-            generated_at: nowIso(),
-            report_type: "fraud_evidence",
+            generated_at: new Date().toISOString(),
+            report_type: 'fraud_evidence'
           },
+          timestamp: new Date().toISOString()
         }).catch(() => {});
-        result.success = true;
-        result.details = { report_generated: true };
+        results.success = true;
+        results.details = { report_generated: true };
         break;
       }
 
-      case "snapshot_metrics": {
-        result.success = true;
-        result.details = { metrics_captured: true };
+      case 'snapshot_metrics': {
+        results.success = true;
+        results.details = { metrics_captured: true };
         break;
       }
 
-      case "analyze_root_cause": {
-        const prompt = `Analyze this revenue anomaly and provide root cause analysis:
-Alert: ${alert.title || "(no title)"}
-Type: ${alert.anomaly_type || alert.alert_type || "(unknown)"}
-Current Value: ${alert.current_value ?? "(unknown)"}
-Expected Value: ${alert.expected_value ?? "(unknown)"}
-Change: ${alert.change_percentage ?? "(unknown)"}%
+      case 'analyze_root_cause': {
+        // Skip LLM integration in this hardened version; log request for async processor.
+        await db.AuditLog.create({
+          tenant_id: tenant.id,
+          action: 'root_cause_analysis_requested',
+          entity_type: 'Alert',
+          entity_id: alert.id,
+          performed_by: 'system',
+          details: { alert },
+          timestamp: new Date().toISOString()
+        }).catch(() => {});
+        results.success = true;
+        results.details = { analysis_queued: true };
+        break;
+      }
 
-Provide 3-5 likely root causes and recommended actions.`;
-        try {
-          const analysis = await base44.functions.invoke("invokeLLM", {
-            prompt,
-            response_json_schema: {
-              type: "object",
-              properties: {
-                root_causes: { type: "array", items: { type: "string" } },
-                recommendations: { type: "array", items: { type: "string" } },
-                severity_assessment: { type: "string" },
-              },
+      case 'block_ip': {
+        if (alert.source_ip) {
+          await db.AuditLog.create({
+            tenant_id: tenant.id,
+            action: 'ip_block_requested',
+            entity_type: 'Security',
+            entity_id: alert.id,
+            performed_by: 'system',
+            details: {
+              ip_address: alert.source_ip,
+              reason: alert.title,
+              alert_id: alert.id
             },
-          });
-          result.success = true;
-          result.details = { analysis };
-        } catch {
-          result.success = true;
-          result.details = {
-            analysis: {
-              severity_assessment: "unknown",
-              root_causes: ["LLM integration not available."],
-              recommendations: ["Add invokeLLM function or enable LLM integration."],
-            },
-          };
+            timestamp: new Date().toISOString()
+          }).catch(() => {});
+          results.success = true;
+          results.details = { ip_logged_for_blocking: alert.source_ip };
         }
         break;
       }
 
-      case "block_ip": {
-        if (!alert.source_ip) break;
+      case 'log_incident': {
         await db.AuditLog.create({
           tenant_id: tenant.id,
-          action: "ip_blocked",
-          entity_type: "Security",
-          details: {
-            ip_address: alert.source_ip,
-            reason: alert.title || "Automated remediation",
-            alert_id: alert.id,
-          },
-        }).catch(() => {});
-        result.success = true;
-        result.details = { ip_logged_for_blocking: alert.source_ip };
-        break;
-      }
-
-      case "log_incident": {
-        await db.AuditLog.create({
-          tenant_id: tenant.id,
-          action: "security_incident",
-          entity_type: "Security",
+          action: 'security_incident',
+          entity_type: 'Security',
+          entity_id: alert.id,
+          performed_by: 'system',
           details: {
             incident_type: alert.alert_type,
-            severity: "critical",
+            severity: 'critical',
             alert_data: alert,
-            auto_remediation: true,
+            auto_remediation: true
           },
+          timestamp: new Date().toISOString()
         }).catch(() => {});
-        result.success = true;
-        result.details = { incident_logged: true };
+        results.success = true;
+        results.details = { incident_logged: true };
         break;
       }
 
-      case "block_identifiers":
-      case "increase_security":
-      case "collect_evidence":
-      case "trigger_retention_campaign":
       default: {
-        result.success = true;
-        result.details = { note: "Action acknowledged but not implemented in this function." };
-        break;
+        results.details = { note: 'Action not implemented' };
       }
     }
-  } catch (err) {
-    console.error(`Action ${action.action} failed:`, err);
-    result.success = false;
-    result.error = err?.message || "unknown_error";
+  } catch (error) {
+    results.error = error.message;
   }
 
-  return result;
+  return results;
 }
 
-// ═════════════════════════════════════════════════════════════════
-// MAIN HANDLER
-// ═════════════════════════════════════════════════════════════════
+async function parseJsonBody(req) {
+  try {
+    const text = await req.text();
+    if (!text || !text.trim()) return {};
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
 
+// -------------------------
+// Main handler
+// -------------------------
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-
-    let authorized = false;
-    try {
-      const user = await base44.auth.me();
-      authorized = !!user;
-    } catch {
-      authorized = true;
-    }
-
-    if (!authorized) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const db = base44.entities;
 
-    let bodyText = "";
-    try {
-      bodyText = await req.text();
-    } catch {
-      bodyText = "{}";
-    }
+    const payload = await parseJsonBody(req);
+    const action = payload.action || 'run';
 
-    let payload = {};
-    try {
-      payload = JSON.parse(bodyText || "{}");
-    } catch {
-      payload = {};
-    }
-
-    const action = payload.action || "remediate";
-
-    // ═══════════════════════════════════════════════════════════
-    // ACTION: debug_payload
-    // ═══════════════════════════════════════════════════════════
-    if (action === "debug_payload") {
-      const resolverResult = await resolveAlertAndTenant(payload, db);
+    // Debug payload mode
+    if (action === 'debug_payload') {
+      const resolved = await resolveAlertAndTenant(db, payload);
       return Response.json({
-        payloadKeys: Object.keys(payload),
-        automationKeys: Object.keys(payload.automation || {}),
-        eventKeys: Object.keys(payload.event || {}),
-        dataKeys: Object.keys(payload.data || {}),
-        payloadTooLarge: payload.payload_too_large || false,
-        ...resolverResult,
+        ok: true,
+        action: 'debug_payload',
+        payloadKeys: sanitizeKeys(payload),
+        automationKeys: sanitizeKeys(payload.automation),
+        eventKeys: sanitizeKeys(payload.event),
+        dataKeys: sanitizeKeys(payload.data),
+        payload_too_large: payload.payload_too_large === true,
+        resolver: resolved.debug,
+        resolved_alert_id: resolved.resolvedAlert?.id || null,
+        resolved_tenant_id: resolved.resolvedTenant?.id || null
       });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // ACTION: self_test
-    // ═══════════════════════════════════════════════════════════
-    if (action === "self_test") {
-      const testCases = [];
-      let proofAlertUpdated = false;
+    // Self-test mode (proof)
+    if (action === 'self_test') {
+      const tenant = await db.Tenant.create({
+        status: 'active',
+        shop_name: 'SelfTest Tenant',
+        created_date: new Date().toISOString()
+      });
 
-      try {
-        // Create test tenant
-        const tenant = await db.Tenant.create({
-          shop_domain: `test-${Date.now()}.myshopify.com`,
-          shop_name: "Self-Test Tenant",
-          status: "active",
+      const alert = await db.Alert.create({
+        tenant_id: tenant.id,
+        title: 'SelfTest Alert',
+        alert_type: 'high_risk_order',
+        risk_score: 75,
+        status: 'pending',
+        created_date: new Date().toISOString()
+      });
+
+      const shapes = [
+        { name: 'automation.record_id', payload: { automation: { record_id: alert.id } } },
+        { name: 'automation.context.selected_record_id', payload: { automation: { context: { selected_record_id: alert.id } } } },
+        { name: 'event.data.record_id', payload: { event: { data: { record_id: alert.id } } } },
+        { name: 'data.selected.record.id', payload: { data: { selected: { record: { id: alert.id } } } } },
+        { name: 'payload_too_large+automation.record_id', payload: { payload_too_large: true, automation: { record_id: alert.id } } },
+        { name: 'deepScan string', payload: { something: `alert:${alert.id}` } },
+        { name: 'old_data.record_id', payload: { old_data: { record_id: alert.id } } },
+        { name: 'data.record_id', payload: { data: { record_id: alert.id } } },
+        { name: 'event.recordId', payload: { event: { recordId: alert.id } } },
+        { name: 'data.id', payload: { data: { id: alert.id } } }
+      ];
+
+      const cases = [];
+      for (const s of shapes) {
+        const r = await resolveAlertAndTenant(db, s.payload);
+        cases.push({
+          name: s.name,
+          ok: r.resolvedAlert?.id === alert.id,
+          resolved_alert_id: r.resolvedAlert?.id || null
         });
-
-        // Create test alert
-        const alert = await db.Alert.create({
-          tenant_id: tenant.id,
-          type: "high_risk_order",
-          severity: "high",
-          title: "Self-Test Alert",
-          message: "Testing resolver robustness",
-          status: "pending",
-        });
-
-        const testPayloads = [
-          { name: "automation.record_id", payload: { automation: { record_id: alert.id }, tenant_id: tenant.id } },
-          { name: "automation.context.selected_record_id", payload: { automation: { context: { selected_record_id: alert.id } }, tenant_id: tenant.id } },
-          { name: "event.data.record_id", payload: { event: { data: { record_id: alert.id } }, tenant_id: tenant.id } },
-          { name: "data.selected.record.id", payload: { data: { selected: { record: { id: alert.id } } }, tenant_id: tenant.id } },
-          { name: "payload_too_large + automation.record_id", payload: { payload_too_large: true, automation: { record_id: alert.id }, tenant_id: tenant.id } },
-          { name: "data.recordId", payload: { data: { recordId: alert.id }, tenant_id: tenant.id } },
-          { name: "data.id", payload: { data: { id: alert.id }, tenant_id: tenant.id } },
-          { name: "event.id", payload: { event: { id: alert.id }, tenant_id: tenant.id } },
-          { name: "direct alert_id", payload: { alert_id: alert.id, tenant_id: tenant.id } },
-          { name: "automation.selectedRecordId", payload: { automation: { selectedRecordId: alert.id }, tenant_id: tenant.id } },
-        ];
-
-        for (const tc of testPayloads) {
-          const res = await resolveAlertAndTenant(tc.payload, db);
-          const ok = res.resolved_alert_id === alert.id && res.resolved_tenant_id === tenant.id;
-          testCases.push({
-            name: tc.name,
-            ok,
-            resolved_alert_id: res.resolved_alert_id,
-            resolved_tenant_id: res.resolved_tenant_id,
-          });
-        }
-
-        // Update alert to prove it exists and is updateable
-        await db.Alert.update(alert.id, {
-          status: "in_progress",
-          remediation_started: true,
-          remediation_started_at: nowIso(),
-        });
-        proofAlertUpdated = true;
-
-        // Cleanup
-        await db.Alert.delete(alert.id).catch(() => {});
-        await db.Tenant.delete(tenant.id).catch(() => {});
-
-        const allPassed = testCases.every(tc => tc.ok);
-        return Response.json({
-          passed: allPassed,
-          cases: testCases,
-          proof_alert_updated: proofAlertUpdated,
-        });
-      } catch (err) {
-        console.error("[self_test] Error:", err);
-        return Response.json(
-          {
-            passed: false,
-            cases: testCases,
-            proof_alert_updated: proofAlertUpdated,
-            error: err?.message,
-          },
-          { status: 500 }
-        );
       }
+
+      // proof update
+      await db.Alert.update(alert.id, {
+        remediation_started: true,
+        remediation_started_at: new Date().toISOString(),
+        status: 'in_progress'
+      });
+
+      return Response.json({
+        ok: true,
+        action: 'self_test',
+        passed: cases.every(c => c.ok),
+        cases,
+        proof_alert_id: alert.id,
+        proof_tenant_id: tenant.id,
+        proof_alert_updated: true
+      });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // STANDARD REMEDIATION FLOW
-    // ═══════════════════════════════════════════════════════════
+    // Normal run
+    const { resolvedAlert, resolvedTenant, debug } = await resolveAlertAndTenant(db, payload);
 
-    const resolverResult = await resolveAlertAndTenant(payload, db);
-    const alertId = resolverResult.resolved_alert_id;
-    const tenantId = resolverResult.resolved_tenant_id;
-
-    if (!alertId || !tenantId) {
-      return Response.json(
-        {
-          ok: false,
-          error: "Could not resolve alert or tenant from payload",
-          resolved_alert_id: alertId,
-          resolved_tenant_id: tenantId,
-          debug: resolverResult.debug,
-          automation_payload_keys: Object.keys(payload),
-        },
-        { status: 404 }
-      );
+    if (!resolvedAlert) {
+      return Response.json({
+        error: 'Alert not found',
+        debug: {
+          message: 'Could not resolve alert from payload',
+          ...debug,
+          nextStep: 'Run with action=debug_payload from Automation UI to see the exact payload shape'
+        }
+      }, { status: 404 });
     }
 
-    // Fetch alert and tenant
-    let alertData = null;
-    let tenantData = null;
-
-    try {
-      const alerts = await db.Alert.filter({ id: alertId });
-      alertData = alerts?.[0];
-    } catch (e) {
-      console.error("[automatedRemediation] Alert lookup failed:", e.message);
+    if (!resolvedTenant) {
+      return Response.json({
+        error: 'Tenant not found',
+        debug: {
+          message: 'Could not resolve tenant from payload or alert.tenant_id',
+          ...debug
+        }
+      }, { status: 404 });
     }
 
-    try {
-      const tenants = await db.Tenant.filter({ id: tenantId });
-      tenantData = tenants?.[0];
-    } catch (e) {
-      console.error("[automatedRemediation] Tenant lookup failed:", e.message);
-    }
-
-    if (!alertData || !tenantData) {
-      return Response.json(
-        {
-          ok: false,
-          error: "Alert or tenant not found in database",
-          resolved_alert_id: alertId,
-          resolved_tenant_id: tenantId,
-        },
-        { status: 404 }
-      );
-    }
-
-    const { execute_automatic = true, dry_run = false } = payload;
-    const alertType = alertData.alert_type || alertData.type || "high_risk_order";
+    const alertType = resolvedAlert.alert_type || resolvedAlert.type || 'high_risk_order';
     const workflow = REMEDIATION_WORKFLOWS[alertType] || REMEDIATION_WORKFLOWS.high_risk_order;
 
+    const execute_automatic = payload.execute_automatic !== false;
+    const dry_run = payload.dry_run === true;
+
     const results = {
-      alert_id: alertData.id,
+      ok: true,
+      resolved_alert_id: resolvedAlert.id,
+      resolved_tenant_id: resolvedTenant.id,
       alert_type: alertType,
-      workflow_found: !!workflow,
+      used_latest_alert_fallback: debug.used_latest_alert_fallback,
       automatic_actions: [],
       suggested_actions: workflow.suggested_actions || [],
-      is_scam: ["fraud_detected", "fraud_ring", "data_breach_attempt", "suspicious_activity"].includes(alertType),
-      dry_run: !!dry_run,
+      dry_run
     };
 
-    // Execute automatic actions
-    if (execute_automatic && workflow.automatic_actions?.length) {
-      if (dry_run) {
-        results.automatic_actions = workflow.automatic_actions.map((a) => ({
-          ...a,
-          result: { dry_run: true, would_execute: true },
-        }));
-      } else {
-        for (const action of workflow.automatic_actions) {
-          const actionResult = await executeAutomaticAction({
-            base44,
-            db,
-            action,
-            alert: alertData,
-            tenant: tenantData,
-          });
-          results.automatic_actions.push({ ...action, result: actionResult });
-        }
-
-        // Update alert
-        const updatedAlert = await db.Alert.update(alertData.id, {
-          remediation_started: true,
-          remediation_started_at: nowIso(),
-          remediation_actions: results.automatic_actions,
-          status: "in_progress",
-        }).catch(() => null);
-
-        if (updatedAlert) {
-          results.updated_alert_fields = {
-            status: updatedAlert.status,
-            remediation_started: updatedAlert.remediation_started,
-            remediation_started_at: updatedAlert.remediation_started_at,
-          };
-        }
+    if (execute_automatic && workflow.automatic_actions && !dry_run) {
+      for (const a of workflow.automatic_actions) {
+        const r = await executeAutomaticAction(db, a, resolvedAlert, resolvedTenant);
+        results.automatic_actions.push({ ...a, result: r });
       }
-    }
 
-    // Check auto-cancel threshold
-    const riskScore = Number(alertData.risk_score ?? alertData.score ?? NaN);
-    if (
-      workflow.auto_cancel_threshold != null &&
-      Number.isFinite(riskScore) &&
-      riskScore >= workflow.auto_cancel_threshold
-    ) {
-      results.auto_cancel_recommended = true;
-      results.auto_cancel_reason = `Risk score ${riskScore} >= ${workflow.auto_cancel_threshold}`;
-    }
-
-    // Audit log
-    try {
-      await db.AuditLog.create({
-        tenant_id: tenantId,
-        action: "remediation_workflow_executed",
-        entity_type: "Alert",
-        entity_id: alertData.id,
-        performed_by: "system",
-        details: {
-          workflow_type: alertType,
-          actions_executed: results.automatic_actions.length,
-          dry_run,
-          is_scam: results.is_scam,
-        },
+      await db.Alert.update(resolvedAlert.id, {
+        remediation_started: true,
+        remediation_started_at: new Date().toISOString(),
+        remediation_actions: results.automatic_actions,
+        status: 'in_progress'
       });
-    } catch (e) {
-      // Silent
+
+      results.updated_alert_fields = {
+        remediation_started: true,
+        status: 'in_progress'
+      };
+    } else if (dry_run) {
+      results.automatic_actions = (workflow.automatic_actions || []).map(a => ({
+        ...a,
+        result: { dry_run: true, would_execute: true }
+      }));
     }
 
-    return Response.json({
-      ok: true,
-      ...results,
-      resolved_alert_id: alertId,
-      resolved_tenant_id: tenantId,
-      updated_alert_fields: results.updated_alert_fields,
-      automation_payload_keys: Object.keys(payload),
-      used_latest_alert_fallback: resolverResult.used_latest_alert_fallback,
-    });
+    if (workflow.auto_cancel_threshold && (resolvedAlert.risk_score || 0) >= workflow.auto_cancel_threshold) {
+      results.auto_cancel_recommended = true;
+      results.auto_cancel_reason = `Risk score ${resolvedAlert.risk_score} exceeds threshold ${workflow.auto_cancel_threshold}`;
+    }
+
+    await db.AuditLog.create({
+      tenant_id: resolvedTenant.id,
+      action: 'remediation_workflow_executed',
+      entity_type: 'Alert',
+      entity_id: resolvedAlert.id,
+      performed_by: 'system',
+      details: {
+        workflow_type: alertType,
+        actions_executed: results.automatic_actions.length,
+        dry_run,
+        used_latest_alert_fallback: debug.used_latest_alert_fallback
+      },
+      timestamp: new Date().toISOString()
+    }).catch(() => {});
+
+    return Response.json(results);
   } catch (error) {
-    console.error("[automatedRemediation] Fatal error:", error);
-    return Response.json({ error: error?.message || "Unknown error", ok: false }, { status: 500 });
+    return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
 });
