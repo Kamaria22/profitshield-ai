@@ -1,8 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-
-const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
-const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
-const SCOPES = 'read_orders,read_products,read_customers,read_inventory,read_fulfillments,read_shipping';
+import {
+  SHOPIFY_API_KEY, SHOPIFY_API_SECRET, REQUIRED_SCOPES as SCOPES,
+  REDIRECT_URI_CANONICAL, API_VERSION,
+  canonicalizeShopDomain, encryptToken, decryptToken,
+  validateRedirectWhitelist
+} from './shopifyConfig.js';
 
 // Normalize action + alias map
 const ACTION_ALIASES = {
