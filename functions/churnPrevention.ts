@@ -363,7 +363,11 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
     days_since_creation: daysSinceCreation,
     plan_status: planStatus,
     trial_days_remaining: trialEndsAt ? Math.max(0, Math.floor((trialEndsAt - nowMs) / DAY)) : null,
-    recent_sync_failures: recentFailedSyncs.length
+    recent_sync_failures: recentFailedSyncs.length,
+    support_open_tickets: openTickets,
+    avg_support_resolution_days: Math.round(avgResolutionTime * 10) / 10,
+    support_tickets_30d: recentSupportTickets.length,
+    ticket_volume_density: Math.round(ticketDensity * 10) / 10
   };
 
   return {
