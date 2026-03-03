@@ -30,6 +30,30 @@ const WINDOWS = {
   ALERTS_DAYS: 30,
 };
 
+// ─────────────────────────────────────────────
+// SAFE SERVICE-ROLE CLIENT GETTER
+// ─────────────────────────────────────────────
+
+function getDbClient(base44) {
+  // Try multiple SDK patterns to get a service-role DB client
+  if (base44.asServiceRole && typeof base44.asServiceRole === 'object') {
+    return base44.asServiceRole;
+  }
+  if (base44.asServiceRole && typeof base44.asServiceRole === 'function') {
+    return base44.asServiceRole();
+  }
+  if (base44.asService && typeof base44.asService === 'function') {
+    return base44.asService();
+  }
+  if (base44.serviceRole && typeof base44.serviceRole === 'function') {
+    return base44.serviceRole();
+  }
+  if (base44.service && typeof base44.service === 'object') {
+    return base44.service;
+  }
+  throw new Error("No service-role client available in this SDK/runtime");
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
