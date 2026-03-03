@@ -24,8 +24,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  CheckCircle, XCircle, RefreshCw, Store, AlertTriangle,
-  Shield, Zap, Tag, FileText, ArrowUpDown, Clock, ExternalLink, Loader2, Lock,
+CheckCircle, XCircle, RefreshCw, Store, AlertTriangle,
+Shield, Zap, Tag, FileText, ArrowUpDown, Clock, ExternalLink, Loader2, Lock, Webhook,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
