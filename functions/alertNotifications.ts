@@ -173,14 +173,20 @@ Deno.serve(async (req) => {
   const timestamp = new Date().toISOString();
   
   try {
-    const base44 = createClientFromRequest(req);
     let payload = {};
     try {
+      // Read body with timeout to prevent hangs
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const text = await req.text();
+      clearTimeout(timeoutId);
       if (text) payload = JSON.parse(text);
-    } catch {
+    } catch (e) {
+      // Body read or parse failed - continue with empty payload
       payload = {};
     }
+    
+    const base44 = createClientFromRequest(req);
 
     const action = payload.action || 'send';
     const payloadKeys = Object.keys(payload);
