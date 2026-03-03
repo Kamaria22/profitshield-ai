@@ -66,7 +66,8 @@ Deno.serve(async (req) => {
       if (!shop) {
         return Response.json({ error: 'Shop domain is required' }, { status: 400 });
       }
-      const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+      const shopDomain = canonicalizeShopDomain(shop);
+      if (!shopDomain) return Response.json({ error: 'Invalid shop domain' }, { status: 400 });
 
       // Look up integration + token
       const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ store_key: shopDomain, platform: 'shopify' });
