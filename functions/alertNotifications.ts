@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
     };
 
     // Send email notification
-    if (notification_channels.includes('email')) {
+    if (notificationChannels.includes('email')) {
       try {
         const emailBody = generateEmailBody(alertData, tenant, isScam);
         const subject = isScam 
