@@ -220,7 +220,8 @@ export default function Integrations() {
       if (integration.platform === 'shopify') {
         const result = await base44.functions.invoke('syncShopifyOrders', {
           tenant_id: integration.tenant_id,
-          days: job_type === 'full_sync' ? 365 : 30
+          integration_id: integration.id,
+          days: job_type === 'full_sync' ? 365 : job_type === 'orders_only' ? 90 : 30
         });
         if (result.data?.error) throw new Error(result.data.error);
         return {
