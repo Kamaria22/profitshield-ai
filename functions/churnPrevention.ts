@@ -472,7 +472,8 @@ async function debugSignals(base44, tenantId) {
       orders: orders.length,
       sync_jobs: syncJobs.length,
       pending_alerts: alerts.length,
-      audit_logs: auditLogs.length
+      audit_logs: auditLogs.length,
+      support_conversations: supportConversations.length
     },
     score_result: result,
     tenant_data: {
