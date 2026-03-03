@@ -145,14 +145,15 @@ async function saveSettings(base44, tenantId, body) {
 
 async function reconnectShopify(shop) {
   const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
-  const appUrl = Deno.env.get('APP_URL') || 'https://app.profitshield.ai';
+  const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 
   if (!apiKey) {
     return Response.json({ error: 'SHOPIFY_API_KEY not configured' }, { status: 500 });
   }
 
-  const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-  const redirectUri = `${appUrl}/api/shopify/callback`;
+  // CANONICAL redirect URI
+  const shopDomain = shop.includes('.myshopify.com') ? shop.toLowerCase() : `${shop.toLowerCase()}.myshopify.com`;
+  const redirectUri = `${appUrl}/ShopifyCallback`;
   const scopes = [
     'write_orders',
     'read_orders',
@@ -166,11 +167,15 @@ async function reconnectShopify(shop) {
     'read_inventory'
   ].join(',');
 
+  console.log(`[reconnectShopify] Generating OAuth URL — shop=${shopDomain} appUrl=${appUrl} redirectUri=${redirectUri}`);
+
   const installUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${apiKey}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
   return Response.json({
     success: true,
     install_url: installUrl,
-    shop: shopDomain
+    shop: shopDomain,
+    redirect_uri: redirectUri,
+    app_url: appUrl
   });
 }
