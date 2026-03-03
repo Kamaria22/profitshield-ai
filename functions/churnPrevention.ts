@@ -392,6 +392,50 @@ async function triggerRetention(base44, tenantId) {
 }
 
 // ─────────────────────────────────────────────
+//  DEBUG SIGNALS (for testing/verification)
+// ─────────────────────────────────────────────
+
+async function debugSignals(base44, tenantId) {
+  if (!tenantId) return Response.json({ error: 'tenant_id required' }, { status: 400 });
+
+  const db = base44.asServiceRole;
+  const now = new Date();
+
+  const [tenant, integrations, orders, syncJobs, alerts, auditLogs] = await Promise.all([
+    db.entities.Tenant.filter({ id: tenantId }).then(r => r[0] || null).catch(() => null),
+    db.entities.PlatformIntegration.filter({ tenant_id: tenantId }).catch(() => []),
+    db.entities.Order.filter({ tenant_id: tenantId }).catch(() => []),
+    db.entities.SyncJob.filter({ tenant_id: tenantId }).catch(() => []),
+    db.entities.Alert.filter({ tenant_id: tenantId, status: 'pending' }).catch(() => []),
+    db.entities.AuditLog.filter({ tenant_id: tenantId }).catch(() => [])
+  ]);
+
+  if (!tenant) return Response.json({ error: `Tenant ${tenantId} not found` }, { status: 404 });
+
+  const result = scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, now });
+
+  return Response.json({
+    tenant_id: tenantId,
+    shop_name: tenant.shop_name || tenant.shop_domain,
+    signal_counts: {
+      integrations: integrations.length,
+      orders: orders.length,
+      sync_jobs: syncJobs.length,
+      pending_alerts: alerts.length,
+      audit_logs: auditLogs.length
+    },
+    score_result: result,
+    tenant_data: {
+      plan_status: tenant.plan_status,
+      subscription_tier: tenant.subscription_tier,
+      trial_ends_at: tenant.trial_ends_at,
+      onboarding_completed: tenant.onboarding_completed,
+      status: tenant.status
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
 //  GET AT-RISK TENANTS
 // ─────────────────────────────────────────────
 
