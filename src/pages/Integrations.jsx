@@ -37,7 +37,7 @@ const PLATFORM_INFO = {
     icon: '🛒',
     color: 'bg-green-500',
     description: 'Connect your Shopify store for real-time order sync and risk scoring',
-    webhookTopics: ['orders/create', 'orders/updated', 'orders/fulfilled', 'orders/cancelled', 'refunds/create']
+    webhookTopics: ['orders/create', 'orders/updated', 'orders/paid', 'orders/cancelled', 'refunds/create', 'products/update', 'app/uninstalled']
   },
   woocommerce: {
     name: 'WooCommerce',
