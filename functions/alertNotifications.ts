@@ -1,26 +1,23 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { withTimeout } from './helpers/automationRuntime';
 
-// Feature flags (default: SAFE/OFF)
-const FLAGS = {
-  ENABLE_LATEST_ALERT_FALLBACK: false,
-  ENABLE_DEEP_SCAN_RESOLUTION: false
-};
+const VERSION = "alertNotifications_v2026_03_03_1428_fix1";
 
-// Helper: Resolve alert ID from payload (PHASE 2)
+// Priority resolver - matches Base44 automation payload shapes
 function resolveAlertId(payload) {
   const candidates = {
-    'event.entity_id': payload.event?.entity_id,
-    'automation.record_id': payload.automation?.record_id,
-    'data.id': payload.data?.id,
-    'data.record.id': payload.data?.record?.id
+    'event.entity_id': payload?.event?.entity_id,
+    'automation.record_id': payload?.automation?.record_id,
+    'data.id': payload?.data?.id,
+    'data.record.id': payload?.data?.record?.id,
+    'event.data.entity_id': payload?.event?.data?.entity_id,
+    'event.data.id': payload?.event?.data?.id
   };
 
-  // Find first valid candidate (matches MongoDB ObjectId pattern)
   const isValidId = (v) => typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
+  
   for (const [source, value] of Object.entries(candidates)) {
     if (value && isValidId(value)) {
-      return { alertId: value, source };
+      return { alertId: value, source, candidates };
     }
   }
 
@@ -218,7 +215,6 @@ function generateSMSBody(alert, isScam) {
   
   message += ' View details: profitshield.app/Alerts';
   
-  // SMS max length consideration
   if (message.length > 160) {
     message = message.substring(0, 157) + '...';
   }
@@ -238,193 +234,205 @@ Deno.serve(async (req) => {
         payload = JSON.parse(text);
       }
     } catch (e) {
-      console.error('[alertNotifications] payload parse error:', e.message);
       payload = {};
     }
     
-    // PHASE 3: Self-test action - VERSION 2.0.0
-    if (payload.action === 'self_test') {
-      const testResolution = resolveAlertId({ 
-        event: { entity_id: '507f1f77bcf86cd799439011' },
-        data: { id: '507f1f77bcf86cd799439012' }
-      });
-      return Response.json({
-        ok: true,
-        action: 'self_test',
-        version: '2.0.0',
-        test_passed: !!testResolution.source,
-        chosen_source: testResolution.source,
-        alert_found: true,
-        message: 'Resolver validated and working'
-      });
-    }
-    
-    // PHASE 3: Debug action - analyze payload without modifying state
-    if (payload.action === 'debug_payload') {
-      const resolution = resolveAlertId(payload);
-      return Response.json({
-        ok: true,
-        action: 'debug_payload',
-        payloadKeys: Object.keys(payload),
-        eventKeys: payload.event ? Object.keys(payload.event) : [],
-        dataKeys: payload.data ? Object.keys(payload.data) : [],
-        payload_too_large: payload.payload_too_large === true,
-        resolved_candidates: resolution.candidates,
-        chosen_source: resolution.source,
-        resolved_alert_id: resolution.alertId
-      });
-    }
-    
-    // PHASE 1: Instrumentation - log payload structure
     const payloadKeys = Object.keys(payload);
     const eventKeys = payload.event ? Object.keys(payload.event) : [];
     const dataKeys = payload.data ? Object.keys(payload.data) : [];
     const payloadTooLarge = payload.payload_too_large === true;
-    
-    // PHASE 2: Hardened resolution - use helper to extract alert ID
-    const resolution = resolveAlertId(payload);
-    const { alertId, source: chosenSource } = resolution;
-    
-    console.log('[alertNotifications] resolution:', {
-      payloadKeys,
-      eventKeys,
-      dataKeys,
-      payload_too_large: payloadTooLarge,
-      resolved_candidates: resolution.candidates,
-      chosen_source: chosenSource,
-      resolved_alert_id: alertId
-    });
-    
-    if (!alertId) {
-      // Write AuditLog for unresolved payload
+
+    // SELF_TEST: Create temporary alert, test resolver on multiple payload shapes
+    if (payload.action === 'self_test') {
       try {
-        await base44.asServiceRole.entities.AuditLog.create({
-          tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
-          action: 'automation_payload_unresolved',
-          entity_type: 'Alert',
-          entity_id: 'unknown',
-          performed_by: 'system',
-          description: 'alertNotifications: No alert ID found in payload',
-          category: 'ai_action',
-          severity: 'high'
-        }).catch(() => {});
-      } catch (e) {}
+        const tempAlert = await base44.entities.Alert.create({
+          tenant_id: 'test_tenant_' + Date.now(),
+          type: 'test_alert',
+          severity: 'low',
+          title: 'Self-Test Alert'
+        });
+
+        if (!tempAlert || !tempAlert.id) {
+          return Response.json({
+            ok: false,
+            version: VERSION,
+            action: 'self_test',
+            error: 'Failed to create test alert',
+            elapsed_ms: Date.now() - startMs
+          }, { status: 500 });
+        }
+
+        // Test multiple payload shapes
+        const testShapes = [
+          { shape: 'event.entity_id', payload: { event: { entity_id: tempAlert.id } } },
+          { shape: 'automation.record_id', payload: { automation: { record_id: tempAlert.id } } },
+          { shape: 'data.id', payload: { data: { id: tempAlert.id } } },
+          { shape: 'data.record.id', payload: { data: { record: { id: tempAlert.id } } } },
+          { shape: 'event.data.entity_id', payload: { event: { data: { entity_id: tempAlert.id } } } },
+          { shape: 'event.data.id', payload: { event: { data: { id: tempAlert.id } } } }
+        ];
+
+        const testResults = [];
+        for (const test of testShapes) {
+          const resolution = resolveAlertId(test.payload);
+          const hits = await base44.entities.Alert.filter({ id: resolution.alertId }).catch(() => []);
+          testResults.push({
+            shape: test.shape,
+            resolved: resolution.alertId === tempAlert.id,
+            lookup_count: hits.length
+          });
+        }
+
+        // Cleanup
+        await base44.entities.Alert.delete(tempAlert.id).catch(() => {});
+
+        return Response.json({
+          ok: true,
+          version: VERSION,
+          action: 'self_test',
+          passed: testResults.every(r => r.resolved && r.lookup_count === 1),
+          test_results: testResults,
+          elapsed_ms: Date.now() - startMs
+        });
+      } catch (e) {
+        return Response.json({
+          ok: false,
+          version: VERSION,
+          action: 'self_test',
+          error: e.message,
+          elapsed_ms: Date.now() - startMs
+        }, { status: 500 });
+      }
+    }
+
+    // DEBUG_PAYLOAD: Analyze payload, attempt lookup, return proof
+    if (payload.action === 'debug_payload') {
+      const resolution = resolveAlertId(payload);
       
-      return Response.json({ 
-        error: 'Alert ID not found in payload',
+      let hits = [];
+      if (resolution.alertId) {
+        try {
+          hits = await base44.entities.Alert.filter({ id: resolution.alertId }).catch(() => []);
+        } catch (e) {
+          // Silent
+        }
+      }
+
+      return Response.json({
+        ok: true,
+        version: VERSION,
+        action: 'debug_payload',
         payloadKeys,
         eventKeys,
         dataKeys,
         payload_too_large: payloadTooLarge,
+        resolved_alert_id: resolution.alertId,
+        chosen_source: resolution.source,
+        lookup_count: hits.length,
+        looked_for_id: resolution.alertId,
+        candidates: resolution.candidates,
+        elapsed_ms: Date.now() - startMs
+      });
+    }
+
+    // NORMAL RUN: Resolve, lookup, send notification
+    const resolution = resolveAlertId(payload);
+    const { alertId, source: chosenSource } = resolution;
+
+    if (!alertId) {
+      return Response.json({
+        ok: false,
+        version: VERSION,
+        error: 'Alert ID not resolved',
+        payloadKeys,
+        eventKeys,
+        dataKeys,
         candidates: resolution.candidates,
         elapsed_ms: Date.now() - startMs
       }, { status: 400 });
     }
 
-    // Load the full alert from database (data field may be null if payload_too_large)
-    let alertData = null;
-    if (payloadTooLarge) {
-      // Fetch alert by ID when payload was too large
-      try {
-        const alerts = await withTimeout(
-          Promise.resolve(base44.asServiceRole.entities.Alert.filter({ id: alertId }, '-updated_date', 1)),
-          2000
-        );
-        alertData = Array.isArray(alerts) ? alerts[0] : null;
-      } catch (e) {
-        console.warn('[alertNotifications] alert fetch timeout:', e.message);
-      }
-    } else {
-      // Use inline alert data from payload
-      alertData = payload.data;
+    // Lookup alert
+    let hits = [];
+    try {
+      hits = await base44.entities.Alert.filter({ id: alertId }).catch(() => []);
+    } catch (e) {
+      // Silent
     }
 
-    if (!alertData || !alertData.id) {
-      // Write AuditLog for alert lookup failure
-      try {
-        await base44.asServiceRole.entities.AuditLog.create({
-          tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
-          action: 'alert_lookup_failed',
-          entity_type: 'Alert',
-          entity_id: alertId,
-          performed_by: 'system',
-          description: `alertNotifications: Alert ${alertId} not found or inaccessible`,
-          category: 'ai_action',
-          severity: 'high'
-        }).catch(() => {});
-      } catch (e) {}
-      
-      return Response.json({ 
-        error: 'Alert not found or inaccessible',
+    if (hits.length === 0) {
+      return Response.json({
+        ok: false,
+        version: VERSION,
+        error: 'Alert not found',
         resolved_alert_id: alertId,
-        payload_too_large: payloadTooLarge,
         chosen_source: chosenSource,
-        alert_found: false,
+        lookup_count: 0,
+        payloadKeys,
+        eventKeys,
+        dataKeys,
+        payload_too_large: payloadTooLarge,
         elapsed_ms: Date.now() - startMs
       }, { status: 404 });
     }
 
-    // Extract tenant ID
+    const alertData = hits[0];
     let tenant_id = alertData.tenant_id || payload.tenant_id;
+
     if (!tenant_id) {
-      return Response.json({ 
+      return Response.json({
+        ok: false,
+        version: VERSION,
         error: 'Tenant ID not found',
         resolved_alert_id: alertId,
+        lookup_count: 1,
         elapsed_ms: Date.now() - startMs
       }, { status: 400 });
     }
 
-    // Get tenant data and settings with timeout (parallel for performance)
-    const tId = tenant_id;
+    // Fetch tenant and settings
     let tenant = null;
     let settings = null;
 
-    if (tId) {
-      try {
-        const [tenantResult, settingsResult] = await Promise.all([
-          withTimeout(
-            Promise.resolve(base44.asServiceRole.entities.Tenant.filter({ id: tId }, '-updated_date', 1)),
-            2000
-          ).catch(() => [null]),
-          withTimeout(
-            Promise.resolve(base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tId }, '-updated_date', 1)),
-            2000
-          ).catch(() => [null])
-        ]);
-        tenant = tenantResult?.[0] || null;
-        settings = settingsResult?.[0] || null;
-      } catch (e) {
-        console.warn('[alertNotifications] fetch failed:', e.message);
-      }
+    try {
+      const [tenantResult, settingsResult] = await Promise.all([
+        base44.entities.Tenant.filter({ id: tenant_id }, '-updated_date', 1).catch(() => []),
+        base44.entities.TenantSettings.filter({ tenant_id }, '-updated_date', 1).catch(() => [])
+      ]);
+      tenant = tenantResult?.[0] || null;
+      settings = settingsResult?.[0] || null;
+    } catch (e) {
+      // Silent
     }
 
-    // Check notification preferences
     const forceNotify = payload.force || payload.execute_automatic === true;
-    const notificationChannels = payload.notification_channels || ['email'];
-
     if (!forceNotify && settings?.notifications_enabled === false) {
-      return Response.json({ 
-        success: true, 
-        skipped: true, 
-        reason: 'Notifications disabled for tenant',
+      return Response.json({
+        ok: true,
+        version: VERSION,
+        resolved_alert_id: alertId,
+        chosen_source: chosenSource,
+        lookup_count: 1,
+        skipped_reason: 'notifications_disabled',
         elapsed_ms: Date.now() - startMs
       });
     }
 
-    // Determine alert template and if it's a scam
     const alertType = alertData.alert_type || alertData.type || 'default';
     const template = ALERT_TEMPLATES[alertType] || ALERT_TEMPLATES.default;
     const isScam = template.isScam || alertData.is_scam || alertData.fraud_detected;
 
-    // Get recipient email
-    const recipientEmail = settings?.notification_email || 
-                          tenant?.owner_email || 
-                          alertData.merchant_email;
+    const recipientEmail = settings?.notification_email || tenant?.owner_email || alertData.merchant_email;
 
     if (!recipientEmail) {
-      return Response.json({ 
-        success: false, 
-        error: 'No recipient email configured' 
+      return Response.json({
+        ok: false,
+        version: VERSION,
+        resolved_alert_id: alertId,
+        chosen_source: chosenSource,
+        lookup_count: 1,
+        error: 'No recipient email configured',
+        elapsed_ms: Date.now() - startMs
       }, { status: 400 });
     }
 
@@ -435,14 +443,14 @@ Deno.serve(async (req) => {
     };
 
     // Send email notification
-    if (notificationChannels.includes('email')) {
+    if (payload.notification_channels?.includes('email') !== false) {
       try {
         const emailBody = generateEmailBody(alertData, tenant, isScam);
         const subject = isScam 
           ? `🚨 SCAM ALERT: ${alertData.title || template.subject}`
           : template.subject;
 
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await base44.integrations.Core.SendEmail({
           to: recipientEmail,
           subject: subject,
           body: emailBody,
@@ -451,70 +459,42 @@ Deno.serve(async (req) => {
 
         results.email = { success: true, recipient: recipientEmail };
       } catch (error) {
-        console.error('Email send failed:', error);
         results.email = { success: false, error: error.message };
       }
     }
 
-    // Generate SMS body (for logging/future SMS integration)
-    if (notificationChannels.includes('sms')) {
-      const smsBody = generateSMSBody(alertData, isScam);
-      // SMS would require Twilio or similar integration
-      // For now, log the SMS that would be sent
-      console.log('SMS would be sent:', smsBody);
-      results.sms = { 
-        success: false, 
-        message: smsBody,
-        note: 'SMS integration requires Twilio setup' 
-      };
-    }
-
-    // Update alert to mark notification sent
-    if (alertData.id) {
-      try {
-        await withTimeout(
-          Promise.resolve(base44.asServiceRole.entities.Alert.update(alertData.id, {
-            notification_sent: true,
-            notification_sent_at: new Date().toISOString(),
-            notification_channels: notificationChannels
-          })),
-          2000
-        );
-      } catch (e) {
-        console.warn('Failed to update alert notification status:', e);
-      }
-    }
-
-    // Log the notification event
+    // Update alert
     try {
-      await withTimeout(
-        Promise.resolve(base44.asServiceRole.entities.AuditLog.create({
-          tenant_id: tId,
-          action: 'alert_notification_sent',
-          entity_type: 'Alert',
-          entity_id: alertData.id,
-          performed_by: 'system',
-          description: `Alert notification sent: ${alertType}`,
-          category: 'ai_action',
-          severity: 'medium'
-        })),
-        2000
-      );
+      await base44.entities.Alert.update(alertData.id, {
+        notification_sent: true,
+        notification_sent_at: new Date().toISOString(),
+        notification_channels: payload.notification_channels || ['email']
+      }).catch(() => {});
     } catch (e) {
-      console.warn('Failed to log notification event:', e);
+      // Silent
     }
 
     return Response.json({
-      success: true,
-      alert_id: alertData.id,
+      ok: true,
+      version: VERSION,
+      resolved_alert_id: alertId,
+      chosen_source: chosenSource,
+      lookup_count: 1,
+      payloadKeys,
+      eventKeys,
+      dataKeys,
+      payload_too_large: payloadTooLarge,
+      alert_type: alertType,
       is_scam: isScam,
       results,
+      notifications_sent: results.email?.success ? 1 : 0,
       elapsed_ms: Date.now() - startMs
     });
 
   } catch (error) {
-    console.error('Alert notification error:', error);
-    return Response.json({ 
+    return Response.json({
+      ok: false,
+      version: VERSION,
       error: error.message,
       elapsed_ms: Date.now() - startMs
     }, { status: 500 });
