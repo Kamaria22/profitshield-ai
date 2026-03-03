@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       const { access_token, scope } = await tokenResponse.json();
       
       // Get shop info
-      const shopResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
+      const shopResponse = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/shop.json`, {
         headers: { 'X-Shopify-Access-Token': access_token }
       });
       
