@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     const body = await safeJson(req);
     const action = body?.action || "predict_churn";
 
-    const validActions = ["predict_churn", "run_anomaly_detection", "trigger_retention", "get_at_risk_tenants", "debug_signals"];
+    const validActions = ["predict_churn", "run_anomaly_detection", "trigger_retention", "get_at_risk_tenants", "debug_signals", "debug_sdk"];
     if (!validActions.includes(action)) {
       return Response.json({ error: "Invalid action: " + action }, { status: 400 });
     }
@@ -92,6 +92,9 @@ Deno.serve(async (req) => {
     }
     if (normalizedAction === "debug_signals") {
       return await debugSignals(base44, body?.tenant_id, user);
+    }
+    if (action === "debug_sdk") {
+      return debugSdk(base44);
     }
 
     return Response.json({ error: "Invalid action" }, { status: 400 });
