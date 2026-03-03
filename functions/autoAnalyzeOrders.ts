@@ -337,8 +337,8 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
 
   let recommendedAction = 'none';
   if (riskLevel === 'critical') recommendedAction = 'cancel';
-  else if (riskLevel === 'high') recommendedAction = fraudScore >= 50 ? 'cancel' : 'verify';
-  else if (riskLevel === 'medium') recommendedAction = 'flag';
+  else if (riskLevel === 'high') recommendedAction = fraudScore >= 60 ? 'cancel' : 'verify';
+  else if (riskLevel === 'medium') recommendedAction = orderValue > 500 ? 'verify' : 'flag';
 
   return {
     fraud_score: Math.min(100, Math.max(0, Math.round(fraudScore))),
