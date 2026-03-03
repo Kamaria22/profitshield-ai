@@ -271,7 +271,7 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                   >
                     {actionLoading === 'fix_webhooks' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Webhook className="w-4 h-4 text-purple-500" />}
                     Register / Re-register Webhooks
-                    {!result.access_token_decryptable && <span className="ml-auto text-xs text-slate-400">needs OAuth first</span>}
+                    {(!result.access_token_decryptable || !result.shopify_api_reachable) && <span className="ml-auto text-xs text-slate-400">needs OAuth first</span>}
                   </Button>
 
                   <div className="flex gap-2">
