@@ -315,6 +315,7 @@ Deno.serve(async (req) => {
       platform: 'shopify',
       shopify_authenticated: true,
       is_new_tenant: isNewTenant,
+      auto_healed: autoHealed,
       billing: {
         plan_status: tenant.plan_status || 'trial',
         subscription_tier: tenant.subscription_tier || 'trial',
