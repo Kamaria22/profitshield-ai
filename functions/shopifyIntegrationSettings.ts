@@ -219,16 +219,10 @@ Deno.serve(async (req) => {
       const shop = tenants[0]?.shop_domain || shopParam;
       if (!shop) return json({ error: 'Cannot determine shop domain' }, 400);
 
-      // Build URL with canonical redirect_uri
-      const redirectUri = `${APP_URL}/ShopifyCallback`;
+      const redirectUri = `${APP_URL}/shopifycallback`;
       const scopes = 'read_orders,write_orders,read_products,write_products,read_customers,write_customers,read_fulfillments,write_fulfillments';
       const nonce = crypto.randomUUID();
-      const installUrl = `https://${shop}/admin/oauth/authorize?` + new URLSearchParams({
-        client_id: SHOPIFY_API_KEY,
-        scope: scopes,
-        redirect_uri: redirectUri,
-        state: nonce,
-      }).toString();
+      const installUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${nonce}&grant_options[]=value`;
 
       return json({ install_url: installUrl, shop });
     }
