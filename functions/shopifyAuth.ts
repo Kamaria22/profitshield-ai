@@ -180,6 +180,9 @@ async function handleCallback(base44, body) {
         subscription_tier: 'trial',
         plan_status: 'trial'
       });
+      console.log(`[shopifyAuth/handleCallback] Created new tenant — id=${tenant.id} shop_domain=${storeKey}`);
+    } else {
+      console.log(`[shopifyAuth/handleCallback] Using existing tenant — id=${tenant.id} shop_domain=${storeKey}`);
     }
 
     // Find or create OAuthToken
@@ -198,9 +201,10 @@ async function handleCallback(base44, body) {
         scopes,
         is_valid: true
       });
+      console.log(`[shopifyAuth/handleCallback] Updated existing OAuth token — id=${oauthTokens[0].id}`);
     } else {
       // Create new token record
-      await db.entities.OAuthToken.create({
+      const newToken = await db.entities.OAuthToken.create({
         tenant_id: tenant.id,
         platform: 'shopify',
         store_key: storeKey,
@@ -208,6 +212,8 @@ async function handleCallback(base44, body) {
         scopes,
         is_valid: true
       });
+      oauthTokens = [newToken];
+      console.log(`[shopifyAuth/handleCallback] Created new OAuth token — id=${newToken.id}`);
     }
 
     // Update or create PlatformIntegration
@@ -222,10 +228,12 @@ async function handleCallback(base44, body) {
         status: 'connected',
         last_connected_at: new Date().toISOString(),
         is_primary: true,
-        token_id: oauthTokens[0]?.id || ''
+        token_id: oauthTokens[0]?.id || '',
+        api_version: API_VERSION
       });
+      console.log(`[shopifyAuth/handleCallback] Updated existing integration — id=${integrations[0].id}`);
     } else {
-      await db.entities.PlatformIntegration.create({
+      const newIntegration = await db.entities.PlatformIntegration.create({
         tenant_id: tenant.id,
         platform: 'shopify',
         store_key: storeKey,
@@ -235,9 +243,12 @@ async function handleCallback(base44, body) {
         is_primary: true,
         installed_at: new Date().toISOString(),
         last_connected_at: new Date().toISOString(),
-        api_version: '2024-01',
-        scopes
+        api_version: API_VERSION,
+        scopes,
+        token_id: oauthTokens[0]?.id || ''
       });
+      integrations = [newIntegration];
+      console.log(`[shopifyAuth/handleCallback] Created new integration — id=${newIntegration.id}`);
     }
 
     // Log audit event
@@ -247,16 +258,22 @@ async function handleCallback(base44, body) {
       entity_type: 'PlatformIntegration',
       entity_id: integrations[0]?.id || '',
       performed_by: 'system',
-      description: `Shopify OAuth authorization completed for ${storeKey}`,
+      description: `Shopify OAuth authorization completed for ${storeKey} with ${scopes.length} scopes`,
       is_auto_action: true,
       category: 'integration'
     }).catch(() => {});
+
+    // Return redirect URL for embedded or non-embedded context
+    const redirectUrl = `${appUrl}/Home?shop=${encodeURIComponent(storeKey)}`;
+
+    console.log(`[shopifyAuth/handleCallback] OAuth complete — redirecting to: ${redirectUrl}`);
 
     return Response.json({
       success: true,
       tenant_id: tenant.id,
       shop_domain: storeKey,
       shop_name: shopName,
+      redirect_url: redirectUrl,
       message: 'Shopify authorization successful'
     });
   } catch (error) {
