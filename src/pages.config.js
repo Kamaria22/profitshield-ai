@@ -81,6 +81,7 @@ import ResolverTestHarness from './pages/ResolverTestHarness';
 import SelectStore from './pages/SelectStore';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
+import ShopifyAuth from './pages/ShopifyAuth';
 import ShopifyCallback from './pages/ShopifyCallback';
 import ShopifyOnboarding from './pages/ShopifyOnboarding';
 import SupportInbox from './pages/SupportInbox';
@@ -88,7 +89,8 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import ShopifyAuth from './pages/ShopifyAuth';
+import SelfHealingCenter from './pages/SelfHealingCenter';
+import PatchReview from './pages/PatchReview';
 import __Layout from './Layout.jsx';
 
 
@@ -127,6 +129,7 @@ export const PAGES = {
     "SelectStore": SelectStore,
     "Settings": Settings,
     "Shipping": Shipping,
+    "ShopifyAuth": ShopifyAuth,
     "ShopifyCallback": ShopifyCallback,
     "ShopifyOnboarding": ShopifyOnboarding,
     "SupportInbox": SupportInbox,
@@ -134,7 +137,8 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "ShopifyAuth": ShopifyAuth,
+    "SelfHealingCenter": SelfHealingCenter,
+    "PatchReview": PatchReview,
 }
 
 export const pagesConfig = {
