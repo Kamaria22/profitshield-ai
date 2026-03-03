@@ -148,9 +148,10 @@ Deno.serve(async (req) => {
       accessToken = await decryptToken(token.encrypted_access_token);
     }
 
-    // Canonical webhook URL derived from APP_URL
-    const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
-    const expectedWebhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
+    // CANONICAL CONFIG
+    const config = getCanonicalConfig();
+    const expectedWebhookUrl = config.webhookEndpoint;
+    console.log(`[diagnoseShopifyIngestion] Using canonical webhook URL: ${expectedWebhookUrl}`);
 
     // ── ACTION: fix_webhooks ──────────────────────────────────────────────────
     if (action === 'fix_webhooks') {
