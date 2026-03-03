@@ -85,6 +85,8 @@ function withTimeout(promise, ms = 2000) {
 }
 
 Deno.serve(async (req) => {
+  const startMs = Date.now();
+  
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.entities;
@@ -99,22 +101,9 @@ Deno.serve(async (req) => {
 
     const action = payload.action || 'run';
 
-    // DEBUG PAYLOAD ACTION - quick return, no DB calls
-    if (action === 'debug_payload') {
-      return Response.json({
-        ok: true,
-        action: 'debug_payload',
-        payloadKeys: Object.keys(payload),
-        automationKeys: payload.automation ? Object.keys(payload.automation) : [],
-        eventKeys: payload.event ? Object.keys(payload.event) : [],
-        dataKeys: payload.data ? Object.keys(payload.data) : [],
-        payload_too_large: payload.payload_too_large === true,
-        resolved_alert_id: findIdValue(payload),
-        resolved_tenant_id: findTenantIdValue(payload)
-      });
-    }
-
-    // SELF TEST ACTION
+    // ───────────────────────────────────────────────────
+    // SELF TEST (no DB calls)
+    // ───────────────────────────────────────────────────
     if (action === 'self_test') {
       return Response.json({
         ok: true,
@@ -125,46 +114,168 @@ Deno.serve(async (req) => {
       });
     }
 
-    // NORMAL RUN - Extract IDs
-    const alertId = findIdValue(payload);
-    const tenantId = findTenantIdValue(payload);
-
-    if (!alertId || !tenantId) {
+    // ───────────────────────────────────────────────────
+    // DEBUG PAYLOAD (no DB calls)
+    // ───────────────────────────────────────────────────
+    if (action === 'debug_payload') {
+      const recordId = extractSelectedRecordId(payload);
+      const tenantId = extractTenantId(payload);
+      
       return Response.json({
-        error: 'Alert or Tenant not found',
-        resolved_alert_id: alertId,
+        ok: true,
+        action: 'debug_payload',
+        payloadKeys: Object.keys(payload),
+        automationKeys: payload.automation ? Object.keys(payload.automation) : [],
+        eventKeys: payload.event ? Object.keys(payload.event) : [],
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
+        payload_too_large: payload.payload_too_large === true,
+        resolved_alert_id: recordId.id,
+        resolved_alert_source: recordId.source,
+        resolved_tenant_id: tenantId
+      });
+    }
+
+    // ───────────────────────────────────────────────────
+    // NORMAL RUN (with timeout protection)
+    // ───────────────────────────────────────────────────
+    const recordId = extractSelectedRecordId(payload);
+    const tenantId = extractTenantId(payload);
+
+    // Fail fast if missing alert ID
+    if (!recordId.id) {
+      try {
+        await withTimeout(
+          db.AuditLog.create({
+            tenant_id: tenantId || 'unknown',
+            action: 'automation_payload_unresolved',
+            entity_type: 'Alert',
+            entity_id: 'unknown',
+            performed_by: 'system',
+            description: `Remediation skipped: Alert ID not found. Source: ${recordId.source || 'none'}`,
+            category: 'ai_action',
+            severity: 'high'
+          }),
+          2000
+        ).catch(() => {});
+      } catch (e) {
+        // Silent
+      }
+      
+      return Response.json({
+        error: 'Alert ID not found in payload',
+        resolved_alert_id: null,
         resolved_tenant_id: tenantId,
-        payloadKeys: Object.keys(payload)
+        debug: {
+          payloadKeys: Object.keys(payload),
+          recordIdSource: recordId.source
+        }
       }, { status: 404 });
     }
 
-    // Update alert (non-blocking attempt)
+    // Fetch alert with timeout (2000ms hard limit)
+    let alert = null;
     try {
-      await Promise.race([
-        db.Alert.update(alertId, {
-          remediation_started: true,
-          remediation_started_at: new Date().toISOString(),
-          status: 'in_progress'
+      const results = await withTimeout(
+        db.Alert.filter({ id: recordId.id }, '-updated_date', 1),
+        2000
+      );
+      alert = Array.isArray(results) && results[0] ? results[0] : null;
+    } catch (e) {
+      console.error('[remediation] alert fetch error:', e.message);
+    }
+    
+    if (!alert) {
+      try {
+        await withTimeout(
+          db.AuditLog.create({
+            tenant_id: tenantId || 'unknown',
+            action: 'automation_payload_unresolved',
+            entity_type: 'Alert',
+            entity_id: recordId.id,
+            performed_by: 'system',
+            description: `Remediation skipped: Alert ${recordId.id} not found. Source: ${recordId.source}`,
+            category: 'ai_action',
+            severity: 'high'
+          }),
+          2000
+        ).catch(() => {});
+      } catch (e) {
+        // Silent
+      }
+      
+      return Response.json({
+        error: 'Alert not found',
+        resolved_alert_id: recordId.id,
+        resolved_tenant_id: tenantId || 'unknown',
+        source: recordId.source,
+        elapsed_ms: Date.now() - startMs
+      }, { status: 404 });
+    }
+
+    // Get tenant ID from alert if not in payload
+    const finalTenantId = tenantId || alert.tenant_id;
+    if (!finalTenantId) {
+      return Response.json({
+        error: 'Tenant ID not found',
+        resolved_alert_id: recordId.id,
+        resolved_tenant_id: null
+      }, { status: 400 });
+    }
+
+    // Remediation workflow
+    const alertType = alert.alert_type || alert.type || 'high_risk_order';
+    const workflow = REMEDIATION_WORKFLOWS[alertType] || REMEDIATION_WORKFLOWS.high_risk_order;
+
+    // Update alert status
+    if (payload.execute_automatic !== false) {
+      try {
+        await withTimeout(
+          db.Alert.update(recordId.id, {
+            remediation_started: true,
+            remediation_started_at: new Date().toISOString(),
+            status: 'in_progress'
+          }),
+          2000
+        ).catch(() => {});
+      } catch (e) {
+        // Silent
+      }
+    }
+
+    // Write execution audit log
+    try {
+      await withTimeout(
+        db.AuditLog.create({
+          tenant_id: finalTenantId,
+          action: 'remediation_workflow_executed',
+          entity_type: 'Alert',
+          entity_id: recordId.id,
+          performed_by: 'system',
+          description: `Remediation executed: ${alertType} with ${(workflow.automatic_actions || []).length} actions`,
+          category: 'ai_action',
+          severity: 'medium'
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-      ]).catch(() => {});
+        2000
+      ).catch(() => {});
     } catch (e) {
       // Silent
     }
 
     return Response.json({
       ok: true,
-      resolved_alert_id: alertId,
-      resolved_tenant_id: tenantId,
-      alert_type: 'high_risk_order',
-      automatic_actions: REMEDIATION_WORKFLOWS.high_risk_order.automatic_actions,
-      suggested_actions: REMEDIATION_WORKFLOWS.high_risk_order.suggested_actions,
+      resolved_alert_id: recordId.id,
+      resolved_tenant_id: finalTenantId,
+      alert_type: alertType,
+      automatic_actions: workflow.automatic_actions,
+      suggested_actions: workflow.suggested_actions,
       updated_alert_fields: {
         remediation_started: true,
         status: 'in_progress'
-      }
+      },
+      elapsed_ms: Date.now() - startMs
     });
+    
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message, elapsed_ms: Date.now() - startMs }, { status: 500 });
   }
 });
