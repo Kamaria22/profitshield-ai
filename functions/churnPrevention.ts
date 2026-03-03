@@ -332,7 +332,7 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
     factors.push({ factor: 'high_support_volume', weight: 8, current_value: Math.round(ticketDensity * 10) / 10, threshold: 5, trend: 'increasing' });
   }
 
-  // ── 6. NEW CUSTOMER BONUS (reduce score if onboarding_completed recently) ──
+  // ── 7. NEW CUSTOMER BONUS (reduce score if onboarding_completed recently) ──
   const daysSinceCreation = Math.floor((nowMs - new Date(tenant.created_date || now).getTime()) / DAY);
   if (daysSinceCreation <= 7 && tenant.onboarding_completed) {
     // Healthy new customer — reduce score
