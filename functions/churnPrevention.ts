@@ -82,13 +82,12 @@ async function predictChurn(base44) {
   }
 
   // Bulk-load supporting data once (avoid N+1 queries)
-  const [allIntegrations, allOrders, allSyncJobs, allAlerts, allAuditLogs, allSupportConversations] = await Promise.all([
+  const [allIntegrations, allOrders, allSyncJobs, allAlerts, allAuditLogs] = await Promise.all([
     db.entities.PlatformIntegration.filter({}).catch(() => []),
     db.entities.Order.filter({}).catch(() => []),
     db.entities.SyncJob.filter({}).catch(() => []),
     db.entities.Alert.filter({ status: 'pending' }).catch(() => []),
-    db.entities.AuditLog.filter({}).catch(() => []),
-    db.entities.SupportConversation.filter({}).catch(() => [])
+    db.entities.AuditLog.filter({}).catch(() => [])
   ]);
 
   // Index by tenant_id for O(1) lookups
@@ -97,7 +96,6 @@ async function predictChurn(base44) {
   const syncsByTenant = groupBy(allSyncJobs, 'tenant_id');
   const alertsByTenant = groupBy(allAlerts, 'tenant_id');
   const auditsByTenant = groupBy(allAuditLogs, 'tenant_id');
-  const supportByTenant = groupBy(allSupportConversations, 'tenant_id');
 
   const predictions = [];
 
@@ -109,7 +107,6 @@ async function predictChurn(base44) {
       syncJobs: syncsByTenant[tenant.id] || [],
       alerts: alertsByTenant[tenant.id] || [],
       auditLogs: auditsByTenant[tenant.id] || [],
-      supportConversations: supportByTenant[tenant.id] || [],
       now
     });
 
@@ -169,7 +166,7 @@ async function predictChurn(base44) {
 //  SCORING ENGINE — pure function, fully testable
 // ─────────────────────────────────────────────
 
-function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations, now }) {
+function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, now }) {
   const factors = [];
   let churnScore = 0;
 
@@ -178,7 +175,6 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
   const d7ago = nowMs - 7 * DAY;
   const d14ago = nowMs - 14 * DAY;
   const d30ago = nowMs - 30 * DAY;
-  const d90ago = nowMs - 90 * DAY;
 
   // ── 1. TRIAL EXPIRY (0-30 pts) ──────────────────────────────
   const trialEndsAt = tenant.trial_ends_at ? new Date(tenant.trial_ends_at).getTime() : null;
@@ -297,42 +293,7 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
     factors.push({ factor: 'low_engagement', weight: 10, current_value: recentActivity, threshold: 5, trend: 'declining' });
   }
 
-  // ── 6. SUPPORT & CUSTOMER HEALTH (0-25 pts) ────────────────────────
-  // Support ticket volume and resolution time
-  const recentSupportTickets = supportConversations.filter(s => {
-    const t = new Date(s.created_date || 0).getTime();
-    return t > d30ago;
-  });
-
-  const openTickets = recentSupportTickets.filter(s => s.status === 'open' || s.status === 'pending').length;
-  const avgResolutionTime = calculateAvgResolutionTime(recentSupportTickets);
-  
-  // Escalated or unresolved tickets indicate customer frustration
-  if (openTickets >= 5) {
-    churnScore += 15;
-    factors.push({ factor: 'high_unresolved_tickets', weight: 15, current_value: openTickets, threshold: 5, trend: 'increasing' });
-  } else if (openTickets >= 2) {
-    churnScore += 8;
-    factors.push({ factor: 'moderate_ticket_volume', weight: 8, current_value: openTickets, threshold: 2, trend: 'increasing' });
-  }
-
-  // Slow resolution time (>7 days avg) suggests support quality issues
-  if (avgResolutionTime > 7) {
-    churnScore += 10;
-    factors.push({ factor: 'slow_ticket_resolution', weight: 10, current_value: Math.round(avgResolutionTime), threshold: 7, trend: 'declining' });
-  } else if (avgResolutionTime > 3) {
-    churnScore += 5;
-    factors.push({ factor: 'moderate_resolution_time', weight: 5, current_value: Math.round(avgResolutionTime), threshold: 3, trend: 'declining' });
-  }
-
-  // High recent support volume (lots of tickets) relative to tenant age suggests issues
-  const ticketDensity = recentSupportTickets.length / Math.max(1, Math.floor(daysSinceCreation / 30));
-  if (ticketDensity > 5) {
-    churnScore += 8;
-    factors.push({ factor: 'high_support_volume', weight: 8, current_value: Math.round(ticketDensity * 10) / 10, threshold: 5, trend: 'increasing' });
-  }
-
-  // ── 7. NEW CUSTOMER BONUS (reduce score if onboarding_completed recently) ──
+  // ── 6. NEW CUSTOMER BONUS (reduce score if onboarding_completed recently) ──
   const daysSinceCreation = Math.floor((nowMs - new Date(tenant.created_date || now).getTime()) / DAY);
   if (daysSinceCreation <= 7 && tenant.onboarding_completed) {
     // Healthy new customer — reduce score
@@ -363,11 +324,7 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
     days_since_creation: daysSinceCreation,
     plan_status: planStatus,
     trial_days_remaining: trialEndsAt ? Math.max(0, Math.floor((trialEndsAt - nowMs) / DAY)) : null,
-    recent_sync_failures: recentFailedSyncs.length,
-    support_open_tickets: openTickets,
-    avg_support_resolution_days: Math.round(avgResolutionTime * 10) / 10,
-    support_tickets_30d: recentSupportTickets.length,
-    ticket_volume_density: Math.round(ticketDensity * 10) / 10
+    recent_sync_failures: recentFailedSyncs.length
   };
 
   return {
@@ -450,19 +407,18 @@ async function debugSignals(base44, tenantId) {
   const db = base44.asServiceRole;
   const now = new Date();
 
-  const [tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations] = await Promise.all([
+  const [tenant, integrations, orders, syncJobs, alerts, auditLogs] = await Promise.all([
     db.entities.Tenant.filter({ id: tenantId }).then(r => r[0] || null).catch(() => null),
     db.entities.PlatformIntegration.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.Order.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.SyncJob.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.Alert.filter({ tenant_id: tenantId, status: 'pending' }).catch(() => []),
-    db.entities.AuditLog.filter({ tenant_id: tenantId }).catch(() => []),
-    db.entities.SupportConversation.filter({ tenant_id: tenantId }).catch(() => [])
+    db.entities.AuditLog.filter({ tenant_id: tenantId }).catch(() => [])
   ]);
 
   if (!tenant) return Response.json({ error: `Tenant ${tenantId} not found` }, { status: 404 });
 
-  const result = scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations, now });
+  const result = scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, now });
 
   return Response.json({
     tenant_id: tenantId,
@@ -472,8 +428,7 @@ async function debugSignals(base44, tenantId) {
       orders: orders.length,
       sync_jobs: syncJobs.length,
       pending_alerts: alerts.length,
-      audit_logs: auditLogs.length,
-      support_conversations: supportConversations.length
+      audit_logs: auditLogs.length
     },
     score_result: result,
     tenant_data: {
