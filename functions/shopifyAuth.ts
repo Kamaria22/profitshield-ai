@@ -280,8 +280,12 @@ Deno.serve(async (req) => {
         auto_provisioned: true,
         context: 'shopify_install',
         tenant_id: tenant.id,
+        integration_id: integration.id,
         shop_domain: shopDomain,
         shop_name: shopData.name || shopDomain,
+        token_saved: true,
+        webhooks_registered: Object.keys(webhookResult.registered).length,
+        webhook_errors: webhookResult.errors.length,
         redirect_url: postInstallUrl
       });
     }
