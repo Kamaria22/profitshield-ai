@@ -26,19 +26,10 @@ import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
 const SHOPIFY_AUTH_KEY = 'shopify_embedded_auth';
 const AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-// ─── CSP injection ───────────────────────────────────────────────────────────
-
-function injectShopifyFrameAncestors() {
-  if (typeof document === 'undefined') return;
-  const id = '__shopify_csp';
-  if (document.getElementById(id)) return;
-  const meta = document.createElement('meta');
-  meta.id = id;
-  meta.httpEquiv = 'Content-Security-Policy';
-  meta.content = "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'";
-  document.head.appendChild(meta);
-}
-injectShopifyFrameAncestors();
+// ─── CSP via HTTP Headers ───────────────────────────────────────────────────
+// NOTE: CSP frame-ancestors must be delivered via HTTP headers, not meta tags.
+// Meta tag CSP is ignored by browsers for frame-ancestors directive.
+// Headers are set on the server side in shopifySessionExchange and shopifyAuth.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
