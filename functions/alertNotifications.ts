@@ -193,6 +193,20 @@ Deno.serve(async (req) => {
     const eventKeys = payload.event ? Object.keys(payload.event) : [];
     const dataKeys = payload.data ? Object.keys(payload.data) : [];
     
+    // Always log automation payloads for debugging
+    if (Object.keys(payload).length > 0) {
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
+        action: 'automation_payload_received',
+        entity_type: 'Alert',
+        entity_id: payload.event?.entity_id || payload.data?.id || 'unknown',
+        performed_by: 'system',
+        description: `alertNotifications called with payload keys: ${payloadKeys.join(', ')}, event_keys: ${eventKeys.join(', ')}, data_keys: ${dataKeys.join(', ')}`,
+        category: 'ai_action',
+        metadata: { payloadKeys, eventKeys, dataKeys, resolved_id: resolveAlertId(payload).alertId }
+      }).catch(() => {});
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════
     // PROVE LIVE: Return handler metadata (no action processing)
     // ═══════════════════════════════════════════════════════════════════════
