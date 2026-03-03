@@ -465,7 +465,34 @@ Deno.serve(async (req) => {
       newestOrderNumber = sorted[0]?.order_number?.toString() || sorted[0]?.name;
     }
     
+    const syncedAt = new Date().toISOString();
     console.log('[syncShopifyOrders] Sync complete. Created:', created, 'Updated:', updated, 'Newest:', newestOrderNumber);
+
+    // Update integration's last_sync_at and stats
+    if (integrationId) {
+      await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
+        last_sync_at: syncedAt,
+        last_sync_status: 'success',
+        last_sync_stats: {
+          orders_synced: shopifyOrders.length,
+          orders_created: created,
+          orders_updated: updated,
+          errors_count: 0
+        }
+      }).catch(() => {});
+    }
+
+    // Update SyncJob to completed
+    if (syncJob?.id) {
+      await base44.asServiceRole.entities.SyncJob.update(syncJob.id, {
+        status: 'completed',
+        completed_at: syncedAt,
+        orders_synced: created + updated,
+        orders_fetched: shopifyOrders.length,
+        orders_created: created,
+        orders_updated: updated
+      }).catch(() => {});
+    }
 
     // Trigger profit alert checks for new/updated orders
     try {
@@ -478,10 +505,12 @@ Deno.serve(async (req) => {
       success: true,
       shopDomain: tenant.shop_domain,
       tenantId: tenant.id,
+      integrationId,
       fetchedCount: shopifyOrders.length,
       createdCount: created,
       updatedCount: updated,
       newestOrderNumber,
+      syncedAt,
       anyErrors: [],
       // Legacy fields for backward compatibility
       created, 
