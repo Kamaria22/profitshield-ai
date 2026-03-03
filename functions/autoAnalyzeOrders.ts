@@ -321,13 +321,19 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     (fraudScore * 0.5) + (returnScore * 0.25) + (chargebackScore * 0.25)
   ));
 
-  // If raw fraud score is extremely high, elevate regardless of combined
-  const effectiveScore = fraudScore >= 70 ? Math.max(combinedScore, fraudScore * 0.75) : combinedScore;
+  // Effective score: if raw fraud score is high, use the higher of combined or fraud*0.8
+  // This ensures extremely high fraud scores (90+) trigger high/critical even if combined is diluted
+  const effectiveScore = fraudScore >= 65
+    ? Math.max(combinedScore, Math.round(fraudScore * 0.8))
+    : combinedScore;
+
+  const highThreshold = settings.high_risk_threshold || 70;
+  const medThreshold = settings.medium_risk_threshold || 40;
 
   let riskLevel = 'low';
   if (effectiveScore >= 80) riskLevel = 'critical';
-  else if (effectiveScore >= (settings.high_risk_threshold || 70)) riskLevel = 'high';
-  else if (effectiveScore >= (settings.medium_risk_threshold || 40)) riskLevel = 'medium';
+  else if (effectiveScore >= highThreshold) riskLevel = 'high';
+  else if (effectiveScore >= medThreshold) riskLevel = 'medium';
 
   let recommendedAction = 'none';
   if (riskLevel === 'critical') recommendedAction = 'cancel';
