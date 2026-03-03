@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 Deno.serve(async (req) => {
   try {
@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, tenant_id } = body;
 
-    if (action === 'detect_anomalies') {
+    if (action === 'detect_anomalies' || action === 'run_anomaly_detection') {
       return await detectAnomalies(base44, tenant_id);
     } else if (action === 'get_active_anomalies') {
       return await getActiveAnomalies(base44, tenant_id);
