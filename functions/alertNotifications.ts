@@ -378,11 +378,15 @@ Deno.serve(async (req) => {
       success: true,
       alert_id: alertData.id,
       is_scam: isScam,
-      results
+      results,
+      elapsed_ms: Date.now() - startMs
     });
 
   } catch (error) {
     console.error('Alert notification error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ 
+      error: error.message,
+      elapsed_ms: Date.now() - startMs
+    }, { status: 500 });
   }
 });
