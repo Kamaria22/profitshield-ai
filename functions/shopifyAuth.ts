@@ -116,8 +116,10 @@ async function handleCallback(base44, body) {
       return Response.json({ error: 'Shopify credentials not configured' }, { status: 500 });
     }
 
-    const normalizedShop = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+    const normalizedShop = shop.includes('.myshopify.com') ? shop.toLowerCase() : `${shop.toLowerCase()}.myshopify.com`;
     const tokenUrl = `https://${normalizedShop}/admin/oauth/access_token`;
+
+    console.log(`[shopifyAuth/handleCallback] Exchanging OAuth code — shop=${normalizedShop} appUrl=${appUrl}`);
 
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -131,6 +133,7 @@ async function handleCallback(base44, body) {
 
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
+      console.error(`[shopifyAuth/handleCallback] Token exchange failed (${tokenResponse.status}): ${error}`);
       return Response.json({ error: `Token exchange failed: ${error}` }, { status: 400 });
     }
 
@@ -142,19 +145,24 @@ async function handleCallback(base44, body) {
       return Response.json({ error: 'No access token in response' }, { status: 400 });
     }
 
-    // Get shop info to determine tenant
-    const shopInfoUrl = `https://${normalizedShop}/admin/api/2024-01/shop.json`;
+    // Get shop info to determine tenant — use consistent API version
+    const API_VERSION = '2024-10';
+    const shopInfoUrl = `https://${normalizedShop}/admin/api/${API_VERSION}/shop.json`;
     const shopResponse = await fetch(shopInfoUrl, {
       headers: { 'X-Shopify-Access-Token': accessToken }
     });
 
     if (!shopResponse.ok) {
+      const error = await shopResponse.text();
+      console.error(`[shopifyAuth/handleCallback] Shop info fetch failed (${shopResponse.status}): ${error}`);
       return Response.json({ error: 'Failed to fetch shop info' }, { status: 400 });
     }
 
     const shopInfo = await shopResponse.json();
     const storeKey = shopInfo.shop?.myshopify_domain || normalizedShop;
     const shopName = shopInfo.shop?.name || normalizedShop;
+    
+    console.log(`[shopifyAuth/handleCallback] Shop info retrieved — storeKey=${storeKey} shopName=${shopName}`);
 
     // Find or create tenant by shop_domain
     const db = base44.asServiceRole;
