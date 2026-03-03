@@ -81,11 +81,8 @@ Deno.serve(async (req) => {
 
     const action = payload.action || 'run';
 
-    // DEBUG PAYLOAD ACTION
+    // DEBUG PAYLOAD ACTION - quick return, no DB calls
     if (action === 'debug_payload') {
-      const alertId = findIdValue(payload);
-      const tenantId = findTenantIdValue(payload);
-      
       return Response.json({
         ok: true,
         action: 'debug_payload',
@@ -94,9 +91,8 @@ Deno.serve(async (req) => {
         eventKeys: payload.event ? Object.keys(payload.event) : [],
         dataKeys: payload.data ? Object.keys(payload.data) : [],
         payload_too_large: payload.payload_too_large === true,
-        resolved_alert_id: alertId,
-        resolved_tenant_id: tenantId,
-        message: alertId && tenantId ? 'RESOLVED' : 'UNRESOLVED'
+        resolved_alert_id: findIdValue(payload),
+        resolved_tenant_id: findTenantIdValue(payload)
       });
     }
 
