@@ -318,13 +318,28 @@ Deno.serve(async (req) => {
 
     console.log('[syncShopifyOrders] Fetching orders from Shopify for:', tenant.shop_domain, 'days:', days);
     
-    // Paginate through orders (up to 5 pages = 250*5 = 1250 orders)
+    // Create / update SyncJob record to track this run
+    let syncJob = null;
+    try {
+      syncJob = await base44.asServiceRole.entities.SyncJob.create({
+        tenant_id: tenant.id,
+        integration_id: integrationId,
+        platform: 'shopify',
+        job_type: `historical_${days}d`,
+        status: 'running',
+        started_at: new Date().toISOString()
+      });
+    } catch (sjErr) {
+      console.warn('[syncShopifyOrders] Could not create SyncJob:', sjErr.message);
+    }
+
+    // Paginate through orders (up to 10 pages = 250*10 = 2500 orders)
     const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     let allOrders = [];
     let pageUrl = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
     let pageCount = 0;
 
-    while (pageUrl && pageCount < 5) {
+    while (pageUrl && pageCount < 10) {
       const shopifyUrl = pageUrl;
       const shopifyRes = await fetch(shopifyUrl, {
         headers: {
