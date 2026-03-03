@@ -1,3 +1,11 @@
+/**
+ * AUTOMATED REMEDIATION — SAFE MODE
+ * ==================================
+ * DO NOT MODIFY without owner approval.
+ * Uses minimal ID extraction (automation.record_id primary).
+ * Hard 2000ms DB timeout. No risky fallbacks.
+ */
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const REMEDIATION_WORKFLOWS = {
@@ -30,40 +38,50 @@ function getByPath(obj, path) {
   return cur;
 }
 
-function findIdValue(obj) {
+function extractSelectedRecordId(payload) {
+  // PRIMARY: automation.record_id
+  const primary = getByPath(payload, 'automation.record_id');
+  if (primary && looksLikeId(primary)) {
+    return { id: primary, source: 'automation.record_id' };
+  }
+  
+  // SECONDARY: data.id
+  const secondary1 = getByPath(payload, 'data.id');
+  if (secondary1 && looksLikeId(secondary1)) {
+    return { id: secondary1, source: 'data.id' };
+  }
+  
+  // TERTIARY: data.record.id
+  const secondary2 = getByPath(payload, 'data.record.id');
+  if (secondary2 && looksLikeId(secondary2)) {
+    return { id: secondary2, source: 'data.record.id' };
+  }
+  
+  return { id: null, source: null };
+}
+
+function extractTenantId(payload) {
   const paths = [
-    'alert_id', 'alertId', 'alert.id', 'alert.record_id',
-    'data.id', 'data.record.id', 'data.record_id', 'data.recordId',
-    'data.selected.id', 'data.selected.record.id', 'data.selected.record_id',
-    'data.selectedRecordId', 'data.selected_record_id',
-    'event.id', 'event.data.id', 'event.data.record.id', 'event.data.record_id',
-    'event.record_id', 'event.recordId',
-    'automation.record_id', 'automation.recordId',
-    'automation.selected_record_id', 'automation.selectedRecordId',
-    'automation.context.record_id', 'automation.context.selected_record_id',
-    'old_data.id', 'old_data.record.id', 'old_data.record_id'
+    'data.tenant_id',
+    'automation.tenant_id',
+    'event.tenant_id',
+    'tenant_id'
   ];
   
   for (const p of paths) {
-    const v = getByPath(obj, p);
+    const v = getByPath(payload, p);
     if (v && looksLikeId(v)) return v;
   }
   return null;
 }
 
-function findTenantIdValue(obj) {
-  const paths = [
-    'tenant_id', 'tenantId',
-    'data.tenant_id', 'data.tenantId',
-    'automation.tenant_id', 'automation.tenantId',
-    'event.tenant_id', 'event.tenantId'
-  ];
-  
-  for (const p of paths) {
-    const v = getByPath(obj, p);
-    if (v && looksLikeId(v)) return v;
-  }
-  return null;
+function withTimeout(promise, ms = 2000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
+    )
+  ]);
 }
 
 Deno.serve(async (req) => {
