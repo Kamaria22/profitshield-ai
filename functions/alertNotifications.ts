@@ -7,7 +7,9 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const VERSION = "alertNotifications_v2026_03_03_fix3_retry_queue";
+const VERSION = "alertNotifications_v2026_03_03_fix4_no404_proof";
+const HANDLER_FILE = "functions/alertNotifications";
+const FUNCTION_NAME = "alertNotifications";
 
 // Retry schedule: 8 attempts over ~4 seconds
 const RETRY_SCHEDULE_MS = [250, 250, 500, 500, 750, 750, 1000];
