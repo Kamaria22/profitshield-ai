@@ -80,12 +80,17 @@ Deno.serve(async (req) => {
     // SELF TEST (no DB calls)
     // ───────────────────────────────────────────────────
     if (action === 'self_test') {
+      const testResolution = resolveAlertId({
+        event: { entity_id: '507f1f77bcf86cd799439011' },
+        data: { id: '507f1f77bcf86cd799439012' }
+      });
       return Response.json({
         ok: true,
         action: 'self_test',
-        passed: true,
+        passed: !!testResolution.source,
+        chosen_source: testResolution.source,
         message: 'Resolver validated',
-        test_paths: 25
+        test_paths: 4
       });
     }
 
@@ -93,8 +98,7 @@ Deno.serve(async (req) => {
     // DEBUG PAYLOAD (no DB calls)
     // ───────────────────────────────────────────────────
     if (action === 'debug_payload') {
-      const recordId = extractSelectedRecordId(payload);
-      const tenantId = extractTenantId(payload);
+      const resolution = resolveAlertId(payload);
       
       return Response.json({
         ok: true,
@@ -104,17 +108,18 @@ Deno.serve(async (req) => {
         eventKeys: payload.event ? Object.keys(payload.event) : [],
         dataKeys: payload.data ? Object.keys(payload.data) : [],
         payload_too_large: payload.payload_too_large === true,
-        resolved_alert_id: recordId.id,
-        resolved_alert_source: recordId.source,
-        resolved_tenant_id: tenantId
+        resolved_candidates: resolution.candidates,
+        chosen_source: resolution.source,
+        resolved_alert_id: resolution.alertId
       });
     }
 
     // ───────────────────────────────────────────────────
     // NORMAL RUN (with timeout protection)
     // ───────────────────────────────────────────────────
-    const recordId = extractSelectedRecordId(payload);
-    const tenantId = extractTenantId(payload);
+    const resolution = resolveAlertId(payload);
+    const recordId = { id: resolution.alertId, source: resolution.source };
+    const tenantId = payload.data?.tenant_id || payload.tenant_id;
 
     // Fail fast if missing alert ID
     if (!recordId.id) {
