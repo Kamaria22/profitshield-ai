@@ -38,9 +38,9 @@ Deno.serve(async (req) => {
       const redirectUri = 'https://profit-shield-ai.base44.app/ShopifyCallback';
       const nonce = crypto.randomUUID();
 
-      console.log(`[shopifyAuth] install redirect_uri = ${redirectUri}`);
+      console.log(`[shopifyAuth] ${action} → redirect_uri=${redirectUri} shop=${shopDomain}`);
       
-      const installUrl = `https://${shopDomain}/admin/oauth/authorize?` + new URLSearchParams({
+      const authorizeUrl = `https://${shopDomain}/admin/oauth/authorize?` + new URLSearchParams({
         client_id: SHOPIFY_API_KEY,
         scope: SCOPES,
         redirect_uri: redirectUri,
@@ -48,7 +48,9 @@ Deno.serve(async (req) => {
       }).toString();
       
       return Response.json({ 
-        install_url: installUrl,
+        ok: true,
+        install_url: authorizeUrl,    // legacy compat
+        authorize_url: authorizeUrl,  // canonical
         state: nonce 
       });
     }
