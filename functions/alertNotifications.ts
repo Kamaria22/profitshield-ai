@@ -236,26 +236,56 @@ Deno.serve(async (req) => {
     let payload = {};
     try {
       const text = await req.text();
-      console.log('[alertNotifications] raw text length:', text.length);
       if (text) {
         payload = JSON.parse(text);
-        console.log('[alertNotifications] payload parsed, keys:', Object.keys(payload));
       }
     } catch (e) {
       console.error('[alertNotifications] payload parse error:', e.message);
       payload = {};
     }
     
-    // Extract alert ID from automation payload
-    // Base44 entity automations provide: { event: { type, entity_name, entity_id }, data: {...alert}, old_data: null }
-    const alertId = payload.event?.entity_id || payload.data?.id || payload.alert_id;
+    // PHASE 1: Instrumentation - log payload structure
+    const payloadKeys = Object.keys(payload);
+    const eventKeys = payload.event ? Object.keys(payload.event) : [];
+    const dataKeys = payload.data ? Object.keys(payload.data) : [];
+    const payloadTooLarge = payload.payload_too_large === true;
+    
+    // PHASE 2: Hardened resolution - use helper to extract alert ID
+    const resolution = resolveAlertId(payload);
+    const { alertId, source: chosenSource } = resolution;
+    
+    console.log('[alertNotifications] resolution:', {
+      payloadKeys,
+      eventKeys,
+      dataKeys,
+      payload_too_large: payloadTooLarge,
+      resolved_candidates: resolution.candidates,
+      chosen_source: chosenSource,
+      resolved_alert_id: alertId
+    });
     
     if (!alertId) {
+      // Write AuditLog for unresolved payload
+      try {
+        await base44.asServiceRole.entities.AuditLog.create({
+          tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
+          action: 'automation_payload_unresolved',
+          entity_type: 'Alert',
+          entity_id: 'unknown',
+          performed_by: 'system',
+          description: 'alertNotifications: No alert ID found in payload',
+          category: 'ai_action',
+          severity: 'high'
+        }).catch(() => {});
+      } catch (e) {}
+      
       return Response.json({ 
         error: 'Alert ID not found in payload',
-        payloadKeys: Object.keys(payload),
-        eventKeys: payload.event ? Object.keys(payload.event) : [],
-        dataKeys: payload.data ? Object.keys(payload.data) : [],
+        payloadKeys,
+        eventKeys,
+        dataKeys,
+        payload_too_large: payloadTooLarge,
+        candidates: resolution.candidates,
         elapsed_ms: Date.now() - startMs
       }, { status: 400 });
     }
