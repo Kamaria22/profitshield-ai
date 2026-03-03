@@ -224,12 +224,21 @@ Deno.serve(async (req) => {
       tenant_id = alertData.tenant_id;
     }
 
+    // DEBUG: Log what we found
+    console.log('[alertNotifications] payload extraction:', {
+      hasAlert: !!alertData,
+      alertId: alertData?.id,
+      tenantId: tenant_id,
+      dataKeys: payload.data ? Object.keys(payload.data) : []
+    });
+
     // Validate we have alert data
     if (!alertData || !alertData.id) {
       return Response.json({ 
         error: 'Alert not found',
         payloadKeys: Object.keys(payload),
         dataKeys: payload.data ? Object.keys(payload.data) : [],
+        hasData: !!payload.data,
         elapsed_ms: Date.now() - startMs
       }, { status: 404 });
     }
