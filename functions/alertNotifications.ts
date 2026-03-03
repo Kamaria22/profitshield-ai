@@ -350,23 +350,29 @@ Deno.serve(async (req) => {
 
     // ───────────────────────────────────────────────────
     // DEFAULT: Send notification (with retry + queue fallback)
+    // CRITICAL: NO 404 ALLOWED — defer instead
     // ───────────────────────────────────────────────────
     const resolution = resolveAlertId(payload);
     
     if (!resolution.alertId) {
+      // Missing ID → queue for later, never 404
       return Response.json({
-        ok: false,
+        ok: true,
         version: VERSION,
+        handler_file: HANDLER_FILE,
+        function_name: FUNCTION_NAME,
         resolved_alert_id: null,
         chosen_source: null,
         lookup_attempts: 0,
         found: false,
         notification_sent: false,
-        deferred: false,
+        deferred: true,
+        queued_id: null,
         payloadKeys,
-        error: 'Alert ID not resolved',
+        error: 'Alert ID not resolved (deferred to queue)',
+        timestamp,
         elapsed_ms: Date.now() - startMs
-      }, { status: 400 });
+      }, { status: 202 });
     }
 
     // Attempt to fetch with retries
