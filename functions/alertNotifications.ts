@@ -211,36 +211,21 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const { payload } = await parseAutomationPayload(req);
     
-    // Try explicit fields first, then fall back to automation payload extraction
-    let alert_id = payload.alert_id || payload.alert?.id;
-    let alertData = payload.alert;
+    // Priority 1: Explicit alert data in payload
+    let alertData = payload.alert || payload.data;
     let tenant_id = payload.tenant_id;
 
-    // If no explicit alert_id, extract from automation payload
-    if (!alert_id && !alertData) {
-      const recordId = extractSelectedRecordId(payload);
-      alert_id = recordId.id;
-      tenant_id = tenant_id || extractTenantId(payload);
+    // Priority 2: If alertData exists, use its tenant_id
+    if (alertData && !tenant_id) {
+      tenant_id = alertData.tenant_id;
     }
 
-    // Get alert data with timeout protection
-    if (alert_id && !alertData) {
-      try {
-        const [foundAlert] = await withTimeout(
-          Promise.resolve(base44.asServiceRole.entities.Alert.filter({ id: alert_id }, '-updated_date', 1)),
-          2000
-        );
-        alertData = foundAlert;
-      } catch (e) {
-        console.error('[alertNotifications] alert fetch timeout:', e.message);
-      }
-    }
-
-    if (!alertData) {
+    // Validate we have alert data
+    if (!alertData || !alertData.id) {
       return Response.json({ 
         error: 'Alert not found',
-        resolved_alert_id: alert_id,
-        resolved_tenant_id: tenant_id,
+        payloadKeys: Object.keys(payload),
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
         elapsed_ms: Date.now() - startMs
       }, { status: 404 });
     }
