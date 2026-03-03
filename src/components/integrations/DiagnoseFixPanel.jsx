@@ -228,7 +228,7 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-slate-700">Fix Actions</p>
 
-                  {!result.access_token_decryptable && (
+                  {(!result.access_token_decryptable || !result.shopify_api_reachable) && (
                     <Button
                       variant="default"
                       className="w-full justify-start gap-2 bg-indigo-600 hover:bg-indigo-700"
