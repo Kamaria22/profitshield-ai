@@ -48,57 +48,7 @@ const REMEDIATION_WORKFLOWS = {
   }
 };
 
-function looksLikeId(v) {
-  return typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
-}
 
-function getByPath(obj, path) {
-  if (!obj || !path) return undefined;
-  const parts = path.split('.');
-  let cur = obj;
-  for (const p of parts) {
-    if (!cur) return undefined;
-    cur = cur[p];
-  }
-  return cur;
-}
-
-function extractSelectedRecordId(payload) {
-  // PRIMARY: automation.record_id
-  const primary = getByPath(payload, 'automation.record_id');
-  if (primary && looksLikeId(primary)) {
-    return { id: primary, source: 'automation.record_id' };
-  }
-  
-  // SECONDARY: data.id
-  const secondary1 = getByPath(payload, 'data.id');
-  if (secondary1 && looksLikeId(secondary1)) {
-    return { id: secondary1, source: 'data.id' };
-  }
-  
-  // TERTIARY: data.record.id
-  const secondary2 = getByPath(payload, 'data.record.id');
-  if (secondary2 && looksLikeId(secondary2)) {
-    return { id: secondary2, source: 'data.record.id' };
-  }
-  
-  return { id: null, source: null };
-}
-
-function extractTenantId(payload) {
-  const paths = [
-    'data.tenant_id',
-    'automation.tenant_id',
-    'event.tenant_id',
-    'tenant_id'
-  ];
-  
-  for (const p of paths) {
-    const v = getByPath(payload, p);
-    if (v && looksLikeId(v)) return v;
-  }
-  return null;
-}
 
 function withTimeout(promise, ms = 2000) {
   return Promise.race([
