@@ -462,10 +462,14 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
+    // Catastrophic error - still return 500 but never 404
     return Response.json({
       ok: false,
       version: VERSION,
+      handler_file: HANDLER_FILE,
+      function_name: FUNCTION_NAME,
       error: error.message,
+      timestamp,
       elapsed_ms: Date.now() - startMs
     }, { status: 500 });
   }
