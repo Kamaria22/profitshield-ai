@@ -386,6 +386,8 @@ Deno.serve(async (req) => {
       return Response.json({
         ok: true,
         version: VERSION,
+        handler_file: HANDLER_FILE,
+        function_name: FUNCTION_NAME,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -393,8 +395,9 @@ Deno.serve(async (req) => {
         notification_sent: sent,
         deferred: false,
         payloadKeys,
+        timestamp,
         elapsed_ms: Date.now() - startMs
-      });
+      }, { status: 200 });
     }
 
     // Not found after retries - queue for later + audit log
