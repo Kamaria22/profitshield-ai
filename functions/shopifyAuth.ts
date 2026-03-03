@@ -292,8 +292,23 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Register webhooks — pass integration.id so we can store the webhook IDs
-      const webhookResult = await registerWebhooks(shopDomain, access_token, integration.id, base44.asServiceRole);
+      // Register / reconcile webhooks via the dedicated reconcile function
+      let webhookResult = { registered: {}, errors: [], registered_count: 0 };
+      try {
+        const reconRes = await base44.functions.invoke('shopifyReconcileWebhooks', {
+          integration_id: integration.id
+        });
+        if (reconRes.data && !reconRes.data.error) {
+          webhookResult = {
+            registered: reconRes.data.registered || {},
+            errors: reconRes.data.errors || [],
+            registered_count: reconRes.data.registered_count || 0
+          };
+        }
+      } catch (reconErr) {
+        console.warn('[shopifyAuth] Reconcile webhooks failed, falling back to inline:', reconErr.message);
+        webhookResult = await registerWebhooks(shopDomain, access_token, integration.id, base44.asServiceRole);
+      }
       
       // Audit log for webhook registration
       await base44.asServiceRole.entities.AuditLog.create({
