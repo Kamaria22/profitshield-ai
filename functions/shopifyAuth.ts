@@ -8,10 +8,13 @@ const SCOPES = 'read_orders,read_products,read_customers,read_inventory,read_ful
 const ACTION_ALIASES = {
   reconnect: 'reauthorize',
   reconnect_oauth: 'reauthorize',
+  reconnectoauth: 'reauthorize',  // camelCase variant lowercased
   reauth: 'reauthorize',
   reauthorize: 'reauthorize',
   install: 'install',
-  callback: 'callback'
+  callback: 'callback',
+  registerwebhooks: 'registerWebhooks',
+  register_webhooks: 'registerWebhooks',
 };
 const ALLOWED_ACTIONS = Object.keys(ACTION_ALIASES);
 
