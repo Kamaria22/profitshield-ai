@@ -1,26 +1,15 @@
 /**
- * diagnoseShopifyIngestion
- * 
- * Full end-to-end health check for a Shopify integration:
- *   1) Tenant lookup
- *   2) Integration record
- *   3) OAuth token: present + decryptable
- *   4) Shopify API reachability (list webhooks)
- *   5) Webhooks registered vs expected
- *   6) Orders in DB
- *   7) WebhookQueue state
- *   8) Recommended fix actions
- *
- * Also supports action=fix_webhooks and action=fix_sync to auto-fix.
+ * diagnoseShopifyIngestion — real Shopify API health check + fix actions
+ * Uses access_scopes as the authoritative API reachability test.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+const API_VERSION = '2024-10';
 const REQUIRED_TOPICS = ['orders/create', 'orders/updated', 'orders/paid', 'refunds/create', 'app/uninstalled', 'products/update', 'orders/cancelled'];
 
 async function decryptToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');
   if (!key) {
-    // Try plain base64
     try { return atob(encryptedToken); } catch { return null; }
   }
   try {
@@ -37,35 +26,37 @@ async function decryptToken(encryptedToken) {
   }
 }
 
-async function registerWebhooks(shopDomain, accessToken, integrationId, db) {
-  const appUrl = Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app';
-  const webhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
-
-  // Delete existing webhooks pointing to our URL
+async function registerWebhooks(shopDomain, accessToken, integrationId, webhookUrl, db) {
+  // Delete existing webhooks pointing to any of our known endpoints to avoid duplicates
+  const knownEndpoints = [
+    webhookUrl,
+    'https://profit-shield-ai.com/api/functions/shopifyWebhook',
+    'https://profit-shield-ai.base44.app/api/functions/shopifyWebhook',
+  ];
   try {
-    const listRes = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+    const listRes = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json?limit=250`, {
       headers: { 'X-Shopify-Access-Token': accessToken }
     });
     if (listRes.ok) {
       const { webhooks } = await listRes.json();
       for (const wh of (webhooks || [])) {
-        if (wh.address === webhookUrl) {
-          await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks/${wh.id}.json`, {
+        if (knownEndpoints.some(ep => wh.address.startsWith(ep.split('/api/')[0]))) {
+          await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks/${wh.id}.json`, {
             method: 'DELETE',
             headers: { 'X-Shopify-Access-Token': accessToken }
-          });
+          }).catch(() => {});
         }
       }
     }
   } catch (e) {
-    console.warn('[diagnoseShopifyIngestion] Cleanup error:', e.message);
+    console.warn('[diagnose/registerWebhooks] Cleanup error:', e.message);
   }
 
   const registered = {};
   const errors = [];
   for (const topic of REQUIRED_TOPICS) {
     try {
-      const res = await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+      const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
         body: JSON.stringify({ webhook: { topic, address: webhookUrl, format: 'json' } })
@@ -95,7 +86,6 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Admin OR owner allowed
     let user = null;
     try { user = await base44.auth.me(); } catch (_) {}
     const role = (user?.role || user?.app_role || '').toLowerCase();
@@ -108,7 +98,7 @@ Deno.serve(async (req) => {
 
     const db = base44.asServiceRole;
 
-    // Resolve shop domain / tenant
+    // Resolve tenant
     let normalized = null;
     let tenant = null;
 
@@ -147,18 +137,38 @@ Deno.serve(async (req) => {
       accessToken = await decryptToken(token.encrypted_access_token);
     }
 
+    // Canonical webhook URL derived from APP_URL
+    const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+    const expectedWebhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
+
     // ── ACTION: fix_webhooks ──────────────────────────────────────────────────
     if (action === 'fix_webhooks') {
       if (!accessToken) return Response.json({ error: 'No valid access token — reconnect OAuth first' }, { status: 400 });
       if (!integration) return Response.json({ error: 'No integration record found' }, { status: 400 });
-      const result = await registerWebhooks(normalized, accessToken, integration.id, db);
+
+      // Verify API reachable before registering
+      const scopeCheck = await fetch(`https://${normalized}/admin/oauth/access_scopes.json`, {
+        headers: { 'X-Shopify-Access-Token': accessToken }
+      });
+      if (!scopeCheck.ok) {
+        // Invalidate token
+        if (token?.id) {
+          await db.entities.OAuthToken.update(token.id, { is_valid: false }).catch(() => {});
+        }
+        if (integration?.id) {
+          await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        }
+        return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth.` }, { status: 400 });
+      }
+
+      const result = await registerWebhooks(normalized, accessToken, integration.id, expectedWebhookUrl, db);
       await db.entities.AuditLog.create({
         tenant_id: tenantId,
         action: 'fix_webhooks_triggered',
         entity_type: 'platform_integration',
         entity_id: integration.id,
         performed_by: user.email,
-        description: `Manual webhook re-registration: ${Object.keys(result.registered).length} registered, ${result.errors.length} failed`,
+        description: `Manual webhook re-registration: ${Object.keys(result.registered).length} registered, ${result.errors.length} failed. URL: ${expectedWebhookUrl}`,
         severity: 'low',
         category: 'integration',
         metadata: { registered: result.registered, errors: result.errors }
@@ -174,7 +184,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── ACTION: fix_sync (historical import) ─────────────────────────────────
+    // ── ACTION: fix_sync ─────────────────────────────────────────────────────
     if (action === 'fix_sync') {
       if (!tenantId) return Response.json({ error: 'No tenant' }, { status: 400 });
       const syncDays = days || 365;
@@ -191,29 +201,52 @@ Deno.serve(async (req) => {
     }
 
     // ── DIAGNOSE ──────────────────────────────────────────────────────────────
-    const appUrl = Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app';
-    const expectedWebhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
 
-    // Shopify webhooks
-    let shopifyWebhooks = [];
+    // Use access_scopes as the REAL API reachability test (more reliable than webhooks list)
     let shopifyApiReachable = false;
-    let shopifyWebhookError = null;
-    if (accessToken) {
+    let shopifyApiStatusCode = null;
+    let shopifyApiError = null;
+    let grantedScopes = [];
+
+    if (accessToken && normalized) {
       try {
-        const whRes = await fetch(`https://${normalized}/admin/api/2024-01/webhooks.json`, {
+        const scopeRes = await fetch(`https://${normalized}/admin/oauth/access_scopes.json`, {
+          headers: { 'X-Shopify-Access-Token': accessToken }
+        });
+        shopifyApiStatusCode = scopeRes.status;
+        if (scopeRes.ok) {
+          shopifyApiReachable = true;
+          const scopeData = await scopeRes.json();
+          grantedScopes = (scopeData.access_scopes || []).map(s => s.handle);
+        } else {
+          shopifyApiError = `HTTP ${scopeRes.status}: ${await scopeRes.text()}`;
+          // Auto-invalidate on 401
+          if (scopeRes.status === 401) {
+            if (token?.id) await db.entities.OAuthToken.update(token.id, { is_valid: false }).catch(() => {});
+            if (integration?.id) await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        shopifyApiError = e.message;
+      }
+    }
+
+    // Fetch webhooks from Shopify as source of truth (only if API reachable)
+    let shopifyWebhooks = [];
+    let shopifyWebhookFetchError = null;
+    if (shopifyApiReachable) {
+      try {
+        const whRes = await fetch(`https://${normalized}/admin/api/${API_VERSION}/webhooks.json?limit=250`, {
           headers: { 'X-Shopify-Access-Token': accessToken }
         });
         if (whRes.ok) {
-          shopifyApiReachable = true;
           const whData = await whRes.json();
-          shopifyWebhooks = (whData.webhooks || []).map(w => ({
-            id: w.id, topic: w.topic, address: w.address
-          }));
+          shopifyWebhooks = (whData.webhooks || []).map(w => ({ id: w.id, topic: w.topic, address: w.address }));
         } else {
-          shopifyWebhookError = `HTTP ${whRes.status}: ${await whRes.text()}`;
+          shopifyWebhookFetchError = `HTTP ${whRes.status}`;
         }
       } catch (e) {
-        shopifyWebhookError = e.message;
+        shopifyWebhookFetchError = e.message;
       }
     }
 
@@ -221,15 +254,10 @@ Deno.serve(async (req) => {
     const ourTopics = ourWebhooks.map(w => w.topic);
     const missingTopics = REQUIRED_TOPICS.filter(t => !ourTopics.includes(t));
 
-    // Orders
+    // Orders + queue
     const allOrders = await db.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 500);
-    const latestOrder = allOrders[0] || null;
-
-    // SyncJobs
     const syncJobs = await db.entities.SyncJob.filter({ tenant_id: tenantId }, '-created_date', 5);
     const lastSyncJob = syncJobs[0] || null;
-
-    // WebhookQueue
     const queueItems = await db.entities.WebhookQueue.filter({ tenant_id: tenantId }, '-created_date', 50);
     const queueDepth = {
       pending: queueItems.filter(j => j.status === 'pending').length,
@@ -239,43 +267,42 @@ Deno.serve(async (req) => {
       dead_letter: queueItems.filter(j => j.status === 'dead_letter').length
     };
 
-    // Issues + recommended actions
+    // Build issues list
     const issues = [];
     const recommendedActions = [];
 
-    if (!token || !token.is_valid) {
-      issues.push('OAuth token missing or invalid');
+    if (!token) {
+      issues.push('OAuth token missing');
       recommendedActions.push({ action: 'reconnect_oauth', label: 'Reconnect OAuth', priority: 1 });
     } else if (!accessToken) {
-      issues.push('OAuth token present but cannot be decrypted');
+      issues.push('OAuth token cannot be decrypted');
       recommendedActions.push({ action: 'reconnect_oauth', label: 'Reconnect OAuth', priority: 1 });
+    } else if (!shopifyApiReachable) {
+      issues.push(`Shopify API unreachable (${shopifyApiStatusCode || 'network error'}): token is invalid or revoked`);
+      recommendedActions.push({ action: 'reconnect_oauth', label: 'Reconnect OAuth (token revoked)', priority: 1 });
     }
 
-    if (!shopifyApiReachable && accessToken) {
-      issues.push(`Shopify API unreachable: ${shopifyWebhookError}`);
-    }
-
-    if (ourWebhooks.length === 0) {
-      issues.push('No app webhooks registered in Shopify — orders will not trigger');
+    if (shopifyApiReachable && ourWebhooks.length === 0) {
+      issues.push('No app webhooks registered in Shopify — new orders will not trigger');
       recommendedActions.push({ action: 'fix_webhooks', label: 'Register Webhooks', priority: 2 });
-    } else if (missingTopics.length > 0) {
+    } else if (shopifyApiReachable && missingTopics.length > 0) {
       issues.push(`Missing webhook topics: ${missingTopics.join(', ')}`);
       recommendedActions.push({ action: 'fix_webhooks', label: 'Re-register Webhooks', priority: 2 });
     }
 
-    if (integration?.webhook_endpoints && Object.keys(integration.webhook_endpoints).length === 0 && ourWebhooks.length > 0) {
-      issues.push('Webhooks exist in Shopify but not saved in DB — run fix_webhooks to resync');
-      recommendedActions.push({ action: 'fix_webhooks', label: 'Sync Webhook Records', priority: 2 });
-    }
-
-    if (allOrders.length === 0) {
+    if (allOrders.length === 0 && shopifyApiReachable) {
       issues.push('No orders in DB — run historical sync');
       recommendedActions.push({ action: 'fix_sync', label: 'Sync Now (365 days)', priority: 3, days: 365 });
     }
 
     if (queueDepth.dead_letter > 0) {
-      issues.push(`${queueDepth.dead_letter} dead-letter jobs — processing failures`);
+      issues.push(`${queueDepth.dead_letter} dead-letter jobs in queue`);
     }
+
+    // Admin debug payload
+    const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
+    const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || '';
+    const tokenLastChars = accessToken ? `...${accessToken.slice(-6)}` : null;
 
     return Response.json({
       checked_at: new Date().toISOString(),
@@ -286,26 +313,32 @@ Deno.serve(async (req) => {
       integration_store_name: integration?.store_name || null,
 
       oauth_token_present: !!token,
-      oauth_token_valid: token?.is_valid || false,
+      oauth_token_valid: token?.is_valid !== false && !!token,
       access_token_decryptable: !!accessToken,
 
+      // REAL API reachability via access_scopes — not webhooks list
       shopify_api_reachable: shopifyApiReachable,
-      shopify_api_secret_env_set: !!Deno.env.get('SHOPIFY_API_SECRET'),
-      expected_webhook_url: expectedWebhookUrl,
+      shopify_api_status_code: shopifyApiStatusCode,
+      shopify_api_error: shopifyApiError,
+      granted_scopes: grantedScopes,
 
-      our_webhooks_registered_in_shopify: ourWebhooks,
+      expected_webhook_url: expectedWebhookUrl,
+      api_version: API_VERSION,
+
+      // Webhooks from Shopify as source of truth
       our_webhooks_count: ourWebhooks.length,
       our_webhook_topics: ourTopics,
       missing_topics: missingTopics,
+      shopify_webhooks_total: shopifyWebhooks.length,
       platformintegration_webhooks_saved: Object.keys(integration?.webhook_endpoints || {}).length,
-      shopify_webhook_list_error: shopifyWebhookError,
+      shopify_webhook_fetch_error: shopifyWebhookFetchError,
 
       orders_in_db_count: allOrders.length,
-      latest_order_in_db: latestOrder ? {
-        order_number: latestOrder.order_number,
-        order_date: latestOrder.order_date,
-        status: latestOrder.status,
-        total_revenue: latestOrder.total_revenue
+      latest_order_in_db: allOrders[0] ? {
+        order_number: allOrders[0].order_number,
+        order_date: allOrders[0].order_date,
+        status: allOrders[0].status,
+        total_revenue: allOrders[0].total_revenue
       } : null,
 
       last_sync_job: lastSyncJob ? {
@@ -316,6 +349,17 @@ Deno.serve(async (req) => {
       } : null,
 
       queue_depth: queueDepth,
+
+      // Admin-only debug info
+      debug: {
+        env_api_key_present: !!apiKey,
+        env_api_secret_present: !!apiSecret,
+        env_api_key_last6: apiKey ? `...${apiKey.slice(-6)}` : null,
+        token_last6: tokenLastChars,
+        app_url_env: Deno.env.get('APP_URL') || '(not set)',
+        webhook_endpoint_in_use: expectedWebhookUrl,
+        api_version: API_VERSION,
+      },
 
       issues_found: issues,
       recommended_actions: recommendedActions,
