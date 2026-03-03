@@ -2,10 +2,20 @@
  * diagnoseShopifyIngestion — real Shopify API health check + fix actions
  * Uses access_scopes as the authoritative API reachability test.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+// CANONICAL CONFIG
 const API_VERSION = '2024-10';
 const REQUIRED_TOPICS = ['orders/create', 'orders/updated', 'orders/paid', 'refunds/create', 'app/uninstalled', 'products/update', 'orders/cancelled'];
+
+function getCanonicalConfig() {
+  const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+  return {
+    appUrl,
+    apiVersion: API_VERSION,
+    webhookEndpoint: `${appUrl}/api/functions/shopifyWebhook`
+  };
+}
 
 async function decryptToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');
