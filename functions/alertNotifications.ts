@@ -209,7 +209,14 @@ Deno.serve(async (req) => {
   const startMs = Date.now();
   try {
     const base44 = createClientFromRequest(req);
-    const { payload } = await parseAutomationPayload(req);
+    
+    let payload = {};
+    try {
+      const text = await req.text();
+      if (text) payload = JSON.parse(text);
+    } catch (e) {
+      payload = {};
+    }
     
     // Priority 1: Explicit alert data in payload
     let alertData = payload.alert || payload.data;
