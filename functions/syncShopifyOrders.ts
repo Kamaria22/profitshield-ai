@@ -336,7 +336,19 @@ Deno.serve(async (req) => {
     // Paginate through orders (up to 10 pages = 250*10 = 2500 orders)
     const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     let allOrders = [];
-    let pageUrl = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
+    // Pre-flight: verify token is still valid before full sync
+    const scopeCheck = await fetch(`https://${tenant.shop_domain}/admin/oauth/access_scopes.json`, {
+      headers: { 'X-Shopify-Access-Token': accessToken }
+    });
+    if (!scopeCheck.ok) {
+      // Invalidate token so diagnose reflects true state
+      await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
+      const integrationList = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
+      if (integrationList[0]) await base44.asServiceRole.entities.PlatformIntegration.update(integrationList[0].id, { status: 'disconnected' }).catch(() => {});
+      return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth.` }, { status: 400 });
+    }
+
+    let pageUrl = `https://${tenant.shop_domain}/admin/api/2024-10/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
     let pageCount = 0;
 
     while (pageUrl && pageCount < 10) {
