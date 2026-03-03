@@ -1,14 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const VERSION = "alertNotifications_v2026_03_03_1428_fix1";
+const VERSION = "alertNotifications_v2026_03_03_fix2_selected_record_priority";
 
-// Priority resolver - matches Base44 automation payload shapes
+// Priority resolver - checks automation UI "selected record" fields FIRST
 function resolveAlertId(payload) {
   const candidates = {
-    'event.entity_id': payload?.event?.entity_id,
-    'automation.record_id': payload?.automation?.record_id,
-    'data.id': payload?.data?.id,
+    'data.selected.id': payload?.data?.selected?.id,
+    'data.selectedRecord.id': payload?.data?.selectedRecord?.id,
     'data.record.id': payload?.data?.record?.id,
+    'data.id': payload?.data?.id,
+    'automation.record_id': payload?.automation?.record_id,
+    'event.entity_id': payload?.event?.entity_id,
     'event.data.entity_id': payload?.event?.data?.entity_id,
     'event.data.id': payload?.event?.data?.id
   };
