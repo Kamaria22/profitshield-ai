@@ -149,11 +149,12 @@ async function fetchAlertWithRetry(base44, alertId, maxRetries = 7) {
 // Send notification (reusable)
 async function sendNotification(base44, alert, tenantId, resolvedSource) {
   try {
+    const db = base44.asServiceRole?.entities ?? base44.entities;
     const template = ALERT_TEMPLATES[alert.type] || ALERT_TEMPLATES.system;
     const body = generateEmailBody(alert, null, template);
     
     // Log that notification was sent
-    await base44.asServiceRole.entities.AuditLog.create({
+    await db.AuditLog.create({
       tenant_id: tenantId,
       action: 'alert_notification_sent',
       entity_type: 'Alert',
@@ -198,7 +199,7 @@ Deno.serve(async (req) => {
     
     // Always log automation payloads for debugging
     if (Object.keys(payload).length > 0) {
-      await base44.asServiceRole.entities.AuditLog.create({
+      await db.AuditLog.create({
         tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
         action: 'automation_payload_received',
         entity_type: 'Alert',
@@ -219,6 +220,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         invocation_detected: true,
         detected_invocation_source_keys: payloadKeys,
         timestamp,
@@ -233,7 +235,7 @@ Deno.serve(async (req) => {
     if (action === 'self_test') {
       try {
         // Create a test alert
-        const testAlert = await base44.asServiceRole.entities.Alert.create({
+        const testAlert = await db.Alert.create({
           tenant_id: 'test_tenant_' + Date.now(),
           type: 'high_risk_order',
           severity: 'high',
@@ -249,6 +251,7 @@ Deno.serve(async (req) => {
           version: VERSION,
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
+          live_id: LIVE_ID,
           action: 'self_test',
           test_alert_id: testAlert.id,
           notification_sent: sent,
@@ -262,6 +265,7 @@ Deno.serve(async (req) => {
           version: VERSION,
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
+          live_id: LIVE_ID,
           action: 'self_test',
           error: e.message,
           timestamp,
@@ -282,6 +286,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         action: 'debug_payload',
         payloadKeys,
         automationKeys,
@@ -300,7 +305,7 @@ Deno.serve(async (req) => {
     // ───────────────────────────────────────────────────
     if (action === 'process_queue') {
       try {
-        const pending = await base44.asServiceRole.entities.AlertNotificationQueue.filter(
+        const pending = await db.AlertNotificationQueue.filter(
           { status: 'pending' },
           'next_attempt_at',
           25
@@ -319,7 +324,7 @@ Deno.serve(async (req) => {
               const notifSent = await sendNotification(base44, result.alert, item.tenant_id, item.resolved_source);
               
               // Mark as sent
-              await base44.asServiceRole.entities.AlertNotificationQueue.update(item.id, {
+              await db.AlertNotificationQueue.update(item.id, {
                 status: 'sent',
                 final_sent_at: new Date().toISOString(),
                 attempts: item.attempts + 1
@@ -331,7 +336,7 @@ Deno.serve(async (req) => {
               const newAttempts = item.attempts + 1;
               if (newAttempts >= 10) {
                 // Dead letter
-                await base44.asServiceRole.entities.AlertNotificationQueue.update(item.id, {
+                await db.AlertNotificationQueue.update(item.id, {
                   status: 'dead_letter',
                   attempts: newAttempts,
                   last_error: 'Max attempts reached'
@@ -340,7 +345,7 @@ Deno.serve(async (req) => {
               } else {
                 // Back off: next attempt = now + (2 * attempts) minutes
                 const nextAttempt = new Date(Date.now() + newAttempts * 2 * 60 * 1000);
-                await base44.asServiceRole.entities.AlertNotificationQueue.update(item.id, {
+                await db.AlertNotificationQueue.update(item.id, {
                   attempts: newAttempts,
                   next_attempt_at: nextAttempt.toISOString(),
                   last_error: result.error || 'Alert not found'
@@ -358,6 +363,7 @@ Deno.serve(async (req) => {
           version: VERSION,
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
+          live_id: LIVE_ID,
           action: 'process_queue',
           processed,
           sent,
@@ -372,6 +378,7 @@ Deno.serve(async (req) => {
           version: VERSION,
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
+          live_id: LIVE_ID,
           action: 'process_queue',
           error: e.message,
           timestamp,
@@ -394,6 +401,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         resolved_alert_id: null,
         chosen_source: null,
         lookup_attempts: 0,
@@ -422,6 +430,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -437,7 +446,7 @@ Deno.serve(async (req) => {
 
     // Not found after retries - queue for later + audit log
     try {
-      await base44.asServiceRole.entities.AuditLog.create({
+      await db.AuditLog.create({
         tenant_id: tenantId || 'unknown',
         action: 'alert_notification_deferred',
         entity_type: 'Alert',
@@ -449,7 +458,7 @@ Deno.serve(async (req) => {
       }).catch(() => {});
       
       // Create queue entry
-      const queueEntry = await base44.asServiceRole.entities.AlertNotificationQueue.create({
+      const queueEntry = await db.AlertNotificationQueue.create({
         tenant_id: tenantId || null,
         alert_id: resolution.alertId,
         payload_snapshot: trimPayload(payload),
@@ -464,6 +473,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -483,6 +493,7 @@ Deno.serve(async (req) => {
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -505,6 +516,7 @@ Deno.serve(async (req) => {
       version: VERSION,
       handler_file: HANDLER_FILE,
       function_name: FUNCTION_NAME,
+      live_id: LIVE_ID,
       error: error.message,
       timestamp,
       elapsed_ms: Date.now() - startMs,
