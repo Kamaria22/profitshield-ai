@@ -331,18 +331,24 @@ Deno.serve(async (req) => {
         return Response.json({
           ok: true,
           version: VERSION,
+          handler_file: HANDLER_FILE,
+          function_name: FUNCTION_NAME,
           action: 'process_queue',
           processed,
           sent,
           dead_lettered: deadLettered,
+          timestamp,
           elapsed_ms: Date.now() - startMs
-        });
+        }, { status: 200 });
       } catch (e) {
         return Response.json({
           ok: false,
           version: VERSION,
+          handler_file: HANDLER_FILE,
+          function_name: FUNCTION_NAME,
           action: 'process_queue',
           error: e.message,
+          timestamp,
           elapsed_ms: Date.now() - startMs
         }, { status: 500 });
       }
