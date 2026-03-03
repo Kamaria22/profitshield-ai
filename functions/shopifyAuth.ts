@@ -16,8 +16,10 @@ Deno.serve(async (req) => {
       }
       
       const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-      // ALWAYS use the whitelisted redirect URI — must match Shopify Dev Dashboard exactly
-      const redirectUri = 'https://profit-shield-ai.base44.app/auth/callback';
+      // Redirect URI must be whitelisted in Shopify Partner Dashboard
+      // Go to: partners.shopify.com → App → Configuration → Allowed redirection URL(s)
+      // Add: https://profit-shield-ai.base44.app/ShopifyCallback
+      const redirectUri = 'https://profit-shield-ai.base44.app/ShopifyCallback';
       const nonce = crypto.randomUUID();
 
       console.log(`[shopifyAuth] install redirect_uri = ${redirectUri}`);
