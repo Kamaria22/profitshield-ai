@@ -292,7 +292,7 @@ Deno.serve(async (req) => {
 
     // Load the full alert from database (data field may be null if payload_too_large)
     let alertData = null;
-    if (payload.payload_too_large) {
+    if (payloadTooLarge) {
       // Fetch alert by ID when payload was too large
       try {
         const alerts = await withTimeout(
@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
         );
         alertData = Array.isArray(alerts) ? alerts[0] : null;
       } catch (e) {
-        console.warn('[alertNotifications] failed to fetch alert:', e.message);
+        console.warn('[alertNotifications] alert fetch timeout:', e.message);
       }
     } else {
       // Use inline alert data from payload
@@ -309,10 +309,26 @@ Deno.serve(async (req) => {
     }
 
     if (!alertData || !alertData.id) {
+      // Write AuditLog for alert lookup failure
+      try {
+        await base44.asServiceRole.entities.AuditLog.create({
+          tenant_id: payload.data?.tenant_id || payload.tenant_id || 'unknown',
+          action: 'alert_lookup_failed',
+          entity_type: 'Alert',
+          entity_id: alertId,
+          performed_by: 'system',
+          description: `alertNotifications: Alert ${alertId} not found or inaccessible`,
+          category: 'ai_action',
+          severity: 'high'
+        }).catch(() => {});
+      } catch (e) {}
+      
       return Response.json({ 
         error: 'Alert not found or inaccessible',
         resolved_alert_id: alertId,
-        payload_too_large: payload.payload_too_large,
+        payload_too_large: payloadTooLarge,
+        chosen_source: chosenSource,
+        alert_found: false,
         elapsed_ms: Date.now() - startMs
       }, { status: 404 });
     }
