@@ -232,18 +232,33 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                     <Button
                       variant="default"
                       className="w-full justify-start gap-2 bg-indigo-600 hover:bg-indigo-700"
-                      onClick={() => {
-                        const shop = result.shop_domain;
-                        if (!shop) return;
-                        const reconnectUrl = `/ShopifyAuth?shop=${shop}`;
-                        if (window !== window.top) {
-                          window.top.location.href = reconnectUrl;
-                        } else {
-                          window.location.href = reconnectUrl;
+                      disabled={actionLoading === 'reconnect_oauth'}
+                      onClick={async () => {
+                        const shop = result.shop_domain || shopDomain;
+                        if (!shop) { toast.error('Shop domain missing'); return; }
+                        setActionLoading('reconnect_oauth');
+                        try {
+                          const res = await base44.functions.invoke('shopifyAuth', {
+                            action: 'reauthorize',
+                            shop
+                          });
+                          const url = res.data?.authorize_url || res.data?.install_url;
+                          if (!url) throw new Error('No authorize URL returned');
+                          try {
+                            window.top.location.href = url;
+                          } catch (_) {
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }
+                        } catch (e) {
+                          toast.error(`Reconnect failed: ${e.message}`);
+                        } finally {
+                          setActionLoading(null);
                         }
                       }}
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      {actionLoading === 'reconnect_oauth'
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <ExternalLink className="w-4 h-4" />}
                       Reconnect OAuth (Re-authorize Shopify)
                     </Button>
                   )}
