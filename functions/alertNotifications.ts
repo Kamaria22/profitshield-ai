@@ -210,8 +210,13 @@ Deno.serve(async (req) => {
     let payload = {};
     try {
       const text = await req.text();
-      if (text) payload = JSON.parse(text);
+      console.log('[alertNotifications] raw text length:', text.length);
+      if (text) {
+        payload = JSON.parse(text);
+        console.log('[alertNotifications] payload parsed, keys:', Object.keys(payload));
+      }
     } catch (e) {
+      console.error('[alertNotifications] payload parse error:', e.message);
       payload = {};
     }
     
