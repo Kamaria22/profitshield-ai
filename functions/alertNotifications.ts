@@ -11,7 +11,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 const HANDLER_FILE = "functions/alertNotifications";
 const FUNCTION_NAME = "alertNotifications";
 const VERSION = "alertNotifications_live_proof_" + new Date().toISOString();
-const LIVE_ID = "alertNotifications_CANONICAL_" + crypto.randomUUID();
+
+// LIVE_ID persists across cold starts using globalThis
+const LIVE_ID = globalThis.__ALERTNOTIFICATIONS_LIVE_ID ?? 
+  (globalThis.__ALERTNOTIFICATIONS_LIVE_ID = "alertNotifications_CANONICAL_" + crypto.randomUUID());
 
 // Retry schedule: 8 attempts over ~4 seconds
 const RETRY_SCHEDULE_MS = [250, 250, 500, 500, 750, 750, 1000];
@@ -197,6 +200,32 @@ Deno.serve(async (req) => {
     const eventKeys = payload.event ? Object.keys(payload.event) : [];
     const dataKeys = payload.data ? Object.keys(payload.data) : [];
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // PROOF WRITE: Record every invocation to AutomationInvocationProof
+    // ═══════════════════════════════════════════════════════════════════════
+    const proofId = crypto.randomUUID();
+    const invokedVia = payload?.automation ? "automation" : "manual";
+    const eventEntityId = payload?.event?.entity_id ?? null;
+    
+    let proofRowId = null;
+    try {
+      const proofRecord = await db.AutomationInvocationProof.create({
+        proof_id: proofId,
+        function_name: FUNCTION_NAME,
+        live_id: LIVE_ID,
+        invoked_via: invokedVia,
+        received_at: timestamp,
+        event_entity_id: eventEntityId,
+        resolved_alert_id: null,
+        payload_keys: payloadKeys,
+        raw_payload_snippet: JSON.stringify(payload).slice(0, 2000)
+      });
+      proofRowId = proofRecord?.id || proofId;
+    } catch (proofErr) {
+      // Proof write failed - continue anyway, but note it
+      console.warn('[alertNotifications] Proof write failed:', proofErr.message);
+    }
+    
     // Always log automation payloads for debugging
     if (Object.keys(payload).length > 0) {
       await db.AuditLog.create({
@@ -221,6 +250,8 @@ Deno.serve(async (req) => {
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         invocation_detected: true,
         detected_invocation_source_keys: payloadKeys,
         timestamp,
@@ -252,6 +283,8 @@ Deno.serve(async (req) => {
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
           live_id: LIVE_ID,
+          proof_row_id: proofRowId,
+          invoked_via: invokedVia,
           action: 'self_test',
           test_alert_id: testAlert.id,
           notification_sent: sent,
@@ -266,6 +299,8 @@ Deno.serve(async (req) => {
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
           live_id: LIVE_ID,
+          proof_row_id: proofRowId,
+          invoked_via: invokedVia,
           action: 'self_test',
           error: e.message,
           timestamp,
@@ -281,12 +316,21 @@ Deno.serve(async (req) => {
       const resolution = resolveAlertId(payload);
       const automationKeys = payload.automation ? Object.keys(payload.automation) : [];
       
+      // Update proof with resolved alert ID
+      if (proofRowId && resolution.alertId) {
+        await db.AutomationInvocationProof.update(proofRowId, {
+          resolved_alert_id: resolution.alertId
+        }).catch(() => {});
+      }
+      
       return Response.json({
         ok: true,
         version: VERSION,
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         action: 'debug_payload',
         payloadKeys,
         automationKeys,
@@ -296,7 +340,8 @@ Deno.serve(async (req) => {
         chosen_source: resolution.source,
         all_candidates: resolution.candidates,
         timestamp,
-        elapsed_ms: Date.now() - startMs
+        elapsed_ms: Date.now() - startMs,
+        status_code: 200
       }, { status: 200 });
     }
 
@@ -364,6 +409,8 @@ Deno.serve(async (req) => {
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
           live_id: LIVE_ID,
+          proof_row_id: proofRowId,
+          invoked_via: invokedVia,
           action: 'process_queue',
           processed,
           sent,
@@ -379,6 +426,8 @@ Deno.serve(async (req) => {
           handler_file: HANDLER_FILE,
           function_name: FUNCTION_NAME,
           live_id: LIVE_ID,
+          proof_row_id: proofRowId,
+          invoked_via: invokedVia,
           action: 'process_queue',
           error: e.message,
           timestamp,
