@@ -255,6 +255,8 @@ Deno.serve(async (req) => {
       return Response.json({
         ok: true,
         version: VERSION,
+        handler_file: HANDLER_FILE,
+        function_name: FUNCTION_NAME,
         action: 'debug_payload',
         payloadKeys,
         automationKeys,
@@ -263,8 +265,9 @@ Deno.serve(async (req) => {
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         all_candidates: resolution.candidates,
+        timestamp,
         elapsed_ms: Date.now() - startMs
-      });
+      }, { status: 200 });
     }
 
     // ───────────────────────────────────────────────────
