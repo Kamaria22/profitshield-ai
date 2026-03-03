@@ -347,6 +347,26 @@ Deno.serve(async (req) => {
   }
 });
 
+async function decryptToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  if (!key) {
+    return atob(encryptedToken);
+  }
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, data);
+    return new TextDecoder().decode(decrypted);
+  } catch (e) {
+    // Fallback for base64-only tokens
+    return atob(encryptedToken);
+  }
+}
+
 async function encryptToken(token) {
   const key = Deno.env.get('ENCRYPTION_KEY');
   if (!key) {
