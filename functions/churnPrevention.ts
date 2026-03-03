@@ -646,3 +646,20 @@ function ordersCountInRange(orders, minMs, maxMs) {
   }
   return c;
 }
+
+// ─────────────────────────────────────────────
+// DEBUG SDK (introspect available clients)
+// ─────────────────────────────────────────────
+
+function debugSdk(base44) {
+  return Response.json({
+    sdk_introspection: {
+      has_asServiceRole: typeof base44.asServiceRole,
+      has_asService: typeof base44.asService,
+      has_serviceRole: typeof base44.serviceRole,
+      has_service: typeof base44.service,
+      sdk_version: base44.SDK_VERSION || "unknown",
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
