@@ -310,7 +310,7 @@ function scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs
   const metrics = {
     orders_last_7d: ordersLast7d,
     orders_prior_7d: ordersPrior7d,
-    days_since_last_sync: daysSinceSync === 999 ? null : daysSinceSync,
+    days_since_last_sync: daysSinceSync >= 999 ? null : daysSinceSync,
     connected_integrations: connected,
     errored_integrations: errored,
     unresolved_critical_alerts: criticalAlerts.length,
