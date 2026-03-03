@@ -450,18 +450,19 @@ async function debugSignals(base44, tenantId) {
   const db = base44.asServiceRole;
   const now = new Date();
 
-  const [tenant, integrations, orders, syncJobs, alerts, auditLogs] = await Promise.all([
+  const [tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations] = await Promise.all([
     db.entities.Tenant.filter({ id: tenantId }).then(r => r[0] || null).catch(() => null),
     db.entities.PlatformIntegration.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.Order.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.SyncJob.filter({ tenant_id: tenantId }).catch(() => []),
     db.entities.Alert.filter({ tenant_id: tenantId, status: 'pending' }).catch(() => []),
-    db.entities.AuditLog.filter({ tenant_id: tenantId }).catch(() => [])
+    db.entities.AuditLog.filter({ tenant_id: tenantId }).catch(() => []),
+    db.entities.SupportConversation.filter({ tenant_id: tenantId }).catch(() => [])
   ]);
 
   if (!tenant) return Response.json({ error: `Tenant ${tenantId} not found` }, { status: 404 });
 
-  const result = scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, now });
+  const result = scoreTenant({ tenant, integrations, orders, syncJobs, alerts, auditLogs, supportConversations, now });
 
   return Response.json({
     tenant_id: tenantId,
