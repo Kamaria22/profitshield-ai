@@ -444,7 +444,7 @@ async function triggerRetention(base44, tenantId, user) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const db = base44.asServiceRole;
+  const db = getDbClient(base44);
 
   const preds = await db.entities.ChurnPrediction.filter({ tenant_id: tenantId }, "-updated_date", 1).catch(() => []);
   if (!preds.length) {
