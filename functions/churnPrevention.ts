@@ -115,7 +115,7 @@ async function predictChurn(base44) {
   const now = new Date();
   const nowMs = now.getTime();
 
-  const db = base44.asServiceRole; // ✅ fixed
+  const db = getDbClient(base44); // ✅ fixed
 
   // Load active tenants (bounded)
   const tenants = await db.entities.Tenant
