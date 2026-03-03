@@ -71,6 +71,7 @@ import NativeBuildGuide from './pages/NativeBuildGuide';
 import NativeHealth from './pages/NativeHealth';
 import Onboarding from './pages/Onboarding';
 import Orders from './pages/Orders';
+import PatchReview from './pages/PatchReview';
 import PerformanceAudit from './pages/PerformanceAudit';
 import PnLAnalytics from './pages/PnLAnalytics';
 import Pricing from './pages/Pricing';
@@ -79,6 +80,7 @@ import Products from './pages/Products';
 import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
 import SelectStore from './pages/SelectStore';
+import SelfHealingCenter from './pages/SelfHealingCenter';
 import Settings from './pages/Settings';
 import Shipping from './pages/Shipping';
 import ShopifyAuth from './pages/ShopifyAuth';
@@ -89,8 +91,6 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import SelfHealingCenter from './pages/SelfHealingCenter';
-import PatchReview from './pages/PatchReview';
 import __Layout from './Layout.jsx';
 
 
@@ -119,6 +119,7 @@ export const PAGES = {
     "NativeHealth": NativeHealth,
     "Onboarding": Onboarding,
     "Orders": Orders,
+    "PatchReview": PatchReview,
     "PerformanceAudit": PerformanceAudit,
     "PnLAnalytics": PnLAnalytics,
     "Pricing": Pricing,
@@ -127,6 +128,7 @@ export const PAGES = {
     "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
     "SelectStore": SelectStore,
+    "SelfHealingCenter": SelfHealingCenter,
     "Settings": Settings,
     "Shipping": Shipping,
     "ShopifyAuth": ShopifyAuth,
@@ -137,8 +139,6 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "SelfHealingCenter": SelfHealingCenter,
-    "PatchReview": PatchReview,
 }
 
 export const pagesConfig = {

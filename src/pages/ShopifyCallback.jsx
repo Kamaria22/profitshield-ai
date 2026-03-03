@@ -48,19 +48,22 @@ export default function ShopifyCallback() {
 
         setStatus('success');
 
-        // Always redirect the top-level window out of any iframe
+        // Use redirect_url from backend (includes shop context)
+        // Fallback to Home if not provided
         setTimeout(() => {
-          const redirectUrl = data.redirect_url;
-          console.log('[ShopifyCallback] Redirecting top window to:', redirectUrl);
+          const redirectUrl = data.redirect_url || '/Home';
+          console.log('[ShopifyCallback] Redirecting to:', redirectUrl);
           try {
             if (window.top && window.top !== window) {
+              // In embedded iframe — try to use top window
               window.top.location.href = redirectUrl;
             } else {
+              // Non-embedded or top window
               window.location.href = redirectUrl;
             }
-          } catch (_) {
+          } catch (err) {
             // Cross-origin iframe — open new tab as fallback
-            console.warn('[ShopifyCallback] window.top inaccessible, opening new tab');
+            console.warn('[ShopifyCallback] window.top access denied, opening new tab:', err.message);
             window.open(redirectUrl, '_blank', 'noopener,noreferrer');
           }
         }, 800);
