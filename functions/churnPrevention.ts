@@ -49,21 +49,24 @@ Deno.serve(async (req) => {
     const body = await safeJson(req);
     const action = body?.action || "predict_churn";
 
-    const validActions = ["predict_churn", "trigger_retention", "get_at_risk_tenants", "debug_signals"];
+    const validActions = ["predict_churn", "run_anomaly_detection", "trigger_retention", "get_at_risk_tenants", "debug_signals"];
     if (!validActions.includes(action)) {
       return Response.json({ error: "Invalid action: " + action }, { status: 400 });
     }
 
-    if (action === "predict_churn") {
+    // Normalize action: run_anomaly_detection is an alias for predict_churn
+    const normalizedAction = action === "run_anomaly_detection" ? "predict_churn" : action;
+
+    if (normalizedAction === "predict_churn") {
       return await predictChurn(base44);
     }
-    if (action === "trigger_retention") {
+    if (normalizedAction === "trigger_retention") {
       return await triggerRetention(base44, body?.tenant_id, user);
     }
-    if (action === "get_at_risk_tenants") {
+    if (normalizedAction === "get_at_risk_tenants") {
       return await getAtRiskTenants(base44);
     }
-    if (action === "debug_signals") {
+    if (normalizedAction === "debug_signals") {
       return await debugSignals(base44, body?.tenant_id, user);
     }
 
