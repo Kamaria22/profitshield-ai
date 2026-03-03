@@ -27,8 +27,13 @@ export default function ShopifyAuth() {
         const installUrl = response?.data?.install_url;
         if (!installUrl) throw new Error('No install URL returned from server.');
         setStatus('redirecting');
-        // Redirect the top-level window (handles embedded context too)
-        window.top.location.href = installUrl;
+        // Redirect top-level window (handles embedded iframe context too)
+        try {
+          window.top.location.href = installUrl;
+        } catch (_) {
+          // Cross-origin iframe restriction — fall back to current window
+          window.location.href = installUrl;
+        }
       } catch (e) {
         setError(e.message || 'Failed to start Shopify OAuth.');
         setStatus('error');
