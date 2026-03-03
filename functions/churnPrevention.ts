@@ -504,7 +504,7 @@ async function debugSignals(base44, tenantId, user) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const db = base44.asServiceRole;
+  const db = getDbClient(base44);
   const now = new Date();
   const nowMs = now.getTime();
 
