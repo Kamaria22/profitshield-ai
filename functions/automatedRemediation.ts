@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
             entity_type: 'Alert',
             entity_id: 'unknown',
             performed_by: 'system',
-            description: `Remediation skipped: Alert ID not found. Source: ${recordId.source || 'none'}`,
+            description: `Remediation skipped: Alert ID not found. Candidates: ${JSON.stringify(resolution.candidates)}`,
             category: 'ai_action',
             severity: 'high'
           }),
@@ -145,10 +145,8 @@ Deno.serve(async (req) => {
         error: 'Alert ID not found in payload',
         resolved_alert_id: null,
         resolved_tenant_id: tenantId,
-        debug: {
-          payloadKeys: Object.keys(payload),
-          recordIdSource: recordId.source
-        }
+        chosen_source: recordId.source,
+        candidates: resolution.candidates
       }, { status: 404 });
     }
 
