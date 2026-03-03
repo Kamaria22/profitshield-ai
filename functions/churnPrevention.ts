@@ -109,6 +109,7 @@ async function predictChurn(base44) {
       syncJobs: syncsByTenant[tenant.id] || [],
       alerts: alertsByTenant[tenant.id] || [],
       auditLogs: auditsByTenant[tenant.id] || [],
+      supportConversations: supportByTenant[tenant.id] || [],
       now
     });
 
