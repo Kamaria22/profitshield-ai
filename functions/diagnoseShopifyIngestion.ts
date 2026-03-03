@@ -158,19 +158,20 @@ Deno.serve(async (req) => {
       if (!accessToken) return Response.json({ error: 'No valid access token — reconnect OAuth first' }, { status: 400 });
       if (!integration) return Response.json({ error: 'No integration record found' }, { status: 400 });
 
-      // Verify API reachable before registering
+      // Preflight: verify API reachable and token valid before registering
       const scopeCheck = await fetch(`https://${normalized}/admin/oauth/access_scopes.json`, {
         headers: { 'X-Shopify-Access-Token': accessToken }
       });
       if (!scopeCheck.ok) {
-        // Invalidate token
+        console.error(`[fix_webhooks] API returned ${scopeCheck.status} — invalidating token`);
+        // Invalidate token — do not attempt to register webhooks
         if (token?.id) {
           await db.entities.OAuthToken.update(token.id, { is_valid: false }).catch(() => {});
         }
         if (integration?.id) {
           await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
         }
-        return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth.` }, { status: 400 });
+        return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid/revoked. Please reconnect OAuth.`, needs_reconnect: true }, { status: 401 });
       }
 
       const result = await registerWebhooks(normalized, accessToken, integration.id, expectedWebhookUrl, db);
