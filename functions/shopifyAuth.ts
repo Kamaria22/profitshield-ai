@@ -165,25 +165,51 @@ Deno.serve(async (req) => {
       const encryptedToken = await encryptToken(access_token);
       
       const existingTokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
-        tenant_id: tenant.id 
+        tenant_id: tenant.id,
+        platform: 'shopify'
       });
-      
+
+      let oauthToken;
       if (existingTokens.length > 0) {
-        await base44.asServiceRole.entities.OAuthToken.update(existingTokens[0].id, {
+        oauthToken = await base44.asServiceRole.entities.OAuthToken.update(existingTokens[0].id, {
           encrypted_access_token: encryptedToken,
+          store_key: shopDomain,
           scopes: scope.split(','),
           is_valid: true,
           rotated_at: new Date().toISOString()
         });
+        oauthToken = { ...existingTokens[0], encrypted_access_token: encryptedToken, store_key: shopDomain, is_valid: true };
+        console.log('[shopifyAuth] Token updated for tenant:', tenant.id, 'token id:', existingTokens[0].id);
       } else {
-        await base44.asServiceRole.entities.OAuthToken.create({
+        oauthToken = await base44.asServiceRole.entities.OAuthToken.create({
           tenant_id: tenant.id,
           platform: 'shopify',
+          store_key: shopDomain,
           encrypted_access_token: encryptedToken,
           scopes: scope.split(','),
           is_valid: true
         });
+        console.log('[shopifyAuth] Token created for tenant:', tenant.id, 'token id:', oauthToken.id);
       }
+
+      // Write token_id back onto the integration record so lookups are O(1)
+      await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+        token_id: oauthToken.id || existingTokens[0]?.id,
+        store_key: shopDomain
+      });
+
+      // Audit log: token saved
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: tenant.id,
+        action: 'oauth_token_saved',
+        entity_type: 'oauth_token',
+        entity_id: oauthToken.id || existingTokens[0]?.id,
+        performed_by: user?.email || 'system',
+        description: `OAuth token saved for ${shopDomain}. Scopes: ${scope}`,
+        severity: 'low',
+        category: 'integration',
+        metadata: { shop_domain: shopDomain, scopes: scope.split(',') }
+      }).catch(() => {});
       
       // CRITICAL: Auto-provision — Shopify install ALWAYS grants owner role, no manual approval.
       if (user) {
