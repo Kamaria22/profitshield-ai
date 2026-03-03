@@ -3,6 +3,32 @@ import {
   withTimeout
 } from './helpers/automationRuntime';
 
+// Feature flags (default: SAFE/OFF)
+const FLAGS = {
+  ENABLE_LATEST_ALERT_FALLBACK: false,
+  ENABLE_DEEP_SCAN_RESOLUTION: false
+};
+
+// Helper: Resolve alert ID from payload (PHASE 2)
+function resolveAlertId(payload) {
+  const candidates = {
+    'event.entity_id': payload.event?.entity_id,
+    'automation.record_id': payload.automation?.record_id,
+    'data.id': payload.data?.id,
+    'data.record.id': payload.data?.record?.id
+  };
+
+  // Find first valid candidate (matches MongoDB ObjectId pattern)
+  const isValidId = (v) => typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
+  for (const [source, value] of Object.entries(candidates)) {
+    if (value && isValidId(value)) {
+      return { alertId: value, source };
+    }
+  }
+
+  return { alertId: null, source: null, candidates };
+}
+
 const ALERT_TEMPLATES = {
   fraud_detected: {
     subject: '🚨 URGENT: Fraud Detected on Your Store',
