@@ -37,12 +37,8 @@ async function decryptToken(encryptedToken) {
 }
 
 async function registerWebhooks(shopDomain, accessToken, integrationId, webhookUrl, db) {
-  // Delete existing webhooks pointing to any of our known endpoints to avoid duplicates
-  const knownEndpoints = [
-    webhookUrl,
-    'https://profit-shield-ai.com/api/functions/shopifyWebhook',
-    'https://profit-shield-ai.base44.app/api/functions/shopifyWebhook',
-  ];
+  // Delete existing webhooks pointing to profit-shield-ai.com (legacy) or any other domain
+  // ONLY keep webhooks for our canonical URL
   try {
     const listRes = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json?limit=250`, {
       headers: { 'X-Shopify-Access-Token': accessToken }
@@ -50,7 +46,12 @@ async function registerWebhooks(shopDomain, accessToken, integrationId, webhookU
     if (listRes.ok) {
       const { webhooks } = await listRes.json();
       for (const wh of (webhooks || [])) {
-        if (knownEndpoints.some(ep => wh.address.startsWith(ep.split('/api/')[0]))) {
+        // Delete if it's for profit-shield-ai.com (legacy) OR if it's for a different endpoint
+        const isLegacy = wh.address.includes('profit-shield-ai.com');
+        const isWrongDomain = !wh.address.includes(webhookUrl.split('/')[2]); // different domain
+        
+        if (isLegacy || isWrongDomain) {
+          console.log(`[registerWebhooks] Deleting stale webhook — topic=${wh.topic} address=${wh.address}`);
           await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks/${wh.id}.json`, {
             method: 'DELETE',
             headers: { 'X-Shopify-Access-Token': accessToken }
@@ -59,7 +60,7 @@ async function registerWebhooks(shopDomain, accessToken, integrationId, webhookU
       }
     }
   } catch (e) {
-    console.warn('[diagnose/registerWebhooks] Cleanup error:', e.message);
+    console.warn('[registerWebhooks] Cleanup error:', e.message);
   }
 
   const registered = {};
