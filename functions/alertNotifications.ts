@@ -328,11 +328,14 @@ Deno.serve(async (req) => {
     // Update alert to mark notification sent
     if (alertData.id) {
       try {
-        await base44.asServiceRole.entities.Alert.update(alertData.id, {
-          notification_sent: true,
-          notification_sent_at: new Date().toISOString(),
-          notification_channels: notification_channels
-        });
+        await withTimeout(
+          Promise.resolve(base44.asServiceRole.entities.Alert.update(alertData.id, {
+            notification_sent: true,
+            notification_sent_at: new Date().toISOString(),
+            notification_channels: notificationChannels
+          })),
+          2000
+        );
       } catch (e) {
         console.warn('Failed to update alert notification status:', e);
       }
