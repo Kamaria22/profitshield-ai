@@ -1,7 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import {
-  withTimeout
-} from './helpers/automationRuntime';
+import { withTimeout } from './helpers/automationRuntime';
 
 // Feature flags (default: SAFE/OFF)
 const FLAGS = {
