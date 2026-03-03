@@ -1007,7 +1007,15 @@ export default function Integrations() {
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {integration.platform === 'shopify' && (
+                        <DiagnoseFixPanel
+                          tenantId={integration.tenant_id}
+                          integrationId={integration.id}
+                          shopDomain={integration.store_key}
+                          onFixed={() => refetchIntegrations()}
+                        />
+                      )}
                       {integration.status === 'connected' && (
                         <>
                           <Button
@@ -1048,7 +1056,7 @@ export default function Integrations() {
                             <Webhook className="w-4 h-4 mr-2" /> Webhooks
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => syncMutation.mutate({ integration_id: integration.id, job_type: 'full_sync' })}>
-                            <RefreshCw className="w-4 h-4 mr-2" /> Full Sync
+                            <RefreshCw className="w-4 h-4 mr-2" /> Full Sync (90d)
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
@@ -1090,7 +1098,10 @@ export default function Integrations() {
                     </div>
                     <div>
                       <p className="text-slate-500">Webhooks</p>
-                      <p className="font-medium">{Object.keys(integration.webhook_endpoints || {}).length} active</p>
+                      <p className={`font-medium ${Object.keys(integration.webhook_endpoints || {}).length >= 5 ? 'text-green-600' : 'text-amber-600'}`}>
+                        {Object.keys(integration.webhook_endpoints || {}).length} active
+                        {Object.keys(integration.webhook_endpoints || {}).length === 0 && ' ⚠️'}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
