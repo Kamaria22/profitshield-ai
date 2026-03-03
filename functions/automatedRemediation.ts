@@ -1,22 +1,20 @@
 /**
- * automatedRemediation — Alert-driven remediation engine (HARDENED)
+ * automatedRemediation — HARDENED Alert-driven remediation engine
  *
- * MAJOR REWRITE:
- * 1) ✅ Robust payload resolver: checks 30+ field paths, supports payload_too_large
- * 2) ✅ getByPath helper for nested lookups + deepScan for 24-hex IDs
- * 3) ✅ Added action="debug_payload" to inspect what the Automation UI sends
- * 4) ✅ Added action="self_test" to prove resolver works on all payload shapes
- * 5) ✅ NO asServiceRole; uses base44.entities directly
- * 6) ✅ Fallback by created_date DESC if record has name/title but no ID
+ * REWRITE v2 (Fixes Automation UI 404):
+ * 1) ✅ Hardened multi-path resolver (30+ field paths + deepScan)
+ * 2) ✅ action="debug_payload" for payload inspection
+ * 3) ✅ action="self_test" for resolver proof
+ * 4) ✅ NO asServiceRole; uses base44.entities directly
+ * 5) ✅ Fallback by created_date DESC when tenant known but alert id missing
+ * 6) ✅ Handles payload_too_large, empty bodies, invalid JSON
  *
- * PROOF REQUIREMENT:
- * After deploy, run with action="self_test" to see passed:true and all cases ok:true
- * Then select a real Alert in Automation UI and verify resolved_alert_id + status update.
+ * PROOF REQUIREMENT: Run with action="self_test" first (all cases must pass),
+ * then run from Automation UI selecting an Alert record (resolved_alert_id must be non-null).
  */
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.20";
 
-// Remediation workflows by alert type
 const REMEDIATION_WORKFLOWS = {
   fraud_detected: {
     automatic_actions: [
@@ -38,7 +36,7 @@ const REMEDIATION_WORKFLOWS = {
       { action: "hold_all_linked_orders", description: "Hold all orders linked to fraud ring" },
       { action: "block_identifiers", description: "Block associated emails, IPs, and devices" },
       { action: "notify_merchant", description: "Send critical alert to merchant", priority: "critical" },
-      { action: "generate_evidence_report", description: "Generate fraud evidence report for law enforcement" },
+      { action: "generate_evidence_report", description: "Generate fraud evidence report" },
     ],
     suggested_actions: [
       "Review all linked orders immediately",
@@ -130,61 +128,179 @@ function nowIso() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HELPER: getByPath(obj, "a.b.c") for safe nested lookups
+// HELPER: getByPath(obj, "a.b.c") — safe nested field access
 // ─────────────────────────────────────────────────────────────────
 function getByPath(obj, path) {
-  if (!obj || !path) return null;
+  if (!obj || !path || typeof path !== 'string') return null;
   const parts = path.split('.');
   let current = obj;
   for (const part of parts) {
     if (!current || typeof current !== 'object') return null;
     current = current[part];
   }
-  return current || null;
+  return current;
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HELPER: Scan payload for 24-hex IDs up to depth 4
-// Returns { alertIdCandidates: [], tenantIdCandidates: [] }
+// HELPER: deepScanForIds — find all 24-hex strings in payload
 // ─────────────────────────────────────────────────────────────────
-function deepScanForIds(payload, depth = 0, visited = new Set(), maxNodes = 200) {
-  const alertIds = [];
-  const tenantIds = [];
-  const visited2 = new Set(visited);
+function deepScanForIds(obj, { depth = 0, maxDepth = 6, maxNodes = 500, visited = new Set() } = {}) {
+  const ids = [];
   
-  if (depth > 4 || visited2.size > maxNodes || !payload || typeof payload !== 'object') {
-    return { alertIds, tenantIds };
+  if (depth > maxDepth || visited.size > maxNodes || !obj || typeof obj !== 'object') {
+    return ids;
   }
 
-  const objRef = String(Object.keys(payload).slice(0, 5).join(','));
-  if (visited2.has(objRef)) return { alertIds, tenantIds };
-  visited2.add(objRef);
+  const ref = `${depth}:${String(Object.keys(obj).slice(0, 3).join(','))}`;
+  if (visited.has(ref)) return ids;
+  visited.add(ref);
 
-  for (const [key, value] of Object.entries(payload)) {
-    if (visited2.size > maxNodes) break;
+  for (const [key, value] of Object.entries(obj)) {
+    if (visited.size > maxNodes) break;
 
-    // Check if this key is a string that looks like a 24-hex ID
     if (typeof value === 'string' && /^[a-f0-9]{24}$/.test(value)) {
-      // Heuristic: keys containing "alert" → likely alert ID; "tenant" → likely tenant ID
-      if (key.toLowerCase().includes('alert') || key.toLowerCase().includes('entity_id')) {
-        alertIds.push(value);
-      } else if (key.toLowerCase().includes('tenant')) {
-        tenantIds.push(value);
-      } else {
-        // Neutral ID: could be either. Guess alert by default.
-        alertIds.push(value);
+      ids.push(value);
+    } else if (value && typeof value === 'object') {
+      ids.push(...deepScanForIds(value, { depth: depth + 1, maxDepth, maxNodes, visited }));
+    }
+  }
+
+  return [...new Set(ids)];
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HELPER: pickFirstTruthy — return first non-null value from list
+// ─────────────────────────────────────────────────────────────────
+function pickFirstTruthy(list) {
+  for (const val of list) {
+    if (val) return val;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CORE RESOLVER: Extract alert and tenant IDs from payload
+// ─────────────────────────────────────────────────────────────────
+async function resolveAlertAndTenant(payload, db) {
+  const result = {
+    resolved_alert_id: null,
+    resolved_tenant_id: null,
+    used_latest_alert_fallback: false,
+    debug: {
+      alertIdCandidates: {},
+      tenantIdCandidates: {},
+      deepScanIds: [],
+    },
+  };
+
+  // ALERT ID PATHS (30+ locations)
+  const alertIdPaths = [
+    // direct
+    "alert_id", "alertId", "alert.id", "alert.record_id",
+    // data common
+    "data.id", "data.record.id", "data.record_id", "data.recordId",
+    "data.selected.id", "data.selected.record.id", "data.selected.record_id",
+    "data.selectedRecordId", "data.selected_record_id",
+    "data.new_data.id", "data.new_data.record_id",
+    // event common
+    "event.id", "event.data.id", "event.data.record.id", "event.data.record_id",
+    "event.record_id", "event.recordId",
+    // automation wrappers (CRITICAL FOR AUTOMATION UI)
+    "automation.record_id", "automation.recordId",
+    "automation.selected_record_id", "automation.selectedRecordId",
+    "automation.context.record_id", "automation.context.selected_record_id",
+    "automation.context.recordId", "automation.context.selectedRecordId",
+    "automation.data.record_id", "automation.data.selected_record_id",
+    "automation.input.record_id", "automation.input.selected_record_id",
+    // old_data
+    "old_data.id", "old_data.record.id", "old_data.record_id",
+  ];
+
+  // TENANT ID PATHS
+  const tenantIdPaths = [
+    "tenant_id", "tenantId",
+    "alert.tenant_id",
+    "data.tenant_id", "data.record.tenant_id",
+    "automation.tenant_id", "automation.context.tenant_id",
+    "event.tenant_id",
+  ];
+
+  // Try each alert ID path
+  for (const path of alertIdPaths) {
+    const val = getByPath(payload, path);
+    if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
+      result.debug.alertIdCandidates[path] = val;
+      result.resolved_alert_id = val;
+      break;
+    }
+  }
+
+  // Try each tenant ID path
+  for (const path of tenantIdPaths) {
+    const val = getByPath(payload, path);
+    if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
+      result.debug.tenantIdCandidates[path] = val;
+      result.resolved_tenant_id = val;
+      break;
+    }
+  }
+
+  // If not found, deepScan for all 24-hex strings
+  if (!result.resolved_alert_id || !result.resolved_tenant_id) {
+    const deepIds = deepScanForIds(payload, { maxDepth: 6, maxNodes: 500 });
+    result.debug.deepScanIds = deepIds;
+
+    // Try each deep ID
+    for (const id of deepIds) {
+      if (!result.resolved_alert_id) {
+        try {
+          const alerts = await db.Alert.filter({ id }).catch(() => []);
+          if (alerts?.length > 0) {
+            result.resolved_alert_id = id;
+            console.log(`[resolver] Found alert via deepScan: ${id}`);
+            break;
+          }
+        } catch (e) {
+          // Silent
+        }
       }
     }
 
-    // Recurse into objects
-    if (value && typeof value === 'object') {
-      const sub = deepScanForIds(value, depth + 1, visited2, maxNodes);
-      alertIds.push(...sub.alertIds);
-      tenantIds.push(...sub.tenantIds);
+    for (const id of deepIds) {
+      if (!result.resolved_tenant_id) {
+        try {
+          const tenants = await db.Tenant.filter({ id }).catch(() => []);
+          if (tenants?.length > 0) {
+            result.resolved_tenant_id = id;
+            console.log(`[resolver] Found tenant via deepScan: ${id}`);
+            break;
+          }
+        } catch (e) {
+          // Silent
+        }
+      }
     }
   }
 
-  return { alertIds: [...new Set(alertIds)], tenantIds: [...new Set(tenantIds)] };
+  // If alert still missing but tenant known, try latest alert by created_date
+  if (!result.resolved_alert_id && result.resolved_tenant_id) {
+    try {
+      const latest = await db.Alert.filter(
+        { tenant_id: result.resolved_tenant_id },
+        "-created_date",
+        1
+      ).catch(() => []);
+      if (latest?.length > 0) {
+        result.resolved_alert_id = latest[0].id;
+        result.used_latest_alert_fallback = true;
+        console.log(`[resolver] Used latest alert fallback: ${result.resolved_alert_id}`);
+      }
+    } catch (e) {
+      // Silent
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -417,13 +533,14 @@ Provide 3-5 likely root causes and recommended actions.`;
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════
 // MAIN HANDLER
-// ─────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+
     let authorized = false;
     try {
       const user = await base44.auth.me();
@@ -431,6 +548,7 @@ Deno.serve(async (req) => {
     } catch {
       authorized = true;
     }
+
     if (!authorized) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -453,295 +571,155 @@ Deno.serve(async (req) => {
 
     const action = payload.action || "remediate";
 
-    // ═════════════════════════════════════════════════════════════
-    // ACTION: debug_payload — Inspect what the Automation UI sent
-    // ═════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
+    // ACTION: debug_payload
+    // ═══════════════════════════════════════════════════════════
     if (action === "debug_payload") {
-      const deepScan = deepScanForIds(payload);
+      const resolverResult = await resolveAlertAndTenant(payload, db);
       return Response.json({
-        debug: {
-          payloadKeys: Object.keys(payload),
-          data: {
-            keys: Object.keys(payload.data || {}),
-            record: payload.data?.record ? Object.keys(payload.data.record) : null,
-            selected: payload.data?.selected ? Object.keys(payload.data.selected) : null,
-            new_data: payload.data?.new_data ? Object.keys(payload.data.new_data) : null,
-          },
-          event: {
-            keys: Object.keys(payload.event || {}),
-          },
-          automation: {
-            keys: Object.keys(payload.automation || {}),
-          },
-          old_data: {
-            keys: Object.keys(payload.old_data || {}),
-          },
-          payload_too_large: payload.payload_too_large || false,
-          deepScanAlertIds: deepScan.alertIds.slice(0, 20),
-          deepScanTenantIds: deepScan.tenantIds.slice(0, 20),
-        },
-        note: "Use deepScanAlertIds and deepScanTenantIds to identify missing paths.",
+        payloadKeys: Object.keys(payload),
+        automationKeys: Object.keys(payload.automation || {}),
+        eventKeys: Object.keys(payload.event || {}),
+        dataKeys: Object.keys(payload.data || {}),
+        payloadTooLarge: payload.payload_too_large || false,
+        ...resolverResult,
       });
     }
 
-    // ═════════════════════════════════════════════════════════════
-    // ACTION: self_test — Prove resolver works on all payload shapes
-    // ═════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
+    // ACTION: self_test
+    // ═══════════════════════════════════════════════════════════
     if (action === "self_test") {
-      const testResults = {
-        passed: false,
-        cases: [],
-        proof_alert_id: null,
-        proof_tenant_id: null,
-        proof_alert_updated: false,
-      };
+      const testCases = [];
+      let proofAlertUpdated = false;
 
       try {
         // Create test tenant
-        const testTenant = await db.Tenant.create({
-          shop_domain: `test-self-test-${Date.now()}.myshopify.com`,
+        const tenant = await db.Tenant.create({
+          shop_domain: `test-${Date.now()}.myshopify.com`,
           shop_name: "Self-Test Tenant",
           status: "active",
         });
-        const tenantId = testTenant.id;
 
         // Create test alert
-        const testAlert = await db.Alert.create({
-          tenant_id: tenantId,
+        const alert = await db.Alert.create({
+          tenant_id: tenant.id,
           type: "high_risk_order",
           severity: "high",
           title: "Self-Test Alert",
           message: "Testing resolver robustness",
           status: "pending",
         });
-        const alertId = testAlert.id;
 
-        testResults.proof_alert_id = alertId;
-        testResults.proof_tenant_id = tenantId;
-
-        // Define payload shapes
-        const payloadShapes = [
-          { name: "data.id", payload: { data: { id: alertId }, tenant_id: tenantId } },
-          { name: "data.record.id", payload: { data: { record: { id: alertId } }, tenant_id: tenantId } },
-          { name: "data.new_data.id", payload: { data: { new_data: { id: alertId } }, tenant_id: tenantId } },
-          { name: "data.selected.id", payload: { data: { selected: { id: alertId } }, tenant_id: tenantId } },
-          { name: "event.data.id", payload: { event: { data: { id: alertId } }, tenant_id: tenantId } },
-          { name: "automation.record_id", payload: { automation: { record_id: alertId }, tenant_id: tenantId } },
-          { name: "automation.selected_record_id", payload: { automation: { selected_record_id: alertId }, tenant_id: tenantId } },
-          { name: "old_data.id", payload: { old_data: { id: alertId }, tenant_id: tenantId } },
-          { name: "payload_too_large + automation.record_id", payload: { payload_too_large: true, automation: { record_id: alertId }, tenant_id: tenantId } },
-          { name: "direct alert_id", payload: { alert_id: alertId, tenant_id: tenantId } },
+        const testPayloads = [
+          { name: "automation.record_id", payload: { automation: { record_id: alert.id }, tenant_id: tenant.id } },
+          { name: "automation.context.selected_record_id", payload: { automation: { context: { selected_record_id: alert.id } }, tenant_id: tenant.id } },
+          { name: "event.data.record_id", payload: { event: { data: { record_id: alert.id } }, tenant_id: tenant.id } },
+          { name: "data.selected.record.id", payload: { data: { selected: { record: { id: alert.id } } }, tenant_id: tenant.id } },
+          { name: "payload_too_large + automation.record_id", payload: { payload_too_large: true, automation: { record_id: alert.id }, tenant_id: tenant.id } },
+          { name: "data.recordId", payload: { data: { recordId: alert.id }, tenant_id: tenant.id } },
+          { name: "data.id", payload: { data: { id: alert.id }, tenant_id: tenant.id } },
+          { name: "event.id", payload: { event: { id: alert.id }, tenant_id: tenant.id } },
+          { name: "direct alert_id", payload: { alert_id: alert.id, tenant_id: tenant.id } },
+          { name: "automation.selectedRecordId", payload: { automation: { selectedRecordId: alert.id }, tenant_id: tenant.id } },
         ];
 
-        // Test each shape
-        for (const testCase of payloadShapes) {
-          const testPayload = testCase.payload;
-          let resolvedAlertId = null;
-          let resolvedTenantId = null;
-
-          // Run resolver logic inline
-          const fieldPaths = [
-            "alert_id", "alert.id", "alertId",
-            "data.id", "data.record.id", "data.recordId", "data.record_id",
-            "data.selectedRecordId", "data.selected_record_id", "data.alert_id", "data.alert.id",
-            "data.new_data.id", "data.new_data.alert_id", "data.current.id", "data.entity.id",
-            "event.id", "event.record_id", "event.data.id", "event.data.record_id", "event.payload.id",
-            "automation.record_id", "automation.selected_record_id", "automation.context.record_id", "automation.context.selected_record_id",
-            "old_data.id", "old_data.record.id",
-          ];
-
-          for (const path of fieldPaths) {
-            const val = getByPath(testPayload, path);
-            if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
-              resolvedAlertId = val;
-              break;
-            }
-          }
-
-          // Fallback: deepScan
-          if (!resolvedAlertId) {
-            const deepScan = deepScanForIds(testPayload);
-            if (deepScan.alertIds.length > 0) {
-              resolvedAlertId = deepScan.alertIds[0];
-            }
-          }
-
-          // Lookup tenant
-          if (!resolvedTenantId) {
-            const tenantPaths = ["tenant_id", "tenantId", "alert.tenant_id", "data.tenant_id", "data.record.tenant_id", "event.tenant_id", "automation.tenant_id"];
-            for (const path of tenantPaths) {
-              const val = getByPath(testPayload, path);
-              if (val) {
-                resolvedTenantId = val;
-                break;
-              }
-            }
-          }
-
-          const ok = resolvedAlertId === alertId && resolvedTenantId === tenantId;
-          testResults.cases.push({
-            name: testCase.name,
-            resolved_alert_id: resolvedAlertId,
-            resolved_tenant_id: resolvedTenantId,
+        for (const tc of testPayloads) {
+          const res = await resolveAlertAndTenant(tc.payload, db);
+          const ok = res.resolved_alert_id === alert.id && res.resolved_tenant_id === tenant.id;
+          testCases.push({
+            name: tc.name,
             ok,
+            resolved_alert_id: res.resolved_alert_id,
+            resolved_tenant_id: res.resolved_tenant_id,
           });
-
-          if (!ok) {
-            console.warn(`[self_test] FAILED: ${testCase.name}`);
-          }
         }
 
-        // Verify the alert can be updated (proof it exists)
-        await db.Alert.update(alertId, {
+        // Update alert to prove it exists and is updateable
+        await db.Alert.update(alert.id, {
           status: "in_progress",
           remediation_started: true,
           remediation_started_at: nowIso(),
         });
-        testResults.proof_alert_updated = true;
+        proofAlertUpdated = true;
 
-        // Check if all passed
-        testResults.passed = testResults.cases.every(c => c.ok);
+        // Cleanup
+        await db.Alert.delete(alert.id).catch(() => {});
+        await db.Tenant.delete(tenant.id).catch(() => {});
 
-        // Clean up (optional)
-        await db.Alert.delete(alertId).catch(() => {});
-        await db.Tenant.delete(tenantId).catch(() => {});
-
-        return Response.json(testResults);
+        const allPassed = testCases.every(tc => tc.ok);
+        return Response.json({
+          passed: allPassed,
+          cases: testCases,
+          proof_alert_updated: proofAlertUpdated,
+        });
       } catch (err) {
         console.error("[self_test] Error:", err);
-        testResults.error = err?.message;
-        return Response.json(testResults, { status: 500 });
+        return Response.json(
+          {
+            passed: false,
+            cases: testCases,
+            proof_alert_updated: proofAlertUpdated,
+            error: err?.message,
+          },
+          { status: 500 }
+        );
       }
     }
 
-    // ═════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
     // STANDARD REMEDIATION FLOW
-    // ═════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
 
-    // Resolve alert using hardened multi-path resolver
+    const resolverResult = await resolveAlertAndTenant(payload, db);
+    const alertId = resolverResult.resolved_alert_id;
+    const tenantId = resolverResult.resolved_tenant_id;
+
+    if (!alertId || !tenantId) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Could not resolve alert or tenant from payload",
+          resolved_alert_id: alertId,
+          resolved_tenant_id: tenantId,
+          debug: resolverResult.debug,
+          automation_payload_keys: Object.keys(payload),
+        },
+        { status: 404 }
+      );
+    }
+
+    // Fetch alert and tenant
     let alertData = null;
-    let resolvedTenantId = null;
+    let tenantData = null;
 
-    // 1. Try 30+ known field paths
-    const fieldPaths = [
-      "alert_id", "alert.id", "alertId",
-      "data.id", "data.record.id", "data.recordId", "data.record_id",
-      "data.selectedRecordId", "data.selected_record_id", "data.alert_id", "data.alert.id",
-      "data.new_data.id", "data.new_data.alert_id", "data.current.id", "data.entity.id",
-      "event.id", "event.record_id", "event.data.id", "event.data.record_id", "event.payload.id",
-      "automation.record_id", "automation.selected_record_id", "automation.context.record_id", "automation.context.selected_record_id",
-      "old_data.id", "old_data.record.id",
-    ];
-
-    let alertIdCandidate = null;
-    for (const path of fieldPaths) {
-      const val = getByPath(payload, path);
-      if (val && typeof val === 'string' && /^[a-f0-9]{24}$/.test(val)) {
-        alertIdCandidate = val;
-        break;
-      }
+    try {
+      const alerts = await db.Alert.filter({ id: alertId });
+      alertData = alerts?.[0];
+    } catch (e) {
+      console.error("[automatedRemediation] Alert lookup failed:", e.message);
     }
 
-    // 2. Try tenant ID paths
-    const tenantPaths = ["tenant_id", "tenantId", "alert.tenant_id", "data.tenant_id", "data.record.tenant_id", "event.tenant_id", "automation.tenant_id"];
-    for (const path of tenantPaths) {
-      const val = getByPath(payload, path);
-      if (val) {
-        resolvedTenantId = val;
-        break;
-      }
+    try {
+      const tenants = await db.Tenant.filter({ id: tenantId });
+      tenantData = tenants?.[0];
+    } catch (e) {
+      console.error("[automatedRemediation] Tenant lookup failed:", e.message);
     }
 
-    // 3. If still not found, deepScan
-    if (!alertIdCandidate) {
-      const deepScan = deepScanForIds(payload);
-      if (deepScan.alertIds.length > 0) {
-        alertIdCandidate = deepScan.alertIds[0];
-      }
-      if (!resolvedTenantId && deepScan.tenantIds.length > 0) {
-        resolvedTenantId = deepScan.tenantIds[0];
-      }
+    if (!alertData || !tenantData) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Alert or tenant not found in database",
+          resolved_alert_id: alertId,
+          resolved_tenant_id: tenantId,
+        },
+        { status: 404 }
+      );
     }
-
-    // 4. Lookup alert by ID
-    if (alertIdCandidate) {
-      try {
-        const alerts = await db.Alert.filter({ id: alertIdCandidate });
-        if (alerts?.length > 0) {
-          alertData = alerts[0];
-          if (!resolvedTenantId) resolvedTenantId = alertData.tenant_id;
-        }
-      } catch (e) {
-        console.warn("[automatedRemediation] Lookup failed for " + alertIdCandidate + ":", e.message);
-      }
-    }
-
-    // 5. Fallback: if record has name/title but no ID, lookup by created_date DESC
-    if (!alertData && resolvedTenantId && (payload.data?.record?.title || payload.data?.record?.name || payload.data?.selected?.title)) {
-      try {
-        const recordName = payload.data?.record?.title || payload.data?.record?.name || payload.data?.selected?.title;
-        const alerts = await db.Alert.filter({ tenant_id: resolvedTenantId, title: recordName }, "-created_date", 1);
-        if (alerts?.length > 0) {
-          alertData = alerts[0];
-          console.log("[automatedRemediation] ✓ Resolved via fallback (by created_date DESC):", alertData.id);
-        }
-      } catch (e) {
-        // Silent
-      }
-    }
-
-    // 6. If STILL not found, return detailed 404
-    if (!alertData) {
-      const debugInfo = {
-        message: "Could not resolve alert from Automation Runner payload",
-        payloadKeys: Object.keys(payload),
-        data_keys: Object.keys(payload.data || {}),
-        event_keys: Object.keys(payload.event || {}),
-        automation_keys: Object.keys(payload.automation || {}),
-        old_data_keys: Object.keys(payload.old_data || {}),
-        payload_too_large: payload.payload_too_large || false,
-        alertIdCandidate: alertIdCandidate || null,
-        resolvedTenantId: resolvedTenantId || null,
-        deepScan: deepScanForIds(payload),
-        nextStep: "Verify alert is selected in Automation UI 'Select an Alert record…' and try again, or run action=debug_payload to inspect the payload.",
-      };
-
-      console.error("[automatedRemediation] Alert resolution failed:", JSON.stringify(debugInfo, null, 2));
-
-      try {
-        await db.AuditLog.create({
-          action: "remediation_failed_alert_not_found",
-          entity_type: "Alert",
-          entity_id: null,
-          details: debugInfo,
-        }).catch(() => {});
-      } catch (e) {
-        // Silent
-      }
-
-      return Response.json({ error: "Alert not found", debug: debugInfo }, { status: 404 });
-    }
-
-    console.log(`[automatedRemediation] ✓ Alert resolved: id=${alertData.id} type=${alertData.type || alertData.alert_type}`);
 
     const { execute_automatic = true, dry_run = false } = payload;
-    const tId = resolvedTenantId || alertData.tenant_id;
-
-    // Fetch tenant
-    let tenant = null;
-    if (tId) {
-      try {
-        const tenants = await db.Tenant.filter({ id: tId });
-        tenant = tenants?.[0] || null;
-      } catch (e) {
-        // Silent
-      }
-    }
-
-    if (!tenant) {
-      return Response.json({ error: "Tenant not found" }, { status: 404 });
-    }
-
     const alertType = alertData.alert_type || alertData.type || "high_risk_order";
     const workflow = REMEDIATION_WORKFLOWS[alertType] || REMEDIATION_WORKFLOWS.high_risk_order;
 
@@ -764,23 +742,41 @@ Deno.serve(async (req) => {
         }));
       } else {
         for (const action of workflow.automatic_actions) {
-          const actionResult = await executeAutomaticAction({ base44, db, action, alert: alertData, tenant });
+          const actionResult = await executeAutomaticAction({
+            base44,
+            db,
+            action,
+            alert: alertData,
+            tenant: tenantData,
+          });
           results.automatic_actions.push({ ...action, result: actionResult });
         }
 
-        // Update alert status
-        await db.Alert.update(alertData.id, {
+        // Update alert
+        const updatedAlert = await db.Alert.update(alertData.id, {
           remediation_started: true,
           remediation_started_at: nowIso(),
           remediation_actions: results.automatic_actions,
           status: "in_progress",
-        }).catch(() => {});
+        }).catch(() => null);
+
+        if (updatedAlert) {
+          results.updated_alert_fields = {
+            status: updatedAlert.status,
+            remediation_started: updatedAlert.remediation_started,
+            remediation_started_at: updatedAlert.remediation_started_at,
+          };
+        }
       }
     }
 
     // Check auto-cancel threshold
     const riskScore = Number(alertData.risk_score ?? alertData.score ?? NaN);
-    if (workflow.auto_cancel_threshold != null && Number.isFinite(riskScore) && riskScore >= workflow.auto_cancel_threshold) {
+    if (
+      workflow.auto_cancel_threshold != null &&
+      Number.isFinite(riskScore) &&
+      riskScore >= workflow.auto_cancel_threshold
+    ) {
       results.auto_cancel_recommended = true;
       results.auto_cancel_reason = `Risk score ${riskScore} >= ${workflow.auto_cancel_threshold}`;
     }
@@ -788,7 +784,7 @@ Deno.serve(async (req) => {
     // Audit log
     try {
       await db.AuditLog.create({
-        tenant_id: tId,
+        tenant_id: tenantId,
         action: "remediation_workflow_executed",
         entity_type: "Alert",
         entity_id: alertData.id,
@@ -804,17 +800,16 @@ Deno.serve(async (req) => {
     }
 
     return Response.json({
+      ok: true,
       ...results,
-      resolved_alert_id: alertData.id,
-      resolved_tenant_id: tId,
-      updated_fields: {
-        remediation_started: true,
-        remediation_started_at: results.automatic_actions?.length > 0 ? nowIso() : undefined,
-        status: "in_progress",
-      },
+      resolved_alert_id: alertId,
+      resolved_tenant_id: tenantId,
+      updated_alert_fields: results.updated_alert_fields,
+      automation_payload_keys: Object.keys(payload),
+      used_latest_alert_fallback: resolverResult.used_latest_alert_fallback,
     });
   } catch (error) {
     console.error("[automatedRemediation] Fatal error:", error);
-    return Response.json({ error: error?.message || "Unknown error" }, { status: 500 });
+    return Response.json({ error: error?.message || "Unknown error", ok: false }, { status: 500 });
   }
 });
