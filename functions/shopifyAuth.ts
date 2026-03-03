@@ -110,7 +110,11 @@ async function handleCallback(base44, body) {
     // Exchange code for access token
     const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
     const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || '';
-    const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+    // CANONICAL APP URL — use base44.app, NEVER profit-shield-ai.com
+    let appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+    if (appUrl.includes('profit-shield-ai.com')) {
+      appUrl = 'https://profit-shield-ai.base44.app';
+    }
 
     if (!apiKey || !apiSecret) {
       return Response.json({ error: 'Shopify credentials not configured' }, { status: 500 });
