@@ -1,10 +1,52 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import {
-  SHOPIFY_API_KEY, SHOPIFY_API_SECRET, REQUIRED_SCOPES as SCOPES,
-  REDIRECT_URI_CANONICAL, API_VERSION,
-  canonicalizeShopDomain, encryptToken, decryptToken,
-  validateRedirectWhitelist
-} from './shopifyConfig.js';
+
+const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
+const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
+const SCOPES = 'read_orders,read_products,read_customers,read_inventory,read_fulfillments,read_shipping';
+const API_VERSION = '2024-10';
+const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+const REDIRECT_URI_CANONICAL = `${APP_URL}/ShopifyCallback`;
+
+function canonicalizeShopDomain(shop) {
+  if (!shop) return null;
+  const s = shop.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  return s.includes('.myshopify.com') ? s : `${s}.myshopify.com`;
+}
+
+function validateRedirectWhitelist(redirectUri) {
+  if (redirectUri !== REDIRECT_URI_CANONICAL) {
+    console.error(`[shopifyAuth] REDIRECT_URI MISMATCH!\n  Used: ${redirectUri}\n  Expected: ${REDIRECT_URI_CANONICAL}`);
+    return false;
+  }
+  return true;
+}
+
+async function encryptToken(token) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  if (!key) { console.warn('ENCRYPTION_KEY not set'); return btoa(token); }
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, encoder.encode(token));
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv); combined.set(new Uint8Array(encrypted), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  if (!key) { try { return atob(encryptedToken); } catch { return null; } }
+  try {
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12); const enc = combined.slice(12);
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+    return new TextDecoder().decode(decrypted);
+  } catch { try { return atob(encryptedToken); } catch { return null; } }
+}
 
 // Normalize action + alias map
 const ACTION_ALIASES = {
