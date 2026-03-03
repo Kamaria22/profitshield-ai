@@ -266,7 +266,7 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2"
-                    disabled={!!actionLoading || !result.access_token_decryptable}
+                    disabled={!!actionLoading || !result.access_token_decryptable || !result.shopify_api_reachable}
                     onClick={() => runAction('fix_webhooks')}
                   >
                     {actionLoading === 'fix_webhooks' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Webhook className="w-4 h-4 text-purple-500" />}
