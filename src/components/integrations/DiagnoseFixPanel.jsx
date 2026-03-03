@@ -228,6 +228,26 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-slate-700">Fix Actions</p>
 
+                  {!result.access_token_decryptable && (
+                    <Button
+                      variant="default"
+                      className="w-full justify-start gap-2 bg-indigo-600 hover:bg-indigo-700"
+                      onClick={() => {
+                        const shop = result.shop_domain;
+                        if (!shop) return;
+                        const reconnectUrl = `/shopifyauth?shop=${shop}`;
+                        if (window !== window.top) {
+                          window.top.location.href = reconnectUrl;
+                        } else {
+                          window.location.href = reconnectUrl;
+                        }
+                      }}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Reconnect OAuth (Re-authorize Shopify)
+                    </Button>
+                  )}
+
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2"
