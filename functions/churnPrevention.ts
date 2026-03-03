@@ -37,14 +37,32 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Parse request body with fallback for scheduler edge cases
     let body = {};
-    try {
-      body = await req.json();
-    } catch (_) {
-      // Scheduled calls may have no body — default to predict_churn
-      body = {};
+    const contentType = req.headers.get('content-type') || '';
+    const contentLength = req.headers.get('content-length');
+    
+    // Only try to parse JSON if there's actual content
+    if (contentLength && parseInt(contentLength) > 0 && contentType.includes('application/json')) {
+      try {
+        const text = await req.text();
+        if (text && text.trim()) {
+          body = JSON.parse(text);
+        }
+      } catch (e) {
+        // Malformed JSON — default to predict_churn
+        body = {};
+      }
     }
-    const action = body.action || 'predict_churn';
+
+    // Default action is predict_churn (for scheduled jobs)
+    const action = body?.action || 'predict_churn';
+
+    // Validate action exists
+    const validActions = ['predict_churn', 'trigger_retention', 'get_at_risk_tenants', 'debug_signals'];
+    if (!validActions.includes(action)) {
+      return Response.json({ error: 'Invalid action: ' + action }, { status: 400 });
+    }
 
     if (action === 'predict_churn') {
       return await predictChurn(base44);
