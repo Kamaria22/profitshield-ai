@@ -31,6 +31,14 @@ Deno.serve(async (req) => {
     }
     const order = orders[0];
 
+    // Idempotency: skip if already analyzed within last 10 minutes
+    if (order.fraud_score !== undefined && order.fraud_score !== null && order.updated_date) {
+      const updatedMs = new Date(order.updated_date).getTime();
+      if (Date.now() - updatedMs < 10 * 60 * 1000) {
+        return Response.json({ skipped: true, reason: 'already_analyzed_recently', order_id: order.id }, { status: 200 });
+      }
+    }
+
     // Fetch customer order history
     const customerOrders = order.customer_email 
       ? await base44.asServiceRole.entities.Order.filter({ 
