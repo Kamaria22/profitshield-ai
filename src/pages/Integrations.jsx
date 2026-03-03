@@ -17,6 +17,7 @@ import {
   AlertTriangle, Clock, ArrowUpDown, Trash2, Webhook, MoreVertical,
   TrendingUp, Shield, Activity, Loader2, ExternalLink, Unplug
 } from 'lucide-react';
+import DiagnoseFixPanel from '@/components/integrations/DiagnoseFixPanel';
 import {
   DropdownMenu,
   DropdownMenuContent,
