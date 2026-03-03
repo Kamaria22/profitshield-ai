@@ -7,7 +7,27 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+// Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
+function shopifyHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com",
+    'X-Frame-Options': 'ALLOWALL', // Explicitly allow embedding
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return Response.json(body, { status, headers: shopifyHeaders() });
+}
+
 Deno.serve(async (req) => {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: shopifyHeaders() });
+  }
+
   try {
     const base44 = createClientFromRequest(req);
 
@@ -21,7 +41,7 @@ Deno.serve(async (req) => {
     }
 
     if (!isAuthorized) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
     let body = {};
@@ -35,7 +55,7 @@ Deno.serve(async (req) => {
     const shop = body.shop;
 
     if (!shop) {
-      return Response.json({ error: 'shop parameter required' }, { status: 400 });
+      return jsonResponse({ error: 'shop parameter required' }, 400);
     }
 
     if (action === 'install' || action === 'reauthorize') {
@@ -44,9 +64,9 @@ Deno.serve(async (req) => {
       return await handleCallback(base44, body);
     }
 
-    return Response.json({ error: 'Invalid action' }, { status: 400 });
+    return jsonResponse({ error: 'Invalid action' }, 400);
   } catch (error) {
-    return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
+    return jsonResponse({ error: error.message, stack: error.stack }, 500);
   }
 });
 
