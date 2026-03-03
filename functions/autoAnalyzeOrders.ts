@@ -18,13 +18,20 @@ Deno.serve(async (req) => {
       return Response.json({ skipped: true, reason: 'no_entity_id' });
     }
 
-    // Fetch fresh order data — always use filter to avoid 404 race conditions
+    // Fetch fresh order data — filter by id (list endpoint, no 404 risk)
     let order = null;
-    try {
-      const results = await base44.asServiceRole.entities.Order.filter({ id: entityId });
-      order = results[0] || null;
-    } catch (e) {
-      console.log(`[autoAnalyzeOrders] Order ${entityId} not found yet (race condition): ${e.message}`);
+    if (entityId && !entityId.startsWith('test-') && entityId.length > 10) {
+      try {
+        const results = await base44.asServiceRole.entities.Order.list('-created_date', 1000);
+        order = results.find(o => o.id === entityId) || null;
+        if (!order) {
+          // Try direct lookup as fallback
+          const filtered = await base44.asServiceRole.entities.Order.filter({ id: entityId });
+          order = filtered[0] || null;
+        }
+      } catch (e) {
+        console.log(`[autoAnalyzeOrders] Order ${entityId} not found yet: ${e.message}`);
+      }
     }
 
     // If not found, return success so automation doesn't fail — it will retry naturally on next webhook
