@@ -254,12 +254,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check if notifications are enabled (unless forced)
-    if (!force && settings?.notifications_enabled === false) {
+    // Check notification preferences
+    const forceNotify = payload.force || payload.execute_automatic === true;
+    const notificationChannels = payload.notification_channels || ['email'];
+
+    if (!forceNotify && settings?.notifications_enabled === false) {
       return Response.json({ 
         success: true, 
         skipped: true, 
-        reason: 'Notifications disabled for tenant' 
+        reason: 'Notifications disabled for tenant',
+        elapsed_ms: Date.now() - startMs
       });
     }
 
