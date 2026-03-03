@@ -46,6 +46,8 @@ Deno.serve(async (req) => {
       return await triggerRetention(base44, body.tenant_id);
     } else if (action === 'get_at_risk_tenants') {
       return await getAtRiskTenants(base44);
+    } else if (action === 'debug_signals') {
+      return await debugSignals(base44, body.tenant_id);
     }
 
     return Response.json({ error: 'Invalid action' }, { status: 400 });
