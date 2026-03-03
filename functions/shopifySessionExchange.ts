@@ -236,14 +236,60 @@ Deno.serve(async (req) => {
       console.log(`[shopifySessionExchange] Auto-provisioned 14-day trial for tenant=${tenant.id}`);
     }
 
-    // Get primary connected integration (service-role)
-    const integrations = await base44.entities.PlatformIntegration.filter({
+    // Get primary integration — prefer connected, but accept any for auto-heal
+    let integrationsList = await base44.entities.PlatformIntegration.filter({
       tenant_id: tenant.id,
       platform: 'shopify',
       status: 'connected'
     });
 
-    const integration = integrations[0] || null;
+    let integration = integrationsList[0] || null;
+    let autoHealed = false;
+
+    // AUTO-HEAL: If no connected integration but we have a session token (embedded valid), 
+    // try to find a disconnected one and verify token is still valid.
+    if (!integration && session_token) {
+      const anyIntegrations = await base44.entities.PlatformIntegration.filter({
+        tenant_id: tenant.id,
+        platform: 'shopify'
+      });
+      const disconnected = anyIntegrations[0] || null;
+
+      if (disconnected) {
+        // Check if we have a valid token for this shop
+        const tokens = await base44.entities.OAuthToken.filter({ tenant_id: tenant.id, platform: 'shopify' });
+        const token = tokens.find(t => t.is_valid !== false) || tokens[0] || null;
+
+        if (token?.encrypted_access_token) {
+          // Quick token validity check via access_scopes
+          try {
+            const { decryptToken: dt } = await import('./shopifyConfig.js');
+            const accessToken = await dt(token.encrypted_access_token);
+            if (accessToken) {
+              const scopeRes = await fetch(`https://${shopDomain}/admin/oauth/access_scopes.json`, {
+                headers: { 'X-Shopify-Access-Token': accessToken }
+              });
+              if (scopeRes.ok) {
+                // Token is valid — auto-heal the integration status
+                await base44.entities.PlatformIntegration.update(disconnected.id, {
+                  status: 'connected',
+                  last_connected_at: new Date().toISOString(),
+                  metadata: { ...(disconnected.metadata || {}), auto_healed_at: new Date().toISOString() }
+                });
+                if (token.is_valid === false) {
+                  await base44.entities.OAuthToken.update(token.id, { is_valid: true });
+                }
+                integration = { ...disconnected, status: 'connected' };
+                autoHealed = true;
+                console.log(`[shopifySessionExchange] ✅ Auto-healed integration ${disconnected.id} for tenant ${tenant.id}`);
+              }
+            }
+          } catch (healErr) {
+            console.warn('[shopifySessionExchange] Auto-heal check failed:', healErr.message);
+          }
+        }
+      }
+    }
 
     // is_new_tenant = true triggers the guided onboarding flow on first open
     const isNewTenant = !tenant.onboarding_completed;
