@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
     const inReviewWindow = tenant.review_mode_enabled ||
       (createdAt && (Date.now() - createdAt) < 7 * 24 * 60 * 60 * 1000);
 
-    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'} is_new=${isNewTenant} trial_expired=${trialExpired}`);
+    console.log(`[shopifySessionExchange] ✓ Authenticated: tenant=${tenant.id} integration=${integration?.id || 'none'} is_new=${isNewTenant} trial_expired=${trialExpired} auto_healed=${autoHealed}`);
 
     // Return authenticated context — frontend persists this to skip Base44 login
     return jsonResponse({
