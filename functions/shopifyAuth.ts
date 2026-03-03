@@ -85,7 +85,7 @@ async function generateInstallUrl(shop) {
   }
 
   if (!apiKey) {
-    return Response.json({ error: 'SHOPIFY_API_KEY not configured' }, { status: 500 });
+    return jsonResponse({ error: 'SHOPIFY_API_KEY not configured' }, 500);
   }
 
   // CANONICAL redirect URI: use ShopifyCallback page, not /api/shopify/callback
@@ -107,7 +107,7 @@ async function generateInstallUrl(shop) {
 
   const installUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${apiKey}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  return Response.json({
+  return jsonResponse({
     success: true,
     install_url: installUrl,
     shop: shopDomain,
