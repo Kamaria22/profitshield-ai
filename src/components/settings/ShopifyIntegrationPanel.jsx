@@ -109,20 +109,47 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
     onError: (e) => toast.error('Failed to save: ' + e.message),
   });
 
+  const [reconciling, setReconciling] = useState(false);
+  const [syncDays, setSyncDays] = useState('90');
+
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const result = await callSettingsApi({ action: 'sync', tenant_id: tenantId });
-      if (result?.success) {
-        toast.success(`Sync complete — ${result.created} created, ${result.updated} updated`);
+      const { data } = await base44.functions.invoke('syncShopifyOrders', {
+        tenant_id: tenantId,
+        days: parseInt(syncDays)
+      });
+      if (data?.success) {
+        toast.success(`Sync complete — ${data.createdCount || 0} created, ${data.updatedCount || 0} updated`);
         queryClient.invalidateQueries({ queryKey: ['shopifyIntegrationPanel', tenantId] });
       } else {
-        toast.error(result?.error || 'Sync failed');
+        toast.error(data?.error || 'Sync failed');
       }
     } catch (e) {
       toast.error('Sync failed: ' + e.message);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleReconcileWebhooks = async () => {
+    setReconciling(true);
+    try {
+      const { data } = await base44.functions.invoke('shopifyReconcileWebhooks', {
+        tenant_id: tenantId
+      });
+      if (data?.ok !== false) {
+        toast.success(`Webhooks reconciled — ${data?.topics_ok || 0}/${data?.topics_required || 7} topics active, ${data?.registered_count || 0} registered, ${data?.deleted_count || 0} stale removed`);
+        queryClient.invalidateQueries({ queryKey: ['shopifyIntegrationPanel', tenantId] });
+      } else if (data?.needs_reauth) {
+        toast.error('Token invalid — please reconnect Shopify OAuth');
+      } else {
+        toast.error(data?.error || 'Reconciliation had errors');
+      }
+    } catch (e) {
+      toast.error('Reconcile failed: ' + e.message);
+    } finally {
+      setReconciling(false);
     }
   };
 
