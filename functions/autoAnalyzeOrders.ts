@@ -1,114 +1,153 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// This function is triggered by entity automation when orders are created/updated
+// Entity automation: triggers on Order create/update
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const payload = await req.json();
-    
-    // Handle entity automation payload
-    const { event, data, old_data, payload_too_large } = payload;
-    
+
+    const { event, data, payload_too_large } = payload;
+
     if (!event || event.entity_name !== 'Order') {
-      return Response.json({ skipped: true, reason: 'Not an order event' });
+      return Response.json({ skipped: true, reason: 'not_order_event' });
     }
 
-    // Get order data
-    let order = data;
-    if (payload_too_large) {
-      const orders = await base44.asServiceRole.entities.Order.filter({ id: event.entity_id });
-      if (orders.length === 0) {
-        return Response.json({ skipped: true, reason: 'Order not found' });
+    // Only process creates (and updates that don't already have fraud_score set by this function)
+    const entityId = event.entity_id || data?.id;
+    if (!entityId) {
+      return Response.json({ skipped: true, reason: 'no_entity_id' });
+    }
+
+    // Fetch fresh order data — always use filter to avoid 404 race conditions
+    let order = null;
+    try {
+      const results = await base44.asServiceRole.entities.Order.filter({ id: entityId });
+      order = results[0] || null;
+    } catch (e) {
+      console.log(`[autoAnalyzeOrders] Order ${entityId} not found yet (race condition): ${e.message}`);
+    }
+
+    // If not found, return success so automation doesn't fail — it will retry naturally on next webhook
+    if (!order) {
+      // Fallback: use inline data if provided
+      if (data && data.tenant_id) {
+        order = data;
+      } else {
+        return Response.json({ skipped: true, reason: 'order_not_found_yet', entity_id: entityId });
       }
-      order = orders[0];
     }
 
-    if (!order || !order.tenant_id) {
-      return Response.json({ skipped: true, reason: 'Missing order or tenant_id' });
+    if (!order.tenant_id) {
+      return Response.json({ skipped: true, reason: 'missing_tenant_id' });
     }
 
-    // Skip if already analyzed (has fraud_score set)
-    if (event.type === 'update' && old_data?.fraud_score !== undefined && old_data?.fraud_score === order.fraud_score) {
-      return Response.json({ skipped: true, reason: 'Already analyzed' });
+    // Idempotency: skip if already analyzed recently (within 5 minutes) to avoid duplicate alerts
+    if (event.type === 'update' && order.fraud_score !== undefined && order.fraud_score !== null) {
+      const updatedMs = order.updated_date ? new Date(order.updated_date).getTime() : 0;
+      if (Date.now() - updatedMs < 5 * 60 * 1000) {
+        return Response.json({ skipped: true, reason: 'recently_analyzed', order_id: order.id });
+      }
     }
 
-    // Check tenant settings for auto-analysis
-    const settings = await base44.asServiceRole.entities.TenantSettings.filter({ 
-      tenant_id: order.tenant_id 
-    });
-    const tenantSettings = settings[0] || {};
-    
-    // Skip if auto-remediation is disabled
+    // Fetch tenant settings
+    let tenantSettings = { high_risk_threshold: 70, medium_risk_threshold: 40, auto_remediation_enabled: true };
+    try {
+      const settings = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: order.tenant_id });
+      if (settings[0]) tenantSettings = { ...tenantSettings, ...settings[0] };
+    } catch (e) {
+      console.warn('[autoAnalyzeOrders] Could not fetch tenant settings:', e.message);
+    }
+
+    // Respect auto-remediation flag
     if (tenantSettings.auto_remediation_enabled === false) {
-      return Response.json({ skipped: true, reason: 'Auto-analysis disabled' });
+      return Response.json({ skipped: true, reason: 'auto_analysis_disabled' });
     }
 
-    // Fetch customer order history
-    const customerOrders = order.customer_email 
-      ? await base44.asServiceRole.entities.Order.filter({ 
-          tenant_id: order.tenant_id, 
-          customer_email: order.customer_email 
-        })
-      : [];
+    // Fetch customer order history for velocity/pattern checks
+    let customerOrders = [];
+    if (order.customer_email) {
+      try {
+        customerOrders = await base44.asServiceRole.entities.Order.filter({
+          tenant_id: order.tenant_id,
+          customer_email: order.customer_email
+        });
+      } catch (e) {
+        console.warn('[autoAnalyzeOrders] Could not fetch customer orders:', e.message);
+      }
+    }
 
-    // Fetch custom risk rules
-    const customRules = await base44.asServiceRole.entities.RiskRule.filter({ 
-      tenant_id: order.tenant_id, 
-      is_active: true 
-    });
-
-    // Perform risk analysis
-    const riskAnalysis = analyzeRisk(order, customerOrders, {
-      high_risk_threshold: tenantSettings.high_risk_threshold || 70,
-      medium_risk_threshold: tenantSettings.medium_risk_threshold || 40
-    }, customRules);
-
-    // Update order with risk scores
-    await base44.asServiceRole.entities.Order.update(order.id, {
-      fraud_score: riskAnalysis.fraud_score,
-      return_score: riskAnalysis.return_score,
-      chargeback_score: riskAnalysis.chargeback_score,
-      risk_level: riskAnalysis.risk_level,
-      risk_reasons: riskAnalysis.risk_reasons,
-      recommended_action: riskAnalysis.recommended_action,
-      confidence: riskAnalysis.confidence
-    });
-
-    // Create alert for high-risk orders
-    if (riskAnalysis.risk_level === 'high' || riskAnalysis.risk_level === 'critical') {
-      const existingAlerts = await base44.asServiceRole.entities.Alert.filter({
+    // Fetch active custom risk rules
+    let customRules = [];
+    try {
+      customRules = await base44.asServiceRole.entities.RiskRule.filter({
         tenant_id: order.tenant_id,
-        entity_type: 'order',
-        entity_id: order.id,
-        type: 'high_risk_order'
+        is_active: true
       });
+    } catch (e) {
+      console.warn('[autoAnalyzeOrders] Could not fetch risk rules:', e.message);
+    }
 
-      if (existingAlerts.length === 0) {
+    // Run risk analysis
+    const riskAnalysis = analyzeRisk(order, customerOrders, tenantSettings, customRules);
+
+    // Update order with risk scores (only if we have a real persisted order)
+    if (order.id) {
+      try {
+        await base44.asServiceRole.entities.Order.update(order.id, {
+          fraud_score: riskAnalysis.fraud_score,
+          return_score: riskAnalysis.return_score,
+          chargeback_score: riskAnalysis.chargeback_score,
+          risk_level: riskAnalysis.risk_level,
+          risk_reasons: riskAnalysis.risk_reasons,
+          recommended_action: riskAnalysis.recommended_action,
+          confidence: riskAnalysis.confidence
+        });
+      } catch (e) {
+        console.warn('[autoAnalyzeOrders] Could not update order risk scores:', e.message);
+      }
+    }
+
+    // Create alert for high/critical risk orders (idempotent check)
+    if (riskAnalysis.risk_level === 'high' || riskAnalysis.risk_level === 'critical') {
+      let existingAlert = false;
+      try {
+        const existing = await base44.asServiceRole.entities.Alert.filter({
+          tenant_id: order.tenant_id,
+          entity_type: 'order',
+          entity_id: order.id,
+          type: 'high_risk_order'
+        });
+        existingAlert = existing.length > 0;
+      } catch (e) {
+        // Proceed to create alert if check fails
+      }
+
+      if (!existingAlert) {
         await base44.asServiceRole.entities.Alert.create({
           tenant_id: order.tenant_id,
           type: 'high_risk_order',
           severity: riskAnalysis.risk_level === 'critical' ? 'critical' : 'high',
           title: `High Risk Order #${order.order_number || order.id}`,
-          message: `Potential scam detected with ${riskAnalysis.risk_reasons.length} risk factors: ${riskAnalysis.risk_reasons.slice(0, 3).join(', ')}`,
+          message: `Order flagged with ${riskAnalysis.risk_reasons.length} risk factor(s): ${riskAnalysis.risk_reasons.slice(0, 3).join(', ')}`,
           entity_type: 'order',
           entity_id: order.id,
           recommended_action: riskAnalysis.recommended_action,
           status: 'pending',
           metadata: {
             fraud_score: riskAnalysis.fraud_score,
+            combined_score: riskAnalysis.combined_score,
             risk_reasons: riskAnalysis.risk_reasons,
             order_value: order.total_revenue
           }
         });
+        console.log(`[autoAnalyzeOrders] Created high-risk alert for order ${order.order_number} (tenant: ${order.tenant_id})`);
       }
     }
 
-    // Handle Shopify actions from matched rules
+    // Create PendingShopifyAction for matched risk rules requiring Shopify actions
     if (riskAnalysis.matched_shopify_actions?.length > 0 && order.platform_order_id) {
       for (const shopifyAction of riskAnalysis.matched_shopify_actions) {
-        const requireConfirmation = shopifyAction.config?.require_confirmation !== false;
-
-        if (requireConfirmation || shopifyAction.type === 'cancel_order') {
+        try {
           await base44.asServiceRole.entities.PendingShopifyAction.create({
             tenant_id: order.tenant_id,
             order_id: order.id,
@@ -119,41 +158,58 @@ Deno.serve(async (req) => {
             source_type: 'risk_rule',
             source_rule_id: shopifyAction.rule_id,
             source_rule_name: shopifyAction.rule_name,
-            reason: `Auto-triggered: ${shopifyAction.rule_name}`,
+            reason: `Auto-triggered by rule: ${shopifyAction.rule_name}`,
             status: 'pending_confirmation'
           });
+        } catch (e) {
+          console.warn('[autoAnalyzeOrders] Could not create pending shopify action:', e.message);
         }
       }
     }
 
-    // Log audit event
-    await base44.asServiceRole.entities.AuditLog.create({
-      tenant_id: order.tenant_id,
-      action_type: 'auto_risk_analysis',
-      entity_type: 'Order',
-      entity_id: order.id,
-      new_state: {
-        fraud_score: riskAnalysis.fraud_score,
-        risk_level: riskAnalysis.risk_level,
-        risk_reasons: riskAnalysis.risk_reasons
-      }
-    });
+    // Audit log
+    try {
+      await base44.asServiceRole.entities.AuditLog.create({
+        tenant_id: order.tenant_id,
+        action: 'auto_fraud_analysis',
+        entity_type: 'Order',
+        entity_id: order.id,
+        performed_by: 'system',
+        description: `Auto fraud analysis: risk_level=${riskAnalysis.risk_level}, fraud_score=${riskAnalysis.fraud_score}, reasons=${riskAnalysis.risk_reasons.length}`,
+        is_auto_action: true,
+        auto_action_type: 'fraud_analysis',
+        severity: riskAnalysis.risk_level === 'critical' || riskAnalysis.risk_level === 'high' ? 'high' : 'low',
+        category: 'ai_action',
+        metadata: {
+          fraud_score: riskAnalysis.fraud_score,
+          risk_level: riskAnalysis.risk_level,
+          risk_reasons: riskAnalysis.risk_reasons
+        }
+      });
+    } catch (e) {
+      console.warn('[autoAnalyzeOrders] Could not write audit log:', e.message);
+    }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       order_id: order.id,
       risk_analysis: {
         fraud_score: riskAnalysis.fraud_score,
+        combined_score: riskAnalysis.combined_score,
         risk_level: riskAnalysis.risk_level,
-        reasons_count: riskAnalysis.risk_reasons.length
+        reasons_count: riskAnalysis.risk_reasons.length,
+        recommended_action: riskAnalysis.recommended_action
       }
     });
 
   } catch (error) {
-    console.error('Auto-analyze orders error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error('[autoAnalyzeOrders] Fatal error:', error.message);
+    // Return 200 to prevent automation retry storm — log is sufficient
+    return Response.json({ error: error.message, skipped: true }, { status: 200 });
   }
 });
+
+// ─── Risk Analysis Engine ────────────────────────────────────────────────────
 
 function analyzeRisk(order, customerOrders, settings, customRules = []) {
   const riskFactors = [];
@@ -162,75 +218,102 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
   let chargebackScore = 0;
   const matchedShopifyActions = [];
 
-  // 1. New Customer Analysis
+  // 1. New customer
   const isFirstOrder = customerOrders.length <= 1;
   if (isFirstOrder) {
     fraudScore += 15;
     riskFactors.push('First-time customer');
   }
 
-  // 2. Order Value Analysis
-  if (order.total_revenue > 500) {
+  // 2. Order value
+  const orderValue = order.total_revenue || 0;
+  if (orderValue > 500) {
     fraudScore += 10;
-    riskFactors.push(`High value order ($${order.total_revenue?.toFixed(2)})`);
+    riskFactors.push(`High value order ($${orderValue.toFixed(2)})`);
   }
-  if (order.total_revenue > 1000) {
+  if (orderValue > 1000) {
     fraudScore += 15;
     chargebackScore += 10;
   }
 
-  // 3. Address Mismatch
+  // 3. Avg order value spike
+  if (customerOrders.length > 1) {
+    const avg = customerOrders.reduce((s, o) => s + (o.total_revenue || 0), 0) / customerOrders.length;
+    if (avg > 0 && orderValue > avg * 3) {
+      fraudScore += 20;
+      riskFactors.push('Order 3x above customer average');
+    }
+  }
+
+  // 4. Address mismatch
   const billing = order.billing_address || {};
   const shipping = order.shipping_address || {};
   if (billing.country && shipping.country && billing.country !== shipping.country) {
     fraudScore += 25;
     chargebackScore += 15;
     riskFactors.push('Billing/shipping country mismatch');
+  } else if (billing.zip && shipping.zip && billing.zip !== shipping.zip) {
+    fraudScore += 8;
+    riskFactors.push('Billing/shipping zip mismatch');
   }
 
-  // 4. Discount Analysis
-  const discountPct = order.total_revenue > 0 
-    ? ((order.discount_total || 0) / (order.total_revenue + (order.discount_total || 0))) * 100 
+  // 5. Heavy discount
+  const discountPct = orderValue > 0
+    ? ((order.discount_total || 0) / (orderValue + (order.discount_total || 0))) * 100
     : 0;
   if (discountPct > 30) {
     fraudScore += 15;
     riskFactors.push(`Heavy discount (${discountPct.toFixed(0)}%)`);
   }
+  if ((order.discount_codes || []).length > 1) {
+    fraudScore += 10;
+    riskFactors.push('Multiple discount codes');
+  }
 
-  // 5. Email Analysis
+  // 6. Suspicious email
   const email = order.customer_email || '';
   if (email.includes('+') || /\d{4,}/.test(email.split('@')[0])) {
     fraudScore += 15;
     riskFactors.push('Suspicious email pattern');
   }
 
-  // 6. Velocity Check
+  // 7. Velocity: multiple orders in 24h
   const recentOrders = customerOrders.filter(o => {
-    const orderDate = new Date(o.order_date);
-    const now = new Date();
-    return (now - orderDate) / (1000 * 60 * 60) < 24 && o.id !== order.id;
+    if (!o.order_date || o.id === order.id) return false;
+    return (Date.now() - new Date(o.order_date).getTime()) < 24 * 60 * 60 * 1000;
   });
   if (recentOrders.length >= 2) {
     fraudScore += 20;
+    chargebackScore += 15;
     riskFactors.push(`${recentOrders.length + 1} orders in 24h`);
   }
 
-  // 7. Return History
-  const refundedOrders = customerOrders.filter(o => o.status === 'refunded' || o.status === 'partially_refunded');
-  if (refundedOrders.length > 0 && customerOrders.length > 0) {
-    const refundRate = (refundedOrders.length / customerOrders.length) * 100;
+  // 8. Refund history
+  const refunded = customerOrders.filter(o => o.status === 'refunded' || o.status === 'partially_refunded');
+  if (refunded.length > 0 && customerOrders.length > 0) {
+    const refundRate = (refunded.length / customerOrders.length) * 100;
     if (refundRate > 30) {
       returnScore += 25;
       riskFactors.push(`High refund rate (${refundRate.toFixed(0)}%)`);
+    } else if (refundRate > 15) {
+      returnScore += 12;
+      riskFactors.push(`Moderate refund rate (${refundRate.toFixed(0)}%)`);
     }
   }
 
-  // 8. Apply Custom Rules
+  // 9. Negative margin
+  if ((order.net_profit || 0) < 0) {
+    chargebackScore += 10;
+    riskFactors.push('Negative profit margin');
+  }
+
+  // 10. Custom rules
   for (const rule of customRules) {
     if (evaluateRule(rule, order, customerOrders)) {
-      fraudScore += rule.risk_adjustment || 0;
-      riskFactors.push(`Rule: ${rule.name}`);
-      
+      const adj = rule.risk_adjustment || 0;
+      fraudScore += adj;
+      riskFactors.push(`Rule: ${rule.name}${adj !== 0 ? ` (${adj > 0 ? '+' : ''}${adj})` : ''}`);
+
       if (rule.shopify_action_type && rule.shopify_action_type !== 'none') {
         matchedShopifyActions.push({
           type: rule.shopify_action_type,
@@ -242,27 +325,27 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     }
   }
 
-  // Calculate combined score
+  // Combined score
   const combinedScore = Math.min(100, Math.round(
     (fraudScore * 0.5) + (returnScore * 0.25) + (chargebackScore * 0.25)
   ));
 
-  // Determine risk level
+  // Risk level
   let riskLevel = 'low';
   if (combinedScore >= 80) riskLevel = 'critical';
-  else if (combinedScore >= settings.high_risk_threshold) riskLevel = 'high';
-  else if (combinedScore >= settings.medium_risk_threshold) riskLevel = 'medium';
+  else if (combinedScore >= (settings.high_risk_threshold || 70)) riskLevel = 'high';
+  else if (combinedScore >= (settings.medium_risk_threshold || 40)) riskLevel = 'medium';
 
   // Recommended action
   let recommendedAction = 'none';
   if (riskLevel === 'critical') recommendedAction = 'cancel';
-  else if (riskLevel === 'high') recommendedAction = 'verify';
+  else if (riskLevel === 'high') recommendedAction = fraudScore >= 50 ? 'cancel' : 'verify';
   else if (riskLevel === 'medium') recommendedAction = 'flag';
 
   return {
-    fraud_score: Math.min(100, Math.max(0, fraudScore)),
-    return_score: Math.min(100, Math.max(0, returnScore)),
-    chargeback_score: Math.min(100, Math.max(0, chargebackScore)),
+    fraud_score: Math.min(100, Math.max(0, Math.round(fraudScore))),
+    return_score: Math.min(100, Math.max(0, Math.round(returnScore))),
+    chargeback_score: Math.min(100, Math.max(0, Math.round(chargebackScore))),
     combined_score: combinedScore,
     risk_level: riskLevel,
     risk_reasons: riskFactors,
@@ -277,17 +360,16 @@ function evaluateRule(rule, order, customerOrders) {
     const { field, operator, value } = condition;
     let fieldVal = getFieldValue(field, order, customerOrders);
     let compareVal = value;
-    
+
     if (['order_value', 'discount_pct', 'customer_orders', 'item_count'].includes(field)) {
       fieldVal = parseFloat(fieldVal) || 0;
       compareVal = parseFloat(value) || 0;
     }
-    
     if (field === 'is_first_order' || field === 'has_discount_code') {
       fieldVal = !!fieldVal;
       compareVal = value === 'true' || value === true;
     }
-    
+
     if (!evalCondition(fieldVal, operator, compareVal)) return false;
   }
   return true;
@@ -317,6 +399,7 @@ function evalCondition(fieldVal, operator, compareVal) {
     case 'greater_than': return Number(fieldVal) > Number(compareVal);
     case 'less_than': return Number(fieldVal) < Number(compareVal);
     case 'contains': return String(fieldVal).toLowerCase().includes(String(compareVal).toLowerCase());
+    case 'not_contains': return !String(fieldVal).toLowerCase().includes(String(compareVal).toLowerCase());
     default: return false;
   }
 }
