@@ -310,12 +310,49 @@ export function usePlatformResolver() {
           
           // Anti-stale: verify integration is still connected
           if (integration.status !== 'connected') {
-            trace.steps.push(traceStep(TRACE_STEP.ANTI_STALE_CHECK, { status: integration.status }, false, 'Integration disconnected'));
-            clearContext();
-            platform = null;
-            storeKey = null;
-            integration = null;
-            chosenBy = null;
+            // In Shopify embedded mode: attempt session exchange auto-heal BEFORE blocking
+            if (isShopifyEmbedded) {
+              trace.steps.push(traceStep(TRACE_STEP.ANTI_STALE_CHECK, { status: integration.status }, null, 'Disconnected in embedded — attempting auto-heal via session exchange'));
+              try {
+                const { data: healData } = await base44.functions.invoke('shopifySessionExchange', {
+                  shop: storeKey,
+                  session_token: undefined // gate will have already set cache; shop param is enough for heal
+                });
+                if (healData?.authenticated && healData?.integration_id) {
+                  // Reload integration post-heal
+                  const healed = await base44.entities.PlatformIntegration.filter({ id: healData.integration_id });
+                  if (healed[0]) {
+                    integration = healed[0];
+                    integrationId = healed[0].id;
+                    tenantId = healed[0].tenant_id;
+                    trace.steps.push(traceStep('auto_heal_embedded', { integration_id: integration.id, status: integration.status }, true, 'Session exchange healed integration'));
+                  }
+                } else {
+                  trace.steps.push(traceStep('auto_heal_embedded', { reason: healData?.reason }, false, 'Session exchange did not heal'));
+                  clearContext();
+                  platform = null;
+                  storeKey = null;
+                  integration = null;
+                  chosenBy = null;
+                }
+              } catch (healErr) {
+                trace.steps.push(traceStep('auto_heal_embedded', { error: healErr.message }, false, 'Auto-heal exception'));
+                clearContext();
+                platform = null;
+                storeKey = null;
+                integration = null;
+                chosenBy = null;
+              }
+            } else {
+              trace.steps.push(traceStep(TRACE_STEP.ANTI_STALE_CHECK, { status: integration.status }, false, 'Integration disconnected'));
+              clearContext();
+              platform = null;
+              storeKey = null;
+              integration = null;
+              chosenBy = null;
+            }
+          } else {
+            trace.steps.push(traceStep(TRACE_STEP.ANTI_STALE_CHECK, { status: integration.status }, true, 'Integration connected'));
           }
         } else {
           trace.steps.push(traceStep(TRACE_STEP.LOOKUP_INTEGRATION, null, false, 'No integration found for platform/storeKey'));
