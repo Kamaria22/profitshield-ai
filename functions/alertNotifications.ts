@@ -189,6 +189,7 @@ Deno.serve(async (req) => {
     }
     
     const base44 = createClientFromRequest(req);
+    const db = base44.asServiceRole?.entities ?? base44.entities;
 
     const action = payload.action || 'send';
     const payloadKeys = Object.keys(payload);
