@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
       payload = {};
     }
     
-    // PHASE 3: Self-test action
+    // PHASE 3: Self-test action - VERSION 2.0.0
     if (payload.action === 'self_test') {
       const testResolution = resolveAlertId({ 
         event: { entity_id: '507f1f77bcf86cd799439011' },
@@ -251,6 +251,7 @@ Deno.serve(async (req) => {
       return Response.json({
         ok: true,
         action: 'self_test',
+        version: '2.0.0',
         test_passed: !!testResolution.source,
         chosen_source: testResolution.source,
         alert_found: true,
