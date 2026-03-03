@@ -235,7 +235,7 @@ export default function DiagnoseFixPanel({ tenantId, integrationId, shopDomain, 
                       onClick={() => {
                         const shop = result.shop_domain;
                         if (!shop) return;
-                        const reconnectUrl = `/shopifyauth?shop=${shop}`;
+                        const reconnectUrl = `/ShopifyAuth?shop=${shop}`;
                         if (window !== window.top) {
                           window.top.location.href = reconnectUrl;
                         } else {
