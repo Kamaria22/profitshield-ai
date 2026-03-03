@@ -788,6 +788,7 @@ Deno.serve(async (req) => {
         action: "remediation_workflow_executed",
         entity_type: "Alert",
         entity_id: alertData.id,
+        performed_by: "system",
         details: {
           workflow_type: alertType,
           actions_executed: results.automatic_actions.length,
