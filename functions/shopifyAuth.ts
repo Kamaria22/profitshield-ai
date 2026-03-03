@@ -4,12 +4,28 @@ const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
 const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
 const SCOPES = 'read_orders,read_products,read_customers,read_inventory,read_fulfillments,read_shipping';
 
+// Normalize action + alias map
+const ACTION_ALIASES = {
+  reconnect: 'reauthorize',
+  reconnect_oauth: 'reauthorize',
+  reauth: 'reauthorize',
+  reauthorize: 'reauthorize',
+  install: 'install',
+  callback: 'callback'
+};
+const ALLOWED_ACTIONS = Object.keys(ACTION_ALIASES);
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const { action, shop, code, state } = await req.json();
+    const body = await req.json();
+    const rawAction = (body.action || '').toString().toLowerCase().trim();
+    const action = ACTION_ALIASES[rawAction] || rawAction;
+    const { shop, code, state } = body;
     
-    if (action === 'install') {
+    console.log(`[shopifyAuth] action=${action} (raw=${rawAction}) shop=${shop}`);
+
+    if (action === 'install' || action === 'reauthorize') {
       // Generate install URL
       if (!shop) {
         return Response.json({ error: 'Shop domain is required' }, { status: 400 });
