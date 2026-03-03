@@ -88,7 +88,7 @@ async function predictChurn(base44) {
   const now = new Date();
   const nowMs = now.getTime();
 
-  const db = base44.asServiceRole(); // ✅ fixed
+  const db = base44.asServiceRole; // ✅ fixed
 
   // Load active tenants (bounded)
   const tenants = await db.entities.Tenant
@@ -417,7 +417,7 @@ async function triggerRetention(base44, tenantId, user) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const db = base44.asServiceRole();
+  const db = base44.asServiceRole;
 
   const preds = await db.entities.ChurnPrediction.filter({ tenant_id: tenantId }, "-updated_date", 1).catch(() => []);
   if (!preds.length) {
@@ -477,7 +477,7 @@ async function debugSignals(base44, tenantId, user) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const db = base44.asServiceRole();
+  const db = base44.asServiceRole;
   const now = new Date();
   const nowMs = now.getTime();
 
@@ -549,7 +549,7 @@ async function debugSignals(base44, tenantId, user) {
 // ─────────────────────────────────────────────
 
 async function getAtRiskTenants(base44) {
-  const db = base44.asServiceRole();
+  const db = base44.asServiceRole;
 
   const predictions = await db.entities.ChurnPrediction
     .filter({}, "-churn_probability", 5000)
