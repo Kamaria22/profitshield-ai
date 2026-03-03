@@ -8,8 +8,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { action } = body;
+    const body = await req.json().catch(() => ({}));
+    // Default to 'predict_churn' for scheduled automation calls (no action provided)
+    const action = body.action || 'predict_churn';
 
     if (action === 'predict_churn') {
       return await predictChurn(base44);
