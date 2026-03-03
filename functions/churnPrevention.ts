@@ -82,12 +82,13 @@ async function predictChurn(base44) {
   }
 
   // Bulk-load supporting data once (avoid N+1 queries)
-  const [allIntegrations, allOrders, allSyncJobs, allAlerts, allAuditLogs] = await Promise.all([
+  const [allIntegrations, allOrders, allSyncJobs, allAlerts, allAuditLogs, allSupportConversations] = await Promise.all([
     db.entities.PlatformIntegration.filter({}).catch(() => []),
     db.entities.Order.filter({}).catch(() => []),
     db.entities.SyncJob.filter({}).catch(() => []),
     db.entities.Alert.filter({ status: 'pending' }).catch(() => []),
-    db.entities.AuditLog.filter({}).catch(() => [])
+    db.entities.AuditLog.filter({}).catch(() => []),
+    db.entities.SupportConversation.filter({}).catch(() => [])
   ]);
 
   // Index by tenant_id for O(1) lookups
@@ -96,6 +97,7 @@ async function predictChurn(base44) {
   const syncsByTenant = groupBy(allSyncJobs, 'tenant_id');
   const alertsByTenant = groupBy(allAlerts, 'tenant_id');
   const auditsByTenant = groupBy(allAuditLogs, 'tenant_id');
+  const supportByTenant = groupBy(allSupportConversations, 'tenant_id');
 
   const predictions = [];
 
