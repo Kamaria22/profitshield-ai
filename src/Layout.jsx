@@ -108,6 +108,8 @@ const navItems = [
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
+  { name: 'Self-Healing Center', page: 'SelfHealingCenter', icon: Shield, permission: 'settings_manage', adminOnly: true },
+  { name: 'Patch Review', page: 'PatchReview', icon: Wrench, permission: 'settings_manage', adminOnly: true },
   { name: 'Support Inbox', page: 'SupportInbox', icon: Inbox, permission: 'settings_manage', adminOnly: true },
   { name: 'Founder AI', page: 'FounderDashboard', icon: Brain, permission: 'settings_manage', adminOnly: true },
   { name: 'Video Jobs', page: 'VideoJobs', icon: Video, permission: 'dashboard_view', adminOnly: true },
