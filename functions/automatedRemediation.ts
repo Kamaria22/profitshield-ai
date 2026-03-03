@@ -450,8 +450,8 @@ Deno.serve(async (req) => {
 
     function isValidBase44Id(val) {
       if (!val || typeof val !== "string") return false;
-      // Base44 IDs are typically 24 hex chars
-      return /^[a-f0-9]{24}$/.test(val);
+      // Accept 24 hex chars OR any string that looks like an ID (20+ chars alphanumeric)
+      return /^[a-f0-9]{24}$/.test(val) || /^[a-zA-Z0-9_-]{20,}$/.test(val);
     }
 
     function extractCandidateIds(obj, depth = 0) {
@@ -528,6 +528,13 @@ Deno.serve(async (req) => {
 
     console.log(`[automatedRemediation] Extracted alert ID candidates: ${allAlertIdCandidates.length}`, allAlertIdCandidates.slice(0, 3));
     console.log(`[automatedRemediation] Extracted tenant ID candidates: ${tenantIdCandidates.length}`, tenantIdCandidates.slice(0, 2));
+    
+    // DETAILED DEBUG: Log the structure we received
+    console.log(`[automatedRemediation] payload.data keys:`, Object.keys(payload.data || {}).slice(0, 10));
+    console.log(`[automatedRemediation] payload.event keys:`, Object.keys(payload.event || {}).slice(0, 10));
+    console.log(`[automatedRemediation] payload.automation keys:`, Object.keys(payload.automation || {}).slice(0, 10));
+    if (payload.data?.record) console.log(`[automatedRemediation] payload.data.record keys:`, Object.keys(payload.data.record).slice(0, 10));
+    if (payload.data?.selected) console.log(`[automatedRemediation] payload.data.selected keys:`, Object.keys(payload.data.selected).slice(0, 10));
 
     // ═══════════════════════════════════════════════════════════════
     // ATTEMPT RESOLUTION
@@ -600,6 +607,8 @@ Deno.serve(async (req) => {
         message: "Could not resolve alert from Automation Runner payload",
         payloadKeys: Object.keys(payload),
         topLevelDataKeys: Object.keys(payload.data || {}),
+        topLevelEventKeys: Object.keys(payload.event || {}),
+        topLevelAutomationKeys: Object.keys(payload.automation || {}),
         candidateIds: allAlertIdCandidates.slice(0, 10),
         candidateTenantIds: tenantIdCandidates,
         attemptedLookups,
@@ -609,7 +618,9 @@ Deno.serve(async (req) => {
           payloadAutomationCandidates: payloadAutomationCandidates.length,
           payloadOldDataCandidates: payloadOldDataCandidates.length,
         },
-        nextStep: "Verify alert was actually selected in the Automation UI and check that candidateIds are not empty."
+        dataRecordKeys: payload.data?.record ? Object.keys(payload.data.record).slice(0, 15) : null,
+        dataSelectedKeys: payload.data?.selected ? Object.keys(payload.data.selected).slice(0, 15) : null,
+        nextStep: "Check if alert is selected in Automation UI, or run with action=debug_to_see payload structure."
       };
 
       console.error(`[automatedRemediation] Alert resolution failed:`, JSON.stringify(debugInfo, null, 2));
