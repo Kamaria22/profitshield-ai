@@ -443,6 +443,13 @@ Deno.serve(async (req) => {
     // ───────────────────────────────────────────────────
     const resolution = resolveAlertId(payload);
     
+    // Update proof with resolved alert ID
+    if (proofRowId && resolution.alertId) {
+      await db.AutomationInvocationProof.update(proofRowId, {
+        resolved_alert_id: resolution.alertId
+      }).catch(() => {});
+    }
+    
     if (!resolution.alertId) {
       // Missing ID → queue for later, never 404
       return Response.json({
@@ -451,6 +458,8 @@ Deno.serve(async (req) => {
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         resolved_alert_id: null,
         chosen_source: null,
         lookup_attempts: 0,
@@ -480,6 +489,8 @@ Deno.serve(async (req) => {
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -523,6 +534,8 @@ Deno.serve(async (req) => {
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -543,6 +556,8 @@ Deno.serve(async (req) => {
         handler_file: HANDLER_FILE,
         function_name: FUNCTION_NAME,
         live_id: LIVE_ID,
+        proof_row_id: proofRowId,
+        invoked_via: invokedVia,
         resolved_alert_id: resolution.alertId,
         chosen_source: resolution.source,
         lookup_attempts: fetchResult.attempt + 1,
@@ -566,6 +581,8 @@ Deno.serve(async (req) => {
       handler_file: HANDLER_FILE,
       function_name: FUNCTION_NAME,
       live_id: LIVE_ID,
+      proof_row_id: proofRowId,
+      invoked_via: invokedVia,
       error: error.message,
       timestamp,
       elapsed_ms: Date.now() - startMs,
