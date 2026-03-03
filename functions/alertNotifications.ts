@@ -343,20 +343,19 @@ Deno.serve(async (req) => {
 
     // Log the notification event
     try {
-      await base44.asServiceRole.entities.AuditLog.create({
-        tenant_id: tId,
-        action: 'alert_notification_sent',
-        entity_type: 'Alert',
-        entity_id: alertData.id,
-        details: {
-          alert_type: alertType,
-          severity: alertData.severity,
-          is_scam: isScam,
-          channels: notification_channels,
-          results: results
-        },
-        timestamp: new Date().toISOString()
-      });
+      await withTimeout(
+        Promise.resolve(base44.asServiceRole.entities.AuditLog.create({
+          tenant_id: tId,
+          action: 'alert_notification_sent',
+          entity_type: 'Alert',
+          entity_id: alertData.id,
+          performed_by: 'system',
+          description: `Alert notification sent: ${alertType}`,
+          category: 'ai_action',
+          severity: 'medium'
+        })),
+        2000
+      );
     } catch (e) {
       console.warn('Failed to log notification event:', e);
     }
