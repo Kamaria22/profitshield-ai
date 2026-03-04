@@ -11,15 +11,18 @@ const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app
 const WEBHOOK_ENDPOINT = `${APP_URL}/api/functions/shopifyWebhook`;
 const API_VERSION = '2024-10';
 
-// Feature flags (env-based with safe defaults)
+// Feature flags (env-based with safe defaults) — all optional env vars
+function getFlag(name, defaultVal) {
+  try { const v = Deno.env.get(name); return v === undefined ? defaultVal : (v !== 'false' && v !== '0'); } catch { return defaultVal; }
+}
 const FLAGS = {
-  ENABLE_GDPR_WEBHOOKS: Deno.env.get('ENABLE_GDPR_WEBHOOKS') !== 'false',
-  ENABLE_APP_UNINSTALLED_HANDLER: Deno.env.get('ENABLE_APP_UNINSTALLED_HANDLER') !== 'false',
-  ENABLE_SUBSCRIPTION_WEBHOOKS: Deno.env.get('ENABLE_SUBSCRIPTION_WEBHOOKS') !== 'false',
-  ENABLE_SHOPIFY_BILLING: Deno.env.get('ENABLE_SHOPIFY_BILLING') === 'true', // default: false
-  ENABLE_RATE_LIMIT_RETRY: Deno.env.get('ENABLE_RATE_LIMIT_RETRY') !== 'false',
-  ENABLE_ONBOARDING_REAL_SYNC: Deno.env.get('ENABLE_ONBOARDING_REAL_SYNC') !== 'false',
-  FAIL_CLOSED_EMBEDDED_AUTH: Deno.env.get('FAIL_CLOSED_EMBEDDED_AUTH') !== 'false',
+  ENABLE_GDPR_WEBHOOKS: getFlag('ENABLE_GDPR_WEBHOOKS', true),
+  ENABLE_APP_UNINSTALLED_HANDLER: getFlag('ENABLE_APP_UNINSTALLED_HANDLER', true),
+  ENABLE_SUBSCRIPTION_WEBHOOKS: getFlag('ENABLE_SUBSCRIPTION_WEBHOOKS', true),
+  ENABLE_SHOPIFY_BILLING: (() => { try { return Deno.env.get('ENABLE_SHOPIFY_BILLING') === 'true'; } catch { return false; } })(),
+  ENABLE_RATE_LIMIT_RETRY: getFlag('ENABLE_RATE_LIMIT_RETRY', true),
+  ENABLE_ONBOARDING_REAL_SYNC: getFlag('ENABLE_ONBOARDING_REAL_SYNC', true),
+  FAIL_CLOSED_EMBEDDED_AUTH: getFlag('FAIL_CLOSED_EMBEDDED_AUTH', true),
 };
 
 const REQUIRED_TOPICS = [

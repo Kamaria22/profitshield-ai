@@ -7,7 +7,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const ENABLE_SHOPIFY_BILLING = Deno.env.get('ENABLE_SHOPIFY_BILLING') === 'true';
+const ENABLE_SHOPIFY_BILLING = (() => { try { return Deno.env.get('ENABLE_SHOPIFY_BILLING') === 'true'; } catch { return false; } })();
 const API_VERSION = '2024-10';
 
 const PLAN_PRICES = {
