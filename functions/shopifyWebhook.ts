@@ -73,10 +73,54 @@ Deno.serve(async (req) => {
   }).catch(() => []);
   const integration = integrations?.[0] || null;
 
-  // Always accept and queue (even if tenant not found) to avoid Shopify retries storms
+  const tenantId = integration?.tenant_id || null;
+
+  // Fast-path: handle app/uninstalled synchronously (must be < 2s)
+  if (topic === "app/uninstalled" && integration) {
+    db.PlatformIntegration.update(integration.id, {
+      status: "disconnected",
+      last_connected_at: new Date().toISOString(),
+    }).catch(() => {});
+    // Clear OAuth tokens (revoke)
+    db.OAuthToken.filter({ tenant_id: tenantId, platform: "shopify" }).then(tokens => {
+      for (const t of tokens) {
+        db.OAuthToken.update(t.id, { is_valid: false, encrypted_access_token: "", encrypted_refresh_token: "" }).catch(() => {});
+      }
+    }).catch(() => {});
+    db.AuditLog.create({
+      tenant_id: tenantId,
+      action: "app_uninstalled",
+      entity_type: "PlatformIntegration",
+      entity_id: integration.id,
+      performed_by: "system",
+      description: `App uninstalled from ${shop}`,
+      category: "integration",
+      severity: "high",
+      is_auto_action: true,
+    }).catch(() => {});
+    return json({ ok: true, action: "uninstall_handled" }, 200);
+  }
+
+  // app_subscriptions/update — enqueue to ShopifyDeferredJob
+  if (topic === "app_subscriptions/update") {
+    let payload = {};
+    try { payload = JSON.parse(raw); } catch {}
+    db.ShopifyDeferredJob?.create({
+      job_type: "subscription_update",
+      shop_domain: shop,
+      tenant_id: tenantId,
+      payload,
+      status: "pending",
+      attempts: 0,
+      next_attempt_at: new Date().toISOString(),
+    }).catch(() => {});
+    return json({ ok: true, queued: true, topic }, 200);
+  }
+
+  // All other topics: queue as before
   const queued = await db.WebhookQueue.create({
     platform: "shopify",
-    tenant_id: integration?.tenant_id || null,
+    tenant_id: tenantId,
     store_key: shop,
     topic,
     payload: raw,
