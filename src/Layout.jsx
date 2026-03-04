@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   Settings,
   Shield,
+  ShieldCheck,
   Menu,
   X,
   LogOut,

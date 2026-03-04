@@ -79,6 +79,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Products from './pages/Products';
 import Referrals from './pages/Referrals';
 import ResolverTestHarness from './pages/ResolverTestHarness';
+import ReviewerProof from './pages/ReviewerProof';
 import SelectStore from './pages/SelectStore';
 import SelfHealingCenter from './pages/SelfHealingCenter';
 import Settings from './pages/Settings';
@@ -91,7 +92,6 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import ReviewerProof from './pages/ReviewerProof';
 import __Layout from './Layout.jsx';
 
 
@@ -128,6 +128,7 @@ export const PAGES = {
     "Products": Products,
     "Referrals": Referrals,
     "ResolverTestHarness": ResolverTestHarness,
+    "ReviewerProof": ReviewerProof,
     "SelectStore": SelectStore,
     "SelfHealingCenter": SelfHealingCenter,
     "Settings": Settings,
@@ -140,7 +141,6 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "ReviewerProof": ReviewerProof,
 }
 
 export const pagesConfig = {
