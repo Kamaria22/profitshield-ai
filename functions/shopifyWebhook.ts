@@ -79,12 +79,18 @@ Deno.serve(async (req) => {
   if (topic === "app/uninstalled" && integration) {
     db.PlatformIntegration.update(integration.id, {
       status: "disconnected",
-      last_connected_at: new Date().toISOString(),
+      disconnected_at: new Date().toISOString(),
+      webhook_endpoints: {},
     }).catch(() => {});
     // Clear OAuth tokens (revoke)
     db.OAuthToken.filter({ tenant_id: tenantId, platform: "shopify" }).then(tokens => {
       for (const t of tokens) {
         db.OAuthToken.update(t.id, { is_valid: false, encrypted_access_token: "", encrypted_refresh_token: "" }).catch(() => {});
+      }
+    }).catch(() => {});
+    db.ShopifySubscriptionState?.filter({ shop_domain: shop }).then(states => {
+      for (const s of states || []) {
+        db.ShopifySubscriptionState.update(s.id, { status: "canceled", updated_at: new Date().toISOString() }).catch(() => {});
       }
     }).catch(() => {});
     db.AuditLog.create({

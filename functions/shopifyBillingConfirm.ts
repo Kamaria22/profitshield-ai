@@ -12,15 +12,53 @@ async function decryptToken(enc) {
   try { return atob(enc); } catch { return null; }
 }
 
+async function shopifyAdminFetch(shopDomain, accessToken, path, init = {}, maxAttempts = 4) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': accessToken,
+        ...(init.headers || {})
+      }
+    });
+    if (res.status !== 429) return res;
+
+    const retryAfter = Number(res.headers.get('Retry-After') || '0');
+    const backoffMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 500 * Math.pow(2, attempt));
+    await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    attempt++;
+  }
+  return fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+      ...(init.headers || {})
+    }
+  });
+}
+
+function parsePlanTier(inputPlan) {
+  const p = String(inputPlan || '').toLowerCase();
+  if (p.includes('starter')) return 'starter';
+  if (p.includes('growth')) return 'growth';
+  if (p.includes('pro')) return 'pro';
+  if (p.includes('enterprise')) return 'enterprise';
+  return null;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole.entities;
+    const url = new URL(req.url);
 
     let body = {};
     try { body = await req.json(); } catch {}
 
-    const action = body.action || 'confirm';
+    const action = body.action || url.searchParams.get('action') || 'confirm';
 
     if (action === 'prove_live') {
       return Response.json({ ok: true, function: 'shopifyBillingConfirm' });
@@ -63,7 +101,25 @@ Deno.serve(async (req) => {
     }
 
     // Direct confirmation: charge_id passed back from Shopify redirect
-    const { charge_id, tenant_id, plan, cycle, shop_domain } = body;
+    const chargeIdFromQuery = url.searchParams.get('charge_id');
+    const tenantIdFromQuery = url.searchParams.get('tenant_id');
+    const planFromQuery = url.searchParams.get('plan');
+    const cycleFromQuery = url.searchParams.get('cycle');
+    const shopFromQuery = url.searchParams.get('shop_domain');
+
+    const {
+      charge_id: chargeIdFromBody,
+      tenant_id: tenantIdFromBody,
+      plan: planFromBody,
+      cycle: cycleFromBody,
+      shop_domain: shopFromBody
+    } = body;
+
+    const charge_id = chargeIdFromBody || chargeIdFromQuery;
+    const tenant_id = tenantIdFromBody || tenantIdFromQuery;
+    const plan = planFromBody || planFromQuery;
+    const cycle = cycleFromBody || cycleFromQuery;
+    const shop_domain = shopFromBody || shopFromQuery;
     if (!tenant_id) return Response.json({ error: 'tenant_id required' }, { status: 400 });
 
     const integrations = await db.PlatformIntegration.filter({ tenant_id, platform: 'shopify', status: 'connected' }).catch(() => []);
@@ -74,30 +130,63 @@ Deno.serve(async (req) => {
     if (!tokens.length) return Response.json({ error: 'No token' }, { status: 401 });
     const accessToken = await decryptToken(tokens[0].encrypted_access_token);
 
-    // Activate the subscription
+    // Verify subscription status via GraphQL AppSubscription node.
     if (charge_id && accessToken) {
-      const activateRes = await fetch(`https://${resolvedShop}/admin/api/${API_VERSION}/recurring_application_charges/${charge_id}/activate.json`, {
+      const subscriptionGid = String(charge_id).startsWith('gid://')
+        ? String(charge_id)
+        : `gid://shopify/AppSubscription/${charge_id}`;
+      const query = `
+        query appSubscriptionStatus($id: ID!) {
+          node(id: $id) {
+            ... on AppSubscription {
+              id
+              name
+              status
+              currentPeriodEnd
+            }
+          }
+        }
+      `;
+      const statusRes = await shopifyAdminFetch(resolvedShop, accessToken, '/graphql.json', {
         method: 'POST',
-        headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recurring_application_charge: { id: charge_id } })
+        body: JSON.stringify({ query, variables: { id: subscriptionGid } })
       });
-      const activateData = await activateRes.json().catch(() => ({}));
-      const activated = activateData?.recurring_application_charge?.status === 'active';
+      const statusData = await statusRes.json().catch(() => ({}));
+      const appSub = statusData?.data?.node || null;
+      const status = String(appSub?.status || '').toLowerCase();
+      const activated = status === 'active';
 
       if (activated) {
         const stateExisting = await db.ShopifySubscriptionState.filter({ shop_domain: resolvedShop }).catch(() => []);
-        const sp = { shop_domain: resolvedShop, tenant_id, subscription_id: String(charge_id), status: 'active', plan: plan || 'unknown', updated_at: new Date().toISOString() };
+        const resolvedPlan = parsePlanTier(plan || appSub?.name) || 'unknown';
+        const sp = {
+          shop_domain: resolvedShop,
+          tenant_id,
+          subscription_id: String(appSub?.id || charge_id),
+          status: 'active',
+          plan: resolvedPlan,
+          billing_cycle: cycle || null,
+          current_period_end: appSub?.currentPeriodEnd || null,
+          updated_at: new Date().toISOString()
+        };
         if (stateExisting.length) await db.ShopifySubscriptionState.update(stateExisting[0].id, sp).catch(() => {});
         else await db.ShopifySubscriptionState.create(sp).catch(() => {});
 
         // Update tenant
-        await db.Tenant.update(tenant_id, { plan_status: 'active', subscription_tier: (plan || '').toLowerCase() }).catch(() => {});
+        await db.Tenant.update(tenant_id, { plan_status: 'active', subscription_tier: resolvedPlan }).catch(() => {});
 
-        return Response.json({ ok: true, status: 'active', plan, shop_domain: resolvedShop });
+        return Response.json({ ok: true, status: 'active', plan: resolvedPlan, shop_domain: resolvedShop });
       }
+
+      return Response.json({
+        ok: false,
+        error: 'Subscription is not active yet',
+        status: status || 'unknown',
+        shop_domain: resolvedShop
+      }, { status: 202 });
     }
 
-    return Response.json({ ok: false, error: 'Activation failed or charge_id missing' }, { status: 400 });
+    return Response.json({ ok: false, error: 'charge_id missing' }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e?.message }, { status: 500 });
   }

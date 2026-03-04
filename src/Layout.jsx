@@ -894,7 +894,14 @@ function LayoutWithProviders({ children, currentPageName }) {
 
   return (
     <SyncProvider tenantId={authTenantId}>
-      <HealthErrorBoundary fallback={null}>
+      <HealthErrorBoundary fallback={
+        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+          <div className="max-w-md w-full rounded-lg border border-amber-200 bg-amber-50 p-5">
+            <h2 className="text-base font-semibold text-amber-900">Temporary app issue</h2>
+            <p className="text-sm text-amber-800 mt-2">The UI recovered into safe mode. Please refresh to continue.</p>
+          </div>
+        </div>
+      }>
         <LayoutWithErrorBoundary currentPageName={currentPageName}>
           {children}
         </LayoutWithErrorBoundary>

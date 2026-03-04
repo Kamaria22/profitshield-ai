@@ -7,7 +7,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const ENABLE_SHOPIFY_BILLING = false; // default off — set env var ENABLE_SHOPIFY_BILLING=true when ready
+const ENABLE_SHOPIFY_BILLING = (Deno.env.get('ENABLE_SHOPIFY_BILLING') || '').toLowerCase() === 'true';
 const API_VERSION = '2024-10';
 
 const PLAN_PRICES = {
@@ -18,6 +18,35 @@ const PLAN_PRICES = {
 
 async function decryptToken(enc) {
   try { return atob(enc); } catch { return null; }
+}
+
+async function shopifyAdminFetch(shopDomain, accessToken, path, init = {}, maxAttempts = 4) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': accessToken,
+        ...(init.headers || {})
+      }
+    });
+
+    if (res.status !== 429) return res;
+
+    const retryAfter = Number(res.headers.get('Retry-After') || '0');
+    const backoffMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 500 * Math.pow(2, attempt));
+    await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    attempt++;
+  }
+  return fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+      ...(init.headers || {})
+    }
+  });
 }
 
 Deno.serve(async (req) => {
@@ -79,9 +108,8 @@ Deno.serve(async (req) => {
       }
     `;
 
-    const gqlRes = await fetch(`https://${resolvedShop}/admin/api/${API_VERSION}/graphql.json`, {
+    const gqlRes = await shopifyAdminFetch(resolvedShop, accessToken, '/graphql.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
       body: JSON.stringify({
         query: mutation,
         variables: {
@@ -98,6 +126,10 @@ Deno.serve(async (req) => {
         }
       })
     });
+    if (!gqlRes.ok) {
+      const text = await gqlRes.text().catch(() => '');
+      return Response.json({ ok: false, error: `Shopify billing request failed (${gqlRes.status})`, detail: text.slice(0, 400) }, { status: 502 });
+    }
 
     const gqlData = await gqlRes.json();
     const result = gqlData?.data?.appSubscriptionCreate;

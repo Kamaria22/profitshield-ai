@@ -18,7 +18,11 @@ const TOPICS = [
   'orders/cancelled',
   'refunds/create',
   'products/update',
-  'app/uninstalled'
+  'app/uninstalled',
+  'customers/data_request',
+  'customers/redact',
+  'shop/redact',
+  'app_subscriptions/update'
 ];
 
 async function decryptToken(encryptedToken) {
@@ -35,6 +39,31 @@ async function decryptToken(encryptedToken) {
     // Fallback: plain base64
     return atob(encryptedToken);
   }
+}
+
+async function shopifyFetchWithRetry(shopDomain, accessToken, path, init = {}, maxAttempts = 4) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+      ...init,
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        ...(init.headers || {})
+      }
+    });
+    if (res.status !== 429) return res;
+    const retryAfter = Number(res.headers.get('Retry-After') || '0');
+    const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 500 * Math.pow(2, attempt));
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    attempt++;
+  }
+  return fetch(`https://${shopDomain}/admin/api/${API_VERSION}${path}`, {
+    ...init,
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      ...(init.headers || {})
+    }
+  });
 }
 
 Deno.serve(async (req) => {
@@ -85,16 +114,13 @@ Deno.serve(async (req) => {
 
     // Delete ALL stale webhooks (including wrong-domain ones)
     try {
-      const listRes = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json?limit=250`, {
-        headers: { 'X-Shopify-Access-Token': accessToken }
-      });
+      const listRes = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json?limit=250');
       if (listRes.ok) {
         const { webhooks } = await listRes.json();
         for (const wh of (webhooks || [])) {
           if (STALE_ENDPOINTS.some(ep => wh.address.includes('shopifyWebhook'))) {
-            await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks/${wh.id}.json`, {
+            await shopifyFetchWithRetry(shopDomain, accessToken, `/webhooks/${wh.id}.json`, {
               method: 'DELETE',
-              headers: { 'X-Shopify-Access-Token': accessToken }
             }).catch(() => {});
           }
         }
@@ -109,9 +135,9 @@ Deno.serve(async (req) => {
 
     for (const topic of TOPICS) {
       try {
-        const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json`, {
+        const res = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ webhook: { topic, address: WEBHOOK_URL, format: 'json' } })
         });
         const data = await res.json();
