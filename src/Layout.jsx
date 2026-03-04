@@ -898,6 +898,9 @@ function LayoutWithProviders({ children, currentPageName }) {
         </LayoutWithErrorBoundary>
       </HealthErrorBoundary>
 
+      {/* GLOBAL FRONTEND GUARDIAN — mounts once when tenant resolves */}
+      {authTenantId && <FrontendGuardian authTenantId={authTenantId} />}
+
       {/* PWA Install & Update Banners */}
       <InstallAppBanner />
       <UpdateAvailableBanner />
