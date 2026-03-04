@@ -169,10 +169,5 @@ function CustomerSegmentationPanelInner({ tenantId }) {
   );
 }
 
-export default function CustomerSegmentationPanel(props) {
-  return (
-    <GuardianErrorBoundary featureKey="customer_segmentation_panel">
-      <CustomerSegmentationPanelInner {...props} />
-    </GuardianErrorBoundary>
-  );
-}
+export { CustomerSegmentationPanelInner };
+export default CustomerSegmentationPanelInner;
