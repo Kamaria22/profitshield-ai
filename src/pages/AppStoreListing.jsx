@@ -101,6 +101,10 @@ function ReadinessChecklist() {
 }
 
 export default function AppStoreListing() {
+  const resolver = usePlatformResolver();
+  const shopDomain = resolver?.storeKey || null;
+  const tenantId = resolver?.tenantId || null;
+
   return (
     <RouteGuard pageName="AppStoreListing">
       <div className="max-w-5xl mx-auto px-2 py-6">
