@@ -1,6 +1,19 @@
 import React, { useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 
+// React component — mounts once when tenant is resolved
+export default function FrontendGuardian({ authTenantId }) {
+  const installed = useRef(false);
+
+  useEffect(() => {
+    if (!authTenantId || installed.current) return;
+    installed.current = true;
+    installFrontendGuardian(authTenantId);
+  }, [authTenantId]);
+
+  return null; // invisible
+}
+
 // 1) Global runtime error capture
 export function installFrontendGuardian(tenantId) {
   const report = async (incident) => {
