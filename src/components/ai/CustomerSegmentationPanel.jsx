@@ -63,6 +63,7 @@ function CustomerSegmentationPanelInner({ tenantId }) {
   if (!tenantId) return null;
 
   return (
+    // inner JSX unchanged
     <Card className="overflow-hidden">
       <CardHeader className="pb-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white">
         <div className="flex items-center justify-between">
