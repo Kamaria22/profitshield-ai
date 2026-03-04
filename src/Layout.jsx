@@ -16,6 +16,7 @@ import { NotificationProvider, NotificationSettingsButton } from '@/components/p
 import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
 import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
 import { healthAgent } from '@/components/health/HealthAgent';
+import FrontendGuardian from '@/components/FrontendGuardian';
 import { HealthErrorBoundary } from '@/components/health/HealthErrorBoundary';
 import { LanguageProvider } from '@/components/i18n/LanguageContext';
 import LanguageSelector from '@/components/i18n/LanguageSelector';
