@@ -38,7 +38,7 @@ const segmentIcons = {
   'default': Users
 };
 
-export default function CustomerSegmentationPanel({ tenantId }) {
+function CustomerSegmentationPanelInner({ tenantId }) {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
     queryFn: async () => {

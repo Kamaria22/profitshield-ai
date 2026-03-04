@@ -1,4 +1,5 @@
 import React from 'react';
+import { GuardianErrorBoundary } from '@/components/FrontendGuardian';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
