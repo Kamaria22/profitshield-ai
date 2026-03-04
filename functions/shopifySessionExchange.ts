@@ -283,8 +283,7 @@ Deno.serve(async (req) => {
         if (token?.encrypted_access_token) {
           // Quick token validity check via access_scopes
           try {
-            const { decryptToken: dt } = await import('./shopifyConfig.js');
-            const accessToken = await dt(token.encrypted_access_token);
+            const accessToken = await decryptToken(token.encrypted_access_token);
             if (accessToken) {
               const scopeRes = await fetch(`https://${shopDomain}/admin/oauth/access_scopes.json`, {
                 headers: { 'X-Shopify-Access-Token': accessToken }
