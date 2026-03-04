@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -132,6 +132,13 @@ export default function Orders() {
   const isLoading = resolverLoading || ordersLoading;
 
   // Apply filters - MUST be before any early returns (React hooks rules)
+  // Detect if store has any test orders (for banner)
+  const hasTestOrders = useMemo(() => orders.some(o => {
+    const gateway = (o.platform_data?.gateway || '').toLowerCase();
+    const tags = Array.isArray(o.tags) ? o.tags.join(',').toLowerCase() : (o.platform_data?.tags || '').toLowerCase();
+    return gateway === 'bogus' || tags.includes('test') || o.is_demo === true;
+  }), [orders]);
+
   const filteredOrders = useMemo(() => {
     if (!canQuery) return [];
     
