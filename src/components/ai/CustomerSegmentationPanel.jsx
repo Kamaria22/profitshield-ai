@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { GuardianErrorBoundary } from '@/components/FrontendGuardian';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { 
