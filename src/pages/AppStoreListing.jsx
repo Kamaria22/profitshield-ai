@@ -124,6 +124,7 @@ export default function AppStoreListing() {
           </div>
         </div>
 
+        <ReviewerProofPanel shopDomain={shopDomain} tenantId={tenantId} />
         <ReadinessChecklist />
 
         <div className="grid md:grid-cols-2 gap-4 mb-8">
