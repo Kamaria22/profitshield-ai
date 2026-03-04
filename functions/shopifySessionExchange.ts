@@ -16,7 +16,27 @@
  *   - Returns 200 with install_required:true if shop not installed yet.
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+
+// ── Inline token decrypt (no local imports allowed in Deno Deploy) ─────────────
+async function decryptToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
+  if (!key) {
+    try { return atob(encryptedToken); } catch { return null; }
+  }
+  try {
+    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const enc = combined.slice(12);
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    try { return atob(encryptedToken); } catch { return null; }
+  }
+}
 
 const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
 const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
