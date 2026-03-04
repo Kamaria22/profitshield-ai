@@ -49,6 +49,7 @@ export default function Orders() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showTestOrders, setShowTestOrders] = useState(false);
   const [filters, setFilters] = useState({
     dateRange: '30',
     status: 'all',
@@ -136,9 +137,16 @@ export default function Orders() {
     
     let result = [...orders];
 
-    // Demo mode filter: only exclude demo orders when demo_mode is explicitly false
-    // Never filter out real orders (those with platform_order_id)
-    result = result.filter(o => o.is_demo !== true || o.platform_order_id);
+    // Test order detection: Shopify test orders have gateway="bogus" or tags containing "test"
+    const isTestOrder = (o) => {
+      const gateway = (o.platform_data?.gateway || '').toLowerCase();
+      const tags = Array.isArray(o.tags) ? o.tags.join(',').toLowerCase() : (o.platform_data?.tags || '').toLowerCase();
+      return gateway === 'bogus' || gateway === 'manual' || tags.includes('test') || o.is_demo === true;
+    };
+
+    if (!showTestOrders) {
+      result = result.filter(o => !isTestOrder(o) || o.is_demo !== true);
+    }
 
     // Date range filter — use a large window to ensure real orders show
     const days = parseInt(filters.dateRange) || 90;
