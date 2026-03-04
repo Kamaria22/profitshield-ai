@@ -193,3 +193,11 @@ function AIAutoActionsPanelInner({ tenantId }) {
     </Card>
   );
 }
+
+export default function AIAutoActionsPanel(props) {
+  return (
+    <GuardianErrorBoundary featureKey="ai_auto_actions_panel">
+      <AIAutoActionsPanelInner {...props} />
+    </GuardianErrorBoundary>
+  );
+}
