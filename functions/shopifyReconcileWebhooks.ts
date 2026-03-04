@@ -19,7 +19,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 const API_VERSION = '2024-10';
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const WEBHOOK_ENDPOINT_CANONICAL = `${APP_URL}/api/functions/shopifyWebhook`;
-const REQUIRED_TOPICS = ['orders/create','orders/updated','orders/paid','orders/cancelled','refunds/create','products/update','app/uninstalled'];
+const REQUIRED_TOPICS = [
+  'orders/create','orders/updated','orders/paid','orders/cancelled',
+  'refunds/create','products/update',
+  'app/uninstalled',
+  'customers/data_request','customers/redact','shop/redact',
+  'app_subscriptions/update',
+];
 
 function canonicalizeShopDomain(shop) {
   if (!shop) return null;
