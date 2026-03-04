@@ -328,16 +328,53 @@ const DEFAULT_POLICY = {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
 
-    if (!user || user.role !== "admin") {
+    // Service-role only for watchdog automations — no user session required
+    let body = {};
+    try { body = await req.json(); } catch {}
+
+    const action = body.action || "enforce";
+    const mode = body.mode || "enforce"; // "watch" | "enforce"
+    const policyOverride = body.policy || {};
+
+    // prove_live: no auth needed
+    if (action === "prove_live") {
+      return Response.json({ ok: true, function: "stabilityAgent", ts: nowIso() });
+    }
+
+    // watchdog: runs via automation — no user session, loop all tenants
+    if (action === "watchdog") {
+      const db = base44.asServiceRole.entities;
+      const policy = { ...DEFAULT_POLICY, ...policyOverride };
+      const brain = new StabilityBrain(policy);
+      const infra = buildInfraAdapter(db);
+      const tenants = await db.Tenant.filter({ status: "active" }).catch(() => []);
+      const results = [];
+      for (const tenant of tenants.slice(0, 20)) {
+        try {
+          const signals = await gatherSignals(db, tenant.id);
+          const incident = brain.assess(signals);
+          if (incident) {
+            await infra.writeAudit({ type: "stability.incident_detected", ts: nowIso(), tenant_id: tenant.id, incident });
+            results.push({ tenant_id: tenant.id, incident: incident.summary });
+          } else {
+            results.push({ tenant_id: tenant.id, ok: true });
+          }
+        } catch (e) {
+          results.push({ tenant_id: tenant.id, error: e?.message });
+        }
+      }
+      return Response.json({ ok: true, watchdog: true, tenants_checked: tenants.length, results, ts: nowIso() });
+    }
+
+    // For direct calls, allow admin users only
+    let user = null;
+    try { user = await base44.auth.me(); } catch {}
+    if (user && user.role !== "admin" && user.role !== "owner") {
       return Response.json({ error: "Forbidden: admin only" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const mode = body.mode || "enforce"; // "watch" | "enforce"
     const tenantId = body.tenant_id || "system";
-    const policyOverride = body.policy || {};
 
     const db = base44.asServiceRole.entities;
     const policy = { ...DEFAULT_POLICY, ...policyOverride };

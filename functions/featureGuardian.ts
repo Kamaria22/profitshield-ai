@@ -199,6 +199,31 @@ Deno.serve(async (req) => {
     elapsed_ms: 0,
   };
 
+  // watchdog: loop all active tenants, no user session required
+  if (action === "watchdog") {
+    const db = base44.asServiceRole?.entities || base44.entities;
+    let tenants = [];
+    try { tenants = await db.Tenant.filter({ status: "active" }); } catch {}
+    const watchResults = [];
+    for (const tenant of tenants.slice(0, 20)) {
+      try {
+        const playbook = FEATURE_PLAYBOOKS[feature];
+        if (!playbook) continue;
+        const smoke = await playbook.smokeTest(base44, tenant.id).catch(e => ({ ok: false, reason: e?.message }));
+        let fixes = [];
+        if (!smoke.ok) {
+          fixes = await playbook.safeFixes(base44, tenant.id).catch(() => []);
+        }
+        const report = { ts: nowIso(), feature, tenant_id: tenant.id, smoke, fixes, version: VERSION };
+        await upsertFixReport(base44, { tenant_id: tenant.id, feature, status: smoke.ok ? "healthy" : "fixed_or_pending", report, created_at: nowIso(), version: VERSION, performed_by: "system" });
+        watchResults.push({ tenant_id: tenant.id, smoke_ok: smoke.ok, fixes_applied: fixes.length });
+      } catch (e) {
+        watchResults.push({ tenant_id: tenant.id, error: e?.message });
+      }
+    }
+    return Response.json({ ok: true, watchdog: true, feature, tenants_processed: tenants.length, results: watchResults, version: VERSION, elapsed_ms: Date.now() - started });
+  }
+
   try {
     if (!FEATURE_PLAYBOOKS[feature]) {
       await writeAudit(base44, tenantId, "featureGuardian_unknown_feature", { feature }, "warning");
