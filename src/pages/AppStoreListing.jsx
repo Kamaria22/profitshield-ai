@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RouteGuard from '@/components/RouteGuard';
+import ReviewerProofPanel from '@/components/appstore/ReviewerProofPanel';
+import { usePlatformResolver } from '@/components/usePlatformResolver';
 
 function CopyBlock({ label, content }) {
   const [copied, setCopied] = useState(false);
