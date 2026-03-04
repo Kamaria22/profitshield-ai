@@ -330,6 +330,22 @@ export default function Orders() {
         userEmail={user?.email}
       />
 
+      {/* Test Order Indicator Banner */}
+      {hasTestOrders && (
+        <div className="rounded-lg p-3 flex items-center justify-between" style={{background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.25)'}}>
+          <div className="flex items-center gap-2 text-sm text-indigo-300">
+            <span className="text-lg">🧪</span>
+            <span>{showTestOrders ? 'Showing test orders (Shopify reviewer mode)' : 'Test orders hidden'}</span>
+          </div>
+          <button
+            onClick={() => setShowTestOrders(v => !v)}
+            className="text-xs text-indigo-400 hover:text-indigo-200 border border-indigo-500/40 px-2 py-1 rounded transition-colors"
+          >
+            {showTestOrders ? 'Hide Test Orders' : 'Show Test Orders'}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
