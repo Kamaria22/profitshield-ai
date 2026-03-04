@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 
 // 1) Global runtime error capture
