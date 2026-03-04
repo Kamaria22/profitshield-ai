@@ -33,7 +33,7 @@ const actionColors = {
   ai_auto_leak_detection: 'bg-amber-100 text-amber-700 border-amber-200'
 };
 
-export default function AIAutoActionsPanel({ tenantId }) {
+function AIAutoActionsPanelInner({ tenantId }) {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
