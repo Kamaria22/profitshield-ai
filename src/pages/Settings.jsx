@@ -365,6 +365,12 @@ export default function Settings() {
               App Store
             </TabsTrigger>
           )}
+          {(user?.role === 'admin' || user?.role === 'owner') && (
+            <TabsTrigger value="email-support" className="flex items-center gap-2">
+              <Mail className="w-3 h-3" />
+              Email & Support
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Tab */}
