@@ -85,12 +85,6 @@ Deno.serve(async (req) => {
         const allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200);
         console.log(`[ProfitAlertWatchdog] Got ${allOrders.length} orders`);
 
-        if (!alertRules || alertRules.length === 0) {
-          results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
-          successCount++;
-          continue;
-        }
-
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const recentOrders = allOrders.filter(o => o.created_date >= yesterday);
 
