@@ -701,6 +701,13 @@ export default function Settings() {
             <ScreenshotGenerator />
           </TabsContent>
         )}
+
+        {/* Email & Support Tab - Admin/Owner Only */}
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+          <TabsContent value="email-support" className="mt-6">
+            <EmailSystemSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
