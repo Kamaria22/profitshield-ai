@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Users, Megaphone, Search, Sparkles } from 'lucide-react';
 import { usePlatformResolver, requireResolved } from '../components/usePlatformResolver';

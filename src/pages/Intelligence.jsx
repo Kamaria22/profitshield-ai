@@ -13,6 +13,10 @@ export default function Intelligence() {
   const { tenantId, status } = usePlatformResolver();
   const [tab, setTab] = useState('orders');
 
+  React.useEffect(() => {
+    document.title = 'Risk Intelligence – ProfitShield AI | Fraud & Chargeback Detection for Shopify';
+  }, []);
+
   if (status === RESOLVER_STATUS.RESOLVING) {
     return (
       <div className="flex items-center justify-center py-20">
