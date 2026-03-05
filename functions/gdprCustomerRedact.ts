@@ -13,6 +13,13 @@ async function hmacSha256Base64(secret, message) {
   return btoa(binary);
 }
 
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -26,12 +33,14 @@ Deno.serve(async (req) => {
     const body = await req.text();
 
     const secret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET') || Deno.env.get('SHOPIFY_API_SECRET') || '';
-    if (secret && hmacHeader) {
-      const computed = await hmacSha256Base64(secret, body);
-      if (computed !== hmacHeader) {
-        console.warn('[GDPR/customer_redact] HMAC mismatch for shop:', shopDomain);
-        return Response.json({ ok: false }, { status: 401 });
-      }
+    if (!secret || !hmacHeader) {
+      return Response.json({ ok: false }, { status: 401 });
+    }
+    const computed = await hmacSha256Base64(secret, body);
+    const valid = timingSafeEqual(new TextEncoder().encode(computed), new TextEncoder().encode(hmacHeader));
+    if (!valid) {
+      console.warn('[GDPR/customer_redact] HMAC mismatch for shop:', shopDomain);
+      return Response.json({ ok: false }, { status: 401 });
     }
 
     let payload = {};
