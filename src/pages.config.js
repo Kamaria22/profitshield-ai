@@ -62,6 +62,7 @@ import DataProcessingAgreement from './pages/DataProcessingAgreement';
 import Download from './pages/Download';
 import Embedded from './pages/Embedded';
 import FounderDashboard from './pages/FounderDashboard';
+import GitHubPullRequests from './pages/GitHubPullRequests';
 import HelpCenter from './pages/HelpCenter';
 import Home from './pages/Home';
 import Install from './pages/Install';
@@ -92,7 +93,6 @@ import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
 import VideoJobs from './pages/VideoJobs';
-import GitHubPullRequests from './pages/GitHubPullRequests';
 import __Layout from './Layout.jsx';
 
 
@@ -112,6 +112,7 @@ export const PAGES = {
     "Download": Download,
     "Embedded": Embedded,
     "FounderDashboard": FounderDashboard,
+    "GitHubPullRequests": GitHubPullRequests,
     "HelpCenter": HelpCenter,
     "Home": Home,
     "Install": Install,
@@ -142,7 +143,6 @@ export const PAGES = {
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,
     "VideoJobs": VideoJobs,
-    "GitHubPullRequests": GitHubPullRequests,
 }
 
 export const pagesConfig = {
