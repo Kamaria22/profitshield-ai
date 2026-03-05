@@ -61,9 +61,28 @@ async function checkWebhooks(db, shop_domain) {
 }
 
 async function checkBilling(db, shop_domain) {
+  // Check ShopifySubscriptionState first
   const sub = await db.ShopifySubscriptionState.filter({ shop_domain }, "-updated_at", 1).catch(() => []);
-  if (!sub.length) return { ok: false, reason: "no_subscription_record" };
-  return { ok: true, status: sub[0].status, plan: sub[0].plan };
+  if (sub.length > 0) {
+    return { ok: true, status: sub[0].status, plan: sub[0].plan, source: "shopify_subscription" };
+  }
+
+  // Fallback: check Tenant record — trial and active both count as billing-enabled
+  const tenants = await db.Tenant.filter({ shop_domain }).catch(() => []);
+  if (tenants.length > 0) {
+    const t = tenants[0];
+    const validStatuses = ["trial", "active"];
+    const ok = validStatuses.includes(t.plan_status) || validStatuses.includes(t.status);
+    return {
+      ok,
+      status: t.plan_status || t.status,
+      plan: t.subscription_tier,
+      trial_ends_at: t.trial_ends_at,
+      source: "tenant_record"
+    };
+  }
+
+  return { ok: false, reason: "no_billing_record" };
 }
 
 async function checkGDPR(db) {
