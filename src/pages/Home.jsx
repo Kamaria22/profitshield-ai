@@ -275,7 +275,22 @@ export default function Home() {
             )}
           </div>
 
-          {/* 1️⃣ AI Profit Intelligence Summary — instant value, above-the-fold */}
+          {/* 1️⃣ AI Profit Operating System — instant, above-the-fold */}
+          <AIProfitOperatingSystem
+            metrics={metrics}
+            profitScore={profitScore}
+            loading={summaryLoading}
+          />
+
+          {/* 2️⃣ Autonomous Profit Guard */}
+          <AutonomousProfitGuard
+            metrics={metrics}
+            profitLeaks={profitLeaks}
+            alerts={dashboardSummary?.alerts || []}
+            loading={summaryLoading}
+          />
+
+          {/* 3️⃣ AI Profit Intelligence Summary */}
           <AIProfitIntelligenceSummary
             metrics={metrics}
             profitLeaks={profitLeaks}
