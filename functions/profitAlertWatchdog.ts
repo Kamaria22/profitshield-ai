@@ -132,3 +132,57 @@ Deno.serve(async (req) => {
     }, { status: 500 });
   }
 });
+
+// --- Inline rule evaluator (no cross-file import) ---
+function checkRule(rule, order) {
+  switch (rule.type) {
+    case 'low_margin': {
+      const m = order.margin_pct || 0;
+      if (m !== 0 && m < rule.threshold_value) {
+        return { message: `Order margin (${m.toFixed(1)}%) below ${rule.threshold_value}% threshold` };
+      }
+      break;
+    }
+    case 'negative_profit': {
+      const p = order.net_profit || 0;
+      if (p < rule.threshold_value) {
+        return { message: `Order has negative profit ($${p.toFixed(2)})` };
+      }
+      break;
+    }
+    case 'shipping_discrepancy': {
+      const charged = order.shipping_charged || 0;
+      const cost = order.shipping_cost || 0;
+      if (charged > 0 && cost > 0) {
+        const diff = ((cost - charged) / charged) * 100;
+        if (diff > rule.threshold_value) {
+          return { message: `Shipping cost exceeds charged by ${diff.toFixed(1)}%` };
+        }
+      }
+      break;
+    }
+    case 'high_discount': {
+      const total = order.total_revenue || 0;
+      const discount = order.discount_total || 0;
+      if (total > 0 && discount > 0) {
+        const pct = (discount / (total + discount)) * 100;
+        if (pct > rule.threshold_value) {
+          return { message: `Discount (${pct.toFixed(1)}%) exceeds ${rule.threshold_value}% threshold` };
+        }
+      }
+      break;
+    }
+  }
+  return null;
+}
+
+function mapAlertType(ruleType) {
+  const map = {
+    low_margin: 'negative_margin',
+    negative_profit: 'negative_margin',
+    shipping_discrepancy: 'shipping_loss',
+    high_discount: 'discount_abuse',
+    cogs_change: 'system'
+  };
+  return map[ruleType] || 'system';
+}
