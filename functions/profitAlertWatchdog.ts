@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
     // 2. Process each tenant — fail individually, never abort the loop
     for (const tenantId of tenantIds) {
       try {
+        console.log(`[ProfitAlertWatchdog] Processing tenant: ${tenantId}`);
         // Use asServiceRole for all entity ops — no user session in scheduled context
         let alertRules = [], allOrders = [];
         try {
