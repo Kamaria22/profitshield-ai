@@ -19,26 +19,45 @@ async function checkWebhooks(db, shop_domain) {
     "app_subscriptions/update"
   ];
 
-  // Check PlatformIntegration.webhook_endpoints (set by registerShopifyWebhooks)
+  // Collect registered topics from multiple sources
+  const registeredSet = new Set();
+
+  // Source 1: PlatformIntegration.webhook_endpoints
   const integrations = await db.PlatformIntegration.filter({ store_key: shop_domain }).catch(() => []);
   if (integrations.length > 0) {
     const endpoints = integrations[0].webhook_endpoints || {};
-    // webhook_endpoints keys use underscore format: orders_create, app_uninstalled, etc.
-    const registeredTopics = Object.keys(endpoints).map(k => k.replace(/_/g, '/'));
-    const missing = required.filter(t => !registeredTopics.includes(t));
-    return {
-      ok: missing.length === 0,
-      registered: registeredTopics,
-      missing,
-      source: "platform_integration"
-    };
+    // Keys use underscore: orders_create → orders/create, app_subscriptions_update → app_subscriptions/update
+    for (const [key, val] of Object.entries(endpoints)) {
+      if (val) {
+        // Handle special case: app_subscriptions_update → app_subscriptions/update
+        // Split on last underscore group to reconstruct topic
+        // Strategy: replace ALL underscores, then fix known compound namespaces
+        let topic = key.replace(/_/g, '/');
+        // Fix compound namespaces: app/subscriptions/update → app_subscriptions/update
+        topic = topic
+          .replace('app/subscriptions/update', 'app_subscriptions/update')
+          .replace('app/uninstalled', 'app/uninstalled') // already correct
+          .replace('customers/data/request', 'customers/data_request');
+        registeredSet.add(topic);
+      }
+    }
   }
 
-  // Fallback: check ShopifyWebhookRegistry
+  // Source 2: ShopifyWebhookRegistry (may have GDPR + subscription webhooks)
   const registry = await db.ShopifyWebhookRegistry.filter({ shop_domain }).catch(() => []);
-  const topics = registry.map(r => r.topic);
-  const missing = required.filter(t => !topics.includes(t));
-  return { ok: missing.length === 0, registered: topics, missing, source: "webhook_registry" };
+  for (const r of registry) {
+    if (r.topic && r.status !== 'missing') registeredSet.add(r.topic);
+  }
+
+  const registered = Array.from(registeredSet);
+  const missing = required.filter(t => !registered.includes(t));
+
+  return {
+    ok: missing.length === 0,
+    registered,
+    missing,
+    sources: { integration_endpoints: Object.keys(integrations[0]?.webhook_endpoints || {}).length, registry_records: registry.length }
+  };
 }
 
 async function checkBilling(db, shop_domain) {
