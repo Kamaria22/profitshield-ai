@@ -7,14 +7,25 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-// Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
+// Shopify-safe response headers — allows Shopify Admin iframe embedding.
+// X-Frame-Options is intentionally NOT set: DENY or SAMEORIGIN would block the Shopify Admin frame.
+const CSP_HEADER = [
+  "frame-ancestors https://admin.shopify.com https://*.myshopify.com",
+  "frame-src https://admin.shopify.com https://*.myshopify.com https: blob:",
+  "connect-src https://*.myshopify.com https://admin.shopify.com https:",
+  "script-src 'self' https://cdn.shopify.com https://unpkg.com https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' data: https:",
+  "font-src 'self' https: data:",
+].join('; ');
+
 function shopifyHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com",
-    'X-Frame-Options': 'ALLOWALL', // Explicitly allow embedding
+    'Content-Security-Policy': CSP_HEADER,
+    // X-Frame-Options intentionally omitted — Shopify requires iframe embedding.
   };
 }
 
