@@ -137,6 +137,7 @@ Deno.serve(async (req) => {
     // Register webhooks
     const registered = {};
     const errors = [];
+    const registryRecords = [];
 
     for (const topic of TOPICS) {
       try {
@@ -147,7 +148,18 @@ Deno.serve(async (req) => {
         });
         const data = await res.json();
         if (data.webhook?.id) {
-          registered[topic.replace('/', '_')] = data.webhook.id.toString();
+          const webhookId = data.webhook.id.toString();
+          // Use full underscore key: orders_create, app_subscriptions_update, customers_data_request
+          registered[topicToKey(topic)] = webhookId;
+          registryRecords.push({
+            shop_domain: shopDomain,
+            tenant_id: integration.tenant_id,
+            topic,
+            address: WEBHOOK_URL,
+            webhook_id: webhookId,
+            status: 'active',
+            last_checked_at: new Date().toISOString()
+          });
         } else {
           errors.push({ topic, error: JSON.stringify(data.errors || data) });
         }
@@ -161,6 +173,22 @@ Deno.serve(async (req) => {
       webhook_endpoints: registered,
       last_connected_at: new Date().toISOString()
     });
+
+    // Upsert into ShopifyWebhookRegistry for reviewer proof checks
+    for (const record of registryRecords) {
+      try {
+        const existing = await base44.asServiceRole.entities.ShopifyWebhookRegistry.filter({
+          shop_domain: shopDomain, topic: record.topic
+        });
+        if (existing.length > 0) {
+          await base44.asServiceRole.entities.ShopifyWebhookRegistry.update(existing[0].id, record);
+        } else {
+          await base44.asServiceRole.entities.ShopifyWebhookRegistry.create(record);
+        }
+      } catch (e) {
+        console.warn(`[registerShopifyWebhooks] Registry upsert failed for ${record.topic}:`, e.message);
+      }
+    }
 
     return Response.json({
       success: true,
