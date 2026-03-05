@@ -171,7 +171,9 @@ async function processOrderJob(db, tenant, payload, job) {
         metadata: { net_profit: profitData.net_profit }
       }).catch(() => {});
     }
+    return { order_id: created.id };
   }
+  return null;
 }
 
 // ─── Process a single refund job ─────────────────────────────────────────────
