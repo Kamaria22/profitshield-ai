@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Shield, AlertTriangle, RefreshCw, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, AlertTriangle, RefreshCw, Loader2, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -265,6 +265,3 @@ export default function OrderRiskTable({ tenantId }) {
     </div>
   );
 }
-
-// Need Zap import
-import { Zap } from 'lucide-react';
