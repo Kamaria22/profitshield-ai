@@ -333,7 +333,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="shopify" className="flex items-center gap-1">
             <Store className="w-3 h-3" />
