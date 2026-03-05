@@ -119,7 +119,6 @@ Deno.serve(async (req) => {
 
     console.log(`[ProfitAlertWatchdog] Done — ${successCount}/${tenantIds.length} tenants processed`);
     return Response.json(summary);
-
   } catch (error) {
     console.error('[ProfitAlertWatchdog] Fatal error:', error.message);
     return Response.json({
