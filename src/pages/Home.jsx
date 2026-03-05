@@ -270,6 +270,13 @@ export default function Home() {
             )}
           </div>
 
+          {/* 1️⃣ AI Profit Intelligence Summary — instant value, above-the-fold */}
+          <AIProfitIntelligenceSummary
+            metrics={metrics}
+            profitLeaks={profitLeaks}
+            loading={summaryLoading}
+          />
+
           {/* Predictive Intelligence Overview */}
           <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
 
