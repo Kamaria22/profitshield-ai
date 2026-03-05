@@ -18,6 +18,8 @@ import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
 
 // Critical above-the-fold components - loaded immediately
+import AIProfitOperatingSystem from '../components/dashboard/AIProfitOperatingSystem';
+import AutonomousProfitGuard from '../components/dashboard/AutonomousProfitGuard';
 import AIProfitIntelligenceSummary from '../components/dashboard/AIProfitIntelligenceSummary';
 import AIAlerts from '../components/dashboard/AIAlerts';
 import AIOpportunities from '../components/dashboard/AIOpportunities';
