@@ -19,6 +19,9 @@ import { useShouldShowTutorial, markTutorialCompleted } from '../components/onbo
 
 // Critical above-the-fold components - loaded immediately
 import AIProfitIntelligenceSummary from '../components/dashboard/AIProfitIntelligenceSummary';
+import AIAlerts from '../components/dashboard/AIAlerts';
+import AIOpportunities from '../components/dashboard/AIOpportunities';
+import ProfitForecast from '../components/dashboard/ProfitForecast';
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
 import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
