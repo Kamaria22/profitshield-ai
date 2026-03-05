@@ -30,10 +30,14 @@ Deno.serve(async (req) => {
   let failCount = 0;
 
   try {
-    // 1. Fetch all active tenants via PlatformIntegration (source of truth for connected stores)
-    const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
-      status: 'connected'
-    });
+    // 1. Fetch all active tenants via Tenant entity
+    const tenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
+
+    // Fallback: also try pending_setup (covers all onboarded tenants)
+    const allTenants = tenants.length > 0 ? tenants : await base44.asServiceRole.entities.Tenant.list();
+
+    // Map to integration-style shape
+    const integrations = allTenants.map(t => ({ tenant_id: t.id }));
 
     if (!integrations || integrations.length === 0) {
       console.log('[ProfitAlertWatchdog] No active integrations found — skipping.');
