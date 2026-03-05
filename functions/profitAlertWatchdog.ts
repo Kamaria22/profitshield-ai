@@ -54,9 +54,44 @@ Deno.serve(async (req) => {
     // 2. Process each tenant — fail individually, never abort the loop
     for (const tenantId of tenantIds) {
       try {
-        const result = await base44.asServiceRole.functions.invoke('checkProfitAlerts', {
-          tenant_id: tenantId
+        // Call checkProfitAlerts directly as service role to avoid auth issues
+        const alertRules = await base44.asServiceRole.entities.AlertRule.filter({
+          tenant_id: tenantId,
+          is_active: true
         });
+
+        if (!alertRules || alertRules.length === 0) {
+          results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
+          successCount++;
+          continue;
+        }
+
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId });
+        const recentOrders = allOrders.filter(o => o.created_date >= yesterday);
+
+        let alertsTriggered = 0;
+        for (const order of recentOrders) {
+          for (const rule of alertRules) {
+            const shouldAlert = checkRule(rule, order);
+            if (shouldAlert) {
+              alertsTriggered++;
+              await base44.asServiceRole.entities.Alert.create({
+                tenant_id: tenantId,
+                type: mapAlertType(rule.type),
+                severity: rule.severity,
+                title: `${rule.name}: Order ${order.order_number}`,
+                message: shouldAlert.message,
+                entity_type: 'order',
+                entity_id: order.id,
+                status: 'pending',
+                metadata: { rule_id: rule.id, rule_type: rule.type }
+              });
+            }
+          }
+        }
+
+        const result = { data: { alerts_triggered: alertsTriggered } };
 
         const data = result?.data || result;
         const alertsTriggered = data?.alerts_triggered ?? 0;
