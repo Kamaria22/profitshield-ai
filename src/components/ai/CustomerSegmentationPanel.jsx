@@ -19,21 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-const priorityColors = {
-  high: 'bg-red-100 text-red-700 border-red-200',
-  medium: 'bg-amber-100 text-amber-700 border-amber-200',
-  low: 'bg-emerald-100 text-emerald-700 border-emerald-200'
-};
 
-const segmentIcons = {
-  'VIP': Crown,
-  'Champions': Crown,
-  'Loyal': UserCheck,
-  'At Risk': AlertTriangle,
-  'Churned': UserX,
-  'New': Sparkles,
-  'default': Users
-};
 
 const priorityColors = {
   high: 'bg-red-100 text-red-700 border-red-200',
