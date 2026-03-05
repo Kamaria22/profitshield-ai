@@ -413,6 +413,7 @@ export default function FounderDashboard() {
           <TabsTrigger value="capital">Capital</TabsTrigger>
           <TabsTrigger value="billing-admin">Billing Admin</TabsTrigger>
           <TabsTrigger value="shopify-debug">Shopify Debug</TabsTrigger>
+          <TabsTrigger value="support-inbox">Support Inbox</TabsTrigger>
         </TabsList>
 
         {/* Autopilot Tab */}
