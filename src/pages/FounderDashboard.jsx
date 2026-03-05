@@ -281,6 +281,9 @@ export default function FounderDashboard() {
       {/* Production Readiness Banner */}
       <ProductionReadinessBanner />
 
+      {/* AI Support Inbox Panel — Admin Owner only */}
+      <AdminSupportInboxPanel />
+
       {/* Reviewer Proof quick link */}
       <div className="flex">
         <a
