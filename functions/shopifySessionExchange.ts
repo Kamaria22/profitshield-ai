@@ -139,16 +139,25 @@ function extractShopFromPayload(payload) {
   return shop;
 }
 
-// Shopify-safe response headers — allow embedding in Shopify Admin
+// Shopify-safe response headers — allow embedding in Shopify Admin.
+// X-Frame-Options intentionally NOT set: DENY or SAMEORIGIN would block the Shopify Admin frame.
+const CSP_HEADER = [
+  "frame-ancestors https://admin.shopify.com https://*.myshopify.com",
+  "frame-src https://admin.shopify.com https://*.myshopify.com https: blob:",
+  "connect-src https://*.myshopify.com https://admin.shopify.com https:",
+  "script-src 'self' https://cdn.shopify.com https://unpkg.com https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' data: https:",
+  "font-src 'self' https: data:",
+].join('; ');
+
 function embeddedHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    // Allow Shopify to embed us in an iframe
-    'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com",
-    // Explicitly remove DENY so Shopify admin can embed
-    'X-Frame-Options': 'ALLOWALL',
+    'Content-Security-Policy': CSP_HEADER,
+    // X-Frame-Options intentionally omitted — Shopify requires iframe embedding.
   };
 }
 
