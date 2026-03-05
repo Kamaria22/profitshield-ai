@@ -274,38 +274,55 @@ export default function Home() {
 
           <div className="flex gap-6 h-full">
             <div className="flex-1 min-w-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Critical render - no suspense */}
+              {/* Row 1: Critical profit metrics - most important for screenshots */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {/* 1️⃣ Profit Health (Integrity Score + Net Profit + Revenue + Margin) */}
                 <ProfitHealthPanel metrics={metrics} loading={false} />
-                <Suspense fallback={<div className="h-48 bg-slate-50 rounded-lg animate-pulse" />}>
+                {/* 2️⃣ Active Risk Level */}
+                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
                   <RiskCommandPanel metrics={metrics} loading={false} />
                 </Suspense>
-                <Suspense fallback={<div className="h-48 bg-slate-50 rounded-lg animate-pulse" />}>
-                  <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
-                </Suspense>
-                
-                {/* Lazy panels */}
+                {/* 3️⃣ Margin Leak Detector */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
                 </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CashflowPanel metrics={metrics} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <SecurityPanel loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
+              </div>
+
+              {/* Row 2: AI Forecast + Alerts & Tasks */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {/* 4️⃣ AI Forecast / Advanced Analytics */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
                 </Suspense>
+                {/* 5️⃣ Alerts & Tasks */}
+                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
+                  <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
+                </Suspense>
+                {/* 6️⃣ Cashflow */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <CashflowPanel metrics={metrics} loading={false} />
+                </Suspense>
+              </div>
+
+              {/* Row 3: Fraud + AI Automations + Integrations + Financial Reports */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 7️⃣ Fraud Detection (Security) */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <SecurityPanel loading={false} />
+                </Suspense>
+                {/* 8️⃣ AI Automations */}
+                <Suspense fallback={<PanelSkeleton />}>
+                  <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
+                </Suspense>
+                {/* 9️⃣ Integrations */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <IntegrationsPanel loading={false} isDemo={isDemoMode} />
                 </Suspense>
+                {/* 🔟 Risk Mitigation */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
                 </Suspense>
+                {/* 1️⃣1️⃣ Financial Reports */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
                 </Suspense>
