@@ -62,6 +62,7 @@ import FounderControlPanel from '@/components/empire/FounderControlPanel';
 import BillingAdminPanel from '@/components/subscription/BillingAdminPanel';
 import ShopifyDebugPanel from '@/components/admin/ShopifyDebugPanel';
 import AdminSupportInboxPanel from '@/components/support/AdminSupportInboxPanel';
+const AISupportControlCenterLazy = React.lazy(() => import('@/components/support/AISupportControlCenter'));
 import AbsorptionRadarPanel from '@/components/supremacy/AbsorptionRadarPanel';
 import AIEvolutionPanel from '@/components/supremacy/AIEvolutionPanel';
 import DataFortressPanel from '@/components/supremacy/DataFortressPanel';
