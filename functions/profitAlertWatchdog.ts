@@ -71,17 +71,19 @@ Deno.serve(async (req) => {
       try {
         console.log(`[ProfitAlertWatchdog] Processing tenant: ${tenantId}`);
         // Use asServiceRole for all entity ops — no user session in scheduled context
-        let alertRules = [], allOrders = [];
-        try {
-          alertRules = await base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true });
-        } catch (e) {
-          console.warn(`[ProfitAlertWatchdog] AlertRule fetch failed for ${tenantId}: ${e.message}`);
+        console.log(`[ProfitAlertWatchdog] Fetching AlertRules for ${tenantId}`);
+        const alertRules = await base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true });
+        console.log(`[ProfitAlertWatchdog] Got ${alertRules.length} rules`);
+
+        if (!alertRules || alertRules.length === 0) {
+          results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
+          successCount++;
+          continue;
         }
-        try {
-          allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200);
-        } catch (e) {
-          console.warn(`[ProfitAlertWatchdog] Order fetch failed for ${tenantId}: ${e.message}`);
-        }
+
+        console.log(`[ProfitAlertWatchdog] Fetching Orders for ${tenantId}`);
+        const allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200);
+        console.log(`[ProfitAlertWatchdog] Got ${allOrders.length} orders`);
 
         if (!alertRules || alertRules.length === 0) {
           results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
