@@ -87,16 +87,6 @@ export default function SecurityHardeningLayer({ children }) {
       return el;
     };
 
-    // Inject Shopify-compatible CSP via meta tag.
-    // frame-ancestors cannot be set via meta tag (browser ignores it),
-    // but we set the remaining directives here. X-Frame-Options is intentionally
-    // NOT injected — Shopify Admin requires iframe embedding.
-    upsertMeta(
-      'http-equiv',
-      // No-op: http-equiv CSP is set in the HTML shell. This just ensures no override.
-      undefined
-    );
-
     const watermark = upsertMeta(
       'copyright',
       PROFITSHIELD_SIGNATURE.copyright
