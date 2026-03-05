@@ -55,7 +55,8 @@ import {
   Lock,
   HelpCircle,
   Inbox,
-  Wrench
+  Wrench,
+  GitPullRequest
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
