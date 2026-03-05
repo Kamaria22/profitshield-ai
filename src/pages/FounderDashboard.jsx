@@ -1114,7 +1114,9 @@ export default function FounderDashboard() {
 
         {/* Support Inbox Tab */}
         <TabsContent value="support-inbox" className="mt-4">
-          {React.createElement(React.lazy(() => import('@/components/support/AISupportControlCenter')), {})}
+          <React.Suspense fallback={<div className="py-8 text-center text-slate-400">Loading Support Inbox...</div>}>
+            <AISupportControlCenterLazy />
+          </React.Suspense>
         </TabsContent>
       </Tabs>
     </div>
