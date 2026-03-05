@@ -23,6 +23,11 @@ export default function AIInsights() {
   const resolverCheck = requireResolved(resolver);
   const authTenantId = resolverCheck.tenantId;
   const { user } = usePermissions();
+
+  // SEO: update document title
+  React.useEffect(() => {
+    document.title = 'AI Insights – ProfitShield AI | Real-Time Profit Intelligence for Shopify';
+  }, []);
   
   // Check if user is admin/owner
   const isAdmin = user && (user.role === 'admin' || user.role === 'owner' || user.app_role === 'admin' || user.app_role === 'owner');
