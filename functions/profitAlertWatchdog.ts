@@ -86,17 +86,21 @@ Deno.serve(async (req) => {
             const shouldAlert = checkRule(rule, order);
             if (shouldAlert) {
               alertsTriggered++;
-              await base44.asServiceRole.entities.Alert.create({
-                tenant_id: tenantId,
-                type: mapAlertType(rule.type),
-                severity: rule.severity,
-                title: `${rule.name}: Order ${order.order_number}`,
-                message: shouldAlert.message,
-                entity_type: 'order',
-                entity_id: order.id,
-                status: 'pending',
-                metadata: { rule_id: rule.id, rule_type: rule.type }
-              });
+              try {
+                await base44.asServiceRole.entities.Alert.create({
+                  tenant_id: tenantId,
+                  type: mapAlertType(rule.type),
+                  severity: rule.severity,
+                  title: `${rule.name}: Order ${order.order_number}`,
+                  message: shouldAlert.message,
+                  entity_type: 'order',
+                  entity_id: order.id,
+                  status: 'pending',
+                  metadata: { rule_id: rule.id, rule_type: rule.type }
+                });
+              } catch (alertErr) {
+                console.warn(`[ProfitAlertWatchdog] Alert create failed: ${alertErr.message}`);
+              }
             }
           }
         }
