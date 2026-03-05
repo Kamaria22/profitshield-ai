@@ -1111,6 +1111,11 @@ export default function FounderDashboard() {
         <TabsContent value="shopify-debug" className="mt-4">
           <ShopifyDebugPanel />
         </TabsContent>
+
+        {/* Support Inbox Tab */}
+        <TabsContent value="support-inbox" className="mt-4">
+          {React.createElement(React.lazy(() => import('@/components/support/AISupportControlCenter')), {})}
+        </TabsContent>
       </Tabs>
     </div>
   );
