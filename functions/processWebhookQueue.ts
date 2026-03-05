@@ -322,7 +322,15 @@ Deno.serve(async (req) => {
         const payload = job.payload;
 
         if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
-          await processOrderJob(db, tenant, payload, job);
+          const orderResult = await processOrderJob(db, tenant, payload, job);
+          // Fire-and-forget async risk scoring after order is saved
+          if (orderResult?.order_id) {
+            base44.asServiceRole.functions.invoke('riskEngine', {
+              action: 'score',
+              tenant_id: tenant.id,
+              order_id: orderResult.order_id
+            }).catch(e => console.warn('[processWebhookQueue] riskEngine call failed:', e.message));
+          }
         } else if (topic === 'refunds/create') {
           await processRefundJob(db, tenant, payload);
         } else if (topic === 'products/update') {
