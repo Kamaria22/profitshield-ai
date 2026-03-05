@@ -18,8 +18,7 @@ import {
   XCircle,
   Shield,
   Download,
-  Film,
-  Mail
+  Film
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,7 +66,6 @@ import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
-import EmailSystemSettings from '@/components/settings/EmailSystemSettings';
 
 // User invitation form component
 function InviteUserForm() {
@@ -334,7 +332,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="shopify" className="flex items-center gap-1">
             <Store className="w-3 h-3" />
@@ -364,12 +362,6 @@ export default function Settings() {
             <TabsTrigger value="app-store" className="flex items-center gap-2">
               <Store className="w-3 h-3" />
               App Store
-            </TabsTrigger>
-          )}
-          {(user?.role === 'admin' || user?.role === 'owner') && (
-            <TabsTrigger value="email-support" className="flex items-center gap-2">
-              <Mail className="w-3 h-3" />
-              Email & Support
             </TabsTrigger>
           )}
         </TabsList>
@@ -699,13 +691,6 @@ export default function Settings() {
           <TabsContent value="app-store" className="mt-6 space-y-6">
             <ShopifySubmitButton />
             <ScreenshotGenerator />
-          </TabsContent>
-        )}
-
-        {/* Email & Support Tab - Admin/Owner Only */}
-        {(user?.role === 'admin' || user?.role === 'owner') && (
-          <TabsContent value="email-support" className="mt-6">
-            <EmailSystemSettings />
           </TabsContent>
         )}
       </Tabs>

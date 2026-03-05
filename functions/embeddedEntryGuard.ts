@@ -26,28 +26,14 @@ function isShopifyOrigin(referer = '') {
   return SHOPIFY_DOMAINS.some(d => referer.includes(d));
 }
 
-// Full CSP allowing Shopify Admin iframe embedding.
-// X-Frame-Options is intentionally NOT set — Shopify requires iframe embedding
-// and DENY/SAMEORIGIN would block the Shopify Admin frame.
-const CSP_HEADER = [
-  "frame-ancestors https://admin.shopify.com https://*.myshopify.com",
-  "frame-src https://admin.shopify.com https://*.myshopify.com https: blob:",
-  "connect-src https://*.myshopify.com https://admin.shopify.com https:",
-  "script-src 'self' https://cdn.shopify.com https://unpkg.com https:",
-  "style-src 'self' 'unsafe-inline' https:",
-  "img-src 'self' data: https:",
-  "font-src 'self' https: data:",
-].join('; ');
-
-const SHOPIFY_EMBEDDING_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Content-Security-Policy': CSP_HEADER,
-};
-
 function jsonResponse(body, status = 200) {
   return Response.json(body, {
     status,
-    headers: SHOPIFY_EMBEDDING_HEADERS,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'",
+      'X-Frame-Options': 'ALLOWALL',
+    },
   });
 }
 
@@ -56,7 +42,8 @@ function htmlResponse(html) {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      ...SHOPIFY_EMBEDDING_HEADERS,
+      'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'",
+      'X-Frame-Options': 'ALLOWALL',
     },
   });
 }
@@ -155,7 +142,7 @@ Deno.serve(async (req) => {
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <meta http-equiv="Content-Security-Policy"
-    content="frame-src https://admin.shopify.com https://*.myshopify.com https: blob:; connect-src https://*.myshopify.com https://admin.shopify.com https:; script-src 'self' https://cdn.shopify.com https://unpkg.com https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' https: data:;"/>
+    content="frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'"/>
   <title>ProfitShield — Loading</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
