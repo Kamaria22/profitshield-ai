@@ -1,60 +1,44 @@
 /**
  * Profit Alert Watchdog
- * 
- * Scheduled runner that iterates ALL active tenants and executes
- * checkProfitAlerts per tenant. Fixes the "tenant_id is required" 400 error
- * that occurred when the automation called checkProfitAlerts globally.
- * 
+ * Iterates ALL tenants (via AlertRule entity) and runs profit alert checks per tenant.
+ * Fixes the original "tenant_id is required" 400 error from global invocation.
  * Failsafe: skips invalid tenants, logs per-tenant failures, never crashes the job.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-
-  // Allow scheduled (no auth) or admin-only manual invocation
-  let isScheduled = false;
-  try {
-    const user = await base44.auth.me();
-    if (user?.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
-  } catch (_) {
-    // Scheduled automations have no user session — allow via service role
-    isScheduled = true;
-  }
-
   const startedAt = new Date().toISOString();
   const results = [];
   let successCount = 0;
   let failCount = 0;
 
   try {
-    // 1. Fetch all tenants — try active first, fall back to all
-    let rawTenants = [];
+    // Discover tenants by getting all active AlertRules — this avoids Tenant entity auth issues
+    // AlertRule has tenant_id which lets us find all tenants that have configured rules
+    const allRules = await base44.asServiceRole.entities.AlertRule.list('-created_date', 500);
+    
+    // Deduplicate tenant IDs from rules
+    const tenantIds = [...new Set(allRules.map(r => r.tenant_id).filter(Boolean))];
+
+    // Also try to get tenants directly as a supplement
+    let extraTenantIds = [];
     try {
-      rawTenants = await base44.asServiceRole.entities.Tenant.filter({ status: 'active' });
-    } catch (_) {}
-    if (rawTenants.length === 0) {
-      try {
-        rawTenants = await base44.asServiceRole.entities.Tenant.list('-created_date', 500);
-      } catch (_) {}
+      const tenants = await base44.asServiceRole.entities.Tenant.list('-created_date', 200);
+      extraTenantIds = tenants.map(t => t.id).filter(Boolean);
+    } catch (_) {
+      // Tenant entity may have security rules — fall back to AlertRule-derived list
+      console.log('[ProfitAlertWatchdog] Could not list Tenants directly, using AlertRule-derived list');
     }
 
-    // Alternatively derive tenants from PlatformIntegration (more reliable for connected stores)
-    let integrations = rawTenants.map(t => ({ tenant_id: t.id }));
-    if (integrations.length === 0) {
-      try {
-        const connected = await base44.asServiceRole.entities.PlatformIntegration.filter({ status: 'connected' });
-        integrations = connected;
-      } catch (_) {}
-    }
+    // Merge: union of both lists
+    const allTenantIds = [...new Set([...tenantIds, ...extraTenantIds])];
 
-    if (!integrations || integrations.length === 0) {
-      console.log('[ProfitAlertWatchdog] No active integrations found — skipping.');
+    if (allTenantIds.length === 0) {
+      console.log('[ProfitAlertWatchdog] No tenants found — skipping.');
       return Response.json({
         success: true,
-        message: 'No active tenants found',
+        message: 'No tenants found',
         tenant_count: 0,
         results: [],
         started_at: startedAt,
@@ -62,49 +46,51 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Deduplicate by tenant_id (one tenant may have multiple integrations)
-    const tenantIds = [...new Set(integrations.map(i => i.tenant_id).filter(Boolean))];
-    console.log(`[ProfitAlertWatchdog] Running for ${tenantIds.length} tenant(s)`);
+    console.log(`[ProfitAlertWatchdog] Running for ${allTenantIds.length} tenant(s)`);
 
-    // 2. Process each tenant — fail individually, never abort the loop
-    for (const tenantId of tenantIds) {
+    // Process each tenant — fail individually, never abort the loop
+    for (const tenantId of allTenantIds) {
       try {
-        console.log(`[ProfitAlertWatchdog] Processing tenant: ${tenantId}`);
-        // Use asServiceRole for all entity ops — no user session in scheduled context
-        console.log(`[ProfitAlertWatchdog] Fetching AlertRules for ${tenantId}`);
-        const alertRules = await base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true });
-        console.log(`[ProfitAlertWatchdog] Got ${alertRules.length} rules`);
+        const tenantRules = allRules.filter(r => r.tenant_id === tenantId && r.is_active !== false);
 
-        if (!alertRules || alertRules.length === 0) {
+        if (tenantRules.length === 0) {
           results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
           successCount++;
           continue;
         }
 
-        console.log(`[ProfitAlertWatchdog] Fetching Orders for ${tenantId}`);
-        const allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200);
-        console.log(`[ProfitAlertWatchdog] Got ${allOrders.length} orders`);
+        // Fetch recent orders for this tenant
+        const allOrders = await base44.asServiceRole.entities.Order.filter(
+          { tenant_id: tenantId }, '-created_date', 200
+        );
 
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const recentOrders = allOrders.filter(o => o.created_date >= yesterday);
 
         let alertsTriggered = 0;
+
         for (const order of recentOrders) {
-          for (const rule of alertRules) {
-            const shouldAlert = checkRule(rule, order);
-            if (shouldAlert) {
+          for (const rule of tenantRules) {
+            const match = checkRule(rule, order);
+            if (match) {
               alertsTriggered++;
               try {
                 await base44.asServiceRole.entities.Alert.create({
                   tenant_id: tenantId,
                   type: mapAlertType(rule.type),
-                  severity: rule.severity,
-                  title: `${rule.name}: Order ${order.order_number}`,
-                  message: shouldAlert.message,
+                  severity: rule.severity || 'medium',
+                  title: `${rule.name}: Order ${order.order_number || order.id}`,
+                  message: match.message,
                   entity_type: 'order',
                   entity_id: order.id,
                   status: 'pending',
                   metadata: { rule_id: rule.id, rule_type: rule.type }
+                });
+
+                // Update rule trigger count
+                await base44.asServiceRole.entities.AlertRule.update(rule.id, {
+                  triggered_count: (rule.triggered_count || 0) + 1,
+                  last_triggered_at: new Date().toISOString()
                 });
               } catch (alertErr) {
                 console.warn(`[ProfitAlertWatchdog] Alert create failed: ${alertErr.message}`);
@@ -113,16 +99,11 @@ Deno.serve(async (req) => {
           }
         }
 
-        const result = { data: { alerts_triggered: alertsTriggered } };
-
-        const data = result?.data || result;
-        const alertsTriggered = data?.alerts_triggered ?? 0;
-
-        results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: alertsTriggered });
+        results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: alertsTriggered, orders_checked: recentOrders.length });
         successCount++;
-        console.log(`[ProfitAlertWatchdog] ✓ tenant=${tenantId} alerts=${alertsTriggered}`);
+        console.log(`[ProfitAlertWatchdog] ✓ tenant=${tenantId} orders=${recentOrders.length} alerts=${alertsTriggered}`);
+
       } catch (tenantError) {
-        // Failsafe: log and continue — never crash the whole job
         failCount++;
         results.push({ tenant_id: tenantId, status: 'error', error: tenantError.message });
         console.error(`[ProfitAlertWatchdog] ✗ tenant=${tenantId} error=${tenantError.message}`);
@@ -131,7 +112,7 @@ Deno.serve(async (req) => {
 
     const summary = {
       success: true,
-      tenant_count: tenantIds.length,
+      tenant_count: allTenantIds.length,
       success_count: successCount,
       fail_count: failCount,
       results,
@@ -139,8 +120,9 @@ Deno.serve(async (req) => {
       finished_at: new Date().toISOString()
     };
 
-    console.log(`[ProfitAlertWatchdog] Done — ${successCount}/${tenantIds.length} tenants processed`);
+    console.log(`[ProfitAlertWatchdog] Complete — ${successCount}/${allTenantIds.length} tenants processed`);
     return Response.json(summary);
+
   } catch (error) {
     console.error('[ProfitAlertWatchdog] Fatal error:', error.message);
     return Response.json({
@@ -155,7 +137,7 @@ Deno.serve(async (req) => {
   }
 });
 
-// --- Inline rule evaluator (no cross-file import) ---
+// --- Inline rule evaluator ---
 function checkRule(rule, order) {
   switch (rule.type) {
     case 'low_margin': {
@@ -167,7 +149,7 @@ function checkRule(rule, order) {
     }
     case 'negative_profit': {
       const p = order.net_profit || 0;
-      if (p < rule.threshold_value) {
+      if (p < (rule.threshold_value || 0)) {
         return { message: `Order has negative profit ($${p.toFixed(2)})` };
       }
       break;
@@ -178,7 +160,7 @@ function checkRule(rule, order) {
       if (charged > 0 && cost > 0) {
         const diff = ((cost - charged) / charged) * 100;
         if (diff > rule.threshold_value) {
-          return { message: `Shipping cost exceeds charged by ${diff.toFixed(1)}%` };
+          return { message: `Shipping cost exceeds charged amount by ${diff.toFixed(1)}%` };
         }
       }
       break;
