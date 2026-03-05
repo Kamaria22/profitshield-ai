@@ -59,10 +59,17 @@ Deno.serve(async (req) => {
     for (const tenantId of tenantIds) {
       try {
         // Use asServiceRole for all entity ops — no user session in scheduled context
-        const [alertRules, allOrders] = await Promise.all([
-          base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true }),
-          base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200)
-        ]);
+        let alertRules = [], allOrders = [];
+        try {
+          alertRules = await base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true });
+        } catch (e) {
+          console.warn(`[ProfitAlertWatchdog] AlertRule fetch failed for ${tenantId}: ${e.message}`);
+        }
+        try {
+          allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200);
+        } catch (e) {
+          console.warn(`[ProfitAlertWatchdog] Order fetch failed for ${tenantId}: ${e.message}`);
+        }
 
         if (!alertRules || alertRules.length === 0) {
           results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
