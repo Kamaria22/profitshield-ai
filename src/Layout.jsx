@@ -125,7 +125,6 @@ const navItems = [
   { name: 'Reviewer Proof', page: 'ReviewerProof', icon: ShieldCheck, permission: 'settings_manage', adminOnly: true },
   { name: 'GitHub PRs', page: 'GitHubPullRequests', icon: GitPullRequest, permission: 'settings_manage', adminOnly: true },
   { name: 'Build Guide', page: 'NativeBuildGuide', icon: Download, permission: 'settings_manage', adminOnly: true },
-  { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
