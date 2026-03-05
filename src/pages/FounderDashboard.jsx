@@ -34,7 +34,8 @@ import {
   Gift,
   Rocket,
   FlaskConical,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 import ProductionReadinessBanner from '@/components/founder/ProductionReadinessBanner';
