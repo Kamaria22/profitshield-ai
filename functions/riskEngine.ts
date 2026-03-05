@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, order_id: order.id, ...result });
     }
 
-    // ── ACTION: backfill unscored orders ────────────────────────────────────
+    // ── ACTION: backfill unscored orders for a single tenant ────────────────
     if (action === 'backfill') {
       if (!tenant_id) return Response.json({ error: 'tenant_id required' }, { status: 400 });
 
@@ -143,6 +143,27 @@ Deno.serve(async (req) => {
       }
 
       return Response.json({ success: true, scored, total_checked: allOrders.length });
+    }
+
+    // ── ACTION: backfill all tenants (used by scheduler) ────────────────────
+    if (action === 'backfill_all') {
+      const tenants = await db.Tenant.filter({ status: 'active' }, '-created_date', 200);
+      let totalScored = 0;
+      let totalChecked = 0;
+      for (const t of tenants) {
+        const allOrders = await db.Order.filter({ tenant_id: t.id, is_demo: false }, '-order_date', 100);
+        const toScore = allOrders.filter(o => o.fraud_score === null || o.fraud_score === undefined);
+        totalChecked += allOrders.length;
+        for (const order of toScore) {
+          const customerOrders = order.customer_email
+            ? await db.Order.filter({ tenant_id: t.id, customer_email: order.customer_email })
+            : [];
+          const result = scoreOrder(order, customerOrders);
+          await db.Order.update(order.id, result).catch(() => {});
+          totalScored++;
+        }
+      }
+      return Response.json({ success: true, scored: totalScored, total_checked: totalChecked, tenants: tenants.length });
     }
 
     // ── ACTION: test — insert synthetic order and score it ──────────────────
