@@ -66,6 +66,7 @@ import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
+import EmailSystemSettings from '@/components/settings/EmailSystemSettings';
 
 // User invitation form component
 function InviteUserForm() {
