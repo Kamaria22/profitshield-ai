@@ -7,7 +7,6 @@ function now() {
 }
 
 async function checkWebhooks(db, shop_domain) {
-  const registry = await db.ShopifyWebhookRegistry.filter({ shop_domain }).catch(() => []);
   const required = [
     "orders/create",
     "orders/updated",
@@ -19,9 +18,27 @@ async function checkWebhooks(db, shop_domain) {
     "app/uninstalled",
     "app_subscriptions/update"
   ];
+
+  // Check PlatformIntegration.webhook_endpoints (set by registerShopifyWebhooks)
+  const integrations = await db.PlatformIntegration.filter({ store_key: shop_domain }).catch(() => []);
+  if (integrations.length > 0) {
+    const endpoints = integrations[0].webhook_endpoints || {};
+    // webhook_endpoints keys use underscore format: orders_create, app_uninstalled, etc.
+    const registeredTopics = Object.keys(endpoints).map(k => k.replace(/_/g, '/'));
+    const missing = required.filter(t => !registeredTopics.includes(t));
+    return {
+      ok: missing.length === 0,
+      registered: registeredTopics,
+      missing,
+      source: "platform_integration"
+    };
+  }
+
+  // Fallback: check ShopifyWebhookRegistry
+  const registry = await db.ShopifyWebhookRegistry.filter({ shop_domain }).catch(() => []);
   const topics = registry.map(r => r.topic);
   const missing = required.filter(t => !topics.includes(t));
-  return { ok: missing.length === 0, registered: topics, missing };
+  return { ok: missing.length === 0, registered: topics, missing, source: "webhook_registry" };
 }
 
 async function checkBilling(db, shop_domain) {
