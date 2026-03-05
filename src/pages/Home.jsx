@@ -18,6 +18,7 @@ import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
 
 // Critical above-the-fold components - loaded immediately
+import AIProfitIntelligenceSummary from '../components/dashboard/AIProfitIntelligenceSummary';
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
 import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
