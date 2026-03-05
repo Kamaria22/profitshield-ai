@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <meta http-equiv="Content-Security-Policy"
-    content="frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'"/>
+    content="frame-src https://admin.shopify.com https://*.myshopify.com https: blob:; connect-src https://*.myshopify.com https://admin.shopify.com https:; script-src 'self' https://cdn.shopify.com https://unpkg.com https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' https: data:;"/>
   <title>ProfitShield — Loading</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
