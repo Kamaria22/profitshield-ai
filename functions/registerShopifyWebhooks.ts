@@ -25,6 +25,11 @@ const TOPICS = [
   'app_subscriptions/update'
 ];
 
+// Map topic → stable key for webhook_endpoints storage
+function topicToKey(topic) {
+  return topic.replace(/\//g, '_');
+}
+
 async function decryptToken(encryptedToken) {
   try {
     const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
