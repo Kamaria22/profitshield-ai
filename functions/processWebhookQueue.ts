@@ -143,6 +143,7 @@ async function processOrderJob(db, tenant, payload, job) {
 
   if (existing.length > 0) {
     await db.entities.Order.update(existing[0].id, rec);
+    return { order_id: existing[0].id };
   } else {
     const created = await db.entities.Order.create(rec);
     if (riskData.risk_level === 'high') {
