@@ -56,6 +56,10 @@ export const ADMIN_ONLY_PAGES = [
   'AuditLogs',
   'SupportInbox',
   'SystemHealth',
+  'ReviewerProof',
+  'GitHubPullRequests',
+  'PatchReview',
+  'SelfHealingCenter',
 ];
 
 export function canAccessPage(pageName, userRole, appContext = APP_CONTEXT) {
