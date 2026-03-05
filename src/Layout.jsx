@@ -95,21 +95,25 @@ const DEBUG_CLOSED_KEY = 'profitshield_debug_closed';
 const DEBUG_CLOSED_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 const navItems = [
+  // Primary — highest merchant value
   { name: 'Dashboard', page: 'Home', icon: LayoutDashboard, permission: 'dashboard_view' },
-  { name: 'Achievements', page: 'Achievements', icon: Gift, permission: 'dashboard_view' },
   { name: 'AI Insights', page: 'AIInsights', icon: Brain, permission: 'dashboard_view' },
   { name: 'P&L Analytics', page: 'PnLAnalytics', icon: TrendingUp, permission: 'dashboard_view' },
   { name: 'Orders', page: 'Orders', icon: ShoppingCart, permission: 'orders_view' },
-  { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
-  { name: 'Customers', page: 'Customers', icon: Users, permission: 'customers_view' },
-  { name: 'Shipping', page: 'Shipping', icon: Truck, permission: 'orders_view' },
   { name: 'Risk Intelligence', page: 'Intelligence', icon: Shield, permission: 'risk_rules_view' },
+  // Secondary
+  { name: 'Customers', page: 'Customers', icon: Users, permission: 'customers_view' },
+  { name: 'Products', page: 'Products', icon: Package, permission: 'products_view' },
+  { name: 'Shipping', page: 'Shipping', icon: Truck, permission: 'orders_view' },
   { name: 'Tasks', page: 'Tasks', icon: ClipboardList, permission: 'alerts_view' },
   { name: 'Alerts', page: 'Alerts', icon: AlertTriangle, permission: 'alerts_view' },
-  { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
-  { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
+  // System
   { name: 'Billing & Plan', page: 'Billing', icon: CreditCard, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
+  { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
+  { name: 'Achievements', page: 'Achievements', icon: Gift, permission: 'dashboard_view' },
+  { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
+  { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
   { name: 'System Health', page: 'SystemHealth', icon: LayoutDashboard, permission: 'system_health_view' },
   { name: 'Self-Healing Center', page: 'SelfHealingCenter', icon: Shield, permission: 'settings_manage', adminOnly: true },
