@@ -26,14 +26,28 @@ function isShopifyOrigin(referer = '') {
   return SHOPIFY_DOMAINS.some(d => referer.includes(d));
 }
 
+// Full CSP allowing Shopify Admin iframe embedding.
+// X-Frame-Options is intentionally NOT set — Shopify requires iframe embedding
+// and DENY/SAMEORIGIN would block the Shopify Admin frame.
+const CSP_HEADER = [
+  "frame-ancestors https://admin.shopify.com https://*.myshopify.com",
+  "frame-src https://admin.shopify.com https://*.myshopify.com https: blob:",
+  "connect-src https://*.myshopify.com https://admin.shopify.com https:",
+  "script-src 'self' https://cdn.shopify.com https://unpkg.com https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' data: https:",
+  "font-src 'self' https: data:",
+].join('; ');
+
+const SHOPIFY_EMBEDDING_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Content-Security-Policy': CSP_HEADER,
+};
+
 function jsonResponse(body, status = 200) {
   return Response.json(body, {
     status,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'",
-      'X-Frame-Options': 'ALLOWALL',
-    },
+    headers: SHOPIFY_EMBEDDING_HEADERS,
   });
 }
 
@@ -42,8 +56,7 @@ function htmlResponse(html) {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com 'self'",
-      'X-Frame-Options': 'ALLOWALL',
+      ...SHOPIFY_EMBEDDING_HEADERS,
     },
   });
 }
