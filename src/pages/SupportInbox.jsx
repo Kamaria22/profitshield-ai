@@ -1,18 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { formatDistanceToNow, format } from 'date-fns';
-import {
-  MessageCircle, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Send, RefreshCw, User, Bot, Bell, X, ChevronRight, Filter, Inbox
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'sonner';
+import React from 'react';
+import AISupportControlCenter from '@/components/support/AISupportControlCenter';
 
 const STATUS_CONFIG = {
   open:          { label: 'Open',          color: 'bg-blue-500/15 text-blue-300 border-blue-500/20' },
