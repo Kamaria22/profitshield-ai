@@ -40,6 +40,10 @@ export default function PnLAnalytics() {
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
   const queryClient = useQueryClient();
   
+  useEffect(() => {
+    document.title = 'P&L Analytics – ProfitShield AI | Profit & Loss Intelligence for Shopify';
+  }, []);
+
   const [datePreset, setDatePreset] = useState('30d');
   const [dateRange, setDateRange] = useState(DATE_PRESETS[2].getDates());
   const [granularity, setGranularity] = useState('daily');
