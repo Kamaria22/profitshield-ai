@@ -1,33 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { 
-  Users, 
-  AlertTriangle, 
-  Sparkles, 
-  RefreshCw,
-  DollarSign,
-  UserCheck,
-  UserX,
-  Crown,
-  Loader2,
-  Target
-} from 'lucide-react';
+import { Users, AlertTriangle, Sparkles, RefreshCw, DollarSign, UserCheck, UserX, Crown, Loader2, Target } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-
-
-const priorityColors = {
+const PRIORITY_COLORS = {
   high: 'bg-red-100 text-red-700 border-red-200',
   medium: 'bg-amber-100 text-amber-700 border-amber-200',
   low: 'bg-emerald-100 text-emerald-700 border-emerald-200'
 };
 
-const riskColors = {
+const RISK_COLORS = {
   high: 'text-red-600 bg-red-50 border-red-200',
   medium: 'text-amber-600 bg-amber-50 border-amber-200',
   low: 'text-emerald-600 bg-emerald-50 border-emerald-200'
@@ -37,17 +23,16 @@ function getSegmentIcon(name) {
   const n = (name || '').toLowerCase();
   if (n.includes('champion') || n.includes('high value')) return Crown;
   if (n.includes('loyal')) return UserCheck;
-  if (n.includes('risk') || n.includes('churn')) return UserX;
+  if (n.includes('churn') || n.includes('at risk')) return UserX;
+  if (n.includes('risk')) return AlertTriangle;
   if (n.includes('new')) return Sparkles;
   if (n.includes('potential')) return Target;
-  if (n.includes('at risk')) return AlertTriangle;
   return Users;
 }
 
-function CustomerSegmentationPanelInner({ tenantId }) {
+function CustomerSegmentationPanel({ tenantId }) {
   const queryClient = useQueryClient();
 
-  // Auto-fetch on mount — no manual "Analyze" click required
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
     queryFn: async () => {
@@ -125,7 +110,7 @@ function CustomerSegmentationPanelInner({ tenantId }) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
-                    className={`p-3 rounded-lg border ${priorityColors[seg.priority] || priorityColors.medium}`}
+                    className={`p-3 rounded-lg border ${PRIORITY_COLORS[seg.priority] || PRIORITY_COLORS.medium}`}
                   >
                     <div className="flex items-start gap-2 mb-1.5">
                       <Icon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -133,7 +118,7 @@ function CustomerSegmentationPanelInner({ tenantId }) {
                         <p className="font-semibold text-sm truncate">{seg.name}</p>
                         <p className="text-xs opacity-75">{seg.size} customers · {seg.percentage}</p>
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${riskColors[seg.risk_level] || riskColors.medium}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${RISK_COLORS[seg.risk_level] || RISK_COLORS.medium}`}>
                         {seg.risk_level}
                       </span>
                     </div>
@@ -180,5 +165,5 @@ function CustomerSegmentationPanelInner({ tenantId }) {
   );
 }
 
-export { CustomerSegmentationPanelInner };
-export default CustomerSegmentationPanelInner;
+export { CustomerSegmentationPanel };
+export default CustomerSegmentationPanel;
