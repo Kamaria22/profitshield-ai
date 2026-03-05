@@ -54,11 +54,11 @@ Deno.serve(async (req) => {
     // 2. Process each tenant — fail individually, never abort the loop
     for (const tenantId of tenantIds) {
       try {
-        // Call checkProfitAlerts directly as service role to avoid auth issues
-        const alertRules = await base44.asServiceRole.entities.AlertRule.filter({
-          tenant_id: tenantId,
-          is_active: true
-        });
+        // Use asServiceRole for all entity ops — no user session in scheduled context
+        const [alertRules, allOrders] = await Promise.all([
+          base44.asServiceRole.entities.AlertRule.filter({ tenant_id: tenantId, is_active: true }),
+          base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-created_date', 200)
+        ]);
 
         if (!alertRules || alertRules.length === 0) {
           results.push({ tenant_id: tenantId, status: 'success', alerts_triggered: 0, note: 'no active rules' });
@@ -67,7 +67,6 @@ Deno.serve(async (req) => {
         }
 
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const allOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId });
         const recentOrders = allOrders.filter(o => o.created_date >= yesterday);
 
         let alertsTriggered = 0;
