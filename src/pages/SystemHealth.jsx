@@ -15,14 +15,11 @@ import {
   Activity,
   Server,
   Webhook,
-  RefreshCw,
   AlertTriangle,
   CheckCircle,
   Clock,
-  TrendingUp,
   Zap,
   Database,
-  Shield,
   Lock
 } from 'lucide-react';
 
