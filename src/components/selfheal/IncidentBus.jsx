@@ -55,11 +55,21 @@ async function flush() {
     publishQueue = [...batch, ...publishQueue].slice(0, 100);
   } finally {
     flushInFlight = false;
+    if (publishQueue.length > 0 && !publishTimer) {
+      publishTimer = setTimeout(() => {
+        flush();
+        publishTimer = null;
+      }, 1500);
+    }
   }
 }
 
 export function publishIncident({ subsystem, issue_code, severity = 'medium', tenant_id, context = {} }) {
   publishQueue.push({ subsystem, issue_code, severity, tenant_id, context, detected_at: new Date().toISOString() });
+  if (publishQueue.length >= 10 && !flushInFlight && !publishTimer) {
+    flush();
+    return;
+  }
   if (!publishTimer) {
     publishTimer = setTimeout(() => { flush(); publishTimer = null; }, 2000);
   }

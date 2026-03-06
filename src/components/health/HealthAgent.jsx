@@ -60,6 +60,14 @@ export class HealthAgent {
       const msg = typeof reason === 'string' ? reason : reason?.message || 'Unhandled rejection';
       const stack = reason?.stack || '';
       this.report('error', `unhandledrejection: ${msg}`, stack, { source: 'promise' });
+      publishError(
+        reason instanceof Error ? reason : new Error(msg),
+        {
+          tenant_id: this.resolverContext?.tenantId,
+          url: window.location.href,
+          source: 'promise'
+        }
+      );
     });
 
     this.instrumentFetch();
