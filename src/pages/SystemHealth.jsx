@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -27,7 +28,10 @@ export default function SystemHealth() {
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => setUserRole(u?.role)).catch(() => {});
+    base44.auth.me().then((u) => {
+      const role = String(u?.role || u?.app_role || '').toLowerCase();
+      setUserRole(role || null);
+    }).catch(() => {});
   }, []);
 
   const isAdmin = userRole === 'admin';
@@ -49,10 +53,15 @@ export default function SystemHealth() {
     ...queryDefaults.realtime // System health should refresh often
   });
 
-  const { data: healthMetrics = [] } = useQuery({
-    queryKey: ['systemHealth'],
-    queryFn: () => base44.entities.SystemHealth.filter({}, '-period', 1),
-    ...queryDefaults.standard
+  const { data: selfHealEvents = [] } = useQuery({
+    queryKey: buildQueryKey('selfHealEvents', resolverCheck),
+    queryFn: () => base44.entities.SelfHealingEvent.filter(
+      { tenant_id: queryFilter.tenant_id, acknowledged: false },
+      '-detected_at',
+      100
+    ),
+    enabled: canQuery,
+    ...queryDefaults.realtime
   });
 
   // Calculate live metrics from event logs
@@ -81,19 +90,19 @@ export default function SystemHealth() {
     };
   }, [eventLogs]);
 
-  const latestHealth = healthMetrics[0];
-
   const runSupportWatchdog = useMutation({
     mutationFn: () => base44.functions.invoke('supportWatchdog', { manual: true })
   });
 
   const runSupportGuardian = useMutation({
-    mutationFn: () => base44.functions.invoke('supportGuardian', { action: 'run_watchdog' })
+    mutationFn: () => base44.functions.invoke('supportGuardian', { action: 'run_watchdog', manual: true })
   });
 
   const runProfitAlertWatchdog = useMutation({
     mutationFn: () => base44.functions.invoke('profitAlertWatchdog', { manual: true })
   });
+
+  const activeIncidentCount = selfHealEvents.filter((e) => e.fix_result !== 'success').length;
 
   return (
     <div className="space-y-6">
@@ -109,6 +118,15 @@ export default function SystemHealth() {
           {metrics.errorRate < 5 ? 'Healthy' : 'Degraded'}
         </Badge>
       </div>
+
+      {activeIncidentCount > 0 && (
+        <Alert className="border-amber-300 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-amber-900">
+            {activeIncidentCount} active runtime incident{activeIncidentCount === 1 ? '' : 's'} detected. Review Self-Healing Center for details.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Autonomous Health Monitor */}
       {canQuery && (

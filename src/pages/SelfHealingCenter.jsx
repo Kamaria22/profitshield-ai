@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Shield, RefreshCw, Activity, AlertTriangle, CheckCircle, Zap, Loader2, Play, Clock, XCircle } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
+import { Shield, RefreshCw, Activity, AlertTriangle, CheckCircle, Zap, Loader2, Play, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,7 +11,8 @@ import IncidentRow from '@/components/selfheal/IncidentRow';
 import PatchBundleCard from '@/components/selfheal/PatchBundleCard';
 
 export default function SelfHealingCenter() {
-  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [healingSubsystem, setHealingSubsystem] = useState(null);
@@ -18,16 +21,15 @@ export default function SelfHealingCenter() {
   const [tab, setTab] = useState('overview');
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
+    base44.auth.me().then((u) => {
       const role = (u?.role || u?.app_role || '').toLowerCase();
       if (role !== 'admin' && role !== 'owner') {
-        window.location.href = '/';
+        navigate(createPageUrl('Home', location.search), { replace: true });
         return;
       }
       loadData();
-    }).catch(() => { window.location.href = '/'; });
-  }, []);
+    }).catch(() => { navigate(createPageUrl('Home', location.search), { replace: true }); });
+  }, [loadData, navigate, location.search]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -77,11 +79,8 @@ export default function SelfHealingCenter() {
   };
 
   const rejectP = async (patchId) => {
-    await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: patchId }); // marks approved, code manual
-    setData(prev => prev ? {
-      ...prev,
-      pending_patches: prev.pending_patches.map(p => p.id === patchId ? { ...p, status: 'rejected' } : p)
-    } : prev);
+    await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: patchId });
+    await loadData();
   };
 
   // Derive subsystem health from events

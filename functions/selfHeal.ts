@@ -589,6 +589,19 @@ Deno.serve(async (req) => {
       return Response.json({ ok: true, message: 'Patch approved. Code changes require manual deployment via the code editor.' });
     }
 
+    // ── reject_patch ───────────────────────────────────────────────────────
+    if (action === 'reject_patch') {
+      const { patch_bundle_id } = body;
+      if (!patch_bundle_id) return Response.json({ error: 'patch_bundle_id required' }, { status: 400 });
+      await db.entities.PatchBundle.update(patch_bundle_id, {
+        status: 'rejected',
+        applied_by: user?.email || 'admin',
+        applied_at: new Date().toISOString()
+      });
+      await logAudit(db, 'patch_rejected', 'system', `Patch bundle ${patch_bundle_id} rejected`, { patch_bundle_id });
+      return Response.json({ ok: true, message: 'Patch rejected.' });
+    }
+
     return Response.json({ error: 'Unknown action', action }, { status: 400 });
 
   } catch (error) {

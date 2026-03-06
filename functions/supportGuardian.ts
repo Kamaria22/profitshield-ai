@@ -78,15 +78,13 @@ Deno.serve(async (req) => {
     const action = body.action || 'run_watchdog';
     const tenantId = body.tenant_id || null;
     execMeta = { action, tenantId, userRole: null, isScheduler: action === 'run_watchdog' };
-    if (action !== 'run_watchdog') {
-      let user = null;
-      try { user = await base44.auth.me(); } catch (_) {}
-      const role = (user?.role || user?.app_role || '').toLowerCase();
-      execMeta.userRole = role || null;
-      execMeta.isScheduler = !user;
-      if (user && !allowRole(role, ['admin', 'owner'])) {
-        return Response.json({ ok: false, error: 'Admin/owner only' }, { status: 403 });
-      }
+    let user = null;
+    try { user = await base44.auth.me(); } catch (_) {}
+    const role = (user?.role || user?.app_role || '').toLowerCase();
+    execMeta.userRole = role || null;
+    execMeta.isScheduler = !user;
+    if (user && !allowRole(role, ['admin', 'owner'])) {
+      return Response.json({ ok: false, error: 'Admin/owner only' }, { status: 403 });
     }
 
     exec = await startAgentExecution({
