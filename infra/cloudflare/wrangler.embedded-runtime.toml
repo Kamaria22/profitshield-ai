@@ -1,0 +1,11 @@
+name = "profitshield-embedded-runtime"
+main = "./embedded-runtime-worker.mjs"
+compatibility_date = "2026-03-06"
+workers_dev = true
+
+[assets]
+directory = "../../embedded-app/dist"
+binding = "ASSETS"
+
+[vars]
+BASE44_API_ORIGIN = "https://profit-shield-ai.base44.app"
