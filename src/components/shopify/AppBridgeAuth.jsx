@@ -32,6 +32,17 @@ function isAllowedShopifyOrigin(origin) {
   return origin === "https://admin.shopify.com" || /^https:\/\/[a-z0-9-]+\.myshopify\.com$/i.test(origin);
 }
 
+function getConfiguredAppUrlOrigin() {
+  if (typeof window === "undefined") return null;
+  const configured = window.__SHOPIFY_APP_URL_ORIGIN__;
+  if (!configured || typeof configured !== "string") return null;
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return null;
+  }
+}
+
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) return window.__SHOPIFY_API_KEY__;
 
@@ -81,6 +92,13 @@ export function hasValidAppBridgeContext() {
   const apiKey = getApiKey();
   if (!host || !apiKey) return false;
   if (!isIframeContext()) return false;
+
+  // Prevent App Bridge bootstrap when the rendered frontend origin
+  // does not match the Shopify App URL origin (e.g. worker -> base44 redirect).
+  const configuredOrigin = getConfiguredAppUrlOrigin();
+  if (configuredOrigin && window.location.origin !== configuredOrigin) {
+    return false;
+  }
 
   const hostOrigin = getHostOrigin();
   if (!isAllowedShopifyOrigin(hostOrigin)) return false;

@@ -57,6 +57,9 @@ ensureEmbeddedContextParams()
 if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
   window.__SHOPIFY_API_KEY__ = import.meta.env.VITE_SHOPIFY_API_KEY || '67be6ef7574f3a32bf9a218ad4582c68';
 }
+if (typeof window !== 'undefined' && !window.__SHOPIFY_APP_URL_ORIGIN__) {
+  window.__SHOPIFY_APP_URL_ORIGIN__ = import.meta.env.VITE_SHOPIFY_APP_URL_ORIGIN || '';
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

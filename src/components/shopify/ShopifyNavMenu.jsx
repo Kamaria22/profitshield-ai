@@ -93,10 +93,12 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
 
     // Build items — admin items already excluded (none in NAV_ITEMS)
     const currentPath = detectCurrentPath();
-    const itemConfigs = NAV_ITEMS.map((item) => ({
-      label: item.label,
-      destination: buildItemUrl(item.path, shop, host),
-    }));
+    const itemConfigs = NAV_ITEMS
+      .map((item) => ({
+        label: typeof item.label === 'string' ? item.label.trim() : '',
+        destination: buildItemUrl(item.path, shop, host),
+      }))
+      .filter((item) => item.label && item.destination);
 
     try {
       // Reuse or create App Bridge instance
@@ -104,7 +106,9 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
         appRef.current = createApp({ apiKey, host, shopOrigin: shopOrigin || undefined, forceRedirect: false });
       }
       const app = appRef.current;
-      const items = itemConfigs.map((item) => AppLink.create(app, item));
+      if (!itemConfigs.length) return;
+      const items = itemConfigs.map((item) => AppLink.create(app, item)).filter(Boolean);
+      if (!items.length) return;
 
       // Find active item
       const activeIndex = NAV_ITEMS.findIndex((item) =>
@@ -152,12 +156,15 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
       const { shop, host } = getUrlParams();
       if (!shop || !host) return;
       const currentPath = detectCurrentPath();
-      const items = NAV_ITEMS.map((item) =>
-        AppLink.create(appRef.current, {
-        label: item.label,
-        destination: buildItemUrl(item.path, shop, host),
+      const items = NAV_ITEMS
+        .map((item) => {
+          const label = typeof item.label === 'string' ? item.label.trim() : '';
+          const destination = buildItemUrl(item.path, shop, host);
+          if (!label || !destination) return null;
+          return AppLink.create(appRef.current, { label, destination });
         })
-      );
+        .filter(Boolean);
+      if (!items.length) return;
       const activeIndex = NAV_ITEMS.findIndex((item) =>
         currentPath === item.path ||
         (item.path !== '/' && currentPath.startsWith(item.path))
