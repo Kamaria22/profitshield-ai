@@ -95,6 +95,8 @@ function checkCriticalBase44Path() {
 function checkLegacyInfraIsolation() {
   const cloudflareDir = 'infra/cloudflare';
   const embeddedDir = 'embedded-app';
+  const cloudflareArchived = fileExists(`${cloudflareDir}/.archived-experimental`);
+  const embeddedArchived = fileExists(`${embeddedDir}/.archived-experimental`);
   const appRel = 'src/App.jsx';
   if (!fileExists(appRel)) return;
   const content = read(appRel);
@@ -110,7 +112,7 @@ function checkLegacyInfraIsolation() {
     });
   }
 
-  if (fileExists(cloudflareDir) || fileExists(embeddedDir)) {
+  if ((fileExists(cloudflareDir) || fileExists(embeddedDir)) && !(cloudflareArchived && embeddedArchived)) {
     addIncident({
       blocker_type: 'workaround_present_isolated',
       severity: 'info',
