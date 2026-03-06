@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: 'AI Insights',   path: '/ai-insights' },
   { label: 'P&L Analytics', path: '/pnl-analytics'},
   { label: 'Orders',        path: '/orders'     },
+  { label: 'Risk Intelligence', path: '/intelligence' },
   { label: 'Products',      path: '/products'   },
   { label: 'Customers',     path: '/customers'  },
   { label: 'Shipping',      path: '/shipping'   },
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { label: 'Alerts',        path: '/alerts'     },
   { label: 'Referrals',     path: '/referrals'  },
   { label: 'Billing & Plan',path: '/billing'    },
+  { label: 'Integrations',  path: '/integrations' },
   { label: 'Help Center',   path: '/helpcenter' },
 ];
 
@@ -129,7 +131,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
         try {
           window.history.pushState({}, '', url);
           window.dispatchEvent(new PopStateEvent('popstate'));
-        } catch (e) {
+        } catch {
           window.location.assign(url);
         }
       });

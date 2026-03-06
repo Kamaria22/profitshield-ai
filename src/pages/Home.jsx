@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect } from 'react';
+import React, { useState, useCallback, lazy, Suspense, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
@@ -26,8 +26,7 @@ import AIOpportunities from '../components/dashboard/AIOpportunities';
 import ProfitForecast from '../components/dashboard/ProfitForecast';
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
 import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
-import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
-import LazyPanel, { PanelSkeleton } from '../components/dashboard/LazyPanel';
+import { PanelSkeleton } from '../components/dashboard/LazyPanel';
 import PredictiveOverviewBar from '../components/dashboard/PredictiveOverviewBar';
 import AutonomousInsightEngine from '../components/dashboard/AutonomousInsightEngine';
 
@@ -78,7 +77,7 @@ export default function Home() {
     }
   };
 
-  const handleUpgrade = (tier) => {
+  const handleUpgrade = (_tier) => {
     navigate(createPageUrl('Pricing'));
   };
   
@@ -104,9 +103,9 @@ export default function Home() {
       console.log(`⚡ Dashboard rendered in ${fetchTime.toFixed(0)}ms`);
 
       // Quick calculations
-      const totalRevenue = orders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
       const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
-      const highRiskOrders = orders.filter(o => (o.risk_score || 0) > 70).length;
+      const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
 
       return {
         metrics: {
@@ -127,20 +126,6 @@ export default function Home() {
     enabled: canQuery,
     staleTime: 60000,
     gcTime: 120000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
-  });
-
-  // PERFORMANCE: Background data loads - never block UI
-  const { data: detailedOrders = [] } = useQuery({
-    queryKey: buildQueryKey('orders-detailed', resolverCheck),
-    queryFn: async () => {
-      if (!queryFilter?.tenant_id) return [];
-      return base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 100);
-    },
-    enabled: canQuery && !!dashboardSummary,
-    staleTime: 120000,
-    gcTime: 300000,
     refetchOnMount: false,
     refetchOnWindowFocus: false
   });
