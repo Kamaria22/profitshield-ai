@@ -67,6 +67,46 @@ const AuthenticatedApp = () => {
           <Pages.Orders />
         </LayoutWrapper>
       } />
+      <Route path="/products" element={
+        <LayoutWrapper currentPageName="Products">
+          <Pages.Products />
+        </LayoutWrapper>
+      } />
+      <Route path="/customers" element={
+        <LayoutWrapper currentPageName="Customers">
+          <Pages.Customers />
+        </LayoutWrapper>
+      } />
+      <Route path="/shipping" element={
+        <LayoutWrapper currentPageName="Shipping">
+          <Pages.Shipping />
+        </LayoutWrapper>
+      } />
+      <Route path="/tasks" element={
+        <LayoutWrapper currentPageName="Tasks">
+          <Pages.Tasks />
+        </LayoutWrapper>
+      } />
+      <Route path="/alerts" element={
+        <LayoutWrapper currentPageName="Alerts">
+          <Pages.Alerts />
+        </LayoutWrapper>
+      } />
+      <Route path="/referrals" element={
+        <LayoutWrapper currentPageName="Referrals">
+          <Pages.Referrals />
+        </LayoutWrapper>
+      } />
+      <Route path="/billing" element={
+        <LayoutWrapper currentPageName="Billing">
+          <Pages.Billing />
+        </LayoutWrapper>
+      } />
+      <Route path="/helpcenter" element={
+        <LayoutWrapper currentPageName="HelpCenter">
+          <Pages.HelpCenter />
+        </LayoutWrapper>
+      } />
       <Route path="/pnl-analytics" element={
         <LayoutWrapper currentPageName="PnLAnalytics">
           <Pages.PnLAnalytics />
