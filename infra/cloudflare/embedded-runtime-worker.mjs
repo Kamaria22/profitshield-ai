@@ -41,12 +41,24 @@ function withSecurityHeaders(response, shop) {
 async function serveSpa(request, env) {
   const url = new URL(request.url);
   const shop = normalizeShop(url.searchParams.get('shop'));
+  const isHtmlRoute =
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    url.pathname.startsWith('/auth/') ||
+    url.pathname === '/dashboard' ||
+    url.pathname.startsWith('/dashboard/');
 
-  // Prefer static asset response via Workers Assets binding.
-  let assetResponse = await env.ASSETS.fetch(request);
+  // For SPA HTML routes, always serve index.html so CSP is attached consistently.
+  let assetResponse;
+  if (isHtmlRoute) {
+    const indexRequest = new Request(new URL('/index.html', url).toString(), request);
+    assetResponse = await env.ASSETS.fetch(indexRequest);
+  } else {
+    assetResponse = await env.ASSETS.fetch(request);
+  }
 
-  // SPA fallback to /index.html for app routes.
-  if (assetResponse.status === 404 && request.method === 'GET') {
+  // SPA fallback to /index.html for app routes (GET + HEAD).
+  if (assetResponse.status === 404 && (request.method === 'GET' || request.method === 'HEAD')) {
     const fallbackRequest = new Request(new URL('/index.html', url).toString(), request);
     assetResponse = await env.ASSETS.fetch(fallbackRequest);
   }
