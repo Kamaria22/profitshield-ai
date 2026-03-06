@@ -2,9 +2,61 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
+import { getPersistedContext } from '@/components/platformContext'
 
-// Shopify App Bridge requires the PUBLIC API key (Client ID)
-window.__SHOPIFY_API_KEY__ = '67be6ef7574f3a32bf9a218ad4582c68'
+function normalizeShop(shop) {
+  if (!shop || typeof shop !== 'string') return null
+  const trimmed = shop.toLowerCase().trim()
+  if (!trimmed) return null
+  return trimmed.includes('.myshopify.com') ? trimmed : `${trimmed}.myshopify.com`
+}
+
+function ensureEmbeddedContextParams() {
+  if (typeof window === 'undefined') return
+
+  let embedded = false
+  try {
+    embedded = window.top !== window.self
+  } catch {
+    embedded = true
+  }
+  if (!embedded) return
+
+  const url = new URL(window.location.href)
+  const params = url.searchParams
+  const hasShop = !!params.get('shop')
+  const hasHost = !!params.get('host')
+
+  if (hasShop && hasHost) return
+
+  const persisted = getPersistedContext(true)
+  const fallbackShop = normalizeShop(
+    params.get('shop')
+    || persisted.shop
+    || (persisted.platform === 'shopify' ? persisted.storeKey : null)
+    || localStorage.getItem('resolved_shop_domain')
+  )
+  const fallbackHost = params.get('host') || persisted.host || localStorage.getItem('resolved_host')
+
+  if (!fallbackShop || !fallbackHost) return
+
+  params.set('shop', fallbackShop)
+  params.set('host', fallbackHost)
+  params.set('embedded', '1')
+  const next = `${url.pathname}?${params.toString()}${url.hash}`
+  const current = `${url.pathname}${url.search}${url.hash}`
+  if (next !== current) {
+    window.history.replaceState({}, '', next)
+  }
+}
+
+ensureEmbeddedContextParams()
+
+// Shopify App Bridge requires the PUBLIC API key (Client ID).
+// Set it in external JS (not inline HTML) so CSP can remain strict.
+if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
+  window.__SHOPIFY_API_KEY__ = import.meta.env.VITE_SHOPIFY_API_KEY || '67be6ef7574f3a32bf9a218ad4582c68';
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

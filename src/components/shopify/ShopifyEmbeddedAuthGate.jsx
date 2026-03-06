@@ -20,6 +20,8 @@ import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
 import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
+import createApp from '@shopify/app-bridge';
+import { Redirect } from '@shopify/app-bridge/actions';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -68,6 +70,27 @@ function setCachedAuth(data) {
   } catch {}
 }
 
+function redirectRemote(url) {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const host = p.get('host');
+    const shop = p.get('shop');
+    const apiKey = window.__SHOPIFY_API_KEY__;
+    if (!host || !apiKey) throw new Error('missing_host_or_api_key');
+    const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
+    const app = createApp({
+      apiKey,
+      host,
+      shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
+      forceRedirect: true,
+    });
+    Redirect.create(app).dispatch(Redirect.Action.REMOTE, url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function clearEmbeddedAuthCache() {
   try { sessionStorage.removeItem(SHOPIFY_AUTH_KEY); } catch {}
 }
@@ -95,6 +118,30 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     runAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, retryCount]);
+
+  async function exchangeSession({ sessionToken, shopDomain }) {
+    const payload = {
+      session_token: sessionToken || undefined,
+      shop: shopDomain,
+    };
+
+    // Primary path: explicit public function endpoint
+    try {
+      const res = await fetch('/api/functions/shopifySessionExchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return { data };
+      return { data: { ...data, error: data?.error || `session_exchange_http_${res.status}` } };
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e.message);
+    }
+
+    // Fallback path: Base44 SDK invoke
+    return base44.functions.invoke('shopifySessionExchange', payload);
+  }
 
   async function runAuth() {
     if (inFlight.current) return;
@@ -131,10 +178,7 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
 
       // ── 4. Exchange (PUBLIC endpoint — no Base44 session required) ────────
       console.log(`[ShopifyEmbeddedAuthGate] Exchanging: shop=${shopDomain} has_token=${!!sessionToken}`);
-      const { data } = await base44.functions.invoke('shopifySessionExchange', {
-        session_token: sessionToken || undefined,
-        shop: shopDomain,
-      });
+      const { data } = await exchangeSession({ sessionToken, shopDomain });
       console.log(`[ShopifyEmbeddedAuthGate] Result: authenticated=${data?.authenticated} reason=${data?.reason || '-'}`);
 
       // ── 5. Handle responses ───────────────────────────────────────────────
@@ -163,12 +207,17 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
   }
 
   function applyAuth(data) {
+    const params = new URLSearchParams(window.location.search);
+    const host = params.get('host');
+
     persistContext({
       platform: 'shopify',
       storeKey: data.shop_domain,
       tenantId: data.tenant_id,
       integrationId: data.integration_id,
       shop: data.shop_domain,
+      host: host || undefined,
+      embedded: '1',
     });
 
     const ctx = {
@@ -228,7 +277,11 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
             ProfitShield needs to finish connecting to <strong>{shopDomain}</strong>. This only takes a few seconds.
           </p>
           <button
-            onClick={() => { const t = window.top || window; t.location.href = installUrl; }}
+            onClick={() => {
+              if (!redirectRemote(installUrl)) {
+                window.location.assign(installUrl);
+              }
+            }}
             className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-white text-sm transition-opacity hover:opacity-90"
             style={{ background: '#008060' }}
           >
@@ -288,7 +341,11 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
             </button>
             {shopDomain && (
               <button
-                onClick={() => { const t = window.top || window; t.location.href = reinstallUrl; }}
+                onClick={() => {
+                  if (!redirectRemote(reinstallUrl)) {
+                    window.location.assign(reinstallUrl);
+                  }
+                }}
                 className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <ExternalLink className="w-4 h-4" />

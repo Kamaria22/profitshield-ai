@@ -1,13 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/components/platformContext';
 import { Shield, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import createApp from '@shopify/app-bridge';
+import { Redirect } from '@shopify/app-bridge/actions';
+
+function redirectWithAppBridge(url) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const host = params.get('host');
+    const shop = params.get('shop');
+    const apiKey = window.__SHOPIFY_API_KEY__;
+    if (!host || !apiKey) throw new Error('missing_host_or_api_key');
+    const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
+    const app = createApp({
+      apiKey,
+      host,
+      shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
+      forceRedirect: true,
+    });
+    Redirect.create(app).dispatch(Redirect.Action.APP, url);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function ShopifyCallback() {
-  const navigate = useNavigate();
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
 
@@ -54,16 +74,12 @@ export default function ShopifyCallback() {
           const redirectUrl = data.redirect_url || '/Home';
           console.log('[ShopifyCallback] Redirecting to:', redirectUrl);
           try {
-            if (window.top && window.top !== window) {
-              // In embedded iframe — try to use top window
-              window.top.location.href = redirectUrl;
-            } else {
-              // Non-embedded or top window
-              window.location.href = redirectUrl;
+            if (!redirectWithAppBridge(redirectUrl)) {
+              window.location.assign(redirectUrl);
             }
           } catch (err) {
-            // Cross-origin iframe — open new tab as fallback
-            console.warn('[ShopifyCallback] window.top access denied, opening new tab:', err.message);
+            // Final fallback
+            console.warn('[ShopifyCallback] redirect failed, opening new tab:', err.message);
             window.open(redirectUrl, '_blank', 'noopener,noreferrer');
           }
         }, 800);

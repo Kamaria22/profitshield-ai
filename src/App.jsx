@@ -42,6 +42,41 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
+      <Route path="/support/contact" element={
+        <LayoutWrapper currentPageName="SupportContact">
+          <Pages.SupportContact />
+        </LayoutWrapper>
+      } />
+      <Route path="/admin/email" element={
+        <LayoutWrapper currentPageName="AdminEmailCenter">
+          <Pages.AdminEmailCenter />
+        </LayoutWrapper>
+      } />
+      <Route path="/dashboard" element={
+        <LayoutWrapper currentPageName="Home">
+          <Pages.Home />
+        </LayoutWrapper>
+      } />
+      <Route path="/ai-insights" element={
+        <LayoutWrapper currentPageName="AIInsights">
+          <Pages.AIInsights />
+        </LayoutWrapper>
+      } />
+      <Route path="/orders" element={
+        <LayoutWrapper currentPageName="Orders">
+          <Pages.Orders />
+        </LayoutWrapper>
+      } />
+      <Route path="/embedded-entry" element={
+        <LayoutWrapper currentPageName={mainPageKey}>
+          <MainPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/api/functions/embeddedEntryGuard" element={
+        <LayoutWrapper currentPageName={mainPageKey}>
+          <MainPage />
+        </LayoutWrapper>
+      } />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />

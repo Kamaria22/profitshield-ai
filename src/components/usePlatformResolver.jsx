@@ -208,7 +208,15 @@ export function usePlatformResolver() {
           chosenBy = 'shopify_embedded_exchange';
           // Persist for future fast-path
           const { persistContext: pc } = await import('@/components/platformContext');
-          pc({ platform: 'shopify', storeKey, tenantId, integrationId, shop: storeKey });
+          pc({
+            platform: 'shopify',
+            storeKey,
+            tenantId,
+            integrationId,
+            shop: storeKey,
+            host: urlParams.host || undefined,
+            embedded: '1'
+          });
           trace.steps.push(traceStep('shopify_embedded_exchange', { tenantId, storeKey, auto_healed: exchangeData.auto_healed }, true, 'Embedded: resolved via session exchange'));
         } else if (exchangeData?.install_required) {
           trace.steps.push(traceStep('shopify_embedded_exchange', { install_required: true }, false, 'Embedded: install required'));

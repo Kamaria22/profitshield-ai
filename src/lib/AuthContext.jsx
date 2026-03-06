@@ -5,6 +5,16 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
 
+function isShopifyEmbeddedContext() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+  } catch {
+    return false;
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -18,6 +28,16 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAppState = async () => {
+    // In Shopify embedded mode, auth is handled by ShopifyEmbeddedAuthGate + session exchange.
+    // Never trigger Base44 login redirects from this provider in embedded context.
+    if (isShopifyEmbeddedContext()) {
+      setAuthError(null);
+      setIsLoadingPublicSettings(false);
+      setIsLoadingAuth(false);
+      setIsAuthenticated(false);
+      return;
+    }
+
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);

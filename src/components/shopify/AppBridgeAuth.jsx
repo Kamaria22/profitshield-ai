@@ -26,6 +26,14 @@ function getHost() {
   return new URLSearchParams(window.location.search).get("host");
 }
 
+function getShopOrigin() {
+  if (typeof window === "undefined") return null;
+  const shop = new URLSearchParams(window.location.search).get("shop");
+  if (!shop) return null;
+  const normalized = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
+  return `https://${normalized}`;
+}
+
 function isEmbedded() {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).has("host");
@@ -43,6 +51,7 @@ export async function getFreshAppBridgeToken({ force = false } = {}) {
 
     const host = getHost();
     const apiKey = getApiKey();
+    const shopOrigin = getShopOrigin();
 
     // Not embedded? No token needed
     if (!host) {
@@ -63,7 +72,7 @@ export async function getFreshAppBridgeToken({ force = false } = {}) {
 
     // Fetch fresh token
     console.log(`[AB] Fetching fresh token (force=${force})`);
-    const app = createApp({ apiKey, host, forceRedirect: true });
+    const app = createApp({ apiKey, host, shopOrigin: shopOrigin || undefined, forceRedirect: true });
     const token = await getSessionToken(app);
 
     if (token && token.length > 50) {

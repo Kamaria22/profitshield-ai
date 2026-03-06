@@ -8,13 +8,25 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 // Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
+const SHOPIFY_FRAME_ANCESTORS = "https://admin.shopify.com https://*.myshopify.com";
+
+function mergeFrameAncestors(csp = '') {
+  const normalized = (csp || '').trim();
+  const frameDirective = `frame-ancestors ${SHOPIFY_FRAME_ANCESTORS};`;
+  if (!normalized) return frameDirective;
+  if (/frame-ancestors\s+/i.test(normalized)) {
+    return normalized.replace(/frame-ancestors[^;]*;?/i, frameDirective);
+  }
+  return `${normalized.replace(/;?\s*$/, ';')} ${frameDirective}`;
+}
+
 function shopifyHeaders() {
+  const existingCsp = '';
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com",
-    'X-Frame-Options': 'ALLOWALL', // Explicitly allow embedding
+    'Content-Security-Policy': mergeFrameAncestors(existingCsp),
   };
 }
 

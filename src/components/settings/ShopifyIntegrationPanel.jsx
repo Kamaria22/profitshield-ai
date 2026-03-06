@@ -7,7 +7,7 @@
  * Works in BOTH embedded Shopify (no Base44 session) and normal login contexts.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -172,31 +172,33 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
             const { Redirect } = await import('@shopify/app-bridge/actions');
             const { default: createApp } = await import('@shopify/app-bridge');
             const urlParams = new URLSearchParams(window.location.search);
+            const host = urlParams.get('host');
+            const shop = urlParams.get('shop');
+            if (!host || !window.__SHOPIFY_API_KEY__) {
+              throw new Error('Missing host/apiKey for embedded App Bridge redirect');
+            }
+            const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
             const app = createApp({
-              apiKey: window.__SHOPIFY_API_KEY__ || '',
-              host: urlParams.get('host') || '',
+              apiKey: window.__SHOPIFY_API_KEY__,
+              host,
+              shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
             });
             const redirect = Redirect.create(app);
             console.log('[ShopifyIntegrationPanel] Using App Bridge Redirect');
             redirect.dispatch(Redirect.Action.REMOTE, oauthUrl);
             return;
           } catch (bridgeErr) {
-            console.warn('[ShopifyIntegrationPanel] App Bridge failed, falling back to window.top:', bridgeErr.message);
+            console.warn('[ShopifyIntegrationPanel] App Bridge failed, falling back to window.location:', bridgeErr.message);
           }
         }
 
-        // Non-embedded or App Bridge fallback: redirect top window
+        // Non-embedded or App Bridge fallback: redirect current window
         try {
-          if (window.top && window.top !== window) {
-            console.log('[ShopifyIntegrationPanel] Redirecting window.top to OAuth URL');
-            window.top.location.href = oauthUrl;
-          } else {
-            console.log('[ShopifyIntegrationPanel] Redirecting window.location to OAuth URL');
-            window.location.href = oauthUrl;
-          }
+          console.log('[ShopifyIntegrationPanel] Redirecting window.location to OAuth URL');
+          window.location.assign(oauthUrl);
         } catch (_) {
-          // Cross-origin restriction — show modal with "open new tab"
-          console.warn('[ShopifyIntegrationPanel] window.top inaccessible — showing new-tab modal');
+          // Browser restriction — show modal with "open new tab"
+          console.warn('[ShopifyIntegrationPanel] window.location redirect blocked — showing new-tab modal');
           setPendingOAuthUrl(oauthUrl);
           setShowNewTabModal(true);
           setReconnecting(false);
