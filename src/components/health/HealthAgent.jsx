@@ -1,5 +1,5 @@
 import { getCachedRemoteConfig, refreshRemoteConfig } from './remoteConfig';
-import { publishError, SUBSYSTEMS } from '@/components/selfheal/IncidentBus';
+import { publishError, publishIncident, SUBSYSTEMS } from '@/components/selfheal/IncidentBus';
 
 function safeId() {
   return `inc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
@@ -63,6 +63,13 @@ export class HealthAgent {
     });
 
     this.instrumentFetch();
+    publishIncident({
+      subsystem: SUBSYSTEMS.GENERAL,
+      issue_code: 'HEALTH_AGENT_ONLINE',
+      severity: 'low',
+      tenant_id: this.resolverContext?.tenantId,
+      context: { source: 'health.agent.init', embedded: inEmbeddedContext() }
+    });
 
     console.info('[HealthAgent] initialized', {
       embedded: inEmbeddedContext(),

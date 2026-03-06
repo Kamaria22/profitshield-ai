@@ -3,10 +3,12 @@ import AutonomousHealthDashboard from '@/components/health/AutonomousHealthDashb
 import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import WebhookSecurityPanel from '@/components/admin/WebhookSecurityPanel';
 import QueueObservabilityPanel from '@/components/admin/QueueObservabilityPanel';
 import {
@@ -32,6 +34,8 @@ export default function SystemHealth() {
   }, []);
 
   const isAdmin = userRole === 'admin';
+  const isOwner = userRole === 'owner';
+  const isPrivileged = isAdmin || isOwner;
 
   // SINGLE SOURCE OF TRUTH: Platform Resolver
   const resolver = usePlatformResolver();
@@ -82,6 +86,14 @@ export default function SystemHealth() {
 
   const latestHealth = healthMetrics[0];
 
+  const runSupportWatchdog = useMutation({
+    mutationFn: () => base44.functions.invoke('supportWatchdog', { manual: true })
+  });
+
+  const runProfitAlertWatchdog = useMutation({
+    mutationFn: () => base44.functions.invoke('profitAlertWatchdog', { manual: true })
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -103,12 +115,36 @@ export default function SystemHealth() {
       )}
 
       {/* ADMIN-ONLY: Security + Queue Observability */}
-      {isAdmin && (
+      {isPrivileged && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <Lock className="w-3 h-3" />
             <span className="font-medium">Admin-Only Section</span> — Webhook security, queue metrics, and audit tools
           </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Protection Stack Controls</CardTitle>
+              <CardDescription>Run guardian watchdog checks without leaving system health.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => runSupportWatchdog.mutate()}
+                disabled={runSupportWatchdog.isPending}
+              >
+                Run Support Watchdog
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => runProfitAlertWatchdog.mutate()}
+                disabled={runProfitAlertWatchdog.isPending}
+              >
+                Run Profit Alert Watchdog
+              </Button>
+            </CardContent>
+          </Card>
           <div className="grid lg:grid-cols-2 gap-4">
             <WebhookSecurityPanel />
             <Card>

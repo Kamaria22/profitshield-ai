@@ -37,9 +37,11 @@ function classifyError(error, context = {}) {
 
 let publishQueue = [];
 let publishTimer = null;
+let flushInFlight = false;
 
 async function flush() {
-  if (!publishQueue.length) return;
+  if (!publishQueue.length || flushInFlight) return;
+  flushInFlight = true;
   const batch = publishQueue.splice(0, 10);
   try {
     for (const incident of batch) {
@@ -50,6 +52,9 @@ async function flush() {
     }
   } catch (e) {
     console.warn('[IncidentBus] flush failed:', e?.message);
+    publishQueue = [...batch, ...publishQueue].slice(0, 100);
+  } finally {
+    flushInFlight = false;
   }
 }
 
@@ -63,6 +68,16 @@ export function publishIncident({ subsystem, issue_code, severity = 'medium', te
 export function publishError(error, context = {}) {
   const classification = classifyError(error, context);
   publishIncident({ ...classification, tenant_id: context.tenant_id, context: { ...context, message: error?.message } });
+}
+
+export class IncidentBusClient {
+  publishIncident(payload) {
+    publishIncident(payload);
+  }
+
+  publishError(error, context = {}) {
+    publishError(error, context);
+  }
 }
 
 export { SUBSYSTEMS, classifyError };

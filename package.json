@@ -5,11 +5,24 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run guard:run",
     "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "guard:discover": "node scripts/guarded/discover.mjs",
+    "guard:layers": "node scripts/guarded/layer-inventory.mjs",
+    "guard:preflight": "node scripts/guarded/preflight.mjs",
+    "guard:risk": "node scripts/guarded/risk-assess.mjs",
+    "guard:guardian-review": "node scripts/guarded/guardian-review.mjs",
+    "guard:builder-action": "node scripts/guarded/builder-action.mjs",
+    "guard:runtime": "node scripts/guarded/runtime-verify.mjs",
+    "guard:runtime-health": "node scripts/guarded/runtime-health-check.mjs",
+    "guard:self-heal": "node scripts/guarded/self-heal.mjs",
+    "guard:simulate-heal": "node scripts/guarded/simulate-heal.mjs",
+    "guard:probe-agents": "node scripts/guarded/probe-agents.mjs",
+    "guard:run": "node scripts/guarded/guarded-workflow.mjs"
   },
   "dependencies": {
     "@shopify/app-bridge": "^3.7.10",

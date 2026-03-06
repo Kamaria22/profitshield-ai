@@ -82,9 +82,9 @@ export default function ShopifyCallback() {
               window.location.assign(redirectUrl);
             }
           } catch (err) {
-            // Final fallback
-            console.warn('[ShopifyCallback] redirect failed, opening new tab:', err.message);
-            window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+            // Final fallback keeps navigation in same window for embedded compatibility.
+            console.warn('[ShopifyCallback] redirect failed, using same-window fallback:', err.message);
+            window.location.assign(redirectUrl);
           }
         }, 800);
       } else {

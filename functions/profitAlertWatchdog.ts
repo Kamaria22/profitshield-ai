@@ -1,17 +1,53 @@
 /**
  * Profit Alert Watchdog
+ * watchdog execution path for tenant-wide alert checks.
  * Iterates ALL tenants (via AlertRule entity) and runs profit alert checks per tenant.
  * Fixes the original "tenant_id is required" 400 error from global invocation.
  * Failsafe: skips invalid tenants, logs per-tenant failures, never crashes the job.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { startAgentExecution, finishAgentExecution } from './helpers/agentRuntime.ts';
+
+const AGENT_NAME = 'profitAlertWatchdog';
+const AGENT_VERSION = '2026-03-06.guard-v1';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
+  const db = base44.asServiceRole.entities;
+  const role = (req.headers.get('x-user-role') || '').toLowerCase() || null;
   const startedAt = new Date().toISOString();
   const results = [];
   let successCount = 0;
   let failCount = 0;
+  let exec = null;
+
+  try {
+    exec = await startAgentExecution({
+      db,
+      agentName: AGENT_NAME,
+      action: 'watchdog_scan',
+      tenantId: null,
+      userRole: role,
+      isScheduler: true,
+      policy: {
+        window_ms: 5 * 60 * 1000,
+        max_executions_per_window: 6,
+        max_failures_per_window: 3,
+        version: AGENT_VERSION
+      }
+    });
+  } catch (_) {
+    exec = { ok: true, startedAt: Date.now() };
+  }
+
+  if (!exec?.ok) {
+    return Response.json({
+      success: false,
+      blocked: true,
+      block_reason: exec?.blockReason || 'guard_blocked',
+      function: AGENT_NAME
+    }, { status: 429 });
+  }
 
   try {
     // Discover tenants by getting all active AlertRules — this avoids Tenant entity auth issues
@@ -36,14 +72,27 @@ Deno.serve(async (req) => {
 
     if (allTenantIds.length === 0) {
       console.log('[ProfitAlertWatchdog] No tenants found — skipping.');
-      return Response.json({
+      const emptyResult = {
         success: true,
         message: 'No tenants found',
         tenant_count: 0,
         results: [],
         started_at: startedAt,
         finished_at: new Date().toISOString()
+      };
+      await finishAgentExecution({
+        db,
+        agentName: AGENT_NAME,
+        action: 'watchdog_scan',
+        tenantId: null,
+        startedAt: exec.startedAt,
+        success: true,
+        repairActions: ['no_tenants'],
+        isScheduler: true,
+        userRole: role,
+        version: AGENT_VERSION
       });
+      return Response.json(emptyResult);
     }
 
     console.log(`[ProfitAlertWatchdog] Running for ${allTenantIds.length} tenant(s)`);
@@ -121,10 +170,34 @@ Deno.serve(async (req) => {
     };
 
     console.log(`[ProfitAlertWatchdog] Complete — ${successCount}/${allTenantIds.length} tenants processed`);
+    await finishAgentExecution({
+      db,
+      agentName: AGENT_NAME,
+      action: 'watchdog_scan',
+      tenantId: null,
+      startedAt: exec.startedAt,
+      success: true,
+      repairActions: ['tenant_watchdog_run'],
+      isScheduler: true,
+      userRole: role,
+      version: AGENT_VERSION
+    });
     return Response.json(summary);
 
   } catch (error) {
     console.error('[ProfitAlertWatchdog] Fatal error:', error.message);
+    await finishAgentExecution({
+      db,
+      agentName: AGENT_NAME,
+      action: 'watchdog_scan',
+      tenantId: null,
+      startedAt: exec?.startedAt || Date.now(),
+      success: false,
+      error: error?.message || String(error),
+      isScheduler: true,
+      userRole: role,
+      version: AGENT_VERSION
+    });
     return Response.json({
       success: false,
       error: error.message,
