@@ -50,7 +50,6 @@
 import AIInsights from './pages/AIInsights';
 import AIModelGovernance from './pages/AIModelGovernance';
 import Achievements from './pages/Achievements';
-import AdminEmailCenter from './pages/AdminEmailCenter';
 import Alerts from './pages/Alerts';
 import AppStoreListing from './pages/AppStoreListing';
 import AppStoreSubmission from './pages/AppStoreSubmission';
@@ -102,7 +101,6 @@ export const PAGES = {
     "AIInsights": AIInsights,
     "AIModelGovernance": AIModelGovernance,
     "Achievements": Achievements,
-    "AdminEmailCenter": AdminEmailCenter,
     "Alerts": Alerts,
     "AppStoreListing": AppStoreListing,
     "AppStoreSubmission": AppStoreSubmission,
