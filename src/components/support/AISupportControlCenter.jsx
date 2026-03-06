@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
 
 const STATUS_CONFIG = {
   open:          { label: 'Open',        color: 'bg-blue-500/15 text-blue-300 border-blue-500/20' },
@@ -40,6 +41,9 @@ export default function AISupportControlCenter() {
   const [reply, setReply] = useState('');
   const [filter, setFilter] = useState('all');
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const role = (user?.role || user?.app_role || '').toLowerCase();
+  const canAccess = role === 'owner' || role === 'admin';
 
   // Fetch conversations
   const { data: conversations = [], isLoading } = useQuery({
@@ -50,7 +54,8 @@ export default function AISupportControlCenter() {
         { status: filter };
       return base44.entities.SupportConversation.filter(query, '-created_date', 100);
     },
-    refetchInterval: 30000
+    refetchInterval: canAccess ? 30000 : false,
+    enabled: canAccess
   });
 
   // Fetch recent audit logs for repair activity
@@ -59,7 +64,8 @@ export default function AISupportControlCenter() {
     queryFn: () => base44.entities.AuditLog.filter(
       { category: 'ai_action' }, '-created_date', 20
     ),
-    refetchInterval: 60000
+    refetchInterval: canAccess ? 60000 : false,
+    enabled: canAccess
   });
 
   // Stats
@@ -119,6 +125,19 @@ export default function AISupportControlCenter() {
       setSelected(null);
     }
   });
+
+  if (!canAccess) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Access Restricted</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-400">Only owner/admin users can access AI Support Control Center.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

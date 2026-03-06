@@ -11,6 +11,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const OWNER_EMAIL = 'support@profitshield.ai';
 const ADMIN_EMAIL = 'rohan.a.roberts@gmail.com';
+const DEFAULT_OWNER_PHONE = '9146894367';
 
 // Issue patterns that can be auto-resolved
 const AUTO_RESOLVABLE_PATTERNS = [
@@ -28,6 +29,26 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const manualTrigger = body.manual === true;
+    const requester = await base44.auth.me().catch(() => null);
+    const requesterRole = String(requester?.role || requester?.app_role || '').toLowerCase();
+    const requesterIsPrivileged = requesterRole === 'owner' || requesterRole === 'admin';
+
+    if (manualTrigger && !requesterIsPrivileged) {
+      return Response.json(
+        { success: false, error: 'forbidden', message: 'Only owner/admin can run support watchdog.' },
+        { status: 403 }
+      );
+    }
+
+    if (body.ui_probe?.embedded_probe?.blocked_text_detected || body.ui_probe?.permission_probe?.mismatch) {
+      await base44.functions.invoke('selfHeal', {
+        action: 'heal_ui_routing',
+        tenant_id: body.tenant_id || 'system',
+        ui_probe: body.ui_probe,
+        issues: [{ type: 'support_watchdog_ui_route_signal' }],
+      }).catch(() => {});
+      report.actions_taken.push('UI routing mismatch forwarded to selfHeal');
+    }
 
     // --- 1. Fetch recent open/escalated conversations ---
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -166,6 +187,42 @@ support@profitshield.ai`
       } catch (emailErr) {
         console.error('[SupportWatchdog] Email alert failed:', emailErr.message);
         report.actions_taken.push(`Email alert failed: ${emailErr.message}`);
+      }
+
+      // Optional SMS notification path (best-effort).
+      // Trigger conditions:
+      // 1) AI could not resolve (needsHuman.length > 0)
+      // 2) Merchant bug report
+      // 3) Critical ticket
+      const bugReports = needsHuman.filter((conv) => /bug|error|crash|broken/i.test(
+        `${conv.issue_summary || ''} ${(conv.messages || []).map((m) => m.content || '').join(' ')}`
+      ));
+      const criticalTickets = needsHuman.filter((conv) => (conv.priority || '').toLowerCase() === 'critical');
+      const shouldSms = needsHuman.length > 0 || bugReports.length > 0 || criticalTickets.length > 0;
+
+      if (shouldSms) {
+        let ownerPhone = DEFAULT_OWNER_PHONE;
+        try {
+          const tenantId = needsHuman[0]?.tenant_id || null;
+          if (tenantId) {
+            const settings = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []);
+            ownerPhone = settings?.[0]?.owner_notification_phone || ownerPhone;
+          }
+        } catch (_) {}
+
+        try {
+          if (base44.asServiceRole?.integrations?.Core?.SendSMS) {
+            await base44.asServiceRole.integrations.Core.SendSMS({
+              to: ownerPhone,
+              body: `ProfitShield Support Alert: ${needsHuman.length} unresolved ticket(s), ${criticalTickets.length} critical, ${bugReports.length} bug report(s). Check Email & Support admin center.`
+            });
+            report.actions_taken.push(`Owner SMS sent to ${ownerPhone}`);
+          } else {
+            report.actions_taken.push('Owner SMS skipped: SendSMS integration unavailable');
+          }
+        } catch (smsErr) {
+          report.actions_taken.push(`Owner SMS failed: ${smsErr.message}`);
+        }
       }
     }
 

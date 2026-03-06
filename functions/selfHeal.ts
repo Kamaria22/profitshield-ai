@@ -7,7 +7,7 @@
  * Actions (auto = no approval needed):
  *   heal_shopify_webhooks, heal_shopify_token (mark + prompt),
  *   heal_queue, heal_resolver_context, heal_missing_secrets,
- *   heal_automation, heal_stripe_webhook
+ *   heal_automation, heal_stripe_webhook, heal_ui_routing
  *
  * Actions (patch = generates PatchBundle + requires admin approval):
  *   generate_patch
@@ -170,6 +170,59 @@ function healStripeWebhook() {
     webhook_secret_present: hasSecret,
     status: !hasSecret ? 'billing_degraded' : 'ok',
     action_required: !hasSecret ? 'Set STRIPE_WEBHOOK_SECRET in env secrets. Get it from Stripe Dashboard → Webhooks → Signing secret.' : null
+  };
+}
+
+// ─── HEAL: UI Routing / Embedded Route Integrity ────────────────────────────
+async function healUiRouting(db, tenantId, payload) {
+  const uiProbe = payload?.ui_probe || {};
+  const issues = Array.isArray(payload?.issues) ? payload.issues : [];
+  const embeddedProbe = uiProbe.embedded_probe || {};
+  const permissionProbe = uiProbe.permission_probe || {};
+
+  const repairPlan = {
+    switch_to_router_navigation: true,
+    verify_critical_routes_registered: true,
+    preserve_embedded_query_params: true,
+    preserve_embedded_host_param: true,
+    enforce_admin_route_permissions: true,
+  };
+
+  const needsPatch =
+    !!embeddedProbe.blocked_text_detected ||
+    (embeddedProbe.link_issues || []).some((i) => i?.repair_needed) ||
+    !!permissionProbe.mismatch ||
+    issues.length > 0;
+
+  if (needsPatch) {
+    await db.entities.PatchBundle.create({
+      title: "UI route integrity repair (embedded + permissions)",
+      subsystem: "ui_routing",
+      severity: "high",
+      status: "proposed",
+      created_at: new Date().toISOString(),
+      details: {
+        tenant_id: tenantId || "system",
+        repair_plan: repairPlan,
+        ui_probe: uiProbe,
+        issues,
+      },
+    }).catch(() => {});
+  }
+
+  await logAudit(
+    db,
+    "heal_ui_routing",
+    tenantId || "system",
+    `UI routing integrity check completed (needs_patch=${needsPatch})`,
+    { needs_patch: needsPatch, issues_count: issues.length, repair_plan: repairPlan }
+  );
+
+  return {
+    ok: true,
+    needs_patch: needsPatch,
+    repair_plan: repairPlan,
+    issues_count: issues.length,
   };
 }
 
@@ -467,6 +520,24 @@ Deno.serve(async (req) => {
         });
       }
       return Response.json({ ok: result.ok, ...result });
+    }
+
+    // ── heal_ui_routing ────────────────────────────────────────────────────
+    if (action === 'heal_ui_routing') {
+      const tenantId = body.tenant_id || 'system';
+      const result = await healUiRouting(db, tenantId, body);
+      await logEvent(db, {
+        tenant_id: tenantId,
+        severity: result.needs_patch ? 'high' : 'low',
+        subsystem: 'UI_ROUTING',
+        issue_code: result.needs_patch ? 'UI_ROUTING_MISMATCH' : 'UI_ROUTING_OK',
+        fix_type: result.needs_patch ? 'patch' : 'auto',
+        fix_result: 'success',
+        auto_healed: !result.needs_patch,
+        fixed_at: new Date().toISOString(),
+        details_json: result
+      });
+      return Response.json(result);
     }
 
     // ── get_incidents ──────────────────────────────────────────────────────

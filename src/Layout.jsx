@@ -54,6 +54,7 @@ import {
   Download,
   Lock,
   HelpCircle,
+  Mail,
   Inbox,
   Wrench,
   GitPullRequest
@@ -111,6 +112,7 @@ const navItems = [
   { name: 'Billing & Plan', page: 'Billing', icon: CreditCard, permission: 'dashboard_view' },
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
+  { name: 'Email & Support', page: 'AdminEmailCenter', path: '/admin/email', icon: Mail, permission: 'settings_view', adminOnly: true },
   { name: 'Achievements', page: 'Achievements', icon: Gift, permission: 'dashboard_view' },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
   { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
@@ -340,6 +342,7 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
+  const [supportUnread, setSupportUnread] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -397,6 +400,17 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     }
   }, []);
 
+  const loadSupportUnread = useCallback(async () => {
+    try {
+      const rows = await base44.entities.SupportConversation.filter({}, '-created_date', 300);
+      const unread = (rows || []).filter((c) => c.status === 'open' || c.needs_owner_attention).length;
+      setSupportUnread(unread);
+    } catch (e) {
+      console.warn('[Layout] Error loading support unread count:', e.message);
+      setSupportUnread(0);
+    }
+  }, []);
+
   // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
     if (isResolved && authTenantId) {
@@ -405,6 +419,15 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       setPendingAlerts(0);
     }
   }, [isResolved, authTenantId, loadAlerts]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadSupportUnread();
+      const t = setInterval(loadSupportUnread, 30000);
+      return () => clearInterval(t);
+    }
+    setSupportUnread(0);
+  }, [isAdmin, loadSupportUnread]);
 
   // Safe redirect to SelectStore — NEVER redirect Shopify install flows
   useEffect(() => {
@@ -579,7 +602,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               return (
                 <Link
                   key={item.page}
-                  to={createPageUrl(item.page, location.search)}
+                  to={item.path || createPageUrl(item.page, location.search)}
                   onClick={handleSidebarClose}
                   className={`
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
@@ -602,6 +625,11 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                   {item.page === 'Alerts' && pendingAlerts > 0 && (
                     <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
                       {pendingAlerts}
+                    </Badge>
+                  )}
+                  {item.page === 'AdminEmailCenter' && supportUnread > 0 && (
+                    <Badge className="ml-auto bg-indigo-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${supportUnread} unread support messages`}>
+                      {supportUnread}
                     </Badge>
                   )}
                 </Link>
@@ -913,7 +941,7 @@ function LayoutWithProviders({ children, currentPageName }) {
       </HealthErrorBoundary>
 
       {/* GLOBAL FRONTEND GUARDIAN — mounts once when tenant resolves */}
-      {authTenantId && <FrontendGuardian authTenantId={authTenantId} />}
+      {authTenantId && <FrontendGuardian authTenantId={authTenantId} userRole={resolver?.user?.role || resolver?.user?.app_role || role} />}
 
       {/* PWA Install & Update Banners */}
       <InstallAppBanner />

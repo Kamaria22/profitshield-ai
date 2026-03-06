@@ -9,6 +9,9 @@
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.20";
 
+const REQUIRED_PAGE_KEYS = ["SupportContact", "AdminEmailCenter", "Home", "AIInsights", "Orders"];
+const REQUIRED_CRITICAL_ROUTES = ["/support/contact", "/admin/email", "/dashboard", "/ai-insights", "/orders"];
+
 function json(res, status = 200) {
   return Response.json(res, { status });
 }
@@ -42,6 +45,45 @@ Deno.serve(async (req) => {
   // 2) Canonical webhook endpoint check
   const appUrl = (Deno.env.get("APP_URL") || "").replace(/\/+$/, "");
   const expectedWebhook = `${appUrl}/api/functions/shopifyWebhook`;
+
+  // 2b) Route integrity check (client-supplied registry from watchdog probes)
+  const routeRegistry = payload.route_registry || {};
+  const pageKeys = Array.isArray(routeRegistry.page_keys) ? routeRegistry.page_keys : [];
+  const criticalRoutes = Array.isArray(routeRegistry.critical_routes) ? routeRegistry.critical_routes : [];
+
+  const missingPageKeys = REQUIRED_PAGE_KEYS.filter((k) => !pageKeys.includes(k));
+  if (missingPageKeys.length > 0) {
+    findings.push({
+      type: "missing_page_registration",
+      severity: "high",
+      missing_pages: missingPageKeys,
+    });
+  }
+
+  const missingCriticalRoutes = REQUIRED_CRITICAL_ROUTES.filter((r) => !criticalRoutes.includes(r));
+  if (missingCriticalRoutes.length > 0) {
+    findings.push({
+      type: "missing_critical_route_monitoring",
+      severity: "medium",
+      missing_routes: missingCriticalRoutes,
+    });
+  }
+
+  const permissionProbe = payload.permission_probe || {};
+  if (permissionProbe.mismatch) {
+    findings.push({
+      type: "permission_integrity_mismatch",
+      severity: "high",
+      details: permissionProbe,
+    });
+  }
+
+  if (routeRegistry.all_pages_mapped_in_router === false) {
+    findings.push({
+      type: "router_pages_config_mismatch",
+      severity: "high",
+    });
+  }
 
   // 3) Auto-heal Shopify integration per tenant (optional)
   if (tenantId) {

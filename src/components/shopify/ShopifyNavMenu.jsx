@@ -45,9 +45,11 @@ function getApiKey() {
 function getUrlParams() {
   if (typeof window === 'undefined') return {};
   const p = new URLSearchParams(window.location.search);
+  const shop = p.get('shop');
   return {
-    shop: p.get('shop'),
+    shop,
     host: p.get('host'),
+    shopOrigin: shop ? `https://${shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`}` : null,
   };
 }
 
@@ -78,7 +80,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const { shop, host } = getUrlParams();
+    const { shop, host, shopOrigin } = getUrlParams();
     if (!shop || !host) return; // Not embedded — do nothing
 
     const apiKey = getApiKey();
@@ -97,7 +99,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
     try {
       // Reuse or create App Bridge instance
       if (!appRef.current) {
-        appRef.current = createApp({ apiKey, host, forceRedirect: false });
+        appRef.current = createApp({ apiKey, host, shopOrigin: shopOrigin || undefined, forceRedirect: false });
       }
       const app = appRef.current;
 

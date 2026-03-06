@@ -14,6 +14,36 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+const CRITICAL_UI_ROUTES = ["/support/contact", "/admin/email", "/dashboard", "/ai-insights", "/orders"];
+
+function evaluateUiRouteHealth(uiProbe = {}) {
+  const issues = [];
+  const observedRoutes = Array.isArray(uiProbe.critical_routes) ? uiProbe.critical_routes : [];
+  const routeRegistry = uiProbe.route_registry || {};
+  if (routeRegistry.all_pages_mapped_in_router === false) {
+    issues.push({ type: "router_pages_config_mismatch" });
+  }
+  const missingRouteChecks = CRITICAL_UI_ROUTES.filter((r) => !observedRoutes.includes(r));
+  if (missingRouteChecks.length > 0) {
+    issues.push({ type: "critical_route_checks_missing", missing_routes: missingRouteChecks });
+  }
+
+  const embeddedProbe = uiProbe.embedded_probe || {};
+  if (embeddedProbe.embedded && embeddedProbe.blocked_text_detected) {
+    issues.push({ type: "embedded_blocked_content_detected" });
+  }
+  if (embeddedProbe.embedded && embeddedProbe.has_host_param === false) {
+    issues.push({ type: "embedded_host_param_missing" });
+  }
+
+  const permissionProbe = uiProbe.permission_probe || {};
+  if (permissionProbe.mismatch) {
+    issues.push({ type: "permission_integrity_mismatch", details: permissionProbe });
+  }
+
+  return { ok: issues.length === 0, issues };
+}
+
 // ─────────────────────────────────────────────
 // STABILITY BRAIN — deterministic signal → plan
 // ─────────────────────────────────────────────
@@ -354,11 +384,27 @@ Deno.serve(async (req) => {
         try {
           const signals = await gatherSignals(db, tenant.id);
           const incident = brain.assess(signals);
+          const uiHealth = evaluateUiRouteHealth(body.ui_probe || {});
           if (incident) {
             await infra.writeAudit({ type: "stability.incident_detected", ts: nowIso(), tenant_id: tenant.id, incident });
-            results.push({ tenant_id: tenant.id, incident: incident.summary });
+            results.push({ tenant_id: tenant.id, incident: incident.summary, ui_health: uiHealth });
           } else {
-            results.push({ tenant_id: tenant.id, ok: true });
+            results.push({ tenant_id: tenant.id, ok: true, ui_health: uiHealth });
+          }
+
+          if (!uiHealth.ok) {
+            await infra.writeAudit({
+              type: "stability.ui_route_integrity_failed",
+              ts: nowIso(),
+              tenant_id: tenant.id,
+              incident: { summary: "UI route integrity mismatch", severity: "warning", signals: { ui: uiHealth } },
+            });
+            await base44.functions.invoke("selfHeal", {
+              action: "heal_ui_routing",
+              tenant_id: tenant.id,
+              ui_probe: body.ui_probe || {},
+              issues: uiHealth.issues,
+            }).catch(() => {});
           }
         } catch (e) {
           results.push({ tenant_id: tenant.id, error: e?.message });
@@ -375,6 +421,7 @@ Deno.serve(async (req) => {
     }
 
     const tenantId = body.tenant_id || "system";
+    const uiHealth = evaluateUiRouteHealth(body.ui_probe || {});
 
     const db = base44.asServiceRole.entities;
     const policy = { ...DEFAULT_POLICY, ...policyOverride };
@@ -388,8 +435,16 @@ Deno.serve(async (req) => {
     const incident = brain.assess(signals);
 
     if (!incident) {
-      await infra.writeAudit({ type: "stability.ok", ts: nowIso(), tenant_id: tenantId, signals });
-      return Response.json({ ok: true, incident: null, actions: [], signals });
+      await infra.writeAudit({ type: "stability.ok", ts: nowIso(), tenant_id: tenantId, signals, ui_health: uiHealth });
+      if (!uiHealth.ok) {
+        await base44.functions.invoke("selfHeal", {
+          action: "heal_ui_routing",
+          tenant_id: tenantId,
+          ui_probe: body.ui_probe || {},
+          issues: uiHealth.issues,
+        }).catch(() => {});
+      }
+      return Response.json({ ok: true, incident: null, actions: [], signals, ui_health: uiHealth });
     }
 
     // 3. Plan

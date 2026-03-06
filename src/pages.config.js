@@ -50,6 +50,7 @@
 import AIInsights from './pages/AIInsights';
 import AIModelGovernance from './pages/AIModelGovernance';
 import Achievements from './pages/Achievements';
+import AdminEmailCenter from './pages/AdminEmailCenter';
 import Alerts from './pages/Alerts';
 import AppStoreListing from './pages/AppStoreListing';
 import AppStoreSubmission from './pages/AppStoreSubmission';
@@ -89,6 +90,7 @@ import ShopifyAuth from './pages/ShopifyAuth';
 import ShopifyCallback from './pages/ShopifyCallback';
 import ShopifyOnboarding from './pages/ShopifyOnboarding';
 import SupportInbox from './pages/SupportInbox';
+import SupportContact from './pages/SupportContact';
 import SystemHealth from './pages/SystemHealth';
 import Tasks from './pages/Tasks';
 import TermsOfService from './pages/TermsOfService';
@@ -100,6 +102,7 @@ export const PAGES = {
     "AIInsights": AIInsights,
     "AIModelGovernance": AIModelGovernance,
     "Achievements": Achievements,
+    "AdminEmailCenter": AdminEmailCenter,
     "Alerts": Alerts,
     "AppStoreListing": AppStoreListing,
     "AppStoreSubmission": AppStoreSubmission,
@@ -139,6 +142,7 @@ export const PAGES = {
     "ShopifyCallback": ShopifyCallback,
     "ShopifyOnboarding": ShopifyOnboarding,
     "SupportInbox": SupportInbox,
+    "SupportContact": SupportContact,
     "SystemHealth": SystemHealth,
     "Tasks": Tasks,
     "TermsOfService": TermsOfService,

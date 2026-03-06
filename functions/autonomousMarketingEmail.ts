@@ -128,9 +128,21 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const body = await req.json().catch(() => ({}));
   const action = body.action || 'run_scheduled';
+  const manualTrigger = body.manual === true || action === 'send_manual';
   const results = { sent: 0, skipped: 0, failed: 0, emails: [] };
 
   try {
+    const requester = await base44.auth.me().catch(() => null);
+    const requesterRole = String(requester?.role || requester?.app_role || '').toLowerCase();
+    const requesterIsPrivileged = requesterRole === 'owner' || requesterRole === 'admin';
+
+    if (manualTrigger && !requesterIsPrivileged) {
+      return Response.json(
+        { success: false, error: 'forbidden', message: 'Only owner/admin can run marketing email automation.' },
+        { status: 403 }
+      );
+    }
+
     // Scheduled run: send event-triggered emails to all tenants
     if (action === 'run_scheduled') {
       const tenants = await base44.asServiceRole.entities.Tenant.list('-created_date', 100);

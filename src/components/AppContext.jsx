@@ -44,6 +44,7 @@ export const INTERNAL_ONLY_PAGES = [
   'SystemHealth',
   'AuditLogs',
   'SupportInbox',
+  'AdminEmailCenter',
 ];
 
 // Pages that require admin role regardless of context
@@ -60,6 +61,7 @@ export const ADMIN_ONLY_PAGES = [
   'GitHubPullRequests',
   'PatchReview',
   'SelfHealingCenter',
+  'AdminEmailCenter',
 ];
 
 export function canAccessPage(pageName, userRole, appContext = APP_CONTEXT) {

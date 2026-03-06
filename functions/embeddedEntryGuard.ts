@@ -6,6 +6,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+const EMBEDDED_ENTRY_VERSION = '2026-03-06-csp-v2';
 
 const SHOPIFY_DOMAINS = [
   'myshopify.com',
@@ -47,6 +48,8 @@ function jsonResponse(body, csp, status = 200) {
       'Content-Security-Policy': csp,
       'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       Pragma: 'no-cache',
+      'X-Embedded-Entry-Version': EMBEDDED_ENTRY_VERSION,
+      'X-Embedded-Entry-Source': 'function',
     },
   });
 }
@@ -59,6 +62,8 @@ function htmlResponse(html, csp) {
       'Content-Security-Policy': csp,
       'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       Pragma: 'no-cache',
+      'X-Embedded-Entry-Version': EMBEDDED_ENTRY_VERSION,
+      'X-Embedded-Entry-Source': 'function',
     },
   });
 }
@@ -168,6 +173,21 @@ Deno.serve(async (req) => {
   }
 
   const csp = buildEmbeddedCsp(shop);
+
+  // Allow fast header verification with `curl -I` without forcing HTML shell fetch.
+  if (req.method === 'HEAD') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': csp,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        Pragma: 'no-cache',
+        'X-Embedded-Entry-Version': EMBEDDED_ENTRY_VERSION,
+        'X-Embedded-Entry-Source': 'function',
+      },
+    });
+  }
 
   // --- Return app shell HTML (not diagnostic page) with CSP-safe headers ---
   let appShell = await loadAppShell(url);

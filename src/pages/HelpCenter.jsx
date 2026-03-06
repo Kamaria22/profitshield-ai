@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/components/platformContext';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -248,6 +248,9 @@ function GuideCard({ guide }) {
 export default function HelpCenter() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const supportContactUrl = createPageUrl('support/contact', location.search);
 
   const filteredFAQs = useMemo(() => {
     let result = FAQS;
@@ -393,12 +396,15 @@ export default function HelpCenter() {
         <p className="text-slate-300 font-medium mb-1">Still need help?</p>
         <p className="text-slate-500 text-sm mb-4">Our support team typically responds within 24 hours.</p>
         <div className="flex items-center justify-center gap-3 flex-wrap">
-          <a href="mailto:support@profitshield.ai">
-            <Button size="sm" className="border-0 text-xs" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.25)', color: '#a5b4fc' }}>
-              <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
-              Email Support
-            </Button>
-          </a>
+          <Button
+            size="sm"
+            className="border-0 text-xs"
+            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.25)', color: '#a5b4fc' }}
+            onClick={() => navigate(supportContactUrl)}
+          >
+            <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+            Contact Support
+          </Button>
           <Link to={createPageUrl('Settings')}>
             <Button variant="ghost" size="sm" className="text-xs text-slate-500 hover:text-slate-300">
               <Settings className="w-3.5 h-3.5 mr-1.5" />

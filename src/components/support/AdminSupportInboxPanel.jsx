@@ -9,14 +9,32 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { MessageCircle, AlertTriangle, CheckCircle2, Clock, Mail, ExternalLink, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/AuthContext';
+
+function isAdminOwner(user) {
+  const role = (user?.role || user?.app_role || '').toLowerCase();
+  return role === 'owner' || role === 'admin';
+}
 
 export default function AdminSupportInboxPanel() {
+  const { user } = useAuth();
+  const canAccess = isAdminOwner(user);
+
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['support-inbox-widget'],
     queryFn: () => base44.entities.SupportConversation.filter({}, '-created_date', 200),
-    refetchInterval: 30000,
-    staleTime: 20000
+    refetchInterval: canAccess ? 30000 : false,
+    staleTime: 20000,
+    enabled: canAccess
   });
+
+  if (!canAccess) {
+    return (
+      <div className="rounded-xl p-4" style={{ background: 'rgba(15,20,40,0.7)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <p className="text-sm text-slate-300">Admin access required for the support inbox.</p>
+      </div>
+    );
+  }
 
   const today = new Date().toDateString();
   const stats = {
