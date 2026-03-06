@@ -10,6 +10,7 @@ import { getSessionToken } from "@shopify/app-bridge-utils";
 let cachedToken = null;
 let tokenFetchedAt = 0;
 const TOKEN_CACHE_TTL_MS = 20000; // 20 seconds
+const TOKEN_FETCH_TIMEOUT_MS = 5000;
 
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) return window.__SHOPIFY_API_KEY__;
@@ -73,7 +74,12 @@ export async function getFreshAppBridgeToken({ force = false } = {}) {
     // Fetch fresh token
     console.log(`[AB] Fetching fresh token (force=${force})`);
     const app = createApp({ apiKey, host, shopOrigin: shopOrigin || undefined, forceRedirect: true });
-    const token = await getSessionToken(app);
+    const token = await Promise.race([
+      getSessionToken(app),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('app_bridge_token_timeout')), TOKEN_FETCH_TIMEOUT_MS);
+      }),
+    ]);
 
     if (token && token.length > 50) {
       cachedToken = token;
