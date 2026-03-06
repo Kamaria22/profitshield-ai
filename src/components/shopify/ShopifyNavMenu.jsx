@@ -12,7 +12,8 @@
 
 import { useEffect, useRef } from 'react';
 import createApp from '@shopify/app-bridge';
-import { NavigationMenu } from '@shopify/app-bridge/actions';
+import { NavigationMenu, AppLink } from '@shopify/app-bridge/actions';
+import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 
 // ─── Route definitions ───────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!hasValidAppBridgeContext()) return;
 
     const { shop, host, shopOrigin } = getUrlParams();
     if (!shop || !host) return; // Not embedded — do nothing
@@ -91,7 +93,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
 
     // Build items — admin items already excluded (none in NAV_ITEMS)
     const currentPath = detectCurrentPath();
-    const items = NAV_ITEMS.map((item) => ({
+    const itemConfigs = NAV_ITEMS.map((item) => ({
       label: item.label,
       destination: buildItemUrl(item.path, shop, host),
     }));
@@ -102,6 +104,7 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
         appRef.current = createApp({ apiKey, host, shopOrigin: shopOrigin || undefined, forceRedirect: false });
       }
       const app = appRef.current;
+      const items = itemConfigs.map((item) => AppLink.create(app, item));
 
       // Find active item
       const activeIndex = NAV_ITEMS.findIndex((item) =>
@@ -144,13 +147,17 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
   // Re-sync active item on route changes
   useEffect(() => {
     const handleRouteChange = () => {
+      if (!hasValidAppBridgeContext()) return;
       if (!menuRef.current || !appRef.current) return;
       const { shop, host } = getUrlParams();
+      if (!shop || !host) return;
       const currentPath = detectCurrentPath();
-      const items = NAV_ITEMS.map((item) => ({
+      const items = NAV_ITEMS.map((item) =>
+        AppLink.create(appRef.current, {
         label: item.label,
         destination: buildItemUrl(item.path, shop, host),
-      }));
+        })
+      );
       const activeIndex = NAV_ITEMS.findIndex((item) =>
         currentPath === item.path ||
         (item.path !== '/' && currentPath.startsWith(item.path))

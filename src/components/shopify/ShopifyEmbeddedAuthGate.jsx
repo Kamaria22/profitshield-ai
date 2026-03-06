@@ -16,7 +16,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
+import { getFreshAppBridgeToken, hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
 import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
@@ -72,6 +72,7 @@ function setCachedAuth(data) {
 
 function redirectRemote(url) {
   try {
+    if (!hasValidAppBridgeContext()) return false;
     const p = new URLSearchParams(window.location.search);
     const host = p.get('host');
     const shop = p.get('shop');

@@ -4,9 +4,11 @@ import { Shield, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import createApp from '@shopify/app-bridge';
 import { Redirect } from '@shopify/app-bridge/actions';
+import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 
 function redirectWithAppBridge(url) {
   try {
+    if (!hasValidAppBridgeContext()) return false;
     const params = new URLSearchParams(window.location.search);
     const host = params.get('host');
     const shop = params.get('shop');

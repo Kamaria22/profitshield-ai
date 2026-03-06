@@ -5,9 +5,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import createApp from '@shopify/app-bridge';
 import { Redirect } from '@shopify/app-bridge/actions';
+import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 
 function redirectWithAppBridge(url) {
   try {
+    if (!hasValidAppBridgeContext()) return false;
     const params = new URLSearchParams(window.location.search);
     const host = params.get('host');
     const shop = params.get('shop');
@@ -41,6 +43,7 @@ export default function ShopifyCallback() {
       const code = urlParams.get('code');
       const shop = urlParams.get('shop');
       const state = urlParams.get('state');
+      const host = urlParams.get('host');
 
       if (!code || !shop) {
         setError('Missing authorization code or shop domain');
@@ -56,7 +59,8 @@ export default function ShopifyCallback() {
         action: 'callback',
         shop,
         code,
-        state
+        state,
+        host
       });
 
       if (data?.success) {

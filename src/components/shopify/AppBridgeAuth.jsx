@@ -12,6 +12,26 @@ let tokenFetchedAt = 0;
 const TOKEN_CACHE_TTL_MS = 20000; // 20 seconds
 const TOKEN_FETCH_TIMEOUT_MS = 5000;
 
+function decodeHostParam(host) {
+  if (!host || typeof host !== "string") return null;
+  try {
+    const normalized = host.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    const decoded = atob(padded);
+    if (!decoded) return null;
+    return decoded.startsWith("http://") || decoded.startsWith("https://")
+      ? decoded
+      : `https://${decoded}`;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedShopifyOrigin(origin) {
+  if (!origin) return false;
+  return origin === "https://admin.shopify.com" || /^https:\/\/[a-z0-9-]+\.myshopify\.com$/i.test(origin);
+}
+
 function getApiKey() {
   if (typeof window !== "undefined" && window.__SHOPIFY_API_KEY__) return window.__SHOPIFY_API_KEY__;
 
@@ -35,9 +55,54 @@ function getShopOrigin() {
   return `https://${normalized}`;
 }
 
+function getHostOrigin() {
+  if (typeof window === "undefined") return null;
+  const decoded = decodeHostParam(getHost());
+  if (!decoded) return null;
+  try {
+    return new URL(decoded).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isIframeContext() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
+export function hasValidAppBridgeContext() {
+  if (typeof window === "undefined") return false;
+  const host = getHost();
+  const apiKey = getApiKey();
+  if (!host || !apiKey) return false;
+  if (!isIframeContext()) return false;
+
+  const hostOrigin = getHostOrigin();
+  if (!isAllowedShopifyOrigin(hostOrigin)) return false;
+
+  const referrer = typeof document !== "undefined" ? document.referrer : "";
+  if (referrer) {
+    try {
+      const refOrigin = new URL(referrer).origin;
+      if (isAllowedShopifyOrigin(refOrigin) && refOrigin !== hostOrigin) {
+        return false;
+      }
+    } catch {
+      // Ignore malformed referrer values.
+    }
+  }
+
+  return true;
+}
+
 function isEmbedded() {
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).has("host");
+  return hasValidAppBridgeContext();
 }
 
 /**
@@ -54,13 +119,8 @@ export async function getFreshAppBridgeToken({ force = false } = {}) {
     const apiKey = getApiKey();
     const shopOrigin = getShopOrigin();
 
-    // Not embedded? No token needed
-    if (!host) {
-      return null;
-    }
-
-    if (!apiKey) {
-      console.error("[AB] Missing SHOPIFY_API_KEY injection.");
+    // Not a valid embedded App Bridge context? No token needed.
+    if (!hasValidAppBridgeContext()) {
       return null;
     }
 
