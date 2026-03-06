@@ -26,8 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
-import { parseQuery, getPersistedContext, hardResetAllContexts, listPersistedStores } from '@/components/platformContext';
-import { useLocation } from 'react-router-dom';
+import { parseQuery, getPersistedContext, hardResetAllContexts, listPersistedStores, createPageUrl } from '@/components/platformContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -65,10 +65,12 @@ const SYNC_FREQUENCIES = [
 ];
 
 export default function Integrations() {
+  const navigate = useNavigate();
   const location = useLocation();
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
-  const { tenantId, status, user } = resolver;
+  const tenantId = resolverCheck.tenantId;
+  const { status, user } = resolver;
   
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [selfTestDialogOpen, setSelfTestDialogOpen] = useState(false);
@@ -354,7 +356,7 @@ export default function Integrations() {
     // Clear query cache too
     queryClient.clear();
     // Redirect to SelectStore
-    window.location.href = '/selectstore';
+    navigate(createPageUrl('SelectStore', location.search), { replace: true });
   };
 
   // Repair integration - recreate missing records

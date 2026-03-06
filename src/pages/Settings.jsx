@@ -1,6 +1,8 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import createApp from '@shopify/app-bridge';
+import { Redirect } from '@shopify/app-bridge/actions';
 import { 
   Settings as SettingsIcon, 
   DollarSign, 
@@ -66,6 +68,29 @@ import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
+import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
+
+function redirectWithAppBridge(url) {
+  try {
+    if (!hasValidAppBridgeContext()) return false;
+    const params = new URLSearchParams(window.location.search);
+    const host = params.get('host');
+    const shop = params.get('shop');
+    const apiKey = window.__SHOPIFY_API_KEY__;
+    if (!host || !apiKey) throw new Error('missing_host_or_api_key');
+    const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
+    const app = createApp({
+      apiKey,
+      host,
+      shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
+      forceRedirect: true,
+    });
+    Redirect.create(app).dispatch(Redirect.Action.REMOTE, url);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // User invitation form component
 function InviteUserForm() {
@@ -240,7 +265,9 @@ export default function Settings() {
       });
       
       if (response.data?.install_url) {
-        window.location.href = response.data.install_url;
+        if (!redirectWithAppBridge(response.data.install_url)) {
+          window.location.assign(response.data.install_url);
+        }
       } else {
         toast.error('Failed to get install URL');
       }
