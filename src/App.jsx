@@ -67,6 +67,11 @@ const AuthenticatedApp = () => {
           <Pages.Orders />
         </LayoutWrapper>
       } />
+      <Route path="/pnl-analytics" element={
+        <LayoutWrapper currentPageName="PnLAnalytics">
+          <Pages.PnLAnalytics />
+        </LayoutWrapper>
+      } />
       <Route path="/embedded-entry" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />

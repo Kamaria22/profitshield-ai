@@ -87,6 +87,10 @@ export default function SystemHealth() {
     mutationFn: () => base44.functions.invoke('supportWatchdog', { manual: true })
   });
 
+  const runSupportGuardian = useMutation({
+    mutationFn: () => base44.functions.invoke('supportGuardian', { action: 'run_watchdog' })
+  });
+
   const runProfitAlertWatchdog = useMutation({
     mutationFn: () => base44.functions.invoke('profitAlertWatchdog', { manual: true })
   });
@@ -139,6 +143,14 @@ export default function SystemHealth() {
                 disabled={runProfitAlertWatchdog.isPending}
               >
                 Run Profit Alert Watchdog
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => runSupportGuardian.mutate()}
+                disabled={runSupportGuardian.isPending}
+              >
+                Run Support Guardian
               </Button>
             </CardContent>
           </Card>

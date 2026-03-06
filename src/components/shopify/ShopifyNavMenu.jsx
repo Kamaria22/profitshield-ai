@@ -18,9 +18,9 @@ import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 // ─── Route definitions ───────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { label: 'Dashboard',     path: '/'           },
-  { label: 'AI Insights',   path: '/aiinsights' },
-  { label: 'P&L Analytics', path: '/planalytics'},
+  { label: 'Dashboard',     path: '/dashboard'  },
+  { label: 'AI Insights',   path: '/ai-insights' },
+  { label: 'P&L Analytics', path: '/pnl-analytics'},
   { label: 'Orders',        path: '/orders'     },
   { label: 'Products',      path: '/products'   },
   { label: 'Customers',     path: '/customers'  },
