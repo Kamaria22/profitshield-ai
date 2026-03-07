@@ -1,39 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Shield, Loader2, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Shield, Loader2, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { createPageUrl } from '@/utils';
+import { createPageUrl } from '@/components/platformContext';
 import PatchBundleCard from '@/components/selfheal/PatchBundleCard';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function PatchReview() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [patches, setPatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     base44.auth.me().then(u => {
       const role = (u?.role || u?.app_role || '').toLowerCase();
-      if (role !== 'admin' && role !== 'owner') { window.location.href = '/'; return; }
+      if (role !== 'admin' && role !== 'owner') {
+        navigate(createPageUrl('Home', location.search), { replace: true });
+        return;
+      }
       loadPatches();
-    }).catch(() => { window.location.href = '/'; });
-  }, []);
+    }).catch(() => {
+      navigate(createPageUrl('Home', location.search), { replace: true });
+    });
+  }, [navigate, location.search]);
 
   const loadPatches = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const res = await base44.functions.invoke('selfHeal', { action: 'get_incidents' });
       setPatches(res.data?.pending_patches || []);
     } catch (e) {
       console.error(e);
+      setErrorMessage(e?.message || 'Failed to load patch proposals');
     }
     setLoading(false);
   };
 
   const approveP = async (id) => {
-    await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: id });
-    await loadPatches();
+    try {
+      await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: id });
+      await loadPatches();
+      setErrorMessage('');
+    } catch (e) {
+      setErrorMessage(e?.message || 'Failed to approve patch proposal');
+    }
   };
   const rejectP = async (id) => {
-    setPatches(prev => prev.map(p => p.id === id ? { ...p, status: 'rejected' } : p));
+    try {
+      await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: id });
+      await loadPatches();
+      setErrorMessage('');
+    } catch (e) {
+      setErrorMessage(e?.message || 'Failed to reject patch proposal');
+    }
   };
 
   if (loading) return (
@@ -46,14 +68,20 @@ export default function PatchReview() {
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <a href={createPageUrl('SelfHealingCenter')} className="text-slate-400 hover:text-slate-200">
+          <Link to={createPageUrl('SelfHealingCenter', location.search)} className="text-slate-400 hover:text-slate-200">
             <ArrowLeft className="w-5 h-5" />
-          </a>
+          </Link>
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6 text-violet-400" />
             <h1 className="text-xl font-bold text-slate-100">Patch Review</h1>
           </div>
         </div>
+        {errorMessage && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
+            <p className="text-sm text-red-300">{errorMessage}</p>
+          </div>
+        )}
 
         {patches.length === 0 ? (
           <div className="text-center py-20">
