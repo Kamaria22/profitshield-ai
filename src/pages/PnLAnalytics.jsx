@@ -1,22 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
+import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
 import { 
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, 
-  Calendar as CalendarIcon, Download, Filter, ChevronRight,
-  BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Loader2
+  Calendar as CalendarIcon, Download, Filter, BarChart3, Loader2
 } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
 import PnLMetricsCards from '@/components/analytics/PnLMetricsCards';
 import PnLTrendsChart from '@/components/analytics/PnLTrendsChart';
@@ -35,7 +31,11 @@ const DATE_PRESETS = [
 ];
 
 export default function PnLAnalytics() {
-  const { tenantId, status } = usePlatformResolver();
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
+  const canQuery = canQueryTenant(resolverCheck);
+  const queryFilter = getTenantFilter(resolverCheck);
+  const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const { hasPermission } = usePermissions();
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
   const queryClient = useQueryClient();
@@ -52,39 +52,36 @@ export default function PnLAnalytics() {
   const [drilldownOrders, setDrilldownOrders] = useState(null);
 
   // Fetch orders for the date range
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['pnl-orders', tenantId, dateRange],
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+    error: ordersErrorValue,
+    refetch: refetchOrders,
+  } = useQuery({
+    queryKey: [...buildQueryKey('pnl-orders', resolverCheck), dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
-      if (!tenantId) return [];
-      const allOrders = await base44.entities.Order.filter({ tenant_id: tenantId });
+      if (!queryFilter?.tenant_id) return [];
+      const allOrders = await base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id });
       return allOrders.filter(order => {
         if (!order.order_date) return false;
         const orderDate = new Date(order.order_date);
         return isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to });
       });
     },
-    enabled: !!tenantId && !tenantLoading,
+    enabled: canQuery && !tenantLoading,
     staleTime: 0,
     refetchInterval: 30000, // refetch every 30s
   });
 
-  // Fetch products for segmentation
-  const { data: products = [] } = useQuery({
-    queryKey: ['pnl-products', tenantId],
-    queryFn: () => base44.entities.Product.filter({ tenant_id: tenantId }),
-    enabled: !!tenantId && !tenantLoading,
-    staleTime: 0,
-    refetchInterval: 60000,
-  });
-
   // Real-time subscription: invalidate query when orders change
   useEffect(() => {
-    if (!tenantId) return;
-    const unsubscribe = base44.entities.Order.subscribe((event) => {
-      queryClient.invalidateQueries({ queryKey: ['pnl-orders', tenantId] });
+    if (!queryFilter?.tenant_id) return;
+    const unsubscribe = base44.entities.Order.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: buildQueryKey('pnl-orders', resolverCheck) });
     });
     return unsubscribe;
-  }, [tenantId, queryClient]);
+  }, [queryFilter?.tenant_id, queryClient, resolverCheck]);
 
   // Calculate P&L metrics
   const metrics = useMemo(() => {
@@ -175,14 +172,16 @@ export default function PnLAnalytics() {
 
     if (segmentBy === 'product') {
       orders.forEach(order => {
-        const items = order.platform_data?.line_items || [];
+        const items = Array.isArray(order.platform_data?.line_items) ? order.platform_data.line_items : [];
         items.forEach(item => {
           const key = item.title || 'Unknown Product';
           if (!segments[key]) {
             segments[key] = { name: key, revenue: 0, cogs: 0, profit: 0, orders: 0, units: 0 };
           }
-          segments[key].revenue += item.price * (item.quantity || 1);
-          segments[key].units += item.quantity || 1;
+          const quantity = Number(item.quantity) || 1;
+          const itemPrice = Number(item.price) || 0;
+          segments[key].revenue += itemPrice * quantity;
+          segments[key].units += quantity;
           segments[key].orders += 1;
         });
         // Distribute COGS proportionally
@@ -206,7 +205,12 @@ export default function PnLAnalytics() {
       });
     } else if (segmentBy === 'tags') {
       orders.forEach(order => {
-        const tags = order.tags || ['Untagged'];
+        const rawTags = Array.isArray(order.tags)
+          ? order.tags
+          : typeof order.tags === 'string'
+            ? order.tags.split(',').map((t) => t.trim()).filter(Boolean)
+            : [];
+        const tags = rawTags.length > 0 ? rawTags : ['Untagged'];
         tags.forEach(tag => {
           if (!segments[tag]) {
             segments[tag] = { name: tag, revenue: 0, cogs: 0, profit: 0, orders: 0 };
@@ -243,7 +247,7 @@ export default function PnLAnalytics() {
 
     if (segmentBy === 'product') {
       filteredOrders = orders.filter(o => 
-        (o.platform_data?.line_items || []).some(item => item.title === segment.name)
+        (Array.isArray(o.platform_data?.line_items) ? o.platform_data.line_items : []).some(item => item.title === segment.name)
       );
     } else if (segmentBy === 'customer') {
       filteredOrders = orders.filter(o => o.customer_email === segment.name);
@@ -279,6 +283,32 @@ export default function PnLAnalytics() {
             </SelectContent>
           </Select>
 
+          {datePreset === 'custom' && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="bg-white/5 border-white/10 text-slate-200">
+                  <CalendarIcon className="w-4 h-4 mr-2 text-slate-400" />
+                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    if (range?.from && range?.to) {
+                      setDateRange({ from: range.from, to: range.to });
+                    } else if (range?.from) {
+                      setDateRange({ from: range.from, to: range.from });
+                    }
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+
           {/* Granularity Selector */}
           <Select value={granularity} onValueChange={setGranularity}>
             <SelectTrigger className="w-32 bg-white/5 border-white/10 text-slate-200">
@@ -313,6 +343,19 @@ export default function PnLAnalytics() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
         </div>
+      ) : ordersError ? (
+        <Card className="border-red-300 bg-red-50/80">
+          <CardContent className="py-10 text-center">
+            <BarChart3 className="w-10 h-10 text-red-500 mx-auto mb-3" />
+            <p className="text-red-900 font-medium">Unable to load P&L data</p>
+            <p className="text-sm text-red-700 mt-1">
+              {ordersErrorValue?.message || 'Order analytics request failed.'}
+            </p>
+            <Button variant="outline" className="mt-4" onClick={() => refetchOrders()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       ) : !metrics ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
