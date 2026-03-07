@@ -1,13 +1,21 @@
 /**
  * autonomousOpsRollout
  * Phase 1 (observe-only): scheduled watchdog telemetry orchestration.
- * No autonomous healing and no patch application.
+ * Phase 2 (safe subset): bounded queue retry + stale cleanup + webhook reconcile.
+ * No patch generation and no patch auto-apply.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { startAgentExecution, finishAgentExecution } from './helpers/agentRuntime.ts';
+import {
+  startAgentExecution,
+  finishAgentExecution,
+  allowRole,
+  ensureTenantIsolation
+} from './helpers/agentRuntime.ts';
 
-const VERSION = 'autonomousOpsRollout_v2026_03_07_phase1';
+const VERSION = 'autonomousOpsRollout_v2026_03_07_phase2';
 const AGENT_NAME = 'autonomousOpsRollout';
+const MAX_TENANTS_PER_RUN = 5;
+const MAX_ACTIONS_PER_RUN = 20;
 
 async function invokeSafe(base44, fn, payload) {
   try {
@@ -23,11 +31,17 @@ Deno.serve(async (req) => {
   const db = base44.asServiceRole.entities;
   const body = await req.json().catch(() => ({}));
   const action = body.action || 'observe_tick';
-  const role = (req.headers.get('x-user-role') || '').toLowerCase() || null;
-  const isScheduler = true;
+  let user = null;
+  try { user = await base44.auth.me(); } catch {}
+  const role = (user?.role || user?.app_role || req.headers.get('x-user-role') || '').toLowerCase() || null;
+  const isScheduler = !user;
 
   let exec = null;
   try {
+    if (user && !allowRole(role, ['owner', 'admin'])) {
+      return Response.json({ ok: false, error: 'forbidden' }, { status: 403 });
+    }
+
     exec = await startAgentExecution({
       db,
       agentName: AGENT_NAME,
@@ -50,7 +64,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (action !== 'observe_tick') {
+    if (!['observe_tick', 'safe_heal_tick'].includes(action)) {
       await finishAgentExecution({
         db,
         agentName: AGENT_NAME,
@@ -67,19 +81,69 @@ Deno.serve(async (req) => {
     }
 
     const started_at = new Date().toISOString();
-    const calls = await Promise.all([
-      invokeSafe(base44, 'supportGuardian', { action: 'run_watchdog', observe_only: true, mode: 'observe' }),
-      invokeSafe(base44, 'shopifyConnectionWatchdog', { observe_only: true, mode: 'observe' }),
-      invokeSafe(base44, 'stabilityAgent', { action: 'watchdog', mode: 'watch', observe_only: true }),
-    ]);
+    const calls = [];
+    let actionsUsed = 0;
+
+    if (action === 'observe_tick') {
+      const observeCalls = await Promise.all([
+        invokeSafe(base44, 'supportGuardian', { action: 'run_watchdog', observe_only: true, mode: 'observe' }),
+        invokeSafe(base44, 'shopifyConnectionWatchdog', { observe_only: true, mode: 'observe' }),
+        invokeSafe(base44, 'stabilityAgent', { action: 'watchdog', mode: 'watch', observe_only: true }),
+      ]);
+      calls.push(...observeCalls);
+      actionsUsed += observeCalls.length;
+    }
+
+    if (action === 'safe_heal_tick') {
+      // 1) Safe queue retry/drain (bounded by processWebhookQueue internal batch size)
+      const queueRun = await invokeSafe(base44, 'processWebhookQueue', {});
+      calls.push(queueRun);
+      actionsUsed += 1;
+
+      // 2) Tenant-bounded stale cleanup + webhook reconcile (non-destructive subset)
+      const tenants = await db.Tenant.filter({ status: 'active' }, '-created_date', MAX_TENANTS_PER_RUN).catch(() => []);
+      for (const tenant of tenants) {
+        if (actionsUsed >= MAX_ACTIONS_PER_RUN) break;
+        const tenantId = tenant?.id || null;
+        const isolated = ensureTenantIsolation({ tenantId, allowSystem: false });
+        if (!isolated.ok) {
+          calls.push({ ok: false, fn: 'tenant_isolation', error: isolated.error, tenant_id: tenantId });
+          actionsUsed += 1;
+          continue;
+        }
+
+        const staleCleanup = await invokeSafe(base44, 'supportGuardian', {
+          action: 'run_watchdog',
+          tenant_id: tenantId,
+          observe_only: false
+        });
+        calls.push({ ...staleCleanup, tenant_id: tenantId, op: 'stale_cleanup' });
+        actionsUsed += 1;
+        if (actionsUsed >= MAX_ACTIONS_PER_RUN) break;
+
+        const reconcile = await invokeSafe(base44, 'shopifyConnectionManager', {
+          action: 'reconcile_webhooks',
+          tenant_id: tenantId
+        });
+        calls.push({ ...reconcile, tenant_id: tenantId, op: 'webhook_reconcile' });
+        actionsUsed += 1;
+      }
+    }
 
     const summary = {
       version: VERSION,
-      mode: 'observe_only',
+      mode: action === 'observe_tick' ? 'observe_only' : 'safe_auto_heal_subset',
       started_at,
       finished_at: new Date().toISOString(),
+      limits: {
+        max_tenants_per_run: MAX_TENANTS_PER_RUN,
+        max_actions_per_run: MAX_ACTIONS_PER_RUN,
+      },
+      actions_used: actionsUsed,
       checks: calls.map((c) => ({
         fn: c.fn,
+        tenant_id: c.tenant_id || null,
+        op: c.op || null,
         ok: c.ok,
         error: c.ok ? null : c.error
       })),
@@ -92,7 +156,7 @@ Deno.serve(async (req) => {
       entity_type: 'autonomous_ops',
       entity_id: AGENT_NAME,
       performed_by: 'system',
-      description: `Observe-only tick complete: ${summary.checks.filter((c) => c.ok).length}/${summary.checks.length} checks ok`,
+      description: `${summary.mode} tick complete: ${summary.checks.filter((c) => c.ok).length}/${summary.checks.length} checks ok`,
       category: 'automation',
       severity: summary.ok ? 'low' : 'medium',
       metadata: summary
