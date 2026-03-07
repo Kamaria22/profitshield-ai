@@ -36,6 +36,24 @@ const checks = [
     tokens: ['Content-Security-Policy', 'frame-ancestors', "object-src 'none'"],
     owner_agent: 'auth_guardian',
   },
+  {
+    id: 'home_embedded_dashboard_summary_path',
+    file: 'src/pages/Home.jsx',
+    tokens: ["action: 'embedded_summary'", "base44.functions.invoke('dashboardAI'"],
+    owner_agent: 'watchdog',
+  },
+  {
+    id: 'home_scan_action_wired',
+    file: 'src/pages/Home.jsx',
+    tokens: ['syncMutation.mutate()', 'onScan={handleScan}'],
+    owner_agent: 'runtime_guardian',
+  },
+  {
+    id: 'self_heal_accepts_incidentbus_publish',
+    file: 'functions/selfHeal.ts',
+    tokens: ["action === 'publish_incident'", 'issue_code', 'details_json'],
+    owner_agent: 'self_healing',
+  },
 ];
 
 const incidents = [];

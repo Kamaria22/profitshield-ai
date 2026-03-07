@@ -3,17 +3,51 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json().catch(() => ({}));
     const { tenant_id, action, query, date_range = 30 } = body;
+    const requestedAction = action || 'analyze';
+    let user = null;
+    try { user = await base44.auth.me(); } catch (_) { user = null; }
 
     if (!tenant_id) {
       return Response.json({ error: 'tenant_id required' }, { status: 400 });
+    }
+
+    // Embedded dashboard bootstrap path: no Base44 login required.
+    if (requestedAction === 'embedded_summary') {
+      const [orders, alerts, leaks, tenant, integration] = await Promise.all([
+        base44.asServiceRole.entities.Order.filter({ tenant_id }, '-order_date', 50),
+        base44.asServiceRole.entities.Alert.filter({ tenant_id, status: 'pending' }, '-created_date', 10),
+        base44.asServiceRole.entities.ProfitLeak.filter({ tenant_id, is_resolved: false }, '-impact_amount', 5),
+        base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }).then((r) => r[0] || null),
+        base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id, platform: 'shopify', status: 'connected' }).then((r) => r[0] || null)
+      ]);
+
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
+      const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
+      const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
+
+      return Response.json({
+        success: true,
+        metrics: {
+          totalRevenue,
+          totalProfit,
+          avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+          highRiskOrders,
+          totalOrders: orders.length,
+          pendingAlerts: alerts.length
+        },
+        profitScore: tenant?.profit_integrity_score || 0,
+        alertsCount: alerts.length,
+        isDemoMode: !integration,
+        orders: orders.slice(0, 5),
+        alerts,
+        profitLeaks: leaks
+      });
+    }
+
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Fetch orders for analysis
@@ -107,7 +141,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    if (action === 'natural_query') {
+    if (requestedAction === 'natural_query') {
       // Natural language query
       const queryPrompt = `
 You are an AI analytics assistant for an e-commerce dashboard. Answer the user's question based on this data:

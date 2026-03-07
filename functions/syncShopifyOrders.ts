@@ -231,11 +231,9 @@ function mapOrderStatus(order) {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Embedded Shopify startup may invoke sync before Base44 session is established.
+    // Keep this endpoint tenant-scoped and service-role-backed; auth is optional here.
+    try { await base44.auth.me(); } catch (_) {}
     
     const { tenant_id, days = 90, integration_id: reqIntegrationId } = await req.json();
     

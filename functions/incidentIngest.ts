@@ -4,10 +4,6 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me().catch(() => null);
-    
-    if (!user) {
-      return Response.json({ error: 'unauthorized' }, { status: 401 });
-    }
 
     const body = await req.json();
     const { incident } = body || {};
@@ -27,7 +23,7 @@ Deno.serve(async (req) => {
       network_json: JSON.stringify(incident.network || []),
       resolver_json: JSON.stringify(incident.resolverContext || {}),
       synthetic_json: JSON.stringify(incident.synthetic || {}),
-      user_email_masked: incident.userEmailMasked || '',
+      user_email_masked: incident.userEmailMasked || (user?.email ? `${user.email.slice(0, 2)}***` : ''),
     });
 
     return Response.json({ ok: true, id: incident.id });

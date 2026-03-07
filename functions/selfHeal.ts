@@ -540,6 +540,29 @@ Deno.serve(async (req) => {
       return Response.json(result);
     }
 
+    // ── publish_incident (frontend IncidentBus) ───────────────────────────
+    if (action === 'publish_incident') {
+      const {
+        subsystem = 'GENERAL',
+        issue_code = 'UNKNOWN_ERROR',
+        severity = 'low',
+        tenant_id = 'system',
+        context = {}
+      } = body || {};
+
+      const event = await logEvent(db, {
+        tenant_id,
+        severity,
+        subsystem,
+        issue_code,
+        fix_type: 'none',
+        fix_result: 'pending',
+        details_json: context,
+      });
+
+      return Response.json({ ok: true, event_id: event?.id || null });
+    }
+
     // ── get_incidents ──────────────────────────────────────────────────────
     if (action === 'get_incidents') {
       const { tenant_id, limit = 50 } = body;

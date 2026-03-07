@@ -104,6 +104,17 @@ export default function Home() {
     queryKey: dashboardSummaryKey,
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return null;
+
+      if (isEmbedded) {
+        const { data } = await base44.functions.invoke('dashboardAI', {
+          action: 'embedded_summary',
+          tenant_id: queryFilter.tenant_id,
+        });
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to load embedded dashboard summary');
+        }
+        return data;
+      }
       
       const startTime = performance.now();
       
@@ -153,7 +164,7 @@ export default function Home() {
         is_resolved: false 
       }, '-impact_amount', 5);
     },
-    enabled: canQuery && !!dashboardSummary,
+    enabled: canQuery && !!dashboardSummary && !isEmbedded,
     staleTime: 120000,
     gcTime: 300000,
     refetchOnMount: false,
@@ -204,6 +215,7 @@ export default function Home() {
 
   // Extract from summary for immediate display
   const isDemoMode = dashboardSummary?.isDemoMode ?? true;
+  const displayProfitLeaks = isEmbedded ? (dashboardSummary?.profitLeaks || []) : profitLeaks;
   const metrics = dashboardSummary?.metrics || {
     totalRevenue: 0,
     totalProfit: 0,
@@ -355,7 +367,7 @@ export default function Home() {
           {/* 2️⃣ Autonomous Profit Guard */}
           <AutonomousProfitGuard
             metrics={metrics}
-            profitLeaks={profitLeaks}
+            profitLeaks={displayProfitLeaks}
             alerts={dashboardSummary?.alerts || []}
             loading={summaryLoading}
           />
@@ -363,7 +375,7 @@ export default function Home() {
           {/* 3️⃣ AI Profit Intelligence Summary */}
           <AIProfitIntelligenceSummary
             metrics={metrics}
-            profitLeaks={profitLeaks}
+            profitLeaks={displayProfitLeaks}
             loading={summaryLoading}
           />
 
@@ -379,14 +391,14 @@ export default function Home() {
                   <RiskCommandPanel metrics={metrics} loading={false} />
                 </Suspense>
                 <Suspense fallback={<PanelSkeleton />}>
-                  <MarginLeakPanel leaks={profitLeaks} loading={false} isDemo={isDemoMode} />
+                  <MarginLeakPanel leaks={displayProfitLeaks} loading={false} isDemo={isDemoMode} />
                 </Suspense>
               </div>
 
               {/* Row 2: AI Alerts + Opportunities + Forecast */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                 <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
-                <AIOpportunities metrics={metrics} profitLeaks={profitLeaks} loading={summaryLoading} />
+                <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
                 <ProfitForecast metrics={metrics} loading={summaryLoading} />
               </div>
 
@@ -454,7 +466,7 @@ export default function Home() {
                 <AutonomousInsightEngine
                   metrics={metrics}
                   alerts={dashboardSummary?.alerts || []}
-                  profitLeaks={profitLeaks}
+                  profitLeaks={displayProfitLeaks}
                 />
                 <Suspense fallback={<PanelSkeleton />}>
                   <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
