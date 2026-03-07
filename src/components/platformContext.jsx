@@ -12,7 +12,6 @@
 const STORAGE_KEY_PREFIX = 'profitshield_ctx::';
 const ACTIVE_STORE_KEY = 'profitshield_ctx_active';
 const LEGACY_KEY = 'profitshield_ctx_v1'; // For migration
-const CONTEXT_CHANGED_EVENT = 'profitshield:context-changed';
 
 /**
  * Context TTL in milliseconds (7 days)
@@ -67,13 +66,6 @@ function hasLocalStorage() {
   } catch (e) {
     return false;
   }
-}
-
-function emitContextChanged(detail = {}) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.dispatchEvent(new CustomEvent(CONTEXT_CHANGED_EVENT, { detail }));
-  } catch (e) {}
 }
 
 /**
@@ -331,17 +323,6 @@ export function persistContext(partial) {
     if (partial.debug !== undefined) merged.debug = partial.debug === '1' ? '1' : null;
     if (partial.userHintEmail !== undefined) merged.userHintEmail = partial.userHintEmail || null;
     
-    const changed =
-      existing.platform !== merged.platform ||
-      existing.storeKey !== merged.storeKey ||
-      existing.tenantId !== merged.tenantId ||
-      existing.integrationId !== merged.integrationId ||
-      existing.shop !== merged.shop ||
-      existing.host !== merged.host ||
-      existing.embedded !== merged.embedded ||
-      existing.debug !== merged.debug ||
-      existing.userHintEmail !== merged.userHintEmail;
-
     // Always update timestamp
     merged.persistedAt = Date.now();
     
@@ -351,15 +332,6 @@ export function persistContext(partial) {
       window.localStorage.setItem(storageKey, JSON.stringify(merged));
       // Update active store pointer
       window.localStorage.setItem(ACTIVE_STORE_KEY, targetStoreKey);
-      if (changed) {
-        emitContextChanged({
-          action: 'persist',
-          storeKey: merged.storeKey,
-          tenantId: merged.tenantId,
-          integrationId: merged.integrationId,
-          platform: merged.platform
-        });
-      }
     }
     
   } catch (e) {
@@ -389,7 +361,6 @@ export function clearContext(storeKey = null) {
     if (!storeKey || storeKey === window.localStorage.getItem(ACTIVE_STORE_KEY)) {
       window.localStorage.removeItem(ACTIVE_STORE_KEY);
     }
-    emitContextChanged({ action: 'clear', storeKey: targetStoreKey || null });
   } catch (e) {
     console.warn('[platformContext] clearContext error:', e.message);
   }
@@ -416,9 +387,6 @@ export function hardResetAllContexts() {
     console.log('[platformContext] Hard reset cleared', cleared, 'keys');
   } catch (e) {
     console.warn('[platformContext] hardResetAllContexts error:', e.message);
-  }
-  if (cleared > 0) {
-    emitContextChanged({ action: 'hard_reset', cleared });
   }
   
   return { cleared };
@@ -481,7 +449,6 @@ export function switchActiveStore(storeKey) {
     if (!ctx.storeKey) return false;
     
     window.localStorage.setItem(ACTIVE_STORE_KEY, storeKey);
-    emitContextChanged({ action: 'switch_active_store', storeKey });
     return true;
   } catch (e) {
     return false;
