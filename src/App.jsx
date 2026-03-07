@@ -27,10 +27,18 @@ const AuthenticatedApp = () => {
     const p = new URLSearchParams(location.search || '');
     return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
   }, [location.search]);
+  const isBareRootEntry = useMemo(() => {
+    const p = new URLSearchParams(location.search || '');
+    return location.pathname === '/' && !p.get('shop') && !p.get('host');
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (authError?.type !== 'auth_required') return;
     if (isEmbedded) return;
+    if (isBareRootEntry) {
+      setRedirectBlocked(true);
+      return;
+    }
 
     const pathKey = `${location.pathname}${location.search}`;
     const storageKey = `profitshield_auth_redirect:${pathKey}`;
@@ -49,7 +57,7 @@ const AuthenticatedApp = () => {
 
     setRedirectBlocked(false);
     navigateToLogin();
-  }, [authError?.type, isEmbedded, location.pathname, location.search, navigateToLogin]);
+  }, [authError?.type, isEmbedded, isBareRootEntry, location.pathname, location.search, navigateToLogin]);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
