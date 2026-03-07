@@ -2,7 +2,8 @@
  * autonomousOpsRollout
  * Phase 1 (observe-only): scheduled watchdog telemetry orchestration.
  * Phase 2 (safe subset): bounded queue retry + stale cleanup + webhook reconcile.
- * No patch generation and no patch auto-apply.
+ * Phase 3 (builder proposals): bounded generate_patch -> PatchBundle proposals only.
+ * No patch auto-apply.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import {
@@ -12,10 +13,11 @@ import {
   ensureTenantIsolation
 } from './helpers/agentRuntime.ts';
 
-const VERSION = 'autonomousOpsRollout_v2026_03_07_phase2';
+const VERSION = 'autonomousOpsRollout_v2026_03_07_phase3';
 const AGENT_NAME = 'autonomousOpsRollout';
 const MAX_TENANTS_PER_RUN = 5;
 const MAX_ACTIONS_PER_RUN = 20;
+const MAX_PROPOSALS_PER_RUN = 5;
 
 async function invokeSafe(base44, fn, payload) {
   try {
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!['observe_tick', 'safe_heal_tick'].includes(action)) {
+    if (!['observe_tick', 'safe_heal_tick', 'generate_patch'].includes(action)) {
       await finishAgentExecution({
         db,
         agentName: AGENT_NAME,
@@ -130,14 +132,78 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === 'generate_patch') {
+      // Proposal-only builder mode: generates bounded PatchBundle proposals from open incidents.
+      const openIncidents = await db.SelfHealingEvent.filter({ status: 'open' }, '-created_date', 100).catch(() => []);
+      const seen = new Set();
+      let proposalsCreated = 0;
+
+      for (const incident of openIncidents) {
+        if (actionsUsed >= MAX_ACTIONS_PER_RUN || proposalsCreated >= MAX_PROPOSALS_PER_RUN) break;
+
+        const tenantId = incident?.tenant_id || null;
+        const isolated = ensureTenantIsolation({ tenantId, allowSystem: false });
+        if (!isolated.ok) {
+          calls.push({ ok: false, fn: 'tenant_isolation', error: isolated.error, tenant_id: tenantId, op: 'generate_patch' });
+          actionsUsed += 1;
+          continue;
+        }
+
+        const dedupeKey = `${tenantId}:${incident.issue_code || incident.feature_key || incident.source || 'generic'}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
+        const existing = await db.PatchBundle
+          .filter({ status: 'proposed' }, '-created_date', 50)
+          .then((rows) => rows.find((r) => r?.details?.source_incident_id === incident.id && r?.details?.tenant_id === tenantId))
+          .catch(() => null);
+        if (existing) continue;
+
+        const severity = ['critical', 'high', 'medium', 'low'].includes(String(incident.severity || '').toLowerCase())
+          ? String(incident.severity).toLowerCase()
+          : 'medium';
+        const subsystem = incident.subsystem || incident.source || 'general';
+
+        const created = await db.PatchBundle.create({
+          title: `Patch proposal: ${incident.issue_code || incident.feature_key || 'incident'}`,
+          subsystem,
+          severity,
+          status: 'proposed',
+          created_at: new Date().toISOString(),
+          details: {
+            proposal_only: true,
+            approval_required: true,
+            auto_apply: false,
+            generated_by: AGENT_NAME,
+            source_incident_id: incident.id,
+            tenant_id: tenantId,
+            incident_summary: incident.message || incident.issue_type || 'No summary',
+            proposed_action: 'Manual code patch review required before deployment'
+          }
+        }).catch(() => null);
+
+        if (created?.id) {
+          proposalsCreated += 1;
+          calls.push({ ok: true, fn: 'patch_bundle_create', tenant_id: tenantId, op: 'generate_patch', data: { patch_bundle_id: created.id } });
+          actionsUsed += 1;
+        }
+      }
+    }
+
     const summary = {
       version: VERSION,
-      mode: action === 'observe_tick' ? 'observe_only' : 'safe_auto_heal_subset',
+      mode:
+        action === 'observe_tick'
+          ? 'observe_only'
+          : action === 'safe_heal_tick'
+          ? 'safe_auto_heal_subset'
+          : 'builder_proposal_only',
       started_at,
       finished_at: new Date().toISOString(),
       limits: {
         max_tenants_per_run: MAX_TENANTS_PER_RUN,
         max_actions_per_run: MAX_ACTIONS_PER_RUN,
+        max_proposals_per_run: MAX_PROPOSALS_PER_RUN,
       },
       actions_used: actionsUsed,
       checks: calls.map((c) => ({
