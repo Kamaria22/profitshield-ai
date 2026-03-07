@@ -127,24 +127,18 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       shop: shopDomain,
     };
 
-    // Primary path: explicit public function endpoints.
-    // Base44 environments can expose functions as /functions/* or /api/functions/*.
-    const candidates = ['/functions/shopifySessionExchange', '/api/functions/shopifySessionExchange'];
-    for (const endpoint of candidates) {
-      try {
-        const safe = await stabilityAgent.safeFetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(payload),
-        }, { ok: false, fallback: true });
-        const data = safe?.data || {};
-        if (safe?.ok) return { data };
-        // Try next endpoint on not-found; otherwise return the concrete failure.
-        if (safe?.status === 404) continue;
-        return { data: { ...data, error: data?.error || `session_exchange_http_${safe?.status || 502}` } };
-      } catch (e) {
-        console.warn(`[ShopifyEmbeddedAuthGate] Direct ${endpoint} failed:`, e.message);
-      }
+    // Primary path: explicit public function endpoint
+    try {
+      const safe = await stabilityAgent.safeFetch('/api/functions/shopifySessionExchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+      }, { ok: false, fallback: true });
+      const data = safe?.data || {};
+      if (safe?.ok) return { data };
+      return { data: { ...data, error: data?.error || `session_exchange_http_${safe?.status || 502}` } };
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e.message);
     }
 
     // Fallback path: Base44 SDK invoke
