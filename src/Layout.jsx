@@ -134,8 +134,16 @@ const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'Sele
 // Detect Shopify embedded from URL — used to short-circuit auth walls
 function detectEmbedded() {
   if (typeof window === 'undefined') return false;
-  const p = new URLSearchParams(window.location.search);
-  return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+  try {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) {
+      return true;
+    }
+    const persisted = getPersistedContext(true);
+    return persisted?.platform === 'shopify' && !!persisted?.tenantId;
+  } catch {
+    return false;
+  }
 }
 
 // Safe admin check

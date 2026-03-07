@@ -6,6 +6,7 @@ import {
   getPersistedShopifyContext,
   persistShopifyContext
 } from '@/components/shopifyContext';
+import { getPersistedContext } from '@/components/platformContext';
 
 /**
  * Hook to resolve the current tenant for pages.
@@ -43,11 +44,23 @@ export function useTenantResolver() {
     let resolvedShopDomain = null;
     let user = null;
     
-    // Get current user
-    try {
-      user = await base44.auth.me();
-    } catch (e) {
-      console.log('[useTenantResolver] No user auth');
+    const isEmbedded = (() => {
+      try {
+        if (urlParams.shop && (urlParams.host || urlParams.embedded === '1')) return true;
+        const persistedCtx = getPersistedContext(true);
+        return persistedCtx?.platform === 'shopify' && !!persistedCtx?.tenantId;
+      } catch {
+        return false;
+      }
+    })();
+
+    // Get current user only outside Shopify embedded mode.
+    if (!isEmbedded) {
+      try {
+        user = await base44.auth.me();
+      } catch (e) {
+        console.log('[useTenantResolver] No user auth');
+      }
     }
     
     // PRIORITY A: URL shop param

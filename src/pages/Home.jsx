@@ -65,7 +65,8 @@ export default function Home() {
   const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
 
   // Tutorial state - deferred to not block render
-  const shouldShowTutorial = useShouldShowTutorial(authTenantId);
+  const tutorialTenantId = isEmbedded ? null : authTenantId;
+  const shouldShowTutorial = useShouldShowTutorial(tutorialTenantId);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function Home() {
         alerts
       };
     },
-    enabled: canQuery,
+    enabled: canQuery && !isEmbedded,
     staleTime: 60000,
     gcTime: 120000,
     refetchOnMount: false,
@@ -152,7 +153,7 @@ export default function Home() {
         is_resolved: false 
       }, '-impact_amount', 5);
     },
-    enabled: canQuery && !!dashboardSummary,
+    enabled: canQuery && !!dashboardSummary && !isEmbedded,
     staleTime: 120000,
     gcTime: 300000,
     refetchOnMount: false,
@@ -161,7 +162,7 @@ export default function Home() {
 
   // Real-time dashboard freshness: webhook/order updates should refresh dashboard data.
   useEffect(() => {
-    if (!authTenantId) return;
+    if (!authTenantId || isEmbedded) return;
 
     let timer = null;
     const scheduleRefresh = () => {
@@ -199,7 +200,7 @@ export default function Home() {
         try { fn(); } catch (_) {}
       });
     };
-  }, [authTenantId, queryClient, dashboardSummaryKey, profitLeaksKey]);
+  }, [authTenantId, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Extract from summary for immediate display
   const isDemoMode = dashboardSummary?.isDemoMode ?? true;
