@@ -29,7 +29,7 @@ async function ensureSupportEmail(db, tenantId) {
   return row.support_email;
 }
 
-async function runWatchdog(db, tenantId) {
+async function runWatchdog(db, tenantId, observeOnly = false) {
   const q = tenantId ? { tenant_id: tenantId } : {};
   const rows = await db.SupportConversation.filter(q, '-created_date', 500).catch(() => []);
   const open = rows.filter(r => r.status !== 'closed').length;
@@ -42,19 +42,24 @@ async function runWatchdog(db, tenantId) {
 
   let selfHealTriggered = false;
   if (unread > 100 || deliveryFailures > 0) {
-    const stale = await db.SupportConversation.filter({ status: 'owner_replied' }, '-created_date', 200).catch(() => []);
-    for (const c of stale) {
-      const updated = c.updated_date ? new Date(c.updated_date).getTime() : 0;
-      if (updated && Date.now() - updated > 14 * 24 * 60 * 60 * 1000) {
-        await db.SupportConversation.update(c.id, { status: 'closed' }).catch(() => {});
+    if (observeOnly) {
+      selfHealTriggered = false;
+    } else {
+      const stale = await db.SupportConversation.filter({ status: 'owner_replied' }, '-created_date', 200).catch(() => []);
+      for (const c of stale) {
+        const updated = c.updated_date ? new Date(c.updated_date).getTime() : 0;
+        if (updated && Date.now() - updated > 14 * 24 * 60 * 60 * 1000) {
+          await db.SupportConversation.update(c.id, { status: 'closed' }).catch(() => {});
+        }
       }
+      selfHealTriggered = true;
     }
-    selfHealTriggered = true;
   }
 
   return {
     ok: true,
     version: VERSION,
+    observe_only: !!observeOnly,
     inbox_health: open > 150 ? 'degraded' : 'healthy',
     unread_count: unread,
     escalated_count: escalated,
@@ -77,6 +82,7 @@ Deno.serve(async (req) => {
 
     const action = body.action || 'run_watchdog';
     const tenantId = body.tenant_id || null;
+    const observeOnly = body.observe_only === true || body.mode === 'observe';
     execMeta = { action, tenantId, userRole: null, isScheduler: action === 'run_watchdog' };
     let user = null;
     try { user = await base44.auth.me(); } catch (_) {}
@@ -109,7 +115,7 @@ Deno.serve(async (req) => {
         });
         return Response.json({ ok: false, error: isolation.error }, { status: 400 });
       }
-      const data = await runWatchdog(db, tenantId);
+      const data = await runWatchdog(db, tenantId, observeOnly);
       await finishAgentExecution({
         db, agentName: 'supportGuardian', action, tenantId,
         startedAt: exec.startedAt, success: true, repairActions: data.self_heal_triggered ? ['self_heal_repair'] : [], isScheduler: execMeta.isScheduler, userRole: execMeta.userRole, version: VERSION

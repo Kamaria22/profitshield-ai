@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole;
+    const body = await req.json().catch(() => ({}));
+    const observeOnly = body.observe_only === true || body.mode === 'observe';
 
     // Allow: scheduler (no auth) OR admin user
     let user = null;
@@ -122,7 +124,7 @@ Deno.serve(async (req) => {
     for (const integration of active) {
       const tenantId = integration.tenant_id;
       const shopDomain = integration.store_key;
-      const result = { integration_id: integration.id, shop_domain: shopDomain, tenant_id: tenantId };
+      const result = { integration_id: integration.id, shop_domain: shopDomain, tenant_id: tenantId, observe_only: observeOnly };
 
       // 1. Get token
       let tokens = await db.entities.OAuthToken.filter({ tenant_id: tenantId, platform: 'shopify', is_valid: true });
@@ -130,7 +132,9 @@ Deno.serve(async (req) => {
       if (!tokens.length) {
         result.token_check = 'missing';
         result.status = 'reauth_required';
-        await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        if (!observeOnly) {
+          await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        }
         results.push(result);
         continue;
       }
@@ -139,7 +143,9 @@ Deno.serve(async (req) => {
       if (!accessToken) {
         result.token_check = 'decrypt_failed';
         result.status = 'reauth_required';
-        await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        if (!observeOnly) {
+          await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        }
         results.push(result);
         continue;
       }
@@ -154,22 +160,24 @@ Deno.serve(async (req) => {
         result.api_status = scopeRes.status;
         result.status = 'reauth_required';
 
-        await db.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
-        await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+        if (!observeOnly) {
+          await db.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
+          await db.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
 
-        // Create Alert for admin
-        await db.entities.Alert.create({
-          tenant_id: tenantId,
-          type: 'system',
-          severity: 'high',
-          title: `Shopify Token Revoked — ${shopDomain}`,
-          message: `Shopify API returned ${scopeRes.status} for ${shopDomain}. Token has been revoked or expired. The merchant must reconnect.`,
-          entity_type: 'platform_integration',
-          entity_id: integration.id,
-          recommended_action: 'Reconnect Shopify OAuth',
-          status: 'pending',
-          metadata: { shop_domain: shopDomain, api_status: scopeRes.status }
-        }).catch(() => {});
+          // Create Alert for admin
+          await db.entities.Alert.create({
+            tenant_id: tenantId,
+            type: 'system',
+            severity: 'high',
+            title: `Shopify Token Revoked — ${shopDomain}`,
+            message: `Shopify API returned ${scopeRes.status} for ${shopDomain}. Token has been revoked or expired. The merchant must reconnect.`,
+            entity_type: 'platform_integration',
+            entity_id: integration.id,
+            recommended_action: 'Reconnect Shopify OAuth',
+            status: 'pending',
+            metadata: { shop_domain: shopDomain, api_status: scopeRes.status }
+          }).catch(() => {});
+        }
 
         results.push(result);
         continue;
@@ -178,8 +186,12 @@ Deno.serve(async (req) => {
       result.api_reachable = true;
 
       // 3. Reconcile webhooks
-      const webhookResult = await reconcileWebhooks(shopDomain, accessToken, integration.id, db);
-      result.webhooks = webhookResult;
+      if (observeOnly) {
+        result.webhooks = { ok: true, observe_only: true, skipped_mutation: true };
+      } else {
+        const webhookResult = await reconcileWebhooks(shopDomain, accessToken, integration.id, db);
+        result.webhooks = webhookResult;
+      }
 
       // 4. Check for stale webhook events
       const webhookStaleMs = WEBHOOK_STALE_HOURS * 60 * 60 * 1000;
@@ -195,18 +207,20 @@ Deno.serve(async (req) => {
 
       if (webhookStale) {
         result.webhook_stale = true;
-        await db.entities.Alert.create({
-          tenant_id: tenantId,
-          type: 'system',
-          severity: 'medium',
-          title: `No Webhook Events in ${WEBHOOK_STALE_HOURS}h — ${shopDomain}`,
-          message: `No webhook events received from ${shopDomain} in over ${WEBHOOK_STALE_HOURS} hours. Webhooks may be misconfigured.`,
-          entity_type: 'platform_integration',
-          entity_id: integration.id,
-          recommended_action: 'Run Reconcile Webhooks',
-          status: 'pending',
-          metadata: { shop_domain: shopDomain, last_webhook_at: recentEvents[0]?.created_date || null }
-        }).catch(() => {});
+        if (!observeOnly) {
+          await db.entities.Alert.create({
+            tenant_id: tenantId,
+            type: 'system',
+            severity: 'medium',
+            title: `No Webhook Events in ${WEBHOOK_STALE_HOURS}h — ${shopDomain}`,
+            message: `No webhook events received from ${shopDomain} in over ${WEBHOOK_STALE_HOURS} hours. Webhooks may be misconfigured.`,
+            entity_type: 'platform_integration',
+            entity_id: integration.id,
+            recommended_action: 'Run Reconcile Webhooks',
+            status: 'pending',
+            metadata: { shop_domain: shopDomain, last_webhook_at: recentEvents[0]?.created_date || null }
+          }).catch(() => {});
+        }
       }
 
       // 5. Auto-sync if stale
@@ -216,25 +230,32 @@ Deno.serve(async (req) => {
 
       if (syncStale) {
         result.sync_stale = true;
-        try {
-          await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
-          result.auto_sync_triggered = true;
-          console.log(`[watchdog] Auto-sync triggered for tenant ${tenantId}`);
-        } catch (syncErr) {
-          result.auto_sync_error = syncErr.message;
-          console.warn(`[watchdog] Auto-sync failed for ${tenantId}:`, syncErr.message);
+        if (observeOnly) {
+          result.auto_sync_triggered = false;
+          result.auto_sync_skipped = true;
+        } else {
+          try {
+            await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
+            result.auto_sync_triggered = true;
+            console.log(`[watchdog] Auto-sync triggered for tenant ${tenantId}`);
+          } catch (syncErr) {
+            result.auto_sync_error = syncErr.message;
+            console.warn(`[watchdog] Auto-sync failed for ${tenantId}:`, syncErr.message);
+          }
         }
       }
 
       // 6. Update last_ok_at on integration
-      await db.entities.PlatformIntegration.update(integration.id, {
-        status: 'connected',
-        metadata: {
-          ...(integration.metadata || {}),
-          last_ok_at: nowIso,
-          watchdog_last_ran: nowIso
-        }
-      }).catch(() => {});
+      if (!observeOnly) {
+        await db.entities.PlatformIntegration.update(integration.id, {
+          status: 'connected',
+          metadata: {
+            ...(integration.metadata || {}),
+            last_ok_at: nowIso,
+            watchdog_last_ran: nowIso
+          }
+        }).catch(() => {});
+      }
 
       result.status = 'healthy';
       results.push(result);
@@ -259,10 +280,10 @@ Deno.serve(async (req) => {
       severity: summary.reauth_required > 0 ? 'medium' : 'low',
       category: 'integration',
       is_auto_action: !user,
-      metadata: summary
+      metadata: { ...summary, observe_only: observeOnly }
     }).catch(() => {});
 
-    return Response.json({ ok: true, ...summary, results });
+    return Response.json({ ok: true, observe_only: observeOnly, ...summary, results });
 
   } catch (error) {
     console.error('[shopifyConnectionWatchdog]', error.message);

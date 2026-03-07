@@ -365,6 +365,7 @@ Deno.serve(async (req) => {
 
     const action = body.action || "enforce";
     const mode = body.mode || "enforce"; // "watch" | "enforce"
+    const observeOnly = body.observe_only === true || mode === "watch";
     const policyOverride = body.policy || {};
 
     // prove_live: no auth needed
@@ -399,18 +400,20 @@ Deno.serve(async (req) => {
               tenant_id: tenant.id,
               incident: { summary: "UI route integrity mismatch", severity: "warning", signals: { ui: uiHealth } },
             });
-            await base44.functions.invoke("selfHeal", {
-              action: "heal_ui_routing",
-              tenant_id: tenant.id,
-              ui_probe: body.ui_probe || {},
-              issues: uiHealth.issues,
-            }).catch(() => {});
+            if (!observeOnly) {
+              await base44.functions.invoke("selfHeal", {
+                action: "heal_ui_routing",
+                tenant_id: tenant.id,
+                ui_probe: body.ui_probe || {},
+                issues: uiHealth.issues,
+              }).catch(() => {});
+            }
           }
         } catch (e) {
           results.push({ tenant_id: tenant.id, error: e?.message });
         }
       }
-      return Response.json({ ok: true, watchdog: true, tenants_checked: tenants.length, results, ts: nowIso() });
+      return Response.json({ ok: true, watchdog: true, observe_only: observeOnly, tenants_checked: tenants.length, results, ts: nowIso() });
     }
 
     // For direct calls, allow admin users only
@@ -436,7 +439,7 @@ Deno.serve(async (req) => {
 
     if (!incident) {
       await infra.writeAudit({ type: "stability.ok", ts: nowIso(), tenant_id: tenantId, signals, ui_health: uiHealth });
-      if (!uiHealth.ok) {
+      if (!uiHealth.ok && !observeOnly) {
         await base44.functions.invoke("selfHeal", {
           action: "heal_ui_routing",
           tenant_id: tenantId,
@@ -475,7 +478,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      if (mode === "watch") {
+      if (observeOnly || mode === "watch") {
         results.push({ actionId: action.id, ok: true, details: { dry_run: true, action: action.name } });
         continue;
       }
