@@ -1,7 +1,7 @@
 import React, { useState, useCallback, lazy, Suspense, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/components/platformContext';
+import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
@@ -56,9 +56,11 @@ export default function Home() {
   
   // Derive resolver values safely
   const resolverCheck = requireResolved(resolver || {});
-  const canQuery = canQueryTenant(resolverCheck);
-  const queryFilter = getTenantFilter(resolverCheck);
-  const authTenantId = resolverCheck.tenantId;
+  const persistedContext = getPersistedContext();
+  const isEmbedded = resolver?.platform === 'shopify' || !!persistedContext?.shop;
+  const authTenantId = resolverCheck.tenantId || (isEmbedded ? persistedContext?.tenantId : null);
+  const canQuery = canQueryTenant(resolverCheck) || !!authTenantId;
+  const queryFilter = getTenantFilter(resolverCheck) || (authTenantId ? { tenant_id: authTenantId } : null);
   const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
   const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
 
