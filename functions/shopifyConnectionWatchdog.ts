@@ -124,7 +124,14 @@ Deno.serve(async (req) => {
     for (const integration of active) {
       const tenantId = integration.tenant_id;
       const shopDomain = integration.store_key;
-      const result = { integration_id: integration.id, shop_domain: shopDomain, tenant_id: tenantId, observe_only: observeOnly };
+      const result = {
+        integration_id: integration.id,
+        shop_domain: shopDomain,
+        tenant_id: tenantId,
+        observe_only: observeOnly,
+        status: 'healthy',
+        health_issues: []
+      };
 
       // 1. Get token
       let tokens = await db.entities.OAuthToken.filter({ tenant_id: tenantId, platform: 'shopify', is_valid: true });
@@ -207,6 +214,8 @@ Deno.serve(async (req) => {
 
       if (webhookStale) {
         result.webhook_stale = true;
+        result.status = 'degraded';
+        result.health_issues.push('webhook_stale');
         if (!observeOnly) {
           await db.entities.Alert.create({
             tenant_id: tenantId,
@@ -240,7 +249,22 @@ Deno.serve(async (req) => {
             console.log(`[watchdog] Auto-sync triggered for tenant ${tenantId}`);
           } catch (syncErr) {
             result.auto_sync_error = syncErr.message;
+            result.status = 'degraded';
+            result.health_issues.push('auto_sync_failed');
             console.warn(`[watchdog] Auto-sync failed for ${tenantId}:`, syncErr.message);
+
+            await db.entities.Alert.create({
+              tenant_id: tenantId,
+              type: 'system',
+              severity: 'high',
+              title: `Dashboard Sync Failure — ${shopDomain}`,
+              message: `Watchdog auto-sync failed: ${syncErr.message}`,
+              entity_type: 'platform_integration',
+              entity_id: integration.id,
+              recommended_action: 'Run manual sync and verify OAuth token',
+              status: 'pending',
+              metadata: { shop_domain: shopDomain, sync_stale: true, auto_sync_error: syncErr.message }
+            }).catch(() => {});
           }
         }
       }
@@ -248,16 +272,16 @@ Deno.serve(async (req) => {
       // 6. Update last_ok_at on integration
       if (!observeOnly) {
         await db.entities.PlatformIntegration.update(integration.id, {
-          status: 'connected',
+          status: result.status === 'healthy' ? 'connected' : 'degraded',
           metadata: {
             ...(integration.metadata || {}),
             last_ok_at: nowIso,
-            watchdog_last_ran: nowIso
+            watchdog_last_ran: nowIso,
+            watchdog_status: result.status,
+            watchdog_health_issues: result.health_issues
           }
         }).catch(() => {});
       }
-
-      result.status = 'healthy';
       results.push(result);
     }
 

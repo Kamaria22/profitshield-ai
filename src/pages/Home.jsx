@@ -10,6 +10,7 @@ import {
   Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
@@ -58,6 +59,8 @@ export default function Home() {
   const canQuery = canQueryTenant(resolverCheck);
   const queryFilter = getTenantFilter(resolverCheck);
   const authTenantId = resolverCheck.tenantId;
+  const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
+  const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
 
   // Tutorial state - deferred to not block render
   const shouldShowTutorial = useShouldShowTutorial(authTenantId);
@@ -86,8 +89,14 @@ export default function Home() {
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
 
   // PERFORMANCE: Ultra-fast summary query - minimal data for instant render
-  const { data: dashboardSummary, isLoading: summaryLoading } = useQuery({
-    queryKey: buildQueryKey('dashboard-summary', resolverCheck),
+  const {
+    data: dashboardSummary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+    error: summaryErrorValue,
+    refetch: refetchSummary,
+  } = useQuery({
+    queryKey: dashboardSummaryKey,
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return null;
       
@@ -131,7 +140,7 @@ export default function Home() {
   });
 
   const { data: profitLeaks = [] } = useQuery({
-    queryKey: buildQueryKey('profitLeaks', resolverCheck),
+    queryKey: profitLeaksKey,
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
       return base44.entities.ProfitLeak.filter({ 
@@ -145,6 +154,48 @@ export default function Home() {
     refetchOnMount: false,
     refetchOnWindowFocus: false
   });
+
+  // Real-time dashboard freshness: webhook/order updates should refresh dashboard data.
+  useEffect(() => {
+    if (!authTenantId) return;
+
+    let timer = null;
+    const scheduleRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+        queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+      }, 250);
+    };
+
+    const matchesTenant = (event) => {
+      const tenantId = event?.data?.tenant_id;
+      return !tenantId || tenantId === authTenantId;
+    };
+
+    const unsubscribers = [];
+
+    try {
+      const unsubOrder = base44.entities.Order.subscribe((event) => {
+        if (matchesTenant(event)) scheduleRefresh();
+      });
+      if (typeof unsubOrder === 'function') unsubscribers.push(unsubOrder);
+    } catch (_) {}
+
+    try {
+      const unsubAlert = base44.entities.Alert.subscribe((event) => {
+        if (matchesTenant(event)) scheduleRefresh();
+      });
+      if (typeof unsubAlert === 'function') unsubscribers.push(unsubAlert);
+    } catch (_) {}
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribers.forEach((fn) => {
+        try { fn(); } catch (_) {}
+      });
+    };
+  }, [authTenantId, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Extract from summary for immediate display
   const isDemoMode = dashboardSummary?.isDemoMode ?? true;
@@ -168,8 +219,9 @@ export default function Home() {
     },
     onSuccess: (data) => {
       toast.success(`Synced: ${data.createdCount || 0} new orders`);
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+      queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+      queryClient.invalidateQueries({ queryKey: buildQueryKey('orders', resolverCheck) });
     },
     onError: (error) => {
       toast.error(error.message || 'Sync failed');
@@ -218,6 +270,24 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 animate-pulse" style={{boxShadow:'0 0 25px rgba(99,102,241,0.4)'}} />
+      </div>
+    );
+  }
+
+  if (summaryError) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-lg border-red-200 bg-red-50/80">
+          <CardContent className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-red-900">Dashboard data unavailable</h2>
+            <p className="text-sm text-red-700 mt-2">
+              {summaryErrorValue?.message || 'Failed to load dashboard summary.'}
+            </p>
+            <Button className="mt-4" variant="outline" onClick={() => refetchSummary()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
