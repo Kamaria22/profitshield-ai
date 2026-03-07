@@ -350,6 +350,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   
   // Platform resolver - single source of truth
   const resolverCheck = requireResolved(resolver || {});
+  const isEmbedded = detectEmbedded();
   
   // ONLY use resolverCheck for gated data - these are the authoritative values
   const isResolved = resolverCheck.ok;
@@ -414,12 +415,16 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
+    if (isEmbedded) {
+      setPendingAlerts(0);
+      return;
+    }
     if (isResolved && authTenantId) {
       loadAlerts(authTenantId);
     } else {
       setPendingAlerts(0);
     }
-  }, [isResolved, authTenantId, loadAlerts]);
+  }, [isEmbedded, isResolved, authTenantId, loadAlerts]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -452,7 +457,6 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   // In embedded mode, hold the loading screen while gate is authenticating.
   // This prevents any auth redirect or login screen from flashing.
-  const isEmbedded = detectEmbedded();
   if (status === RESOLVER_STATUS.RESOLVING) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { createPageUrl } from '@/components/platformContext';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -63,6 +63,7 @@ const defaultRiskRules = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [currentStep, setCurrentStep] = useState('verify');
   const [verificationData, setVerificationData] = useState(null);
@@ -85,9 +86,30 @@ export default function Onboarding() {
   });
   const [showTutorial, setShowTutorial] = useState(false);
 
+  const isEmbeddedShopify = useMemo(() => {
+    try {
+      const params = new URLSearchParams(location.search || '');
+      if (params.get('shop') && (params.get('host') || params.get('embedded') === '1')) {
+        return true;
+      }
+      const persisted = getPersistedContext(true);
+      return persisted?.platform === 'shopify' && !!persisted?.tenantId;
+    } catch {
+      return false;
+    }
+  }, [location.search]);
+
   useEffect(() => {
+    if (isEmbeddedShopify) {
+      navigate(createPageUrl('Home', location.search), { replace: true });
+      return;
+    }
     loadUser();
-  }, []);
+  }, [isEmbeddedShopify, navigate, location.search]);
+
+  if (isEmbeddedShopify) {
+    return null;
+  }
 
   const loadUser = async () => {
     try {
