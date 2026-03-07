@@ -939,7 +939,7 @@ function LayoutWithProviders({ children, currentPageName }) {
       </HealthErrorBoundary>
 
       {/* GLOBAL FRONTEND GUARDIAN — mounts once when tenant resolves */}
-      {authTenantId && <FrontendGuardian authTenantId={authTenantId} userRole={resolver?.user?.role || resolver?.user?.app_role || role} />}
+      {authTenantId && <FrontendGuardian authTenantId={authTenantId} userRole={resolver?.user?.role || resolver?.user?.app_role || 'user'} />}
 
       {/* PWA Install & Update Banners */}
       <InstallAppBanner />
