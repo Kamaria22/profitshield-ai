@@ -175,9 +175,17 @@ export function usePlatformResolver() {
       hasValidContext(persisted) &&
       persisted.platform === 'shopify' &&
       !!persisted.tenantId;
+    const isIframeRuntime = (() => {
+      try {
+        return typeof window !== 'undefined' && window.top !== window;
+      } catch {
+        return true;
+      }
+    })();
     const isShopifyEmbedded = !!(
       (urlParams.shop && (urlParams.host || urlParams.embedded === '1')) ||
-      hasPersistedEmbeddedShopifyContext
+      hasPersistedEmbeddedShopifyContext ||
+      isIframeRuntime
     );
     const embeddedShop = isShopifyEmbedded
       ? (urlParams.shop?.toLowerCase().includes('.myshopify.com')
@@ -190,6 +198,7 @@ export function usePlatformResolver() {
 
     trace.steps.push(traceStep('embedded_detection', {
       isShopifyEmbedded,
+      is_iframe_runtime: isIframeRuntime,
       shop: embeddedShop,
       host: urlParams.host || null,
       has_persisted: hasPersistedEmbeddedShopifyContext,

@@ -63,14 +63,17 @@ const TIER_FEATURES = {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json().catch(() => ({}));
     const { action, tenant_id, feature } = body;
+    let user = null;
+
+    // Embedded Shopify startup can call this function before Base44 login exists.
+    // Only admin actions require an authenticated Base44 user.
+    try {
+      user = await base44.auth.me();
+    } catch (_) {
+      user = null;
+    }
 
     if (!tenant_id) {
       return Response.json({ error: 'tenant_id required' }, { status: 400 });
@@ -112,7 +115,8 @@ Deno.serve(async (req) => {
 
     // ADMIN: RESET TRIAL
     if (action === 'admin_reset_trial') {
-      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      const role = (user?.app_role || user?.role || '').toLowerCase();
+      if (!(role === 'admin' || role === 'owner')) return Response.json({ error: 'Admin only' }, { status: 403 });
       const trialEnd = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
       await base44.asServiceRole.entities.Tenant.update(tenant.id, {
         trial_started_at: new Date().toISOString(),
@@ -126,7 +130,8 @@ Deno.serve(async (req) => {
 
     // ADMIN: SET REVIEW MODE
     if (action === 'admin_set_review_mode') {
-      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      const role = (user?.app_role || user?.role || '').toLowerCase();
+      if (!(role === 'admin' || role === 'owner')) return Response.json({ error: 'Admin only' }, { status: 403 });
       await base44.asServiceRole.entities.Tenant.update(tenant.id, {
         review_mode_enabled: !!body.enabled
       });
@@ -135,7 +140,8 @@ Deno.serve(async (req) => {
 
     // ADMIN: FORCE BILLING RESYNC
     if (action === 'admin_force_billing_resync') {
-      if (user?.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 });
+      const role = (user?.app_role || user?.role || '').toLowerCase();
+      if (!(role === 'admin' || role === 'owner')) return Response.json({ error: 'Admin only' }, { status: 403 });
       await base44.asServiceRole.entities.Tenant.update(tenant.id, {
         last_billing_sync_at: null
       });
@@ -185,10 +191,12 @@ Deno.serve(async (req) => {
         });
 
         // Send final reminder
-        await base44.asServiceRole.integrations.Core.SendEmail({
-          to: tenant.billing_email || user.email,
-          subject: '⚠️ Your ProfitShield Trial Has Ended',
-          body: `Hi,
+        const recipient = tenant.billing_email || user?.email;
+        if (recipient) {
+          await base44.asServiceRole.integrations.Core.SendEmail({
+            to: recipient,
+            subject: '⚠️ Your ProfitShield Trial Has Ended',
+            body: `Hi,
 
 Your 30-day ProfitShield trial has ended. Your account has been temporarily locked.
 
@@ -201,7 +209,8 @@ Your data is safe and will be restored immediately upon subscription.
 Questions? Reply to this email.
 
 - The ProfitShield Team`
-        });
+          });
+        }
 
         return Response.json({ 
           success: true, 
