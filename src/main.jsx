@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 import { getPersistedContext } from '@/components/platformContext'
+import { base44 } from '@/api/base44Client'
 
 function normalizeShop(shop) {
   if (!shop || typeof shop !== 'string') return null
@@ -78,6 +79,41 @@ function ensureEmbeddedContextParams() {
 }
 
 ensureEmbeddedContextParams()
+
+function isEmbeddedRuntime() {
+  try {
+    return window.top !== window.self
+  } catch {
+    return true
+  }
+}
+
+function hasEmbeddedShopifyContext() {
+  if (typeof window === 'undefined') return false
+  try {
+    const p = new URLSearchParams(window.location.search || '')
+    if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) return true
+    const persisted = getPersistedContext(true)
+    return persisted?.platform === 'shopify' && !!persisted?.tenantId
+  } catch {
+    return false
+  }
+}
+
+// Hard guard: in embedded runtime, never allow Base44 auth.me bootstrap calls.
+// ShopifyEmbeddedAuthGate/session exchange is the source of truth.
+if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_AUTH_ME_PATCHED__) {
+  window.__PS_EMBEDDED_AUTH_ME_PATCHED__ = true
+  const originalAuthMe = base44?.auth?.me?.bind(base44.auth)
+  if (typeof originalAuthMe === 'function') {
+    base44.auth.me = async (...args) => {
+      if (isEmbeddedRuntime() && hasEmbeddedShopifyContext()) {
+        return null
+      }
+      return originalAuthMe(...args)
+    }
+  }
+}
 
 // Shopify App Bridge requires the PUBLIC API key (Client ID).
 // Set it in external JS (not inline HTML) so CSP can remain strict.
