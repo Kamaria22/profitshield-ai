@@ -15,12 +15,21 @@ Deno.serve(async (req) => {
 
     // Embedded dashboard bootstrap path: no Base44 login required.
     if (requestedAction === 'embedded_summary') {
+      const safeFetch = async (fn, fallback) => {
+        try {
+          const value = await fn();
+          return value ?? fallback;
+        } catch {
+          return fallback;
+        }
+      };
+
       const [orders, alerts, leaks, tenant, integration] = await Promise.all([
-        base44.asServiceRole.entities.Order.filter({ tenant_id }, '-order_date', 50),
-        base44.asServiceRole.entities.Alert.filter({ tenant_id, status: 'pending' }, '-created_date', 10),
-        base44.asServiceRole.entities.ProfitLeak.filter({ tenant_id, is_resolved: false }, '-impact_amount', 5),
-        base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }).then((r) => r[0] || null),
-        base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id, platform: 'shopify', status: 'connected' }).then((r) => r[0] || null)
+        safeFetch(() => base44.asServiceRole.entities.Order.filter({ tenant_id }, '-order_date', 50), []),
+        safeFetch(() => base44.asServiceRole.entities.Alert.filter({ tenant_id, status: 'pending' }, '-created_date', 10), []),
+        safeFetch(() => base44.asServiceRole.entities.ProfitLeak.filter({ tenant_id, is_resolved: false }, '-impact_amount', 5), []),
+        safeFetch(() => base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }).then((r) => r[0] || null), null),
+        safeFetch(() => base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id, platform: 'shopify', status: 'connected' }).then((r) => r[0] || null), null)
       ]);
 
       const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
