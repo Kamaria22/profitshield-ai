@@ -146,10 +146,12 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
 
     // Fallback path: Base44 SDK invoke
     try {
-      return await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
+      const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
         attempts: 2,
         baseDelayMs: 300
       });
+      if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
+      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
     } catch {
       return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
     }
