@@ -11,6 +11,32 @@ function normalizeShop(shop) {
   return trimmed.includes('.myshopify.com') ? trimmed : `${trimmed}.myshopify.com`
 }
 
+function decodeHostParam(host) {
+  if (!host || typeof host !== 'string') return null
+  try {
+    const normalized = host.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const decoded = atob(padded)
+    if (!decoded) return null
+    return decoded.startsWith('http://') || decoded.startsWith('https://')
+      ? decoded
+      : `https://${decoded}`
+  } catch {
+    return null
+  }
+}
+
+function isValidEmbeddedHost(host) {
+  const decoded = decodeHostParam(host)
+  if (!decoded) return false
+  try {
+    const origin = new URL(decoded).origin
+    return origin === 'https://admin.shopify.com' || /^https:\/\/[a-z0-9-]+\.myshopify\.com$/i.test(origin)
+  } catch {
+    return false
+  }
+}
+
 function ensureEmbeddedContextParams() {
   if (typeof window === 'undefined') return
 
@@ -36,7 +62,8 @@ function ensureEmbeddedContextParams() {
     || (persisted.platform === 'shopify' ? persisted.storeKey : null)
     || localStorage.getItem('resolved_shop_domain')
   )
-  const fallbackHost = params.get('host') || persisted.host || localStorage.getItem('resolved_host')
+  const fallbackHostRaw = params.get('host') || persisted.host || localStorage.getItem('resolved_host')
+  const fallbackHost = isValidEmbeddedHost(fallbackHostRaw) ? fallbackHostRaw : null
 
   if (!fallbackShop || !fallbackHost) return
 
