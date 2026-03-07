@@ -17,6 +17,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { withEndpointGuard, validateEnv, safeFilter, jsonSafe } from './helpers/endpointSafety.ts';
 
 // ── Inline token decrypt (no local imports allowed in Deno Deploy) ─────────────
 async function decryptToken(encryptedToken) {
@@ -164,7 +165,7 @@ function embeddedHeaders() {
 }
 
 function jsonResponse(body, status = 200) {
-  return Response.json(body, { status, headers: embeddedHeaders() });
+  return jsonSafe(body, status, embeddedHeaders());
 }
 
 // Build a request that looks unauthenticated (no Authorization header)
@@ -179,16 +180,16 @@ function makeUnauthenticatedReq(originalReq) {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('shopifySessionExchange', async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: embeddedHeaders() });
-  }
-
   try {
+    const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
+    if (!envState.ok) {
+      return jsonResponse({ error: `Missing env: ${envState.missing.join(',')}`, reason: 'env_missing' }, 500);
+    }
+
     // PUBLIC ENDPOINT — use asServiceRole so no Base44 user session is required.
     const base44 = createClientFromRequest(req).asServiceRole;
 
@@ -234,7 +235,11 @@ Deno.serve(async (req) => {
     }
 
     // Resolve tenant by shop_domain (service-role, no user session required)
-    const tenants = await base44.entities.Tenant.filter({ shop_domain: shopDomain });
+    const tenants = await safeFilter(
+      () => base44.entities.Tenant.filter({ shop_domain: shopDomain }),
+      [],
+      'shopifySessionExchange.tenant_lookup'
+    );
     console.log(`[shopifySessionExchange] Tenant lookup for ${shopDomain}: found ${tenants.length}`);
 
     if (tenants.length === 0) {
@@ -361,4 +366,4 @@ Deno.serve(async (req) => {
     console.error('[shopifySessionExchange] Unhandled error:', error.message, error.stack);
     return jsonResponse({ error: error.message, reason: 'server_error' }, 500);
   }
-});
+}, embeddedHeaders()));

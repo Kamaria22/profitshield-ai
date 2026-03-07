@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -16,17 +17,22 @@ Deno.serve(async (req) => {
     }
     
     // Get tenant and token
-    const tenants = await base44.asServiceRole.entities.Tenant.filter({ id: tenant_id });
+    const tenants = await safeFilter(
+      () => base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }),
+      [],
+      'syncShopifyData.tenant_lookup'
+    );
     if (tenants.length === 0) {
       return Response.json({ error: 'Tenant not found' }, { status: 404 });
     }
     
     const tenant = tenants[0];
     
-    const tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
-      tenant_id,
-      is_valid: true 
-    });
+    const tokens = await safeFilter(
+      () => base44.asServiceRole.entities.OAuthToken.filter({ tenant_id, is_valid: true }),
+      [],
+      'syncShopifyData.token_lookup'
+    );
     
     if (tokens.length === 0) {
       return Response.json({ error: 'No valid token found' }, { status: 400 });
@@ -112,7 +118,7 @@ Deno.serve(async (req) => {
     console.error('Sync error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}));
 
 async function decryptToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');

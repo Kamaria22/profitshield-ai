@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const WEBHOOK_URL = `${APP_URL}/api/functions/shopifyWebhook`;
@@ -71,7 +72,7 @@ async function shopifyFetchWithRetry(shopDomain, accessToken, path, init = {}, m
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -81,7 +82,11 @@ Deno.serve(async (req) => {
     if (!integration_id) return Response.json({ error: 'Missing integration_id' }, { status: 400 });
 
     // Load integration
-    const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration_id });
+    const integrations = await safeFilter(
+      () => base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration_id }),
+      [],
+      'registerShopifyWebhooks.integration_lookup'
+    );
     if (!integrations.length) return Response.json({ error: 'Integration not found' }, { status: 404 });
     const integration = integrations[0];
 
@@ -90,13 +95,21 @@ Deno.serve(async (req) => {
     }
 
     // Get OAuth token
-    let tokens = await base44.asServiceRole.entities.OAuthToken.filter({
-      tenant_id: integration.tenant_id, platform: 'shopify', is_valid: true
-    });
+    let tokens = await safeFilter(
+      () => base44.asServiceRole.entities.OAuthToken.filter({
+        tenant_id: integration.tenant_id, platform: 'shopify', is_valid: true
+      }),
+      [],
+      'registerShopifyWebhooks.token_lookup'
+    );
     if (!tokens.length) {
-      tokens = await base44.asServiceRole.entities.OAuthToken.filter({
-        tenant_id: integration.tenant_id, platform: 'shopify'
-      });
+      tokens = await safeFilter(
+        () => base44.asServiceRole.entities.OAuthToken.filter({
+          tenant_id: integration.tenant_id, platform: 'shopify'
+        }),
+        [],
+        'registerShopifyWebhooks.token_fallback'
+      );
     }
     if (!tokens.length) return Response.json({ error: 'No Shopify token found. Please re-authenticate.' }, { status: 400 });
 
@@ -202,4 +215,4 @@ Deno.serve(async (req) => {
     console.error('[registerShopifyWebhooks] Error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}));

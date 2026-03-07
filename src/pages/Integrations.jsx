@@ -30,6 +30,7 @@ import { parseQuery, getPersistedContext, hardResetAllContexts, listPersistedSto
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -114,11 +115,11 @@ export default function Integrations() {
       const jobs = [];
       for (const integration of integrations) {
         try {
-          const result = await base44.functions.invoke('syncEngine', {
+          const result = await invokeWithRetry('syncEngine', {
             action: 'list_sync_jobs',
             integration_id: integration.id,
             limit: 10
-          });
+          }, { attempts: 2, baseMs: 250 });
           jobs.push(...(result.data?.jobs || []));
         } catch (e) {
           console.error('Failed to load sync jobs:', e);
@@ -131,11 +132,11 @@ export default function Integrations() {
 
   const connectMutation = useMutation({
     mutationFn: async (data) => {
-      const result = await base44.functions.invoke('platformConnector', {
+      const result = await invokeWithRetry('platformConnector', {
         action: 'connect_platform',
         tenant_id: tenantId,
         ...data
-      });
+      }, { attempts: 3, baseMs: 300 });
       return result.data;
     },
     onSuccess: async (data) => {
@@ -145,11 +146,11 @@ export default function Integrations() {
       if (data.integration_id) {
         try {
           const webhookBaseUrl = window.location.origin.replace('app.', 'api.');
-          await base44.functions.invoke('platformConnector', {
+          await invokeWithRetry('platformConnector', {
             action: 'register_webhooks',
             integration_id: data.integration_id,
             webhook_base_url: webhookBaseUrl
-          });
+          }, { attempts: 2, baseMs: 300 });
           toast.success('Platform connected and webhooks registered!');
         } catch (e) {
           toast.success('Platform connected! Webhook registration had issues.');
@@ -170,10 +171,10 @@ export default function Integrations() {
     mutationFn: async (integrationId) => {
       // Deregister webhooks first
       try {
-        await base44.functions.invoke('platformConnector', {
+        await invokeWithRetry('platformConnector', {
           action: 'deregister_webhooks',
           integration_id: integrationId
-        });
+        }, { attempts: 2, baseMs: 300 });
       } catch (e) {
         console.error('Webhook deregistration failed:', e);
       }
@@ -220,11 +221,11 @@ export default function Integrations() {
       
       // For Shopify, use syncShopifyOrders directly (has OAuth token decryption)
       if (integration.platform === 'shopify') {
-        const result = await base44.functions.invoke('syncShopifyOrders', {
+        const result = await invokeWithRetry('syncShopifyOrders', {
           tenant_id: integration.tenant_id,
           integration_id: integration.id,
           days: job_type === 'full_sync' ? 365 : job_type === 'orders_only' ? 90 : 30
-        });
+        }, { attempts: 3, baseMs: 400 });
         if (result.data?.error) throw new Error(result.data.error);
         return {
           results: {
@@ -235,11 +236,11 @@ export default function Integrations() {
       }
       
       // Fallback for other platforms
-      const result = await base44.functions.invoke('syncEngine', {
+      const result = await invokeWithRetry('syncEngine', {
         action: 'start_sync',
         integration_id,
         job_type
-      });
+      }, { attempts: 2, baseMs: 300 });
       return result.data;
     },
     onSuccess: (data) => {
@@ -261,19 +262,19 @@ export default function Integrations() {
       const integration = integrations.find(i => i.id === integrationId);
       // For Shopify, use the dedicated OAuth-aware webhook registrar
       if (integration?.platform === 'shopify') {
-        const result = await base44.functions.invoke('registerShopifyWebhooks', {
+        const result = await invokeWithRetry('registerShopifyWebhooks', {
           integration_id: integrationId
-        });
+        }, { attempts: 2, baseMs: 300 });
         if (result.data?.error) throw new Error(result.data.error);
         return result.data;
       }
       // Fallback for other platforms
       const webhookBaseUrl = window.location.origin.replace('app.', 'api.');
-      const result = await base44.functions.invoke('platformConnector', {
+      const result = await invokeWithRetry('platformConnector', {
         action: 'register_webhooks',
         integration_id: integrationId,
         webhook_base_url: webhookBaseUrl
-      });
+      }, { attempts: 2, baseMs: 300 });
       return result.data;
     },
     onSuccess: (data) => {
@@ -293,10 +294,10 @@ export default function Integrations() {
 
   const pushRiskMutation = useMutation({
     mutationFn: async (integration_id) => {
-      const result = await base44.functions.invoke('syncEngine', {
+      const result = await invokeWithRetry('syncEngine', {
         action: 'push_risk_scores',
         integration_id
-      });
+      }, { attempts: 2, baseMs: 300 });
       return result.data;
     },
     onSuccess: (data) => {
@@ -316,7 +317,7 @@ export default function Integrations() {
       const urlParams = parseQuery(location.search);
       const persistedContext = getPersistedContext();
       
-      const response = await base44.functions.invoke('runResolverSelfTest', {
+      const response = await invokeWithRetry('runResolverSelfTest', {
         urlParams: {
           shop: urlParams.shop,
           platform: urlParams.platform,
@@ -332,7 +333,7 @@ export default function Integrations() {
           integrationId: persistedContext.integrationId,
           persistedAt: persistedContext.persistedAt
         }
-      });
+      }, { attempts: 2, baseMs: 250 });
       
       setSelfTestResult(response.data);
     } catch (e) {

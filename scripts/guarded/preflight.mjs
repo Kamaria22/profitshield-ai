@@ -92,8 +92,28 @@ function checkCriticalBase44Path() {
   }
 }
 
+function checkShopifyEnvValidationPresence() {
+  const rel = 'functions/shopifySessionExchange.ts';
+  if (!fileExists(rel)) return;
+  const content = read(rel);
+  const requiredKeys = ['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET'];
+  for (const key of requiredKeys) {
+    if (!content.includes(key)) {
+      addIncident({
+        blocker_type: 'missing_env_validation_signal',
+        severity: 'high',
+        owner_agent: 'auth_guardian',
+        file: rel,
+        message: `Expected env validation reference for ${key}`,
+        healable: true,
+      });
+    }
+  }
+}
+
 checkPagesConfigImports();
 checkCriticalBase44Path();
+checkShopifyEnvValidationPresence();
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT_FILE, JSON.stringify({ ts: new Date().toISOString(), incidents }, null, 2));

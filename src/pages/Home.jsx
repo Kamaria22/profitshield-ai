@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { invokeWithRetry, withUiGuard } from '@/lib/safeApi';
 import { 
   Sparkles,
   ArrowRight,
@@ -106,10 +107,10 @@ export default function Home() {
       if (!queryFilter?.tenant_id) return null;
 
       if (isEmbedded) {
-        const { data } = await base44.functions.invoke('dashboardAI', {
+        const { data } = await invokeWithRetry('dashboardAI', {
           action: 'embedded_summary',
           tenant_id: queryFilter.tenant_id,
-        });
+        }, { attempts: 2, baseMs: 250 });
         if (!data?.success) {
           throw new Error(data?.error || 'Failed to load embedded dashboard summary');
         }
@@ -230,7 +231,7 @@ export default function Home() {
   const syncMutation = useMutation({
     mutationFn: async () => {
       if (!authTenantId) throw new Error('No store connected');
-      const response = await base44.functions.invoke('syncShopifyOrders', { tenant_id: authTenantId });
+      const response = await invokeWithRetry('syncShopifyOrders', { tenant_id: authTenantId }, { attempts: 3, baseMs: 300 });
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
@@ -245,18 +246,18 @@ export default function Home() {
     }
   });
 
-  const handleSync = useCallback(() => syncMutation.mutate(), [syncMutation]);
+  const handleSync = useCallback(withUiGuard(() => syncMutation.mutate(), () => toast.error('Sync failed')), [syncMutation]);
   const handleScan = useCallback(() => {
     if (!syncMutation.isPending) {
       syncMutation.mutate();
     }
   }, [syncMutation]);
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(withUiGuard(() => {
     navigate(createPageUrl('PnLAnalytics'));
-  }, [navigate]);
-  const handleSecurity = useCallback(() => {
+  }, () => toast.error('Could not open analytics')), [navigate]);
+  const handleSecurity = useCallback(withUiGuard(() => {
     navigate(createPageUrl('Intelligence'));
-  }, [navigate]);
+  }, () => toast.error('Could not open risk page')), [navigate]);
 
   // Minimal blocking state
   if (tenantLoading) {

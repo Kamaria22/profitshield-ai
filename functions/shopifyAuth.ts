@@ -6,6 +6,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { withEndpointGuard, validateEnv, jsonSafe } from './helpers/endpointSafety.ts';
 
 // Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
 const SHOPIFY_FRAME_ANCESTORS = "https://admin.shopify.com https://*.myshopify.com";
@@ -31,16 +32,18 @@ function shopifyHeaders() {
 }
 
 function jsonResponse(body, status = 200) {
-  return Response.json(body, { status, headers: shopifyHeaders() });
+  return jsonSafe(body, status, shopifyHeaders());
 }
 
-Deno.serve(async (req) => {
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: shopifyHeaders() });
-  }
-
+Deno.serve(withEndpointGuard('shopifyAuth', async (req) => {
   try {
+    const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
+    const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
+    if (!envState.ok || !shopifyAppUrl) {
+      const missing = [...envState.missing, ...(shopifyAppUrl ? [] : ['SHOPIFY_APP_URL|APP_URL'])];
+      return jsonResponse({ error: `Missing env: ${missing.join(',')}` }, 500);
+    }
+
     const base44 = createClientFromRequest(req);
 
     // Support both authenticated and scheduled calls
@@ -80,7 +83,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     return jsonResponse({ error: error.message, stack: error.stack }, 500);
   }
-});
+}, shopifyHeaders()));
 
 // ─────────────────────────────────────────────
 // GENERATE INSTALL URL

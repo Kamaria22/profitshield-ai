@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
 // Calculate profit for an order
 function calculateOrderProfit(order, costMappings, settings) {
@@ -228,7 +229,7 @@ function mapOrderStatus(order) {
   return 'pending';
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     // Embedded Shopify startup may invoke sync before Base44 session is established.
@@ -242,25 +243,37 @@ Deno.serve(async (req) => {
     }
     
     // Get tenant
-    const tenants = await base44.asServiceRole.entities.Tenant.filter({ id: tenant_id });
+    const tenants = await safeFilter(
+      () => base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }),
+      [],
+      'syncShopifyOrders.tenant_lookup'
+    );
     if (tenants.length === 0) {
       return Response.json({ error: 'Tenant not found' }, { status: 404 });
     }
     const tenant = tenants[0];
     
     // Get OAuth token — try is_valid=true first, fall back to any token for this tenant/platform
-    let tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
-      tenant_id: tenant.id, 
-      platform: 'shopify',
-      is_valid: true 
-    });
+    let tokens = await safeFilter(
+      () => base44.asServiceRole.entities.OAuthToken.filter({
+        tenant_id: tenant.id,
+        platform: 'shopify',
+        is_valid: true
+      }),
+      [],
+      'syncShopifyOrders.token_lookup'
+    );
 
     if (tokens.length === 0) {
       // Fallback: try without is_valid filter (token may exist but flag not set)
-      tokens = await base44.asServiceRole.entities.OAuthToken.filter({ 
-        tenant_id: tenant.id, 
-        platform: 'shopify'
-      });
+      tokens = await safeFilter(
+        () => base44.asServiceRole.entities.OAuthToken.filter({
+          tenant_id: tenant.id,
+          platform: 'shopify'
+        }),
+        [],
+        'syncShopifyOrders.token_fallback'
+      );
     }
     
     if (tokens.length === 0) {
@@ -532,7 +545,7 @@ Deno.serve(async (req) => {
     console.error('[syncShopifyOrders] Error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}));
 
 async function decryptAccessToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');
