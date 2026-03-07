@@ -170,8 +170,11 @@ Deno.serve(async (req) => {
         status: 'active'
       });
 
-      // Schedule trial reminder emails
-      await scheduleTrialReminders(base44, tenant.id, tenant.billing_email || user.email, trialEnd);
+      // Schedule trial reminder emails (no Base44 session required in embedded mode)
+      const reminderEmail = tenant.billing_email || user?.email || '';
+      if (reminderEmail) {
+        await scheduleTrialReminders(base44, tenant.id, reminderEmail, trialEnd);
+      }
 
       return Response.json({ 
         success: true, 

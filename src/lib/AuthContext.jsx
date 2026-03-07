@@ -17,9 +17,13 @@ function isShopifyEmbeddedContext() {
     // Fallback: if embedded auth already resolved once, rely on persisted
     // Shopify context to avoid re-entering Base44 auth.me() bootstrap.
     const persisted = getPersistedContext(true);
-    return persisted?.platform === 'shopify' && !!persisted?.tenantId;
+    if (persisted?.platform === 'shopify' && !!persisted?.tenantId) {
+      return true;
+    }
+    // Final fallback: Shopify embedded always runs in an iframe.
+    return window.top !== window;
   } catch {
-    return false;
+    return true;
   }
 }
 

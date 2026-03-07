@@ -141,8 +141,11 @@ export function PermissionsProvider({ children }) {
           return true;
         }
         const persisted = getPersistedContext(true);
-        return persisted?.platform === 'shopify' && !!persisted?.tenantId;
-      } catch { return false; }
+        if (persisted?.platform === 'shopify' && !!persisted?.tenantId) {
+          return true;
+        }
+        return window.top !== window;
+      } catch { return true; }
     })();
 
     if (isEmbedded) {
