@@ -39,15 +39,40 @@ class StabilityAgent {
   }
 
   async safeFetch(input, options = {}, fallback = { ok: false, fallback: true }) {
-    const res = await this.retry(async () => {
-      const response = await fetch(input, options);
-      if ([500, 502, 503, 504, 429].includes(response.status) && (options?.method || 'GET').toUpperCase() === 'GET') {
-        throw new Error(`transient_http_${response.status}`);
-      }
-      return response;
-    }, { attempts: options?.attempts || 3, baseDelayMs: options?.baseDelayMs || 250 });
+    const maxRetries = Math.min(2, Math.max(0, options?.retries ?? 2));
+    let res = null;
+    let lastNetworkError = null;
 
-    if (!res) return { ok: false, status: 0, fallback: true, data: fallback, response: null };
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        res = await fetch(input, options);
+      } catch (error) {
+        lastNetworkError = error;
+        if (attempt >= maxRetries) break;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        continue;
+      }
+
+      if (res.status === 429) {
+        console.warn("Rate limit detected, stopping retries");
+        return { ok: false, rateLimited: true, status: 429, fallback: true, data: fallback, response: res };
+      }
+
+      if (res.status === 500 || res.status === 502) {
+        if (attempt >= maxRetries) break;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        continue;
+      }
+
+      break;
+    }
+
+    if (!res) {
+      if (lastNetworkError) {
+        this.logError('safe_fetch_network', lastNetworkError, { input: typeof input === 'string' ? input : null });
+      }
+      return { ok: false, status: 0, fallback: true, data: fallback, response: null };
+    }
     try {
       const data = await res.clone().json();
       return { ok: res.ok, status: res.status, fallback: false, data, response: res };
