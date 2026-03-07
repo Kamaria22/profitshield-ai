@@ -262,6 +262,10 @@ export function usePlatformResolver() {
         trace.steps.push(traceStep('shopify_embedded_exchange', { error: exErr.message }, false, 'Embedded: session exchange exception'));
       }
       // Skip Base44 auth regardless of result — in embedded mode never redirect to login
+    } else if (isShopifyEmbedded) {
+      // Embedded runtime with missing/late shop params: never fall back to Base44 auth.
+      // ShopifyEmbeddedAuthGate will establish/persist context shortly.
+      trace.steps.push(traceStep(TRACE_STEP.AUTH_USER, { skipped: true }, true, 'Embedded runtime: skipped Base44 auth.me() fallback'));
     } else {
       // =====================
       // STEP 3: Authenticate User (non-embedded only)
