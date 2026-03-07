@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { usePlatformResolver, requireResolved } from '@/components/usePlatformResolver';
 import HolographicCard from '@/components/quantum/HolographicCard';
 import QuantumButton from '@/components/quantum/QuantumButton';
 import { Badge } from '@/components/ui/badge';
-import { Check, Zap, Crown, Rocket, Star, ExternalLink } from 'lucide-react';
+import { Check, Zap, Crown, Rocket, Star, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PLANS = [
@@ -73,11 +73,10 @@ export default function Billing() {
   const resolverCheck = requireResolved(resolver);
   const tenantId = resolverCheck.tenantId;
   const user = resolver.user;
-  const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState('monthly');
 
   // Check which price IDs are configured
-  const { data: stripeHealth } = useQuery({
+  const { data: stripeHealth, isError: stripeHealthError } = useQuery({
     queryKey: ['stripe-health'],
     queryFn: async () => {
       const res = await base44.functions.invoke('stripeCheckout', { action: 'ping' });
@@ -92,7 +91,11 @@ export default function Billing() {
     return !(stripeHealth.missing_price_ids || []).includes(key);
   };
 
-  const { data: subscription } = useQuery({
+  const {
+    data: subscription,
+    isError: subscriptionError,
+    refetch: refetchSubscription
+  } = useQuery({
     queryKey: ['subscription', tenantId],
     queryFn: async () => {
       if (!tenantId) return null;
@@ -102,7 +105,11 @@ export default function Billing() {
     enabled: !!tenantId
   });
 
-  const { data: trialStatus } = useQuery({
+  const {
+    data: trialStatus,
+    isError: trialStatusError,
+    refetch: refetchTrialStatus
+  } = useQuery({
     queryKey: ['trial-status', user?.id],
     queryFn: async () => {
       const response = await base44.functions.invoke('subscriptionManager', {
@@ -162,11 +169,40 @@ export default function Billing() {
         </p>
       </div>
 
+      {(stripeHealthError || subscriptionError || trialStatusError) && (
+        <HolographicCard className="p-5 border border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-amber-300 font-medium">Billing status could not fully refresh</p>
+              <p className="text-slate-400 text-sm mt-1">
+                Plan changes may still work, but subscription/trial status may be stale.
+              </p>
+            </div>
+            <QuantumButton
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                refetchSubscription();
+                refetchTrialStatus();
+              }}
+            >
+              Retry
+            </QuantumButton>
+          </div>
+        </HolographicCard>
+      )}
+
       {trialStatus?.trial_active && (
         <HolographicCard glow className="p-6 text-center">
           <p className="text-cyan-300 text-lg">
             You have <strong className="text-cyan-400">{trialStatus.days_remaining} days</strong> left in your trial
           </p>
+          {trialStatus?.trial_ends_at && (
+            <p className="text-xs text-slate-500 mt-2">
+              Trial ends {new Date(trialStatus.trial_ends_at).toLocaleDateString()}
+            </p>
+          )}
         </HolographicCard>
       )}
 

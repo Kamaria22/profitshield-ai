@@ -19,6 +19,8 @@ export default function SelfHealingCenter() {
   const [data, setData] = useState(null);
   const [watchdogResult, setWatchdogResult] = useState(null);
   const [tab, setTab] = useState('overview');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then((u) => {
@@ -36,8 +38,11 @@ export default function SelfHealingCenter() {
     try {
       const res = await base44.functions.invoke('selfHeal', { action: 'get_incidents', limit: 100 });
       setData(res.data);
+      setLastUpdatedAt(new Date().toISOString());
+      setErrorMessage('');
     } catch (e) {
       console.error('Failed to load self-healing data:', e);
+      setErrorMessage(e?.message || 'Failed to load self-healing data');
     }
     setLoading(false);
   }, []);
@@ -48,8 +53,10 @@ export default function SelfHealingCenter() {
       const res = await base44.functions.invoke('selfHeal', { action: 'run_watchdog' });
       setWatchdogResult(res.data);
       await loadData();
+      setErrorMessage('');
     } catch (e) {
       console.error('Watchdog failed:', e);
+      setErrorMessage(e?.message || 'Watchdog execution failed');
     }
     setRunning(false);
   };
@@ -59,28 +66,45 @@ export default function SelfHealingCenter() {
     try {
       await base44.functions.invoke('selfHeal', { action, ...extra });
       await loadData();
+      setErrorMessage('');
     } catch (e) {
       console.error('Heal failed:', e);
+      setErrorMessage(e?.message || `Failed to run ${action}`);
     }
     setHealingSubsystem(null);
   };
 
   const acknowledgeEvent = async (eventId) => {
-    await base44.functions.invoke('selfHeal', { action: 'acknowledge_event', event_id: eventId });
-    setData(prev => prev ? {
-      ...prev,
-      events: prev.events.map(e => e.id === eventId ? { ...e, acknowledged: true } : e)
-    } : prev);
+    try {
+      await base44.functions.invoke('selfHeal', { action: 'acknowledge_event', event_id: eventId });
+      setData(prev => prev ? {
+        ...prev,
+        events: prev.events.map(e => e.id === eventId ? { ...e, acknowledged: true } : e)
+      } : prev);
+      setErrorMessage('');
+    } catch (e) {
+      setErrorMessage(e?.message || 'Failed to acknowledge incident');
+    }
   };
 
   const approveP = async (patchId) => {
-    await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: patchId });
-    await loadData();
+    try {
+      await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: patchId });
+      await loadData();
+      setErrorMessage('');
+    } catch (e) {
+      setErrorMessage(e?.message || 'Failed to approve patch proposal');
+    }
   };
 
   const rejectP = async (patchId) => {
-    await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: patchId });
-    await loadData();
+    try {
+      await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: patchId });
+      await loadData();
+      setErrorMessage('');
+    } catch (e) {
+      setErrorMessage(e?.message || 'Failed to reject patch proposal');
+    }
   };
 
   // Derive subsystem health from events
@@ -154,6 +178,12 @@ export default function SelfHealingCenter() {
           </div>
         </div>
 
+        {errorMessage && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-300">{errorMessage}</p>
+          </div>
+        )}
+
         {/* Pending patches banner */}
         {pendingPatches.length > 0 && (
           <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4 flex items-center justify-between">
@@ -161,7 +191,7 @@ export default function SelfHealingCenter() {
               <AlertTriangle className="w-5 h-5 text-violet-400" />
               <div>
                 <p className="font-semibold text-violet-200 text-sm">{pendingPatches.length} Fix{pendingPatches.length > 1 ? 'es' : ''} Available — Approval Required</p>
-                <p className="text-xs text-violet-400">Code changes detected. Review and approve to apply.</p>
+                <p className="text-xs text-violet-400">Proposal-only. Approvals require manual code application and deployment.</p>
               </div>
             </div>
             <Button size="sm" onClick={() => setTab('patches')} className="bg-violet-600 hover:bg-violet-700 text-white">
@@ -308,6 +338,11 @@ export default function SelfHealingCenter() {
                 </tbody>
               </table>
             </div>
+            {lastUpdatedAt && (
+              <p className="text-xs text-slate-500 mt-2">
+                Last refreshed: {new Date(lastUpdatedAt).toLocaleString()}
+              </p>
+            )}
           </TabsContent>
         </Tabs>
       </div>

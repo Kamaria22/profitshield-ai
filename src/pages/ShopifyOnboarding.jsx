@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/components/platformContext';
 
 const STEPS = [
   { id: 'welcome',    label: 'Welcome',    icon: Shield },
@@ -65,6 +64,7 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
     push_tags: true,
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const currentStepId = STEPS[step].id;
 
@@ -72,6 +72,7 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
 
   const finish = async () => {
     setSaving(true);
+    setSaveError('');
     try {
       if (tenantId) {
         // Mark onboarding complete
@@ -108,11 +109,12 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
           });
         }
       }
+      onComplete?.();
     } catch (e) {
       console.warn('[ShopifyOnboarding] Save error:', e.message);
+      setSaveError(e?.message || 'Failed to save onboarding settings. Please try again.');
     } finally {
       setSaving(false);
-      onComplete?.();
     }
   };
 
@@ -283,6 +285,9 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
                 {saving ? 'Saving...' : 'Open Dashboard'}
                 {!saving && <ArrowRight className="w-4 h-4 ml-1" />}
               </Button>
+              {saveError && (
+                <p className="text-xs text-red-400 mt-3">{saveError}</p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

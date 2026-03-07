@@ -13,8 +13,14 @@ const RISK_CONFIG = {
 export default function PatchBundleCard({ patch, onApprove, onReject }) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const risk = RISK_CONFIG[patch.risk_score] || RISK_CONFIG.MEDIUM;
+  const normalizedRisk = String(patch.risk_score || patch.severity || 'MEDIUM').toUpperCase();
+  const risk = RISK_CONFIG[normalizedRisk] || RISK_CONFIG.MEDIUM;
   const ago = patch.created_date ? formatDistanceToNow(new Date(patch.created_date), { addSuffix: true }) : '—';
+  const summary = patch.summary || patch.title || patch.details?.incident_summary || 'Patch proposal generated from incident signals.';
+  const fileList = Array.isArray(patch.files_json) && patch.files_json.length > 0
+    ? patch.files_json
+    : (patch.details?.files_json || []);
+  const diffList = Array.isArray(patch.diff_json) ? patch.diff_json : (patch.details?.diff_json || []);
 
   const handleApprove = async () => {
     setLoading(true);
@@ -33,11 +39,11 @@ export default function PatchBundleCard({ patch, onApprove, onReject }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <AlertTriangle className={`w-4 h-4 ${risk.color}`} />
-            <span className="font-semibold text-sm text-slate-100">Proposed Fix</span>
-            <Badge className={`text-xs ${risk.color} bg-transparent border-current`}>{patch.risk_score} RISK</Badge>
+            <span className="font-semibold text-sm text-slate-100">Patch Proposal</span>
+            <Badge className={`text-xs ${risk.color} bg-transparent border-current`}>{normalizedRisk} RISK</Badge>
             {patch.subsystem && <Badge className="text-xs bg-slate-700 text-slate-300 border-slate-600">{patch.subsystem}</Badge>}
           </div>
-          <p className="text-sm text-slate-200 mb-1">{patch.summary}</p>
+          <p className="text-sm text-slate-200 mb-1">{summary}</p>
           <p className="text-xs text-slate-500">{ago}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -53,16 +59,16 @@ export default function PatchBundleCard({ patch, onApprove, onReject }) {
 
       {expanded && (
         <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-          {(patch.files_json || []).map((f, i) => (
+          {fileList.map((f, i) => (
             <div key={i} className="text-xs bg-slate-900/50 rounded p-2">
               <span className="text-indigo-400 font-mono">{f.path}</span>
               <span className="text-slate-500 ml-2">[{f.action}]</span>
               {f.description && <p className="text-slate-400 mt-1">{f.description}</p>}
             </div>
           ))}
-          {patch.diff_json?.length > 0 && (
+          {diffList?.length > 0 && (
             <div className="text-xs text-slate-500 mt-2">
-              {patch.diff_json.length} change(s) proposed
+              {diffList.length} change(s) proposed
             </div>
           )}
         </div>
@@ -77,7 +83,7 @@ export default function PatchBundleCard({ patch, onApprove, onReject }) {
             className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1"
           >
             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-            Approve Fix
+            Approve Proposal
           </Button>
           <Button
             size="sm" variant="outline"
@@ -91,7 +97,7 @@ export default function PatchBundleCard({ patch, onApprove, onReject }) {
       )}
       {patch.status === 'approved' && (
         <div className="mt-2 flex items-center gap-2 text-xs text-emerald-400">
-          <CheckCircle className="w-3 h-3" /> Approved — apply code changes in the code editor
+          <CheckCircle className="w-3 h-3" /> Approved — manual application required in code workflow
         </div>
       )}
     </div>
