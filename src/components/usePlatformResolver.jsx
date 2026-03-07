@@ -296,7 +296,7 @@ export function usePlatformResolver() {
     // STEP 4: Lookup Integration
     // (Skipped in Shopify embedded short-circuit — tenantId already set)
     // =====================
-    if (platform && storeKey && !(chosenBy === 'shopify_embedded_persisted' && tenantId)) {
+    if (platform && storeKey && !(isShopifyEmbedded && tenantId)) {
       try {
         const integrations = await base44.entities.PlatformIntegration.filter({
           platform,
@@ -486,7 +486,7 @@ export function usePlatformResolver() {
     // attempt to resolve via Tenant.shop_domain directly (handles race condition right after OAuth).
     // Never gate Shopify users with approval screens.
     // =====================
-    if (!integration && urlParams.shop) {
+    if (!integration && urlParams.shop && !(isShopifyEmbedded && tenantId)) {
       const normalizedShop = urlParams.shop.toLowerCase().includes('.myshopify.com')
         ? urlParams.shop.toLowerCase().trim()
         : `${urlParams.shop.toLowerCase().trim()}.myshopify.com`;
@@ -563,7 +563,7 @@ export function usePlatformResolver() {
     // =====================
     // STEP 5: Lookup Tenant (if not already loaded)
     // =====================
-    if (tenantId && !tenant) {
+    if (tenantId && !tenant && !isShopifyEmbedded) {
       try {
         const tenants = await base44.entities.Tenant.filter({ id: tenantId });
         tenant = tenants[0] || null;
@@ -594,7 +594,7 @@ export function usePlatformResolver() {
     // =====================
     // STEP 7: Load Available Stores
     // =====================
-    if (tenantId && availableStores.length === 0) {
+    if (tenantId && availableStores.length === 0 && !isShopifyEmbedded) {
       try {
         availableStores = await base44.entities.PlatformIntegration.filter({
           tenant_id: tenantId,
@@ -612,14 +612,16 @@ export function usePlatformResolver() {
     // =====================
     let finalStatus;
 
-    // Shopify embedded short-circuit: tenantId was set from persisted context,
-    // integration lookup was skipped. Treat as RESOLVED if we have tenantId.
-    const isEmbeddedShortCircuit = chosenBy === 'shopify_embedded_persisted' && tenantId;
+    // Shopify embedded bootstrap: once session exchange/persisted context sets tenantId,
+    // treat startup as resolved and avoid Base44 entity bootstrap during initial load.
+    const isEmbeddedShortCircuit = isShopifyEmbedded && !!tenantId;
     
     if (isEmbeddedShortCircuit) {
       finalStatus = RESOLVER_STATUS.RESOLVED;
-      reason = 'shopify_embedded_shortcircuit';
-      trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, true, 'Embedded short-circuit resolved'));
+      reason = chosenBy === 'shopify_embedded_exchange'
+        ? 'shopify_embedded_exchange_resolved'
+        : 'shopify_embedded_shortcircuit';
+      trace.steps.push(traceStep(TRACE_STEP.FINAL_DECISION, { status: finalStatus, reason }, true, 'Embedded startup resolved without entity bootstrap'));
     } else if (integration && (integration.status === 'connected' || (isShopifyEmbedded && tenantId && integrationId))) {
       // In embedded mode: if we have tenantId+integrationId (even after heal), treat as resolved
       finalStatus = RESOLVER_STATUS.RESOLVED;
