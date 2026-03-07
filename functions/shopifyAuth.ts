@@ -35,7 +35,7 @@ function jsonResponse(body, status = 200) {
   return jsonSafe(body, status, shopifyHeaders());
 }
 
-Deno.serve(withEndpointGuard('shopifyAuth', async (req) => {
+const handler = withEndpointGuard('shopifyAuth', async (req) => {
   try {
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
@@ -87,7 +87,10 @@ Deno.serve(withEndpointGuard('shopifyAuth', async (req) => {
   } catch (error) {
     return jsonResponse({ error: error.message, stack: error.stack }, 500);
   }
-}, shopifyHeaders()));
+}, shopifyHeaders());
+
+Deno.serve(handler);
+export default handler;
 
 // ─────────────────────────────────────────────
 // GENERATE INSTALL URL

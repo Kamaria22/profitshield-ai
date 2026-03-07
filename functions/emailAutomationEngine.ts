@@ -43,7 +43,7 @@ async function alreadySentRecently(db, tenantId, recipient, eventType) {
   });
 }
 
-Deno.serve(async (req) => {
+const handler = async (req) => {
   let exec = null;
   let execDb = null;
   let execMeta = { action: 'status', tenantId: null, userRole: null, isScheduler: true };
@@ -173,4 +173,7 @@ Deno.serve(async (req) => {
     }
     return Response.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }
-});
+};
+
+Deno.serve(handler);
+export default handler;

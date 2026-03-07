@@ -107,7 +107,7 @@ async function runJob(base44, db, job) {
   return { ok: true, action: 'skipped_unknown_type' };
 }
 
-Deno.serve(async (req) => {
+const handler = async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole.entities;
@@ -182,4 +182,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ ok: false, error: error?.message || String(error) }, { status: 500 });
   }
-});
+};
+
+Deno.serve(handler);
+export default handler;

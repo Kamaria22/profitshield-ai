@@ -364,7 +364,7 @@ async function runFullWatchdog(db, user) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-Deno.serve(withEndpointGuard('selfHeal', async (req) => {
+const handler = withEndpointGuard('selfHeal', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole;
@@ -632,4 +632,7 @@ Deno.serve(withEndpointGuard('selfHeal', async (req) => {
     console.error('[selfHeal]', error.message, error.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
-}));
+});
+
+Deno.serve(handler);
+export default handler;

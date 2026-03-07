@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
-Deno.serve(withEndpointGuard('dashboardAI', async (req) => {
+const handler = withEndpointGuard('dashboardAI', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json().catch(() => ({}));
@@ -288,4 +288,7 @@ Provide:
     console.error('Dashboard AI error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-}));
+});
+
+Deno.serve(handler);
+export default handler;

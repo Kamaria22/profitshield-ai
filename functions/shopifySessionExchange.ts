@@ -181,7 +181,7 @@ function makeUnauthenticatedReq(originalReq) {
   });
 }
 
-Deno.serve(withEndpointGuard('shopifySessionExchange', async (req) => {
+const handler = withEndpointGuard('shopifySessionExchange', async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
@@ -367,4 +367,7 @@ Deno.serve(withEndpointGuard('shopifySessionExchange', async (req) => {
     console.error('[shopifySessionExchange] Unhandled error:', error.message, error.stack);
     return jsonResponse({ ok: false, fallback: true, reason: 'server_error' }, 200);
   }
-}, embeddedHeaders()));
+}, embeddedHeaders());
+
+Deno.serve(handler);
+export default handler;
