@@ -85,6 +85,8 @@ export default function Home() {
   };
   
   const tenant = resolver?.tenant || null;
+  const hasConnectedStore = !!authTenantId;
+  const tenantForGate = tenant || (hasConnectedStore ? { id: authTenantId } : null);
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
 
@@ -243,7 +245,7 @@ export default function Home() {
   }
 
   // No tenant state - instant
-  if (!tenant && !tenantLoading) {
+  if (!hasConnectedStore && !tenantLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center max-w-md">
@@ -293,7 +295,7 @@ export default function Home() {
   }
 
   return (
-    <SubscriptionGate tenant={tenant}>
+    <SubscriptionGate tenant={tenantForGate}>
       {tutorialOpen && (
         <OnboardingTutorial
           open={tutorialOpen}
