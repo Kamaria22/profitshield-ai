@@ -7,6 +7,21 @@ import { getPersistedContext } from '@/components/platformContext';
 const AuthContext = createContext();
 const LOGIN_REDIRECT_TTL_MS = 15000;
 
+async function withRetry(fn, attempts = 3, baseMs = 250) {
+  let lastError = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (i === attempts - 1) break;
+      const waitMs = Math.min(2000, baseMs * 2 ** i);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+  throw lastError;
+}
+
 function isShopifyEmbeddedContext() {
   if (typeof window === 'undefined') return false;
   try {
@@ -66,7 +81,11 @@ export const AuthProvider = ({ children }) => {
       });
       
       try {
-        const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
+        const publicSettings = await withRetry(
+          () => appClient.get(`/prod/public-settings/by-id/${appParams.appId}`),
+          2,
+          250
+        );
         setAppPublicSettings(publicSettings);
         
         // If we got the app public settings successfully, check if user is authenticated
@@ -123,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
+      const currentUser = await withRetry(() => base44.auth.me(), 2, 250);
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);

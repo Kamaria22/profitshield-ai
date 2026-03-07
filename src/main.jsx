@@ -121,6 +121,34 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_AUTH_ME_PATCHED__) {
 if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__) {
   window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__ = true
   const originalFetch = window.fetch.bind(window)
+  const retryableStatuses = new Set([429, 500, 502, 503, 504])
+
+  const shouldRetryApi = (url, method, status) => {
+    if (!url || !method) return false
+    const isApi = /\/api\/(functions|apps)\//.test(url)
+    const idempotent = method === 'GET' || method === 'HEAD'
+    return isApi && idempotent && retryableStatuses.has(Number(status || 0))
+  }
+
+  const fetchWithRetry = async (input, init, maxAttempts = 3) => {
+    const method = (init?.method || 'GET').toUpperCase()
+    const url = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input?.url || ''
+    let response = null
+    for (let i = 0; i < maxAttempts; i++) {
+      response = await originalFetch(input, init)
+      if (!shouldRetryApi(url, method, response.status) || i === maxAttempts - 1) {
+        return response
+      }
+      const waitMs = Math.min(2500, 250 * 2 ** i)
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+    }
+    return response
+  }
+
   window.fetch = async (input, init) => {
     const method = (init?.method || 'GET').toUpperCase()
     const url = typeof input === 'string'
@@ -139,7 +167,7 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__
         headers: { 'Content-Type': 'application/json' }
       })
     }
-    return originalFetch(input, init)
+    return fetchWithRetry(input, init)
   }
 }
 
