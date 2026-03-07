@@ -136,6 +136,9 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       }, { ok: false, fallback: true });
       const data = safe?.data || {};
       if (safe?.ok) return { data };
+      if ([404, 500, 502].includes(Number(safe?.status || 0))) {
+        throw new Error(`session_exchange_http_${safe?.status || 502}`);
+      }
       return { data: { ...data, error: data?.error || `session_exchange_http_${safe?.status || 502}` } };
     } catch (e) {
       console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e.message);
