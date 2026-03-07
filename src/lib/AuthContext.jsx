@@ -2,14 +2,22 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { getPersistedContext } from '@/components/platformContext';
 
 const AuthContext = createContext();
+const LOGIN_REDIRECT_TTL_MS = 15000;
 
 function isShopifyEmbeddedContext() {
   if (typeof window === 'undefined') return false;
   try {
     const p = new URLSearchParams(window.location.search);
-    return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+    if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) {
+      return true;
+    }
+    // Fallback: if embedded auth already resolved once, rely on persisted
+    // Shopify context to avoid re-entering Base44 auth.me() bootstrap.
+    const persisted = getPersistedContext(true);
+    return persisted?.platform === 'shopify' && !!persisted?.tenantId;
   } catch {
     return false;
   }
@@ -144,6 +152,24 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
+    // Guard against redirect loops on bare/root runtime loads without token context.
+    // In these cases, auto-redirecting to login can bounce repeatedly.
+    if (!appParams.token) {
+      console.warn('Skipping automatic login redirect: missing auth token context');
+      return;
+    }
+    try {
+      const key = `profitshield_login_redirect:${window.location.pathname}${window.location.search}`;
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem(key) || 0);
+      if (last && now - last < LOGIN_REDIRECT_TTL_MS) {
+        console.warn('Skipping automatic login redirect: throttled to prevent loop');
+        return;
+      }
+      sessionStorage.setItem(key, String(now));
+    } catch {
+      // Continue if sessionStorage is unavailable.
+    }
     // Use the SDK's redirectToLogin method
     base44.auth.redirectToLogin(window.location.href);
   };
