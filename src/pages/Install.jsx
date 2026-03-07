@@ -5,6 +5,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import createApp from '@shopify/app-bridge';
+import { Redirect } from '@shopify/app-bridge/actions';
+import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
+
+function redirectWithAppBridge(url) {
+  try {
+    if (!hasValidAppBridgeContext()) return false;
+    const params = new URLSearchParams(window.location.search);
+    const host = params.get('host');
+    const shop = params.get('shop');
+    const apiKey = window.__SHOPIFY_API_KEY__;
+    if (!host || !apiKey) throw new Error('missing_host_or_api_key');
+    const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
+    const app = createApp({
+      apiKey,
+      host,
+      shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
+      forceRedirect: true,
+    });
+    Redirect.create(app).dispatch(Redirect.Action.REMOTE, url);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function Install() {
   const [shopDomain, setShopDomain] = useState('');
@@ -29,7 +54,9 @@ export default function Install() {
       });
 
       if (data?.install_url) {
-        window.location.href = data.install_url;
+        if (!redirectWithAppBridge(data.install_url)) {
+          window.location.assign(data.install_url);
+        }
       } else {
         setError('Failed to generate install URL');
         setLoading(false);
