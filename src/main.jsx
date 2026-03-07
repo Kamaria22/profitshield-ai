@@ -143,6 +143,41 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__
   }
 }
 
+// Some SDK paths use XHR/axios transport instead of fetch. Guard the same
+// embedded-only /entities/User/me probe to avoid noisy 403 bootstrap errors.
+if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_XHR_GUARD__) {
+  window.__PS_EMBEDDED_USER_ME_XHR_GUARD__ = true
+  const nativeOpen = XMLHttpRequest.prototype.open
+  const nativeSend = XMLHttpRequest.prototype.send
+
+  XMLHttpRequest.prototype.open = function patchedOpen(method, url, ...rest) {
+    this.__psMethod = String(method || 'GET').toUpperCase()
+    this.__psUrl = typeof url === 'string' ? url : String(url || '')
+    this.__psShouldStub =
+      this.__psMethod === 'GET' &&
+      isEmbeddedRuntime() &&
+      hasEmbeddedShopifyContext() &&
+      /\/entities\/User\/me(?:\?|$)/.test(this.__psUrl)
+    return nativeOpen.call(this, method, url, ...rest)
+  }
+
+  XMLHttpRequest.prototype.send = function patchedSend(body) {
+    if (this.__psShouldStub) {
+      const payload = '{}'
+      queueMicrotask(() => {
+        Object.defineProperty(this, 'readyState', { configurable: true, value: 4 })
+        Object.defineProperty(this, 'status', { configurable: true, value: 200 })
+        Object.defineProperty(this, 'responseText', { configurable: true, value: payload })
+        Object.defineProperty(this, 'response', { configurable: true, value: payload })
+        this.onreadystatechange?.()
+        this.onload?.()
+      })
+      return
+    }
+    return nativeSend.call(this, body)
+  }
+}
+
 // Shopify App Bridge requires the PUBLIC API key (Client ID).
 // Set it in external JS (not inline HTML) so CSP can remain strict.
 if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
