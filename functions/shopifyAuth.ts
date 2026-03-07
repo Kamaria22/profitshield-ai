@@ -39,9 +39,13 @@ Deno.serve(withEndpointGuard('shopifyAuth', async (req) => {
   try {
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
+    const shopifyScopes = Deno.env.get('SHOPIFY_SCOPES');
     if (!envState.ok || !shopifyAppUrl) {
       const missing = [...envState.missing, ...(shopifyAppUrl ? [] : ['SHOPIFY_APP_URL|APP_URL'])];
       console.warn(`[shopifyAuth] Missing env vars: ${missing.join(',')}`);
+    }
+    if (!shopifyScopes) {
+      console.warn('[shopifyAuth] Missing env var: SHOPIFY_SCOPES');
     }
 
     const base44 = createClientFromRequest(req);

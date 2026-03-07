@@ -68,7 +68,7 @@ class StabilityAgent {
   }
 
   monitorStatus(status, meta = {}) {
-    if ([401, 403, 500, 502].includes(Number(status || 0))) {
+    if ([401, 403, 404, 500, 502].includes(Number(status || 0))) {
       this.logError('http_status_detected', new Error(`http_${status}`), meta);
       this.triggerSelfHealRetry(status, meta).catch(() => null);
     }
