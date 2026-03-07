@@ -69,7 +69,18 @@ export default function Integrations() {
   const location = useLocation();
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
-  const tenantId = resolverCheck.tenantId;
+  const persistedContext = getPersistedContext(true);
+  const isEmbeddedRuntime = (() => {
+    try {
+      const p = new URLSearchParams(location.search || '');
+      if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) return true;
+      if (persistedContext?.platform === 'shopify' && !!persistedContext?.tenantId) return true;
+      return window.top !== window.self;
+    } catch {
+      return true;
+    }
+  })();
+  const tenantId = resolverCheck.tenantId || (isEmbeddedRuntime ? persistedContext?.tenantId : null);
   const { status, user } = resolver;
   
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);

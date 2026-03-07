@@ -713,6 +713,28 @@ export function usePlatformResolver() {
   }, [resolve]);
 
   /**
+   * Re-resolve when persisted platform context changes.
+   * This is critical in embedded mode where ShopifyEmbeddedAuthGate persists
+   * tenant context asynchronously after initial mount.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const rerun = () => resolve();
+    const onStorage = (event) => {
+      if (!event?.key) return;
+      if (event.key === 'profitshield_ctx_active' || event.key.startsWith('profitshield_ctx::')) {
+        rerun();
+      }
+    };
+    window.addEventListener('profitshield:context-changed', rerun);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('profitshield:context-changed', rerun);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [resolve]);
+
+  /**
    * Manual store selection (P0 override)
    */
   const selectStore = useCallback(async (selectedIntegration) => {

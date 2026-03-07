@@ -861,10 +861,7 @@ class ErrorBoundary extends React.Component {
 }
 
 // Wrapper that captures resolver context for error boundary
-function LayoutWithErrorBoundary({ children, currentPageName }) {
-  // Get resolver to pass to error boundary
-  const resolver = usePlatformResolver() || {};
-  
+function LayoutWithErrorBoundary({ children, currentPageName, resolver = {} }) {
   // Build context for error boundary
   const resolverContext = useMemo(() => ({
     status: resolver.status,
@@ -948,7 +945,7 @@ function LayoutWithProviders({ children, currentPageName }) {
           </div>
         </div>
       }>
-        <LayoutWithErrorBoundary currentPageName={currentPageName}>
+        <LayoutWithErrorBoundary currentPageName={currentPageName} resolver={resolver}>
           {children}
         </LayoutWithErrorBoundary>
       </HealthErrorBoundary>
