@@ -15,6 +15,7 @@
  * Special: run_watchdog = runs full 30-min health check inline
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { withEndpointGuard } from './helpers/endpointSafety.ts';
 
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const API_VERSION = '2024-10';
@@ -363,7 +364,7 @@ async function runFullWatchdog(db, user) {
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('selfHeal', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole;
@@ -631,4 +632,4 @@ Deno.serve(async (req) => {
     console.error('[selfHeal]', error.message, error.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}));

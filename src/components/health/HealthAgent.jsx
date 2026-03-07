@@ -1,5 +1,6 @@
 import { getCachedRemoteConfig, refreshRemoteConfig } from './remoteConfig';
 import { publishError, publishIncident, SUBSYSTEMS } from '@/components/selfheal/IncidentBus';
+import { stabilityAgent } from '@/agents/StabilityAgent';
 
 function safeId() {
   return `inc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
@@ -170,13 +171,17 @@ export class HealthAgent {
     if (!cfg.enableIncidentUpload) return;
 
     try {
-      await fetch('/api/functions/incidentIngest', {
+      const result = await stabilityAgent.safeFetch('/api/functions/incidentIngest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ incident }),
-      });
-      console.info('[HealthAgent] incident uploaded', { id: incident.id });
+      }, { ok: false, fallback: true, error: 'incident_ingest_failed' });
+      if (result?.ok) {
+        console.info('[HealthAgent] incident uploaded', { id: incident.id });
+      } else {
+        console.warn('[HealthAgent] incident upload fallback', { id: incident.id, status: result?.status });
+      }
     } catch (e) {
       console.warn('[HealthAgent] incident upload failed', e);
     }

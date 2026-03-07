@@ -187,7 +187,7 @@ Deno.serve(withEndpointGuard('shopifySessionExchange', async (req) => {
   try {
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     if (!envState.ok) {
-      return jsonResponse({ error: `Missing env: ${envState.missing.join(',')}`, reason: 'env_missing' }, 500);
+      console.warn(`[shopifySessionExchange] Missing env vars: ${envState.missing.join(',')}`);
     }
 
     // PUBLIC ENDPOINT — use asServiceRole so no Base44 user session is required.
@@ -364,6 +364,6 @@ Deno.serve(withEndpointGuard('shopifySessionExchange', async (req) => {
 
   } catch (error) {
     console.error('[shopifySessionExchange] Unhandled error:', error.message, error.stack);
-    return jsonResponse({ error: error.message, reason: 'server_error' }, 500);
+    return jsonResponse({ ok: false, fallback: true, reason: 'server_error' }, 200);
   }
 }, embeddedHeaders()));

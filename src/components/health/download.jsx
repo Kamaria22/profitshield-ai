@@ -1,3 +1,5 @@
+import { stabilityAgent } from '@/agents/StabilityAgent';
+
 export async function downloadViaProxy(args) {
   const isDev = window.location.hostname === 'localhost' || window.location.hostname.includes('dev');
   
@@ -10,12 +12,16 @@ export async function downloadViaProxy(args) {
   }
   
   try {
-    const res = await fetch('/api/functions/demoVideoProxyDownload', {
+    const result = await stabilityAgent.safeFetch('/api/functions/demoVideoProxyDownload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ jobId: args.jobId, format: args.variant }),
-    });
+    }, { ok: false, fallback: true, error: 'download_proxy_failed' });
+    const res = result?.response;
+    if (!res) {
+      return { ok: false, fallback: true, error: result?.data?.error || 'No response from proxy' };
+    }
 
     const contentType = res.headers.get('content-type') || '';
     const contentLength = res.headers.get('content-length') || '0';

@@ -41,7 +41,7 @@ Deno.serve(withEndpointGuard('shopifyAuth', async (req) => {
     const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
     if (!envState.ok || !shopifyAppUrl) {
       const missing = [...envState.missing, ...(shopifyAppUrl ? [] : ['SHOPIFY_APP_URL|APP_URL'])];
-      return jsonResponse({ error: `Missing env: ${missing.join(',')}` }, 500);
+      console.warn(`[shopifyAuth] Missing env vars: ${missing.join(',')}`);
     }
 
     const base44 = createClientFromRequest(req);
@@ -94,7 +94,7 @@ async function generateInstallUrl(shop) {
   const shopDomain = shop.includes('.myshopify.com') ? shop.toLowerCase() : `${shop.toLowerCase()}.myshopify.com`;
   const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
   // CANONICAL APP URL — use base44.app, NEVER profit-shield-ai.com
-  let appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+  let appUrl = (Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
   if (appUrl.includes('profit-shield-ai.com')) {
     appUrl = 'https://profit-shield-ai.base44.app';
   }
@@ -150,7 +150,7 @@ async function handleCallback(base44, body) {
     const apiKey = Deno.env.get('SHOPIFY_API_KEY') || '';
     const apiSecret = Deno.env.get('SHOPIFY_API_SECRET') || '';
     // CANONICAL APP URL — use base44.app, NEVER profit-shield-ai.com
-    let appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+    let appUrl = (Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
     if (appUrl.includes('profit-shield-ai.com')) {
       appUrl = 'https://profit-shield-ai.base44.app';
     }

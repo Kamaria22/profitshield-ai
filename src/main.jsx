@@ -4,6 +4,7 @@ import App from '@/App.jsx'
 import '@/index.css'
 import { getPersistedContext } from '@/components/platformContext'
 import { base44 } from '@/api/base44Client'
+import { stabilityAgent } from '@/agents/StabilityAgent'
 
 function normalizeShop(shop) {
   if (!shop || typeof shop !== 'string') return null
@@ -139,7 +140,21 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__
         : input?.url || ''
     let response = null
     for (let i = 0; i < maxAttempts; i++) {
-      response = await originalFetch(input, init)
+      try {
+        response = await originalFetch(input, init)
+      } catch (error) {
+        if (i === maxAttempts - 1) {
+          stabilityAgent.logError('global_fetch_network', error, { url, method })
+          return new Response(JSON.stringify({ ok: false, fallback: true, reason: 'network_error' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        }
+        const waitMs = Math.min(2500, 250 * 2 ** i)
+        await new Promise((resolve) => setTimeout(resolve, waitMs))
+        continue
+      }
+      stabilityAgent.monitorStatus(response.status, { url, method })
       if (!shouldRetryApi(url, method, response.status) || i === maxAttempts - 1) {
         return response
       }
@@ -169,6 +184,10 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__
     }
     return fetchWithRetry(input, init)
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.__PS_STABILITY_AGENT__ = stabilityAgent
 }
 
 // Some SDK paths use XHR/axios transport instead of fetch. Guard the same

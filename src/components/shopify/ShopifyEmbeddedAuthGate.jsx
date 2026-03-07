@@ -18,6 +18,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getFreshAppBridgeToken, hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
+import { stabilityAgent } from '@/agents/StabilityAgent';
 import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
 import createApp from '@shopify/app-bridge';
@@ -128,20 +129,27 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
 
     // Primary path: explicit public function endpoint
     try {
-      const res = await fetch('/api/functions/shopifySessionExchange', {
+      const safe = await stabilityAgent.safeFetch('/api/functions/shopifySessionExchange', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) return { data };
-      return { data: { ...data, error: data?.error || `session_exchange_http_${res.status}` } };
+      }, { ok: false, fallback: true });
+      const data = safe?.data || {};
+      if (safe?.ok) return { data };
+      return { data: { ...data, error: data?.error || `session_exchange_http_${safe?.status || 502}` } };
     } catch (e) {
       console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e.message);
     }
 
     // Fallback path: Base44 SDK invoke
-    return base44.functions.invoke('shopifySessionExchange', payload);
+    try {
+      return await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
+        attempts: 2,
+        baseDelayMs: 300
+      });
+    } catch {
+      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
+    }
   }
 
   async function runAuth() {

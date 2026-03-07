@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
-Deno.serve(async (req) => {
+Deno.serve(withEndpointGuard('dashboardAI', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json().catch(() => ({}));
@@ -60,10 +61,14 @@ Deno.serve(async (req) => {
     }
 
     // Fetch orders for analysis
-    const orders = await base44.asServiceRole.entities.Order.filter(
-      { tenant_id }, 
-      '-order_date', 
-      1000
+    const orders = await safeFilter(
+      () => base44.asServiceRole.entities.Order.filter(
+        { tenant_id },
+        '-order_date',
+        1000
+      ),
+      [],
+      'dashboardAI.orders'
     );
 
     const now = new Date();
@@ -200,7 +205,7 @@ Provide a concise, helpful answer. Use specific numbers when possible. If the qu
         }
       });
 
-      return Response.json({ success: true, ...response });
+      return Response.json({ success: true, ...(response || { answer: 'No response available', confidence: 'low', related_metrics: [] }) });
     }
 
     // Generate AI trends and insights
@@ -276,11 +281,11 @@ Provide:
       metrics: { current, previous },
       anomalies: anomalies.slice(0, 10),
       daily_stats: { revenue: revenueStats, profit: profitStats, orders: ordersStats },
-      ...aiResponse
+      ...(aiResponse || {})
     });
 
   } catch (error) {
     console.error('Dashboard AI error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}));
