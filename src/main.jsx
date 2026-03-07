@@ -115,6 +115,34 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_AUTH_ME_PATCHED__) {
   }
 }
 
+// Some SDK/bootstrap paths can still attempt GET /entities/User/me before
+// embedded session exchange completes. In Shopify iframe mode, fail this call
+// closed (local no-op response) so startup doesn't depend on Base44 login.
+if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__) {
+  window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__ = true
+  const originalFetch = window.fetch.bind(window)
+  window.fetch = async (input, init) => {
+    const method = (init?.method || 'GET').toUpperCase()
+    const url = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input?.url || ''
+    if (
+      method === 'GET' &&
+      isEmbeddedRuntime() &&
+      hasEmbeddedShopifyContext() &&
+      /\/entities\/User\/me(?:\?|$)/.test(url)
+    ) {
+      return new Response('{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    return originalFetch(input, init)
+  }
+}
+
 // Shopify App Bridge requires the PUBLIC API key (Client ID).
 // Set it in external JS (not inline HTML) so CSP can remain strict.
 if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
