@@ -93,11 +93,15 @@ export function hasValidAppBridgeContext() {
   if (!host || !apiKey) return false;
   if (!isIframeContext()) return false;
 
-  // Prevent App Bridge bootstrap when the rendered frontend origin
-  // does not match the Shopify App URL origin (e.g. worker -> base44 redirect).
+  // Guardrail for explicit configured origins. If mismatched, do not hard-fail:
+  // stale deploy config can otherwise disable App Bridge inside Shopify Admin.
+  // We rely on iframe + host/referrer checks below as primary validity signals.
   const configuredOrigin = getConfiguredAppUrlOrigin();
   if (configuredOrigin && window.location.origin !== configuredOrigin) {
-    return false;
+    console.warn('[AB] Configured origin mismatch; continuing with Shopify context checks', {
+      configuredOrigin,
+      currentOrigin: window.location.origin,
+    });
   }
 
   const hostOrigin = getHostOrigin();

@@ -133,7 +133,7 @@ async function generateInstallUrl(shop) {
 // ─────────────────────────────────────────────
 
 async function handleCallback(base44, body) {
-  const { code, hmac, shop, state } = body;
+  const { code, hmac, shop, state, host } = body;
 
   if (!code || !shop) {
     return jsonResponse({ error: 'Missing OAuth code or shop parameter' }, 400);
@@ -303,8 +303,19 @@ async function handleCallback(base44, body) {
       category: 'integration'
     }).catch(() => {});
 
-    // Return redirect URL for embedded or non-embedded context
-    const redirectUrl = `${appUrl}/Home?shop=${encodeURIComponent(storeKey)}`;
+    // Return redirect URL for embedded or non-embedded context.
+    // Preserve host+embedded so frontend stays in Shopify embedded auth path.
+    const redirectParams = new URLSearchParams({
+      shop: storeKey
+    });
+    // Always force embedded context after OAuth callback.
+    // host may be absent on some callback paths; ShopifyEmbeddedAuthGate can
+    // still complete via shop-only session exchange when embedded=1 is present.
+    if (host) {
+      redirectParams.set('host', host);
+    }
+    redirectParams.set('embedded', '1');
+    const redirectUrl = `${appUrl}/Home?${redirectParams.toString()}`;
 
     console.log(`[shopifyAuth/handleCallback] OAuth complete — redirecting to: ${redirectUrl}`);
 

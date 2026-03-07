@@ -29,6 +29,25 @@ function redirectWithAppBridge(url) {
   }
 }
 
+function withEmbeddedParams(rawUrl) {
+  try {
+    const current = new URLSearchParams(window.location.search);
+    const target = new URL(rawUrl, window.location.origin);
+    if (!target.searchParams.get('shop') && current.get('shop')) {
+      target.searchParams.set('shop', current.get('shop'));
+    }
+    if (!target.searchParams.get('host') && current.get('host')) {
+      target.searchParams.set('host', current.get('host'));
+    }
+    if (!target.searchParams.get('embedded')) {
+      target.searchParams.set('embedded', '1');
+    }
+    return target.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 export default function ShopifyCallback() {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
@@ -75,7 +94,7 @@ export default function ShopifyCallback() {
         // Use redirect_url from backend (includes shop context)
         // Fallback to Home if not provided
         setTimeout(() => {
-          const redirectUrl = data.redirect_url || '/Home';
+          const redirectUrl = withEmbeddedParams(data.redirect_url || '/Home');
           console.log('[ShopifyCallback] Redirecting to:', redirectUrl);
           try {
             if (!redirectWithAppBridge(redirectUrl)) {
