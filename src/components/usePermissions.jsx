@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { base44 } from '@/api/base44Client';
+import { getPersistedContext } from '@/components/platformContext';
 
 // Default permissions for built-in roles
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -136,7 +137,11 @@ export function PermissionsProvider({ children }) {
     const isEmbedded = (() => {
       try {
         const p = new URLSearchParams(window.location.search);
-        return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+        if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) {
+          return true;
+        }
+        const persisted = getPersistedContext(true);
+        return persisted?.platform === 'shopify' && !!persisted?.tenantId;
       } catch { return false; }
     })();
 
