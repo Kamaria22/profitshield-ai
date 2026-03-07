@@ -171,7 +171,14 @@ export function usePlatformResolver() {
     // When running inside Shopify Admin iframe, derive context from URL params first,
     // then persisted context. Never requires Base44 auth session.
     // =====================
-    const isShopifyEmbedded = !!(urlParams.shop && (urlParams.host || urlParams.embedded === '1'));
+    const hasPersistedEmbeddedShopifyContext =
+      hasValidContext(persisted) &&
+      persisted.platform === 'shopify' &&
+      !!persisted.tenantId;
+    const isShopifyEmbedded = !!(
+      (urlParams.shop && (urlParams.host || urlParams.embedded === '1')) ||
+      hasPersistedEmbeddedShopifyContext
+    );
     const embeddedShop = isShopifyEmbedded
       ? (urlParams.shop?.toLowerCase().includes('.myshopify.com')
           ? urlParams.shop.toLowerCase()
@@ -182,7 +189,7 @@ export function usePlatformResolver() {
       isShopifyEmbedded,
       shop: embeddedShop,
       host: urlParams.host || null,
-      has_persisted: hasValidContext(persisted) && !!persisted.tenantId
+      has_persisted: hasPersistedEmbeddedShopifyContext
     }, true, isShopifyEmbedded ? 'Embedded context detected from URL' : 'Not embedded'));
 
     if (isShopifyEmbedded && hasValidContext(persisted) && persisted.tenantId) {
