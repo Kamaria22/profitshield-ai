@@ -22,7 +22,9 @@ function redirectWithAppBridge(url) {
       shopOrigin: normalizedShop ? `https://${normalizedShop}` : undefined,
       forceRedirect: true,
     });
-    Redirect.create(app).dispatch(Redirect.Action.APP, url);
+    const target = new URL(url, window.location.origin);
+    const appPath = `${target.pathname}${target.search}${target.hash}`;
+    Redirect.create(app).dispatch(Redirect.Action.APP, appPath);
     return true;
   } catch {
     return false;
@@ -42,7 +44,9 @@ function withEmbeddedParams(rawUrl) {
     if (!target.searchParams.get('embedded')) {
       target.searchParams.set('embedded', '1');
     }
-    return target.toString();
+    // Keep embedded callback handoff on the current app origin to avoid
+    // cross-origin redirect loops when backend redirect_url is absolute.
+    return `${target.pathname}${target.search}${target.hash}`;
   } catch {
     return rawUrl;
   }
