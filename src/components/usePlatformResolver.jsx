@@ -185,14 +185,32 @@ export function usePlatformResolver() {
           : urlParams.shop ? `${urlParams.shop.toLowerCase()}.myshopify.com` : null)
       : null;
 
+    const persistedShopMismatch =
+      !!(embeddedShop && persisted?.storeKey && persisted.storeKey !== embeddedShop);
+
     trace.steps.push(traceStep('embedded_detection', {
       isShopifyEmbedded,
       shop: embeddedShop,
       host: urlParams.host || null,
-      has_persisted: hasPersistedEmbeddedShopifyContext
+      has_persisted: hasPersistedEmbeddedShopifyContext,
+      persisted_store_key: persisted?.storeKey || null,
+      persisted_shop_mismatch: persistedShopMismatch
     }, true, isShopifyEmbedded ? 'Embedded context detected from URL' : 'Not embedded'));
 
-    if (isShopifyEmbedded && hasValidContext(persisted) && persisted.tenantId) {
+    // Auto-heal stale embedded context bleed across stores.
+    // If URL shop and persisted shop disagree, discard persisted tenant context
+    // and force fresh session exchange for the current shop.
+    if (persistedShopMismatch) {
+      clearContext();
+      trace.steps.push(traceStep(
+        'embedded_persisted_mismatch',
+        { embedded_shop: embeddedShop, persisted_store_key: persisted.storeKey },
+        false,
+        'Cleared stale persisted Shopify context due to shop mismatch'
+      ));
+    }
+
+    if (isShopifyEmbedded && hasValidContext(persisted) && persisted.tenantId && !persistedShopMismatch) {
       // Fast path: resolve directly from persisted Shopify context (preferred — no extra API call)
       platform = 'shopify';
       storeKey = persisted.storeKey || embeddedShop;
