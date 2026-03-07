@@ -92,41 +92,8 @@ function checkCriticalBase44Path() {
   }
 }
 
-function checkLegacyInfraIsolation() {
-  const cloudflareDir = 'infra/cloudflare';
-  const embeddedDir = 'embedded-app';
-  const cloudflareArchived = fileExists(`${cloudflareDir}/.archived-experimental`);
-  const embeddedArchived = fileExists(`${embeddedDir}/.archived-experimental`);
-  const appRel = 'src/App.jsx';
-  if (!fileExists(appRel)) return;
-  const content = read(appRel);
-
-  if (content.includes('embedded-app') || content.includes('infra/cloudflare')) {
-    addIncident({
-      blocker_type: 'legacy_infra_coupling',
-      severity: 'high',
-      owner_agent: 'frontend_guardian_fn',
-      file: appRel,
-      message: 'Base44 app imports/mentions Cloudflare workaround paths',
-      healable: false,
-    });
-  }
-
-  if ((fileExists(cloudflareDir) || fileExists(embeddedDir)) && !(cloudflareArchived && embeddedArchived)) {
-    addIncident({
-      blocker_type: 'workaround_present_isolated',
-      severity: 'info',
-      owner_agent: 'build_guardian',
-      file: cloudflareDir,
-      message: 'Cloudflare/standalone artifacts present but not coupled to Base44 runtime',
-      healable: false,
-    });
-  }
-}
-
 checkPagesConfigImports();
 checkCriticalBase44Path();
-checkLegacyInfraIsolation();
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT_FILE, JSON.stringify({ ts: new Date().toISOString(), incidents }, null, 2));

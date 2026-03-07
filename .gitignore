@@ -1,11 +1,6 @@
 #env
 .env
 
-# archived experimental runtime (not active Base44 path)
-embedded-app/node_modules/
-embedded-app/dist/
-embedded-app/.env.production
-embedded-app/package-lock.json
 .guard/
 .env.*
 
