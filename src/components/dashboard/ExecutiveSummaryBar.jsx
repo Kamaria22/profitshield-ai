@@ -24,6 +24,8 @@ export default function ExecutiveSummaryBar({
   metrics = {}, 
   onSync, 
   onScan,
+  onExport,
+  onSecurity,
   syncing = false,
   isDemo = false 
 }) {
@@ -110,11 +112,11 @@ export default function ExecutiveSummaryBar({
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync Now'}
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem onClick={onExport} className="gap-2">
               <Download className="w-4 h-4" />
               Export Report
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem onClick={onSecurity} className="gap-2">
               <Lock className="w-4 h-4" />
               Security Center
             </DropdownMenuItem>

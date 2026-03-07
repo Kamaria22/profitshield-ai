@@ -137,7 +137,7 @@ export default function Home() {
         alerts
       };
     },
-    enabled: canQuery && !isEmbedded,
+    enabled: canQuery,
     staleTime: 60000,
     gcTime: 120000,
     refetchOnMount: false,
@@ -153,7 +153,7 @@ export default function Home() {
         is_resolved: false 
       }, '-impact_amount', 5);
     },
-    enabled: canQuery && !!dashboardSummary && !isEmbedded,
+    enabled: canQuery && !!dashboardSummary,
     staleTime: 120000,
     gcTime: 300000,
     refetchOnMount: false,
@@ -162,7 +162,7 @@ export default function Home() {
 
   // Real-time dashboard freshness: webhook/order updates should refresh dashboard data.
   useEffect(() => {
-    if (!authTenantId || isEmbedded) return;
+    if (!authTenantId) return;
 
     let timer = null;
     const scheduleRefresh = () => {
@@ -200,7 +200,7 @@ export default function Home() {
         try { fn(); } catch (_) {}
       });
     };
-  }, [authTenantId, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
+  }, [authTenantId, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Extract from summary for immediate display
   const isDemoMode = dashboardSummary?.isDemoMode ?? true;
@@ -235,8 +235,16 @@ export default function Home() {
 
   const handleSync = useCallback(() => syncMutation.mutate(), [syncMutation]);
   const handleScan = useCallback(() => {
-    toast.info('Running profit scan...');
-  }, []);
+    if (!syncMutation.isPending) {
+      syncMutation.mutate();
+    }
+  }, [syncMutation]);
+  const handleExport = useCallback(() => {
+    navigate(createPageUrl('PnLAnalytics'));
+  }, [navigate]);
+  const handleSecurity = useCallback(() => {
+    navigate(createPageUrl('Intelligence'));
+  }, [navigate]);
 
   // Minimal blocking state
   if (tenantLoading) {
@@ -315,6 +323,8 @@ export default function Home() {
           metrics={metrics}
           onSync={handleSync}
           onScan={handleScan}
+          onExport={handleExport}
+          onSecurity={handleSecurity}
           syncing={syncMutation.isPending}
           isDemo={isDemoMode}
         />
