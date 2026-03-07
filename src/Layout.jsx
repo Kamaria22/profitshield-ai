@@ -346,7 +346,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   
   // Safe permissions
   const permissionsData = usePermissions() || {};
-  const { hasPermission = () => true, role = null, user: permUser = null } = permissionsData;
+  const { hasPermission = () => true, role: permissionRole = null, user: permUser = null } = permissionsData;
   
   // Platform resolver - single source of truth
   const resolverCheck = requireResolved(resolver || {});
@@ -364,6 +364,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   // Derived values needed for hooks
   const activeUser = user || permUser;
   const isAdmin = isUserAdmin(activeUser);
+  const roleLabel = typeof permissionRole === 'string' && permissionRole.trim()
+    ? permissionRole
+    : (activeUser?.app_role || activeUser?.role || '');
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Memoized nav items
@@ -659,7 +662,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                         {activeUser.full_name || 'User'}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{activeUser.email || ''}</p>
-                      {role && (
+                      {roleLabel && (
                         <span className="inline-block text-xs font-medium px-1.5 py-0 rounded mt-0.5 capitalize"
                           style={{
                             background:'rgba(99,102,241,0.18)',
@@ -667,7 +670,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                             color:'#a5b4fc',
                             textShadow:'0 0 8px rgba(129,140,248,0.5)'
                           }}>
-                          {role}
+                          {roleLabel}
                         </span>
                       )}
                     </div>

@@ -124,17 +124,20 @@ export default function ShopifyNavMenu({ isAdmin = false }) {
       });
 
       // Subscribe to navigation events from App Bridge
-      menu.subscribe(NavigationMenu.Action.APP_LINK_CLICK, (data) => {
-        const url = data?.destination;
-        if (!url) return;
-        // Use History API for SPA navigation
-        try {
-          window.history.pushState({}, '', url);
-          window.dispatchEvent(new PopStateEvent('popstate'));
-        } catch {
-          window.location.assign(url);
-        }
-      });
+      const appLinkClickAction = NavigationMenu?.Action?.APP_LINK_CLICK;
+      if (typeof appLinkClickAction === 'string' && appLinkClickAction) {
+        menu.subscribe(appLinkClickAction, (data) => {
+          const url = data?.destination;
+          if (!url) return;
+          // Use History API for SPA navigation
+          try {
+            window.history.pushState({}, '', url);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          } catch {
+            window.location.assign(url);
+          }
+        });
+      }
 
       menuRef.current = menu;
       console.log('[ShopifyNavMenu] Navigation menu registered with', items.length, 'items');
