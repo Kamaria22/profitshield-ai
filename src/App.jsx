@@ -1,9 +1,10 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -16,8 +17,39 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
+const AUTH_REDIRECT_TTL_MS = 15000;
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const location = useLocation();
+  const [redirectBlocked, setRedirectBlocked] = useState(false);
+  const isEmbedded = useMemo(() => {
+    const p = new URLSearchParams(location.search || '');
+    return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+  }, [location.search]);
+
+  useEffect(() => {
+    if (authError?.type !== 'auth_required') return;
+    if (isEmbedded) return;
+
+    const pathKey = `${location.pathname}${location.search}`;
+    const storageKey = `profitshield_auth_redirect:${pathKey}`;
+    const now = Date.now();
+
+    try {
+      const last = Number(sessionStorage.getItem(storageKey) || 0);
+      if (last && now - last < AUTH_REDIRECT_TTL_MS) {
+        setRedirectBlocked(true);
+        return;
+      }
+      sessionStorage.setItem(storageKey, String(now));
+    } catch {
+      // Ignore storage failures and proceed with a single redirect attempt.
+    }
+
+    setRedirectBlocked(false);
+    navigateToLogin();
+  }, [authError?.type, isEmbedded, location.pathname, location.search, navigateToLogin]);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -33,9 +65,18 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
+      if (redirectBlocked) {
+        return (
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <div className="text-sm text-slate-600">Authentication retry paused to prevent redirect loop. Refresh to try again.</div>
+          </div>
+        );
+      }
+      return (
+        <div className="fixed inset-0 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+        </div>
+      );
     }
   }
 
@@ -100,6 +141,21 @@ const AuthenticatedApp = () => {
       <Route path="/billing" element={
         <LayoutWrapper currentPageName="Billing">
           <Pages.Billing />
+        </LayoutWrapper>
+      } />
+      <Route path="/integrations" element={
+        <LayoutWrapper currentPageName="Integrations">
+          <Pages.Integrations />
+        </LayoutWrapper>
+      } />
+      <Route path="/intelligence" element={
+        <LayoutWrapper currentPageName="Intelligence">
+          <Pages.Intelligence />
+        </LayoutWrapper>
+      } />
+      <Route path="/settings" element={
+        <LayoutWrapper currentPageName="Settings">
+          <Pages.Settings />
         </LayoutWrapper>
       } />
       <Route path="/helpcenter" element={
