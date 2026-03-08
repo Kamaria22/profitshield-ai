@@ -162,7 +162,7 @@ export default function Home() {
           const { data } = await invokeWithRetry('dashboardAI', {
             action: 'embedded_summary',
             tenant_id: queryFilter.tenant_id,
-          }, { attempts: 4, baseMs: 400 });
+          }, { attempts: 1, baseMs: 200 });
           if (!data?.success) {
             throw new Error(data?.error || 'Failed to load embedded dashboard summary');
           }
@@ -170,8 +170,9 @@ export default function Home() {
         } catch (error) {
           const msg = String(error?.message || '');
           const isRateLimited = msg.includes('429') || msg.toLowerCase().includes('rate limit');
+          const isMissingDeployment = msg.includes('404') || msg.toLowerCase().includes('deployment does not exist');
           const cached = queryClient.getQueryData(dashboardSummaryKey);
-          if (cached && isRateLimited) {
+          if (cached && (isRateLimited || isMissingDeployment)) {
             return { ...cached, fallback: true, fallback_source: 'cached_summary' };
           }
           return await fetchEntitySummary(queryFilter.tenant_id);
