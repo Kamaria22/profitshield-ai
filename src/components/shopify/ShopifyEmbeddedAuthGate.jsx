@@ -127,27 +127,10 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       shop: shopDomain,
     };
 
-    // Primary path: explicit public function endpoint
-    try {
-      const safe = await stabilityAgent.safeFetch('/api/functions/shopifySessionExchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(payload),
-      }, { ok: false, fallback: true });
-      const data = safe?.data || {};
-      if (safe?.ok) return { data };
-      if ([404, 500, 502].includes(Number(safe?.status || 0))) {
-        throw new Error(`session_exchange_http_${safe?.status || 502}`);
-      }
-      return { data: { ...data, error: data?.error || `session_exchange_http_${safe?.status || 502}` } };
-    } catch (e) {
-      console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e.message);
-    }
-
-    // Fallback path: Base44 SDK invoke
+    // Base44 SDK invoke path avoids deployment-specific /api/functions route differences.
     try {
       const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
-        attempts: 2,
+        attempts: 3,
         baseDelayMs: 300
       });
       if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
