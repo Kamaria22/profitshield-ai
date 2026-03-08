@@ -1,0 +1,17 @@
+{
+  "name": "ProfitShield AI",
+  "short_name": "ProfitShield",
+  "description": "AI-powered profit intelligence, fraud protection, and automation for Shopify merchants.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "https://base44.com/logo_v2.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+

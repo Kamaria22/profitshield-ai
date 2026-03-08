@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://profit-shield-ai.base44.app/sitemap.xml
+

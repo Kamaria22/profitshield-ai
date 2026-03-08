@@ -20,6 +20,7 @@ import FrontendGuardian from '@/components/FrontendGuardian';
 import { HealthErrorBoundary } from '@/components/health/HealthErrorBoundary';
 import { LanguageProvider } from '@/components/i18n/LanguageContext';
 import LanguageSelector from '@/components/i18n/LanguageSelector';
+import SeoMeta from '@/components/seo/SeoMeta';
 
 // PERFORMANCE: Defer non-critical components - loaded after idle
 const MerchantAIChat = lazy(() => import('@/components/merchant/MerchantAIChat'));
@@ -511,6 +512,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      <SeoMeta currentPageName={currentPageName} pathname={location.pathname} />
       {/* Shopify App Bridge Navigation Menu */}
       {detectEmbedded() && isResolved && (
         <ShopifyNavMenu isAdmin={isAdmin} />
