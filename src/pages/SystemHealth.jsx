@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';
+import { invokeWithRetry } from '@/lib/safeApi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -95,11 +96,23 @@ export default function SystemHealth() {
   });
 
   const runSupportGuardian = useMutation({
-    mutationFn: () => base44.functions.invoke('supportGuardian', { action: 'run_watchdog', manual: true })
+    mutationFn: () => invokeWithRetry('supportGuardian', { action: 'run_watchdog', manual: true }, { attempts: 2, baseMs: 300 })
   });
 
   const runProfitAlertWatchdog = useMutation({
-    mutationFn: () => base44.functions.invoke('profitAlertWatchdog', { manual: true })
+    mutationFn: async () => {
+      try {
+        return await invokeWithRetry('profitAlertWatchdog', { manual: true }, { attempts: 2, baseMs: 400 });
+      } catch (error) {
+        const status = Number(error?.status || error?.response?.status || 0);
+        const msg = String(error?.message || '').toLowerCase();
+        const missing = status === 404 || msg.includes('deployment does not exist');
+        if (missing && queryFilter?.tenant_id) {
+          return invokeWithRetry('checkProfitAlerts', { tenant_id: queryFilter.tenant_id }, { attempts: 2, baseMs: 400 });
+        }
+        throw error;
+      }
+    }
   });
 
   const activeIncidentCount = selfHealEvents.filter((e) => e.fix_result !== 'success').length;

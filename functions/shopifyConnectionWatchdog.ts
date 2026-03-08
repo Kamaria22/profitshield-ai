@@ -18,6 +18,11 @@ const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app
 const WEBHOOK_ENDPOINT_CANONICAL = `${APP_URL}/api/functions/shopifyWebhook`;
 const REQUIRED_TOPICS = ['orders/create','orders/updated','orders/paid','orders/cancelled','refunds/create','products/update','app/uninstalled'];
 
+function isMissingFunctionDeployment(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('deployment does not exist') || msg.includes('not found') || msg.includes('404');
+}
+
 async function decryptToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');
   if (!key) { try { return atob(encryptedToken); } catch { return null; } }
@@ -244,7 +249,13 @@ Deno.serve(async (req) => {
           result.auto_sync_skipped = true;
         } else {
           try {
-            await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
+            try {
+              await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
+            } catch (syncOrdersErr) {
+              if (!isMissingFunctionDeployment(syncOrdersErr)) throw syncOrdersErr;
+              await db.functions.invoke('syncShopifyData', { tenant_id: tenantId, days: 1 });
+              result.auto_sync_fallback = 'syncShopifyData';
+            }
             result.auto_sync_triggered = true;
             console.log(`[watchdog] Auto-sync triggered for tenant ${tenantId}`);
           } catch (syncErr) {

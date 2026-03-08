@@ -116,6 +116,53 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_AUTH_ME_PATCHED__) {
   }
 }
 
+function extractStatusFromError(error) {
+  const direct = error?.status || error?.response?.status || error?.data?.status;
+  if (Number.isFinite(Number(direct))) return Number(direct);
+  const msg = String(error?.message || '');
+  const m = msg.match(/\b(4\d\d|5\d\d)\b/);
+  return m ? Number(m[1]) : null;
+}
+
+function isDeploymentMissingError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('deployment does not exist') || msg.includes('not found');
+}
+
+// Global invoke hardening for known unstable/missing function deployments.
+if (typeof window !== 'undefined' && !window.__PS_FUNCTION_INVOKE_GUARD__) {
+  window.__PS_FUNCTION_INVOKE_GUARD__ = true;
+  const originalInvoke = base44?.functions?.invoke?.bind(base44.functions);
+  if (typeof originalInvoke === 'function') {
+    base44.functions.invoke = async (name, payload = {}, ...rest) => {
+      try {
+        return await originalInvoke(name, payload, ...rest);
+      } catch (error) {
+        const status = extractStatusFromError(error);
+        const isMissing = status === 404 || isDeploymentMissingError(error);
+
+        // Keep Shopify sync operational even if syncShopifyOrders deployment is missing.
+        if (name === 'syncShopifyOrders' && isMissing) {
+          return originalInvoke('syncShopifyData', payload, ...rest);
+        }
+
+        // Self-heal endpoint is currently undeployed in production; fail soft.
+        if (name === 'selfHeal' && isMissing) {
+          return {
+            data: {
+              ok: false,
+              fallback: true,
+              reason: 'selfHeal_unavailable',
+            },
+          };
+        }
+
+        throw error;
+      }
+    };
+  }
+}
+
 // Some SDK/bootstrap paths can still attempt GET /entities/User/me before
 // embedded session exchange completes. In Shopify iframe mode, fail this call
 // closed (local no-op response) so startup doesn't depend on Base44 login.

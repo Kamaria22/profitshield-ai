@@ -2,6 +2,7 @@ import { base44 } from '@/api/base44Client';
 
 const FUNCTION_FALLBACKS = {
   syncShopifyOrders: ['syncShopifyData'],
+  supportGuardian: ['supportWatchdog'],
 };
 
 function extractHttpStatus(error) {

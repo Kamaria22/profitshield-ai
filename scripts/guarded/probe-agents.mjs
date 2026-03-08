@@ -6,14 +6,15 @@ const OUT_DIR = path.join(ROOT, '.guard');
 const OUT_FILE = path.join(OUT_DIR, 'agent-probe.json');
 
 const APP_URL = (process.env.APP_URL || '').replace(/\/$/, '');
+const APP_ID = process.env.APP_ID || '69921553e99437d437b39bf3';
 
 const probes = [
-  { id: 'selfHeal', path: '/api/functions/selfHeal', body: { action: 'get_flags' } },
-  { id: 'stabilityAgent', path: '/api/functions/stabilityAgent', body: { action: 'prove_live' } },
-  { id: 'appStoreReadinessGuardian', path: '/api/functions/appStoreReadinessGuardian', body: { action: 'prove_live' } },
-  { id: 'supportGuardian', path: '/api/functions/supportGuardian', body: { action: 'run_watchdog' } },
-  { id: 'buildGuardian', path: '/api/functions/buildGuardian', body: { action: 'run' } },
-  { id: 'shopifyConnectionWatchdog', path: '/api/functions/shopifyConnectionWatchdog', body: {} },
+  { id: 'selfHeal', fn: 'selfHeal', body: { action: 'get_flags' } },
+  { id: 'stabilityAgent', fn: 'stabilityAgent', body: { action: 'prove_live' } },
+  { id: 'appStoreReadinessGuardian', fn: 'appStoreReadinessGuardian', body: { action: 'prove_live' } },
+  { id: 'supportGuardian', fn: 'supportGuardian', body: { action: 'run_watchdog' } },
+  { id: 'buildGuardian', fn: 'buildGuardian', body: { action: 'run' } },
+  { id: 'shopifyConnectionWatchdog', fn: 'shopifyConnectionWatchdog', body: {} },
 ];
 
 function delay(ms) {
@@ -65,11 +66,22 @@ async function run() {
 
   const results = [];
   for (const p of probes) {
-    const url = `${APP_URL}${p.path}`;
+    const candidates = [
+      `${APP_URL}/api/functions/${p.fn}`,
+      `${APP_URL}/api/apps/${APP_ID}/functions/${p.fn}`,
+    ];
     try {
-      const probe = await postProbe(url, p.body, 3);
+      let probe = null;
+      let url = candidates[0];
+      for (const candidate of candidates) {
+        const next = await postProbe(candidate, p.body, 3);
+        probe = next;
+        url = candidate;
+        // stop at first non-404 response
+        if (next.status !== 404) break;
+      }
       const ok = probe.status >= 200 && probe.status < 300 && probe.data?.ok !== false;
-      const degraded = !ok && probe.rateLimited;
+      const degraded = !ok && (probe.rateLimited || probe.status === 429);
       results.push({
         id: p.id,
         url,
