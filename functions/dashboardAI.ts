@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
+import { robustZScore, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 const handler = withEndpointGuard('dashboardAI', async (req) => {
   try {
@@ -123,33 +124,37 @@ const handler = withEndpointGuard('dashboardAI', async (req) => {
     // Detect anomalies (values > 2 std deviations)
     const anomalies = [];
     dailyValues.forEach(day => {
-      if (revenueStats.std > 0 && Math.abs(day.revenue - revenueStats.mean) > 2 * revenueStats.std) {
+      const revenueZ = robustZScore(day.revenue, dailyValues.map(d => d.revenue));
+      const profitZ = robustZScore(day.profit, dailyValues.map(d => d.profit));
+      const ordersZ = robustZScore(day.orders, dailyValues.map(d => d.orders));
+
+      if (Math.abs(revenueZ) > 2) {
         anomalies.push({
           date: day.date,
           metric: 'revenue',
           value: day.revenue,
           expected: revenueStats.mean,
-          deviation: ((day.revenue - revenueStats.mean) / revenueStats.std).toFixed(1),
+          deviation: revenueZ.toFixed(1),
           type: day.revenue > revenueStats.mean ? 'spike' : 'drop'
         });
       }
-      if (profitStats.std > 0 && Math.abs(day.profit - profitStats.mean) > 2 * profitStats.std) {
+      if (Math.abs(profitZ) > 2) {
         anomalies.push({
           date: day.date,
           metric: 'profit',
           value: day.profit,
           expected: profitStats.mean,
-          deviation: ((day.profit - profitStats.mean) / profitStats.std).toFixed(1),
+          deviation: profitZ.toFixed(1),
           type: day.profit > profitStats.mean ? 'spike' : 'drop'
         });
       }
-      if (ordersStats.std > 0 && Math.abs(day.orders - ordersStats.mean) > 2 * ordersStats.std) {
+      if (Math.abs(ordersZ) > 2) {
         anomalies.push({
           date: day.date,
           metric: 'orders',
           value: day.orders,
           expected: ordersStats.mean,
-          deviation: ((day.orders - ordersStats.mean) / ordersStats.std).toFixed(1),
+          deviation: ordersZ.toFixed(1),
           type: day.orders > ordersStats.mean ? 'spike' : 'drop'
         });
       }
@@ -281,6 +286,7 @@ Provide:
       metrics: { current, previous },
       anomalies: anomalies.slice(0, 10),
       daily_stats: { revenue: revenueStats, profit: profitStats, orders: ordersStats },
+      ml_runtime: { version: ML_RUNTIME_VERSION, anomaly_model: 'robust_zscore' },
       ...(aiResponse || {})
     });
 
