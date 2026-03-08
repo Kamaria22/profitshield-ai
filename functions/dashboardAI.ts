@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
-const runtimeHandler = withEndpointGuard('dashboardAI', async (req) => {
+const handler = withEndpointGuard('dashboardAI', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json().catch(() => ({}));
@@ -290,16 +290,5 @@ Provide:
   }
 });
 
-export default async function handler(req, res) {
-  const response = await runtimeHandler(req);
-  if (res && typeof res.status === 'function' && typeof res.json === 'function') {
-    const payload = await response
-      .clone()
-      .json()
-      .catch(async () => ({ ok: response.ok, status: response.status, text: await response.text().catch(() => '') }));
-    return res.status(response.status || 200).json(payload);
-  }
-  return response;
-}
-
 Deno.serve(handler);
+export default handler;

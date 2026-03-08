@@ -181,7 +181,7 @@ function makeUnauthenticatedReq(originalReq) {
   });
 }
 
-const runtimeHandler = withEndpointGuard('shopifySessionExchange', async (req) => {
+const handler = withEndpointGuard('shopifySessionExchange', async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
@@ -369,16 +369,5 @@ const runtimeHandler = withEndpointGuard('shopifySessionExchange', async (req) =
   }
 }, embeddedHeaders());
 
-export default async function handler(req, res) {
-  const response = await runtimeHandler(req);
-  if (res && typeof res.status === 'function' && typeof res.json === 'function') {
-    const payload = await response
-      .clone()
-      .json()
-      .catch(async () => ({ ok: response.ok, status: response.status, text: await response.text().catch(() => '') }));
-    return res.status(response.status || 200).json(payload);
-  }
-  return response;
-}
-
 Deno.serve(handler);
+export default handler;

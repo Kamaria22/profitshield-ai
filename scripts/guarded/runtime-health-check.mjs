@@ -39,7 +39,8 @@ const checks = [
   {
     id: 'home_embedded_dashboard_summary_path',
     file: 'src/pages/Home.jsx',
-    tokens: ["action: 'embedded_summary'", "base44.functions.invoke('dashboardAI'"],
+    tokens: ["action: 'embedded_summary'"],
+    anyTokens: ["base44.functions.invoke('dashboardAI'", "invokeWithRetry('dashboardAI'"],
     owner_agent: 'watchdog',
   },
   {
@@ -64,7 +65,11 @@ for (const c of checks) {
     continue;
   }
   const text = fs.readFileSync(abs, 'utf8');
-  const missing = c.tokens.filter((t) => !text.includes(t));
+  const missing = (c.tokens || []).filter((t) => !text.includes(t));
+  const anyTokensMissing = c.anyTokens && !c.anyTokens.some((t) => text.includes(t));
+  if (anyTokensMissing) {
+    missing.push(`one_of:${c.anyTokens.join('|')}`);
+  }
   if (missing.length) {
     incidents.push({ severity: 'high', blocker_type: 'runtime_guard_missing', owner_agent: c.owner_agent, check: c.id, file: c.file, missing });
   }

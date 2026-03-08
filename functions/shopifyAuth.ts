@@ -35,7 +35,7 @@ function jsonResponse(body, status = 200) {
   return jsonSafe(body, status, shopifyHeaders());
 }
 
-const runtimeHandler = withEndpointGuard('shopifyAuth', async (req) => {
+const handler = withEndpointGuard('shopifyAuth', async (req) => {
   try {
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
@@ -89,19 +89,8 @@ const runtimeHandler = withEndpointGuard('shopifyAuth', async (req) => {
   }
 }, shopifyHeaders());
 
-export default async function handler(req, res) {
-  const response = await runtimeHandler(req);
-  if (res && typeof res.status === 'function' && typeof res.json === 'function') {
-    const payload = await response
-      .clone()
-      .json()
-      .catch(async () => ({ ok: response.ok, status: response.status, text: await response.text().catch(() => '') }));
-    return res.status(response.status || 200).json(payload);
-  }
-  return response;
-}
-
 Deno.serve(handler);
+export default handler;
 
 // ─────────────────────────────────────────────
 // GENERATE INSTALL URL

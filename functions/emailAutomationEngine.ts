@@ -43,7 +43,7 @@ async function alreadySentRecently(db, tenantId, recipient, eventType) {
   });
 }
 
-const runtimeHandler = async (req) => {
+const handler = async (req) => {
   let exec = null;
   let execDb = null;
   let execMeta = { action: 'status', tenantId: null, userRole: null, isScheduler: true };
@@ -175,16 +175,5 @@ const runtimeHandler = async (req) => {
   }
 };
 
-export default async function handler(req, res) {
-  const response = await runtimeHandler(req);
-  if (res && typeof res.status === 'function' && typeof res.json === 'function') {
-    const payload = await response
-      .clone()
-      .json()
-      .catch(async () => ({ ok: response.ok, status: response.status, text: await response.text().catch(() => '') }));
-    return res.status(response.status || 200).json(payload);
-  }
-  return response;
-}
-
 Deno.serve(handler);
+export default handler;

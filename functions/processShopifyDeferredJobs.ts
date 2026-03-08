@@ -107,7 +107,7 @@ async function runJob(base44, db, job) {
   return { ok: true, action: 'skipped_unknown_type' };
 }
 
-const runtimeHandler = async (req) => {
+const handler = async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole.entities;
@@ -184,16 +184,5 @@ const runtimeHandler = async (req) => {
   }
 };
 
-export default async function handler(req, res) {
-  const response = await runtimeHandler(req);
-  if (res && typeof res.status === 'function' && typeof res.json === 'function') {
-    const payload = await response
-      .clone()
-      .json()
-      .catch(async () => ({ ok: response.ok, status: response.status, text: await response.text().catch(() => '') }));
-    return res.status(response.status || 200).json(payload);
-  }
-  return response;
-}
-
 Deno.serve(handler);
+export default handler;
