@@ -121,19 +121,37 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, retryCount]);
 
-  async function exchangeSession({ sessionToken, shopDomain }) {
-    const payload = {
-      session_token: sessionToken || undefined,
-      shop: shopDomain,
-    };
+async function exchangeSession({ sessionToken, shopDomain }) {
+  const payload = {
+    session_token: sessionToken || undefined,
+    shop: shopDomain,
+  };
 
-    // Primary path: dedicated exchange function.
+  // Primary path: public Base44 function route.
+  try {
+      const directRes = await stabilityAgent.safeFetch('/api/functions/shopifySessionExchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        retries: 1,
+      }, { authenticated: false, reason: 'session_exchange_http_error' });
+      if (directRes?.ok && directRes?.data && typeof directRes.data === 'object') {
+        return { data: directRes.data };
+      }
+      if (directRes?.status && directRes.status !== 404 && directRes?.data && typeof directRes.data === 'object') {
+        return { data: directRes.data };
+      }
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e?.message || String(e));
+    }
+
+    // Fallback path: Base44 function invoke for compatibility with app-scoped routing.
     try {
-      const primaryResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
+      const invokeResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
         attempts: 2,
         baseDelayMs: 300
       });
-      if (primaryResult && typeof primaryResult === 'object') return primaryResult;
+      if (invokeResult && typeof invokeResult === 'object') return invokeResult;
     } catch (e) {
       console.warn('[ShopifyEmbeddedAuthGate] shopifySessionExchange invoke failed:', e?.message || String(e));
     }
@@ -222,7 +240,8 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
 
       // ── 4. Exchange (PUBLIC endpoint — no Base44 session required) ────────
       console.log(`[ShopifyEmbeddedAuthGate] Exchanging: shop=${shopDomain} has_token=${!!sessionToken}`);
-      const { data } = await exchangeSession({ sessionToken, shopDomain });
+      const exchangeResult = await exchangeSession({ sessionToken, shopDomain });
+      const data = exchangeResult?.data || null;
       console.log(`[ShopifyEmbeddedAuthGate] Result: authenticated=${data?.authenticated} reason=${data?.reason || '-'}`);
 
       // ── 5. Handle responses ───────────────────────────────────────────────

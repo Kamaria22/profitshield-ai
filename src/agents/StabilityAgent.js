@@ -43,12 +43,6 @@ class StabilityAgent {
     const maxRetries = Math.min(2, Math.max(0, options?.retries ?? 2));
     let res = null;
     let lastNetworkError = null;
-    const inputUrl = typeof input === 'string' ? input : '';
-    const isApiFunctionRoute = inputUrl.startsWith('/api/functions/');
-    const fallbackFunctionUrl = isApiFunctionRoute
-      ? inputUrl.replace('/api/functions/', '/functions/')
-      : null;
-    let functionRouteFallbackTried = false;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -58,18 +52,6 @@ class StabilityAgent {
         if (attempt >= maxRetries) break;
         await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
         continue;
-      }
-
-      if (res.status === 404 && fallbackFunctionUrl && !functionRouteFallbackTried) {
-        functionRouteFallbackTried = true;
-        try {
-          const fallbackRes = await fetch(fallbackFunctionUrl, options);
-          if (fallbackRes.ok || fallbackRes.status !== 404) {
-            res = fallbackRes;
-          }
-        } catch (error) {
-          lastNetworkError = error;
-        }
       }
 
       if (res.status === 429) {
