@@ -120,6 +120,23 @@ function normalizeState(state) {
   };
 }
 
+async function invokeEmbeddedSessionExchange(shop) {
+  const payload = { shop, session_token: undefined };
+  try {
+    const result = await base44.functions.invoke('shopifySessionExchange', payload);
+    if (result?.data) return result;
+  } catch (_) {}
+  try {
+    const fallback = await base44.functions.invoke('shopifyAuth', {
+      action: 'session_exchange',
+      ...payload,
+    });
+    return fallback || { data: null };
+  } catch (_) {
+    return { data: null };
+  }
+}
+
 /**
  * Enterprise Platform Resolver Hook
  */
@@ -231,9 +248,7 @@ export function usePlatformResolver() {
       // No persisted context — derive from URL + session exchange (works on fresh load / cache miss)
       trace.steps.push(traceStep('shopify_embedded_no_persist', { shop: embeddedShop }, null, 'Embedded: no persisted context — attempting session exchange'));
       try {
-        const { data: exchangeData } = await base44.functions.invoke('shopifySessionExchange', {
-          shop: embeddedShop
-        });
+        const { data: exchangeData } = await invokeEmbeddedSessionExchange(embeddedShop);
         if (exchangeData?.authenticated && exchangeData?.tenant_id) {
           platform = 'shopify';
           storeKey = exchangeData.shop_domain || embeddedShop;
@@ -400,10 +415,7 @@ export function usePlatformResolver() {
             if (isShopifyEmbedded) {
               trace.steps.push(traceStep(TRACE_STEP.ANTI_STALE_CHECK, { status: integration.status }, null, 'Disconnected in embedded — attempting auto-heal via session exchange'));
               try {
-                const { data: healData } = await base44.functions.invoke('shopifySessionExchange', {
-                  shop: storeKey,
-                  session_token: undefined // gate will have already set cache; shop param is enough for heal
-                });
+                const { data: healData } = await invokeEmbeddedSessionExchange(storeKey);
                 if (healData?.authenticated && healData?.integration_id) {
                   // Reload integration post-heal
                   const healed = await base44.entities.PlatformIntegration.filter({ id: healData.integration_id });
