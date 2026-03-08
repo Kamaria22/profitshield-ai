@@ -19,6 +19,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { withEndpointGuard, validateEnv, safeFilter, jsonSafe } from './helpers/endpointSafety.ts';
+import { enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
 
 // ── Inline token decrypt (no local imports allowed in Deno Deploy) ─────────────
 async function decryptToken(encryptedToken) {
@@ -186,6 +187,16 @@ const handler = withEndpointGuard('shopifySessionExchange', async (req) => {
   const path = url.pathname;
 
   try {
+    const payloadLimit = enforcePayloadLimit(req, 20 * 1024); // 20KB max for exchange payload
+    if (!payloadLimit.ok) {
+      return jsonResponse({ ok: false, reason: payloadLimit.reason }, payloadLimit.status || 413);
+    }
+
+    const rate = enforceRateLimit(`session_exchange:${getClientKey(req)}`, 120, 60_000);
+    if (!rate.ok) {
+      return jsonResponse({ ok: false, reason: rate.reason, retry_after_ms: rate.retry_after_ms }, rate.status || 429);
+    }
+
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     if (!envState.ok) {
       console.warn(`[shopifySessionExchange] Missing env vars: ${envState.missing.join(',')}`);

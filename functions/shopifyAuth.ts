@@ -7,6 +7,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { withEndpointGuard, validateEnv, jsonSafe } from './helpers/endpointSafety.ts';
+import { enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
 
 // Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
 const SHOPIFY_FRAME_ANCESTORS = "https://admin.shopify.com https://*.myshopify.com";
@@ -37,6 +38,16 @@ function jsonResponse(body, status = 200) {
 
 const handler = withEndpointGuard('shopifyAuth', async (req) => {
   try {
+    const payloadLimit = enforcePayloadLimit(req, 24 * 1024); // 24KB
+    if (!payloadLimit.ok) {
+      return jsonResponse({ ok: false, reason: payloadLimit.reason }, payloadLimit.status || 413);
+    }
+
+    const rate = enforceRateLimit(`shopify_auth:${getClientKey(req)}`, 100, 60_000);
+    if (!rate.ok) {
+      return jsonResponse({ ok: false, reason: rate.reason, retry_after_ms: rate.retry_after_ms }, rate.status || 429);
+    }
+
     const envState = validateEnv(['SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET']);
     const shopifyAppUrl = Deno.env.get('SHOPIFY_APP_URL') || Deno.env.get('APP_URL');
     const shopifyScopes = Deno.env.get('SHOPIFY_SCOPES');
@@ -75,6 +86,9 @@ const handler = withEndpointGuard('shopifyAuth', async (req) => {
 
     if (!shop) {
       return jsonResponse({ error: 'shop parameter required' }, 400);
+    }
+    if (!/^[a-z0-9-]+(\.myshopify\.com)?$/i.test(String(shop).trim())) {
+      return jsonResponse({ error: 'invalid shop domain' }, 400);
     }
 
     if (action === 'install' || action === 'reauthorize') {
