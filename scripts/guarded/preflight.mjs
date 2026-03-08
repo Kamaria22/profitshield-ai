@@ -111,9 +111,65 @@ function checkShopifyEnvValidationPresence() {
   }
 }
 
+function walkFiles(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(full, out);
+    } else if (/\.(jsx?|tsx?)$/i.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+function checkUnsafeWindowOpen() {
+  const files = walkFiles(path.join(ROOT, 'src'));
+  for (const abs of files) {
+    const rel = path.relative(ROOT, abs);
+    const lines = fs.readFileSync(abs, 'utf8').split('\n');
+    lines.forEach((line, idx) => {
+      if (!line.includes('window.open(')) return;
+      const opensBlank = line.includes("'_blank'") || line.includes('"_blank"');
+      const hasNoopener = /noopener|noreferrer/.test(line);
+      if (opensBlank && !hasNoopener) {
+        addIncident({
+          blocker_type: 'unsafe_window_open',
+          severity: 'high',
+          owner_agent: 'frontend_guardian_component',
+          file: rel,
+          line: idx + 1,
+          message: 'window.open with _blank is missing noopener/noreferrer',
+          healable: true,
+        });
+      }
+    });
+  }
+}
+
+function checkHardcodedShopifyApiKeyFallback() {
+  const rel = 'src/main.jsx';
+  if (!fileExists(rel)) return;
+  const content = read(rel);
+  if (/67be6ef7574f3a32bf9a218ad4582c68/.test(content)) {
+    addIncident({
+      blocker_type: 'hardcoded_shopify_api_key_fallback',
+      severity: 'critical',
+      owner_agent: 'auth_guardian',
+      file: rel,
+      message: 'Hardcoded Shopify API key fallback found in frontend bootstrap',
+      healable: true,
+    });
+  }
+}
+
 checkPagesConfigImports();
 checkCriticalBase44Path();
 checkShopifyEnvValidationPresence();
+checkUnsafeWindowOpen();
+checkHardcodedShopifyApiKeyFallback();
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT_FILE, JSON.stringify({ ts: new Date().toISOString(), incidents }, null, 2));

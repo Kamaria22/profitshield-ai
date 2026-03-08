@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { usePlatformResolver } from '@/components/usePlatformResolver';
 
 const STATUS_CONFIG = {
   open:          { label: 'Open',        color: 'bg-blue-500/15 text-blue-300 border-blue-500/20' },
@@ -42,20 +43,23 @@ export default function AISupportControlCenter() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { user } = useAuth();
+  const resolver = usePlatformResolver();
   const role = (user?.role || user?.app_role || '').toLowerCase();
+  const tenantId = resolver?.tenantId || resolver?.tenant?.id || user?.tenant_id || null;
   const canAccess = role === 'owner' || role === 'admin';
 
   // Fetch conversations
   const { data: conversations = [], isLoading } = useQuery({
-    queryKey: ['support-conversations', filter],
+    queryKey: ['support-conversations', tenantId, filter],
     queryFn: async () => {
+      if (!tenantId) return [];
       const query = filter === 'all' ? {} :
         filter === 'escalated' ? { needs_owner_attention: true } :
         { status: filter };
-      return base44.entities.SupportConversation.filter(query, '-created_date', 100);
+      return base44.entities.SupportConversation.filter({ tenant_id: tenantId, ...query }, '-created_date', 100);
     },
     refetchInterval: canAccess ? 30000 : false,
-    enabled: canAccess
+    enabled: canAccess && !!tenantId
   });
 
   // Fetch recent audit logs for repair activity

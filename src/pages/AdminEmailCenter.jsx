@@ -30,10 +30,13 @@ export default function AdminEmailCenter() {
   const canAccess = isAdminOwner(user);
 
   const { data: conversations = [] } = useQuery({
-    queryKey: ['admin-email-center-support-count'],
-    queryFn: () => base44.entities.SupportConversation.filter({}, '-created_date', 300),
+    queryKey: ['admin-email-center-support-count', tenantId],
+    queryFn: () => {
+      if (!tenantId) return [];
+      return base44.entities.SupportConversation.filter({ tenant_id: tenantId }, '-created_date', 300);
+    },
     refetchInterval: canAccess ? 30000 : false,
-    enabled: canAccess
+    enabled: canAccess && !!tenantId
   });
 
   const { data: settingsRow } = useQuery({

@@ -22,14 +22,18 @@ export default function AdminSupportInboxPanel() {
   const resolver = usePlatformResolver();
   const location = useLocation();
   const effectiveUser = user || resolver?.user || null;
+  const tenantId = resolver?.tenantId || resolver?.tenant?.id || effectiveUser?.tenant_id || null;
   const canAccess = isAdminOwner(effectiveUser);
 
   const { data: conversations = [], isLoading } = useQuery({
-    queryKey: ['support-inbox-widget'],
-    queryFn: () => base44.entities.SupportConversation.filter({}, '-created_date', 200),
+    queryKey: ['support-inbox-widget', tenantId],
+    queryFn: () => {
+      if (!tenantId) return [];
+      return base44.entities.SupportConversation.filter({ tenant_id: tenantId }, '-created_date', 200);
+    },
     refetchInterval: canAccess ? 30000 : false,
     staleTime: 20000,
-    enabled: canAccess
+    enabled: canAccess && !!tenantId
   });
 
   if (!canAccess) {

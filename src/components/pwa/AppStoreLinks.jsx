@@ -68,7 +68,7 @@ export default function AppStoreLinks() {
             size="sm" 
             variant="outline" 
             className="w-full mt-2"
-            onClick={() => window.open('https://apps.shopify.com', '_blank')}
+            onClick={() => window.open('https://apps.shopify.com', '_blank', 'noopener,noreferrer')}
           >
             View Listing
           </Button>

@@ -7,11 +7,11 @@ import { Apple, Play } from 'lucide-react';
  */
 export default function AppStoreButtons({ variant = 'default' }) {
   const handleAppStore = () => {
-    window.open('https://apps.apple.com/app/profitshield-ai/id6741820887', '_blank');
+    window.open('https://apps.apple.com/app/profitshield-ai/id6741820887', '_blank', 'noopener,noreferrer');
   };
 
   const handlePlayStore = () => {
-    window.open('https://play.google.com/store/apps/details?id=ai.profitshield.app', '_blank');
+    window.open('https://play.google.com/store/apps/details?id=ai.profitshield.app', '_blank', 'noopener,noreferrer');
   };
 
   if (variant === 'compact') {

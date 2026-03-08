@@ -410,9 +410,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     }
   }, []);
 
-  const loadSupportUnread = useCallback(async () => {
+  const loadSupportUnread = useCallback(async (tid) => {
+    if (!tid) {
+      setSupportUnread(0);
+      return;
+    }
     try {
-      const rows = await base44.entities.SupportConversation.filter({}, '-created_date', 300);
+      const rows = await base44.entities.SupportConversation.filter({ tenant_id: tid }, '-created_date', 300);
       const unread = (rows || []).filter((c) => c.status === 'open' || c.needs_owner_attention).length;
       setSupportUnread(unread);
     } catch (e) {
@@ -435,13 +439,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   }, [isEmbedded, isResolved, authTenantId, loadAlerts]);
 
   useEffect(() => {
-    if (isAdmin) {
-      loadSupportUnread();
-      const t = setInterval(loadSupportUnread, 30000);
+    if (isAdmin && authTenantId) {
+      loadSupportUnread(authTenantId);
+      const t = setInterval(() => loadSupportUnread(authTenantId), 30000);
       return () => clearInterval(t);
     }
     setSupportUnread(0);
-  }, [isAdmin, loadSupportUnread]);
+  }, [isAdmin, authTenantId, loadSupportUnread]);
 
   // Safe redirect to SelectStore — NEVER redirect Shopify install flows
   useEffect(() => {

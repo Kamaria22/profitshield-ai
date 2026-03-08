@@ -36,7 +36,7 @@ export default function SmartInstallPrompt({ onInstall, onDismiss }) {
       }
       setDeferredPrompt(null);
     } else if (recommended?.url) {
-      window.open(recommended.url, '_blank');
+      window.open(recommended.url, '_blank', 'noopener,noreferrer');
       onInstall?.();
     }
   };

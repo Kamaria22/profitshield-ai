@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +19,7 @@ const APP_STORE_URLS = {
 export default function ReviewRequestModal({ 
   isOpen, 
   onClose, 
-  tenantId, 
+  tenantId: _tenantId, 
   platform = 'shopify',
   condition,
   requestId 
@@ -72,7 +70,7 @@ export default function ReviewRequestModal({
   };
 
   const openAppStore = () => {
-    window.open(APP_STORE_URLS[platform] || APP_STORE_URLS.shopify, '_blank');
+    window.open(APP_STORE_URLS[platform] || APP_STORE_URLS.shopify, '_blank', 'noopener,noreferrer');
     setStep('thanks');
   };
 

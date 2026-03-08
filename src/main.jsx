@@ -289,7 +289,13 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_XHR_GUARD__) 
 // Shopify App Bridge requires the PUBLIC API key (Client ID).
 // Set it in external JS (not inline HTML) so CSP can remain strict.
 if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
-  window.__SHOPIFY_API_KEY__ = import.meta.env.VITE_SHOPIFY_API_KEY || '67be6ef7574f3a32bf9a218ad4582c68';
+  const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY || '';
+  if (apiKey) {
+    window.__SHOPIFY_API_KEY__ = apiKey;
+  } else {
+    // Never hardcode a fallback key in the bundle.
+    console.warn('[bootstrap] Missing VITE_SHOPIFY_API_KEY; App Bridge auth will be unavailable until configured.');
+  }
 }
 if (typeof window !== 'undefined' && !window.__SHOPIFY_APP_URL_ORIGIN__) {
   window.__SHOPIFY_APP_URL_ORIGIN__ = import.meta.env.VITE_SHOPIFY_APP_URL_ORIGIN || '';

@@ -153,7 +153,7 @@ export default function Billing() {
     },
     onSuccess: (data) => {
       if (data.data?.portal_url) {
-        window.open(data.data.portal_url, '_blank');
+        window.open(data.data.portal_url, '_blank', 'noopener,noreferrer');
       }
     }
   });

@@ -90,7 +90,7 @@ export default function DownloadPage() {
               <h3 className="text-xl font-bold text-white mb-1">iOS App</h3>
               <p className="text-sm text-slate-400 mb-4">iPhone & iPad — iOS 16+</p>
               <QuantumButton
-                onClick={() => window.open(APP_CONFIG.appStore.ios.url, '_blank')}
+                onClick={() => window.open(APP_CONFIG.appStore.ios.url, '_blank', 'noopener,noreferrer')}
                 className="w-full"
                 size="sm"
               >
@@ -108,7 +108,7 @@ export default function DownloadPage() {
               <h3 className="text-xl font-bold text-white mb-1">Android App</h3>
               <p className="text-sm text-slate-400 mb-4">All Android — 10+</p>
               <QuantumButton
-                onClick={() => window.open(APP_CONFIG.appStore.android.url, '_blank')}
+                onClick={() => window.open(APP_CONFIG.appStore.android.url, '_blank', 'noopener,noreferrer')}
                 className="w-full"
                 size="sm"
               >
