@@ -6,6 +6,18 @@
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.20";
 
+async function invokeSelfHealSafe(base44, payload) {
+  try {
+    return await base44.functions.invoke("selfHeal", payload);
+  } catch (error) {
+    const msg = String(error?.message || "").toLowerCase();
+    if (msg.includes("deployment does not exist") || msg.includes("not found") || msg.includes("404")) {
+      return { data: { ok: false, fallback: true, reason: "selfHeal_unavailable" } };
+    }
+    throw error;
+  }
+}
+
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 }
@@ -401,7 +413,7 @@ Deno.serve(async (req) => {
               incident: { summary: "UI route integrity mismatch", severity: "warning", signals: { ui: uiHealth } },
             });
             if (!observeOnly) {
-              await base44.functions.invoke("selfHeal", {
+              await invokeSelfHealSafe(base44, {
                 action: "heal_ui_routing",
                 tenant_id: tenant.id,
                 ui_probe: body.ui_probe || {},
@@ -440,7 +452,7 @@ Deno.serve(async (req) => {
     if (!incident) {
       await infra.writeAudit({ type: "stability.ok", ts: nowIso(), tenant_id: tenantId, signals, ui_health: uiHealth });
       if (!uiHealth.ok && !observeOnly) {
-        await base44.functions.invoke("selfHeal", {
+        await invokeSelfHealSafe(base44, {
           action: "heal_ui_routing",
           tenant_id: tenantId,
           ui_probe: body.ui_probe || {},

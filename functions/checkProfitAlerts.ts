@@ -7,7 +7,31 @@ Deno.serve(async (req) => {
     const { tenant_id, order_id } = await req.json();
 
     if (!tenant_id) {
-      return Response.json({ error: 'tenant_id is required' }, { status: 400 });
+      const rules = await base44.asServiceRole.entities.AlertRule.list('-created_date', 500).catch(() => []);
+      const tenantIds = [...new Set(rules.map((r) => r.tenant_id).filter(Boolean))];
+      if (tenantIds.length === 0) {
+        return Response.json({ success: true, alerts_triggered: 0, checked_tenants: 0, message: 'No tenant rules found' });
+      }
+
+      let totalAlerts = 0;
+      const tenantResults = [];
+      for (const tId of tenantIds.slice(0, 50)) {
+        try {
+          const nested = await base44.functions.invoke('checkProfitAlerts', { tenant_id: tId });
+          const count = Number(nested?.data?.alerts_triggered || 0);
+          totalAlerts += count;
+          tenantResults.push({ tenant_id: tId, alerts_triggered: count, ok: true });
+        } catch (nestedErr) {
+          tenantResults.push({ tenant_id: tId, ok: false, error: nestedErr?.message || String(nestedErr) });
+        }
+      }
+
+      return Response.json({
+        success: true,
+        alerts_triggered: totalAlerts,
+        checked_tenants: tenantResults.length,
+        results: tenantResults
+      });
     }
 
     // Allow service-role scheduled calls (no user session) OR authenticated users

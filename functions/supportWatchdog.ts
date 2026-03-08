@@ -21,6 +21,53 @@ const AUTO_RESOLVABLE_PATTERNS = [
   { pattern: /automation.*fail|alert.*not.*trigger/i, type: 'automation_failure', action: 'check_automations' },
 ];
 
+async function invokeSelfHealSafe(base44, payload) {
+  try {
+    return await base44.functions.invoke('selfHeal', payload);
+  } catch (error) {
+    const msg = String(error?.message || '').toLowerCase();
+    if (msg.includes('deployment does not exist') || msg.includes('not found') || msg.includes('404')) {
+      return { data: { ok: false, fallback: true, reason: 'selfHeal_unavailable' } };
+    }
+    throw error;
+  }
+}
+
+async function reconcileAutomationFallbacks(db) {
+  try {
+    const automations = await db.entities.Automation.list('-created_date', 300).catch(() => []);
+    let updated = 0;
+    for (const automation of automations) {
+      const fn = String(automation?.function_name || '');
+      const name = String(automation?.automation_name || '').toLowerCase();
+      const payload = typeof automation?.payload === 'object' && automation?.payload ? { ...automation.payload } : {};
+      let nextFn = null;
+      let nextPayload = null;
+
+      if (fn === 'profitAlertWatchdog') {
+        nextFn = 'checkProfitAlerts';
+        if (!payload.tenant_id && automation?.tenant_id) {
+          nextPayload = { ...payload, tenant_id: automation.tenant_id };
+        }
+      } else if (fn === 'selfHeal' && (name.includes('watchdog') || payload.action === 'run_watchdog')) {
+        nextFn = 'stabilityAgent';
+        nextPayload = { ...payload, action: 'watchdog', mode: 'watch', observe_only: true };
+      }
+
+      if (nextFn) {
+        await db.entities.Automation.update(automation.id, {
+          function_name: nextFn,
+          payload: nextPayload || payload
+        }).catch(() => {});
+        updated++;
+      }
+    }
+    return { ok: true, updated };
+  } catch (error) {
+    return { ok: false, updated: 0, error: error?.message || String(error) };
+  }
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const startedAt = new Date().toISOString();
@@ -40,8 +87,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    const automationFallbacks = await reconcileAutomationFallbacks(base44.asServiceRole);
+    if (automationFallbacks.updated > 0) {
+      report.actions_taken.push(`Automation fallback routes repaired: ${automationFallbacks.updated}`);
+    }
+
     if (body.ui_probe?.embedded_probe?.blocked_text_detected || body.ui_probe?.permission_probe?.mismatch) {
-      await base44.functions.invoke('selfHeal', {
+      await invokeSelfHealSafe(base44, {
         action: 'heal_ui_routing',
         tenant_id: body.tenant_id || 'system',
         ui_probe: body.ui_probe,

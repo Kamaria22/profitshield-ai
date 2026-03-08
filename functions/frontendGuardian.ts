@@ -35,6 +35,18 @@ const FEATURE_KEYS = [
 const REQUIRED_PAGE_KEYS = ["SupportContact", "AdminEmailCenter", "Home", "AIInsights", "Orders"];
 const REQUIRED_CRITICAL_ROUTES = ["/support/contact", "/admin/email", "/dashboard", "/ai-insights", "/orders"];
 
+async function invokeSelfHealSafe(base44, payload) {
+  try {
+    return await base44.functions.invoke("selfHeal", payload);
+  } catch (error) {
+    const msg = String(error?.message || "").toLowerCase();
+    if (msg.includes("deployment does not exist") || msg.includes("not found") || msg.includes("404")) {
+      return { data: { ok: false, fallback: true, reason: "selfHeal_unavailable" } };
+    }
+    throw error;
+  }
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -166,7 +178,7 @@ async function evaluateUiProbe(base44, tenantId, uiProbe) {
       issues,
     });
 
-    await base44.functions.invoke("selfHeal", {
+    await invokeSelfHealSafe(base44, {
       action: "heal_ui_routing",
       tenant_id: tenantId,
       ui_probe: uiProbe,

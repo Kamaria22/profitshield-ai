@@ -24,6 +24,25 @@ async function invokeSafe(base44, fn, payload) {
     const response = await base44.functions.invoke(fn, payload);
     return { ok: true, fn, data: response?.data || response || null };
   } catch (error) {
+    const msg = String(error?.message || '').toLowerCase();
+    const missing = msg.includes('deployment does not exist') || msg.includes('not found') || msg.includes('404');
+    if (missing) {
+      try {
+        if (fn === 'supportGuardian') {
+          const fallback = await base44.functions.invoke('supportWatchdog', payload);
+          return { ok: true, fn, fallback_fn: 'supportWatchdog', data: fallback?.data || fallback || null };
+        }
+        if (fn === 'profitAlertWatchdog') {
+          const tenantId = payload?.tenant_id || null;
+          if (tenantId) {
+            const fallback = await base44.functions.invoke('checkProfitAlerts', { tenant_id: tenantId });
+            return { ok: true, fn, fallback_fn: 'checkProfitAlerts', data: fallback?.data || fallback || null };
+          }
+        }
+      } catch (fallbackError) {
+        return { ok: false, fn, error: fallbackError?.message || String(fallbackError) };
+      }
+    }
     return { ok: false, fn, error: error?.message || String(error) };
   }
 }
