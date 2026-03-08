@@ -11,6 +11,7 @@ import { MessageCircle, AlertTriangle, CheckCircle2, Clock, Mail, ExternalLink, 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
+import { usePermissions } from '@/components/usePermissions';
 
 function isAdminOwner(user) {
   const role = (user?.role || user?.app_role || '').toLowerCase();
@@ -19,11 +20,12 @@ function isAdminOwner(user) {
 
 export default function AdminSupportInboxPanel() {
   const { user } = useAuth();
+  const { role: permissionRole } = usePermissions();
   const resolver = usePlatformResolver();
   const location = useLocation();
   const effectiveUser = user || resolver?.user || null;
   const tenantId = resolver?.tenantId || resolver?.tenant?.id || effectiveUser?.tenant_id || null;
-  const canAccess = isAdminOwner(effectiveUser);
+  const canAccess = isAdminOwner(effectiveUser) || permissionRole === 'admin' || permissionRole === 'owner';
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['support-inbox-widget', tenantId],

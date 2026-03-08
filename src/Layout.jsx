@@ -373,7 +373,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   
   // Derived values needed for hooks
   const activeUser = user || permUser;
-  const isAdmin = isUserAdmin(activeUser);
+  const isAdmin = isUserAdmin(activeUser) || permissionRole === 'admin' || permissionRole === 'owner';
   const roleLabel = typeof permissionRole === 'string' && permissionRole.trim()
     ? permissionRole
     : (activeUser?.app_role || activeUser?.role || '');

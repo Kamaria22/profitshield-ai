@@ -250,18 +250,26 @@ support@profitshield.ai`
         `${conv.issue_summary || ''} ${(conv.messages || []).map((m) => m.content || '').join(' ')}`
       ));
       const criticalTickets = needsHuman.filter((conv) => (conv.priority || '').toLowerCase() === 'critical');
-      const shouldSms = needsHuman.length > 0 || bugReports.length > 0 || criticalTickets.length > 0;
+      let smsCriticalEnabled = true;
+      let smsBugReportEnabled = true;
+      let ownerPhone = DEFAULT_OWNER_PHONE;
+      try {
+        const tenantId = needsHuman[0]?.tenant_id || null;
+        if (tenantId) {
+          const settings = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []);
+          const row = settings?.[0] || null;
+          ownerPhone = row?.owner_notification_phone || ownerPhone;
+          smsCriticalEnabled = row?.sms_critical_enabled !== false;
+          smsBugReportEnabled = row?.sms_bug_report_enabled !== false;
+        }
+      } catch (_) {}
+
+      const shouldSmsForCritical = smsCriticalEnabled && criticalTickets.length > 0;
+      const shouldSmsForBug = smsBugReportEnabled && bugReports.length > 0;
+      const shouldSmsForUnresolved = needsHuman.length > 0 && (smsCriticalEnabled || smsBugReportEnabled);
+      const shouldSms = shouldSmsForCritical || shouldSmsForBug || shouldSmsForUnresolved;
 
       if (shouldSms) {
-        let ownerPhone = DEFAULT_OWNER_PHONE;
-        try {
-          const tenantId = needsHuman[0]?.tenant_id || null;
-          if (tenantId) {
-            const settings = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []);
-            ownerPhone = settings?.[0]?.owner_notification_phone || ownerPhone;
-          }
-        } catch (_) {}
-
         try {
           if (base44.asServiceRole?.integrations?.Core?.SendSMS) {
             await base44.asServiceRole.integrations.Core.SendSMS({
