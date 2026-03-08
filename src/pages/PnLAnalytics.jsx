@@ -80,7 +80,9 @@ export default function PnLAnalytics() {
     const unsubscribe = base44.entities.Order.subscribe(() => {
       queryClient.invalidateQueries({ queryKey: buildQueryKey('pnl-orders', resolverCheck) });
     });
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [queryFilter?.tenant_id, queryClient, resolverCheck]);
 
   // Calculate P&L metrics
