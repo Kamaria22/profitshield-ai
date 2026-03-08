@@ -79,6 +79,8 @@ const handler = withEndpointGuard('shopifyAuth', async (req) => {
 
     if (action === 'install' || action === 'reauthorize') {
       return await generateInstallUrl(shop);
+    } else if (action === 'session_exchange') {
+      return await handleSessionExchange(base44, body);
     } else if (action === 'callback') {
       return await handleCallback(base44, body);
     }
@@ -136,6 +138,73 @@ async function generateInstallUrl(shop) {
     redirect_uri: redirectUri,
     app_url: appUrl
   });
+}
+
+function decodeSessionTokenShop(sessionToken) {
+  if (!sessionToken || typeof sessionToken !== 'string') return null;
+  try {
+    const parts = sessionToken.split('.');
+    if (parts.length < 2) return null;
+    const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = payloadB64 + '='.repeat((4 - payloadB64.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
+    const source = payload?.dest || payload?.iss || '';
+    const match = String(source).match(/https?:\/\/([^\/]+)/i);
+    if (!match?.[1]) return null;
+    const shop = match[1].toLowerCase().trim();
+    return shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+  } catch {
+    return null;
+  }
+}
+
+async function handleSessionExchange(base44, body) {
+  try {
+    const providedShop = (body?.shop || '').toString().trim().toLowerCase();
+    const tokenShop = decodeSessionTokenShop(body?.session_token);
+    const shopDomain = (tokenShop || providedShop || '').replace(/^https?:\/\//, '');
+    const normalizedShop = shopDomain
+      ? (shopDomain.includes('.myshopify.com') ? shopDomain : `${shopDomain}.myshopify.com`)
+      : '';
+
+    if (!normalizedShop) {
+      return jsonResponse({ authenticated: false, reason: 'missing_shop', error: 'Missing shop parameter' }, 400);
+    }
+
+    const db = base44.asServiceRole.entities;
+    const tenants = await db.Tenant.filter({ shop_domain: normalizedShop }).catch(() => []);
+    const tenant = tenants[0];
+    if (!tenant) {
+      return jsonResponse({
+        authenticated: false,
+        shop_domain: normalizedShop,
+        reason: 'shop_not_installed',
+        install_required: true
+      }, 200);
+    }
+
+    const integrations = await db.PlatformIntegration.filter({
+      tenant_id: tenant.id,
+      platform: 'shopify'
+    }).catch(() => []);
+    const connected = integrations.find((i) => i.status === 'connected') || integrations[0] || null;
+
+    const isNewTenant = !tenant.onboarding_completed;
+    return jsonResponse({
+      authenticated: true,
+      fallback: true,
+      fallback_source: 'shopifyAuth.session_exchange',
+      shop_domain: normalizedShop,
+      tenant_id: tenant.id,
+      tenant_name: tenant.shop_name || tenant.name || normalizedShop,
+      integration_id: connected?.id || null,
+      integration_status: connected?.status || 'missing',
+      shopify_authenticated: true,
+      is_new_tenant: isNewTenant
+    }, 200);
+  } catch (error) {
+    return jsonResponse({ authenticated: false, error: error.message || 'session_exchange_failed' }, 200);
+  }
 }
 
 // ─────────────────────────────────────────────

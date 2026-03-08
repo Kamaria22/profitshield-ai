@@ -127,15 +127,30 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
       shop: shopDomain,
     };
 
-    // Base44 SDK invoke path avoids deployment-specific /api/functions route differences.
+    // Primary path: dedicated exchange function.
     try {
-      const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
-        attempts: 3,
+      const primaryResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
+        attempts: 2,
+        baseDelayMs: 300
+      });
+      if (primaryResult && typeof primaryResult === 'object') return primaryResult;
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] shopifySessionExchange invoke failed:', e?.message || String(e));
+    }
+
+    // Durable fallback path: shopifyAuth action-based exchange.
+    try {
+      const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifyAuth', {
+        action: 'session_exchange',
+        ...payload,
+      }), {
+        attempts: 2,
         baseDelayMs: 300
       });
       if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
       return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
-    } catch {
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] shopifyAuth session_exchange fallback failed:', e?.message || String(e));
       return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
     }
   }
