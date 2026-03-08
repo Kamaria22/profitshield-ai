@@ -23,6 +23,51 @@ function isMissingFunctionDeployment(error) {
   return msg.includes('deployment does not exist') || msg.includes('not found') || msg.includes('404');
 }
 
+function mapOrderStatus(orderData) {
+  if (orderData?.cancelled_at) return 'cancelled';
+  const financial = String(orderData?.financial_status || '').toLowerCase();
+  if (financial === 'paid' || financial === 'partially_paid') return 'paid';
+  if (financial === 'refunded' || financial === 'partially_refunded') return 'refunded';
+  return 'pending';
+}
+
+async function runInlineSyncFallback(db, tenantId, shopDomain, accessToken, days = 1) {
+  const createdAtMin = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=100&created_at_min=${createdAtMin}`, {
+    headers: { 'X-Shopify-Access-Token': accessToken }
+  });
+  if (!res.ok) throw new Error(`inline_sync_shopify_${res.status}`);
+  const payload = await res.json().catch(() => ({}));
+  const orders = Array.isArray(payload?.orders) ? payload.orders : [];
+
+  let created = 0;
+  let updated = 0;
+  for (const order of orders) {
+    const platformOrderId = order?.id ? String(order.id) : null;
+    if (!platformOrderId) continue;
+    const existing = await db.entities.Order.filter({ tenant_id: tenantId, platform_order_id: platformOrderId }, '-created_date', 1).catch(() => []);
+    const record = {
+      tenant_id: tenantId,
+      platform_order_id: platformOrderId,
+      order_number: String(order?.order_number || order?.name || platformOrderId),
+      order_date: order?.created_at || new Date().toISOString(),
+      status: mapOrderStatus(order),
+      customer_email: order?.email || order?.customer?.email || null,
+      customer_name: order?.customer?.first_name ? `${order.customer.first_name} ${order?.customer?.last_name || ''}`.trim() : null,
+      total_revenue: Number(order?.total_price || 0) || 0,
+      platform_data: order
+    };
+    if (existing[0]?.id) {
+      await db.entities.Order.update(existing[0].id, record).catch(() => {});
+      updated++;
+    } else {
+      await db.entities.Order.create(record).catch(() => {});
+      created++;
+    }
+  }
+  return { ok: true, fetched: orders.length, created, updated };
+}
+
 async function decryptToken(encryptedToken) {
   const key = Deno.env.get('ENCRYPTION_KEY');
   if (!key) { try { return atob(encryptedToken); } catch { return null; } }
@@ -253,8 +298,14 @@ Deno.serve(async (req) => {
               await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
             } catch (syncOrdersErr) {
               if (!isMissingFunctionDeployment(syncOrdersErr)) throw syncOrdersErr;
-              await db.functions.invoke('syncShopifyData', { tenant_id: tenantId, days: 1 });
-              result.auto_sync_fallback = 'syncShopifyData';
+              try {
+                await db.functions.invoke('syncShopifyData', { tenant_id: tenantId, days: 1 });
+                result.auto_sync_fallback = 'syncShopifyData';
+              } catch (syncDataErr) {
+                if (!isMissingFunctionDeployment(syncDataErr)) throw syncDataErr;
+                result.auto_sync_fallback = 'inline_watchdog_sync';
+                result.auto_sync_inline = await runInlineSyncFallback(db, tenantId, shopDomain, accessToken, 1);
+              }
             }
             result.auto_sync_triggered = true;
             console.log(`[watchdog] Auto-sync triggered for tenant ${tenantId}`);

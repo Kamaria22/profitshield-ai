@@ -146,6 +146,20 @@ if (typeof window !== 'undefined' && !window.__PS_FUNCTION_INVOKE_GUARD__) {
           return originalInvoke('syncShopifyData', payload, ...rest);
         }
 
+        // Keep guardian checks operational if supportGuardian deployment is missing.
+        if (name === 'supportGuardian' && isMissing) {
+          return originalInvoke('supportWatchdog', payload, ...rest);
+        }
+
+        // Keep profit checks operational if profitAlertWatchdog deployment is missing.
+        if (name === 'profitAlertWatchdog' && isMissing) {
+          const tenantId = payload?.tenant_id || getPersistedContext(true)?.tenantId || null;
+          if (tenantId) {
+            return originalInvoke('checkProfitAlerts', { tenant_id: tenantId }, ...rest);
+          }
+          return { data: { success: false, fallback: true, reason: 'profit_alert_watchdog_unavailable' } };
+        }
+
         // Self-heal endpoint is currently undeployed in production; fail soft.
         if (name === 'selfHeal' && isMissing) {
           return {
