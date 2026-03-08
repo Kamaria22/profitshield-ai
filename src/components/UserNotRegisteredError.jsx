@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { getPersistedContext, createPageUrl } from '@/components/platformContext';
 
 /**
  * UserNotRegisteredError
@@ -11,17 +11,33 @@ import { base44 } from '@/api/base44Client';
 const UserNotRegisteredError = () => {
   const params = new URLSearchParams(window.location.search);
   const isShopifyFlow = !!(params.get('shop') || params.get('hmac') || params.get('embedded'));
+  const RETRY_KEY = 'profitshield_embedded_not_registered_retry_at';
 
   // For ANY Shopify context: never show "Access Restricted".
   // The ShopifyEmbeddedAuthGate handles identity — if we land here it's a
   // transient state while the session token exchange is in-flight.
   useEffect(() => {
     if (isShopifyFlow) {
-      // Give the gate a moment, then hard-reload the current URL so the
-      // ShopifyEmbeddedAuthGate re-runs with a fresh session token.
+      // Avoid reload loops in embedded mode. Try one bounded retry to app root.
       const timer = setTimeout(() => {
-        window.location.reload();
-      }, 2500);
+        try {
+          const now = Date.now();
+          const last = Number(sessionStorage.getItem(RETRY_KEY) || 0);
+          if (last && now - last < 15000) {
+            return;
+          }
+          sessionStorage.setItem(RETRY_KEY, String(now));
+          const persisted = getPersistedContext(true);
+          const target = createPageUrl('Home', window.location.search || '');
+          if (persisted?.platform === 'shopify' && window.top && window.top !== window) {
+            window.location.assign(target);
+          } else {
+            window.location.assign(target);
+          }
+        } catch {
+          // no-op
+        }
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [isShopifyFlow]);

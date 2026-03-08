@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import createApp from '@shopify/app-bridge';
 import { Redirect } from '@shopify/app-bridge/actions';
 import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
+import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 
 function redirectWithAppBridge(url) {
   try {
@@ -54,8 +55,12 @@ export default function Install() {
       });
 
       if (data?.install_url) {
-        if (!redirectWithAppBridge(data.install_url)) {
-          window.location.assign(data.install_url);
+        if (!isTrustedShopifyRedirect(data.install_url)) {
+          throw new Error('Received untrusted install redirect URL');
+        }
+        const safeInstallUrl = normalizeTrustedRedirect(data.install_url, '/install');
+        if (!redirectWithAppBridge(safeInstallUrl)) {
+          window.location.assign(safeInstallUrl);
         }
       } else {
         setError('Failed to generate install URL');

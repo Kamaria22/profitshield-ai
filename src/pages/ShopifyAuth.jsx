@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import createApp from '@shopify/app-bridge';
 import { Redirect } from '@shopify/app-bridge/actions';
 import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
+import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 
 function redirectWithAppBridge(url) {
   try {
@@ -51,9 +52,13 @@ export default function ShopifyAuth() {
         });
         const installUrl = response?.data?.install_url;
         if (!installUrl) throw new Error('No install URL returned from server.');
+        if (!isTrustedShopifyRedirect(installUrl)) {
+          throw new Error('Received untrusted install redirect URL');
+        }
+        const safeInstallUrl = normalizeTrustedRedirect(installUrl, '/install');
         setStatus('redirecting');
-        if (!redirectWithAppBridge(installUrl)) {
-          window.location.assign(installUrl);
+        if (!redirectWithAppBridge(safeInstallUrl)) {
+          window.location.assign(safeInstallUrl);
         }
       } catch (e) {
         setError(e.message || 'Failed to start Shopify OAuth.');

@@ -69,6 +69,7 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/compone
 import { createPageUrl } from '@/components/platformContext';
 import { usePermissions, RequirePermission } from '@/components/usePermissions';
 import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
+import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 
 function redirectWithAppBridge(url) {
   try {
@@ -265,8 +266,12 @@ export default function Settings() {
       });
       
       if (response.data?.install_url) {
-        if (!redirectWithAppBridge(response.data.install_url)) {
-          window.location.assign(response.data.install_url);
+        if (!isTrustedShopifyRedirect(response.data.install_url)) {
+          throw new Error('Received untrusted install redirect URL');
+        }
+        const safeInstallUrl = normalizeTrustedRedirect(response.data.install_url, '/Settings');
+        if (!redirectWithAppBridge(safeInstallUrl)) {
+          window.location.assign(safeInstallUrl);
         }
       } else {
         toast.error('Failed to get install URL');

@@ -212,6 +212,7 @@ export default function Home() {
       };
     },
     enabled: canQuery,
+    retry: false,
     staleTime: 60000,
     gcTime: 120000,
     refetchOnMount: false,

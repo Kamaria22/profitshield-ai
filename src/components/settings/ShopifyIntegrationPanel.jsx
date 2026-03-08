@@ -29,6 +29,7 @@ Shield, Zap, Tag, FileText, ArrowUpDown, Clock, ExternalLink, Loader2, Lock, Web
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
+import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 import TwoWaySyncPanel from '@/components/shopify/TwoWaySyncPanel';
 
 function isEmbedded() {
@@ -159,7 +160,10 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
     try {
       const result = await callSettingsApi({ action: 'reconnect', tenant_id: tenantId, shop: shopDomain });
       if (result?.install_url) {
-        const oauthUrl = result.install_url;
+        if (!isTrustedShopifyRedirect(result.install_url)) {
+          throw new Error('Received untrusted install redirect URL');
+        }
+        const oauthUrl = normalizeTrustedRedirect(result.install_url, '/Integrations');
         const embedded = isEmbedded();
 
         console.log('[ShopifyIntegrationPanel] OAuth start — url:', oauthUrl,
