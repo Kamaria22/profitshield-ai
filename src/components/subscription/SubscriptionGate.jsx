@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
-export default function SubscriptionGate({ tenant, children, feature = null }) {
+export default function SubscriptionGate({ tenant, children, feature = null, suppressTrialBanner = false }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -87,7 +87,7 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
   if (status?.allowed !== false) {
     return (
       <>
-        {status?.is_in_trial && status?.days_remaining <= 7 && (
+        {!suppressTrialBanner && status?.is_in_trial && status?.days_remaining <= 7 && (
           <TrialBanner 
             daysRemaining={status.days_remaining}
             onSubscribe={() => navigate(createPageUrl('Pricing'))}

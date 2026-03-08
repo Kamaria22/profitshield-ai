@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
+import { usePermissions } from '../components/usePermissions';
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
 import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
@@ -52,6 +53,7 @@ const CustomAlerts = lazy(() => import('../components/dashboard/CustomAlerts'));
 
 export default function Home() {
   const resolver = usePlatformResolver();
+  const { role } = usePermissions();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -352,15 +354,7 @@ export default function Home() {
     );
   }
 
-  const showDashboard = !summaryLoading || dashboardSummary;
-
-  if (!showDashboard) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 animate-pulse" style={{boxShadow:'0 0 25px rgba(99,102,241,0.4)'}} />
-      </div>
-    );
-  }
+  const suppressTrialBanner = role === 'owner' || role === 'admin';
 
   if (summaryError) {
     return (
@@ -381,7 +375,7 @@ export default function Home() {
   }
 
   return (
-    <SubscriptionGate tenant={tenantForGate}>
+    <SubscriptionGate tenant={tenantForGate} suppressTrialBanner={suppressTrialBanner}>
       {tutorialOpen && (
         <OnboardingTutorial
           open={tutorialOpen}
