@@ -32,6 +32,15 @@ async function invokeSafe(base44, fn, payload) {
           const fallback = await base44.functions.invoke('supportWatchdog', payload);
           return { ok: true, fn, fallback_fn: 'supportWatchdog', data: fallback?.data || fallback || null };
         }
+        if (fn === 'vulnerabilityWatchdog') {
+          const fallback = await base44.functions.invoke('stabilityAgent', {
+            action: 'watchdog',
+            mode: 'watch',
+            observe_only: true,
+            tenant_id: payload?.tenant_id || undefined
+          });
+          return { ok: true, fn, fallback_fn: 'stabilityAgent', data: fallback?.data || fallback || null };
+        }
         if (fn === 'profitAlertWatchdog') {
           const tenantId = payload?.tenant_id || null;
           if (tenantId) {

@@ -100,11 +100,27 @@ export default function SystemHealth() {
   });
 
   const runVulnerabilityWatchdog = useMutation({
-    mutationFn: () => invokeWithRetry(
-      'vulnerabilityWatchdog',
-      { action: 'watchdog', manual: true, tenant_id: queryFilter?.tenant_id || undefined },
-      { attempts: 2, baseMs: 300 }
-    )
+    mutationFn: async () => {
+      try {
+        return await invokeWithRetry(
+          'vulnerabilityWatchdog',
+          { action: 'watchdog', manual: true, tenant_id: queryFilter?.tenant_id || undefined },
+          { attempts: 2, baseMs: 300 }
+        );
+      } catch (error) {
+        const status = Number(error?.status || error?.response?.status || 0);
+        const msg = String(error?.message || '').toLowerCase();
+        const missing = status === 404 || msg.includes('deployment does not exist') || msg.includes('not found');
+        if (missing) {
+          return invokeWithRetry(
+            'stabilityAgent',
+            { action: 'watchdog', mode: 'watch', observe_only: true, tenant_id: queryFilter?.tenant_id || undefined },
+            { attempts: 2, baseMs: 300 }
+          );
+        }
+        throw error;
+      }
+    }
   });
 
   const runProfitAlertWatchdog = useMutation({

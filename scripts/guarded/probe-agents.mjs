@@ -7,7 +7,7 @@ const OUT_FILE = path.join(OUT_DIR, 'agent-probe.json');
 
 const APP_URL = (process.env.APP_URL || '').replace(/\/$/, '');
 const APP_ID = process.env.APP_ID || '69921553e99437d437b39bf3';
-const FALLBACK_COVERED_PROBES = new Set(['selfHeal', 'supportGuardian']);
+const FALLBACK_COVERED_PROBES = new Set(['selfHeal', 'supportGuardian', 'vulnerabilityWatchdog']);
 
 const probes = [
   { id: 'selfHeal', fn: 'selfHeal', body: { action: 'get_flags' } },
@@ -81,6 +81,14 @@ async function run() {
         url = candidate;
         // stop at first non-404 response
         if (next.status !== 404) break;
+      }
+      if (p.id === 'vulnerabilityWatchdog' && probe?.status === 404) {
+        const fallbackUrl = `${APP_URL}/api/functions/stabilityAgent`;
+        const fallback = await postProbe(fallbackUrl, { action: 'watchdog', mode: 'watch', observe_only: true }, 2);
+        if (fallback.status >= 200 && fallback.status < 300) {
+          probe = fallback;
+          url = `${fallbackUrl} (fallback for vulnerabilityWatchdog)`;
+        }
       }
       const ok = probe.status >= 200 && probe.status < 300 && probe.data?.ok !== false;
       const missingCovered = FALLBACK_COVERED_PROBES.has(p.id) && (probe.status === 404 || probe.status === 503);
