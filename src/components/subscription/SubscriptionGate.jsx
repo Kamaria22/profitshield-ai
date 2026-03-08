@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/components/platformContext';
+import { usePermissions } from '@/components/usePermissions';
 import { 
   Lock, 
   Clock, 
@@ -12,15 +13,16 @@ import {
   ArrowRight,
   Shield
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
 export default function SubscriptionGate({ tenant, children, feature = null }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { role } = usePermissions();
+  const isOwnerOrAdmin = role === 'owner' || role === 'admin';
 
   useEffect(() => {
     let mounted = true;
@@ -87,7 +89,7 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
   if (status?.allowed !== false) {
     return (
       <>
-        {status?.is_in_trial && status?.days_remaining <= 7 && (
+        {status?.is_in_trial && status?.days_remaining <= 7 && !isOwnerOrAdmin && (
           <TrialBanner 
             daysRemaining={status.days_remaining}
             onSubscribe={() => navigate(createPageUrl('Pricing'))}
@@ -335,7 +337,7 @@ export function useFeatureAccess(tenantId, feature) {
           feature
         });
         setAccess({ loading: false, ...response.data });
-      } catch (e) {
+      } catch {
         setAccess({ loading: false, allowed: true });
       }
     };

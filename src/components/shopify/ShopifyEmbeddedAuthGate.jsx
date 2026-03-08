@@ -19,6 +19,7 @@ import { base44 } from '@/api/base44Client';
 import { getFreshAppBridgeToken, hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 import { persistContext } from '@/components/platformContext';
 import { stabilityAgent } from '@/agents/StabilityAgent';
+import { appParams } from '@/lib/app-params';
 import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import ShopifyOnboarding from '@/pages/ShopifyOnboarding';
 import createApp from '@shopify/app-bridge';
@@ -28,6 +29,7 @@ import { Redirect } from '@shopify/app-bridge/actions';
 
 const SHOPIFY_AUTH_KEY = 'shopify_embedded_auth';
 const AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const SESSION_EXCHANGE_ROUTE_KEY = 'shopify_session_exchange_route';
 
 // ─── CSP via HTTP Headers ───────────────────────────────────────────────────
 // NOTE: CSP frame-ancestors must be delivered via HTTP headers, not meta tags.
@@ -118,7 +120,6 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
   useEffect(() => {
     if (!embedded) return;
     runAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, retryCount]);
 
 async function exchangeSession({ sessionToken, shopDomain }) {
@@ -127,83 +128,97 @@ async function exchangeSession({ sessionToken, shopDomain }) {
     shop: shopDomain,
   };
 
-  // Primary path: public Base44 function route.
-  try {
-      const directRes = await stabilityAgent.safeFetch('/api/functions/shopifySessionExchange', {
+  const appId = appParams?.appId;
+  const preferredRoute = sessionStorage.getItem(SESSION_EXCHANGE_ROUTE_KEY);
+  const routeCandidates = [
+    preferredRoute,
+    appId ? `/api/apps/${appId}/functions/shopifySessionExchange` : null,
+    '/api/functions/shopifySessionExchange'
+  ].filter(Boolean);
+
+  // Primary path: public Base44 function routes.
+  for (const route of routeCandidates) {
+    try {
+      const directRes = await stabilityAgent.safeFetch(route, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        retries: 1,
+        retries: 0,
       }, { authenticated: false, reason: 'session_exchange_http_error' });
+
       if (directRes?.ok && directRes?.data && typeof directRes.data === 'object') {
+        sessionStorage.setItem(SESSION_EXCHANGE_ROUTE_KEY, route);
         return { data: directRes.data };
       }
+
       if (directRes?.status && directRes.status !== 404 && directRes?.data && typeof directRes.data === 'object') {
+        sessionStorage.setItem(SESSION_EXCHANGE_ROUTE_KEY, route);
         return { data: directRes.data };
       }
     } catch (e) {
-      console.warn('[ShopifyEmbeddedAuthGate] Direct /api/functions/shopifySessionExchange failed:', e?.message || String(e));
-    }
-
-    // Fallback path: Base44 function invoke for compatibility with app-scoped routing.
-    try {
-      const invokeResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
-        attempts: 2,
-        baseDelayMs: 300
-      });
-      if (invokeResult && typeof invokeResult === 'object') return invokeResult;
-    } catch (e) {
-      console.warn('[ShopifyEmbeddedAuthGate] shopifySessionExchange invoke failed:', e?.message || String(e));
-    }
-
-    // Durable fallback path: shopifyAuth action-based exchange.
-    try {
-      const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifyAuth', {
-        action: 'session_exchange',
-        ...payload,
-      }), {
-        attempts: 2,
-        baseDelayMs: 300
-      });
-      if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
-    } catch (e) {
-      console.warn('[ShopifyEmbeddedAuthGate] shopifyAuth session_exchange fallback failed:', e?.message || String(e));
-    }
-
-    // Final fallback path: resolve live integration context directly.
-    try {
-      const resolver = await stabilityAgent.retry(() => base44.functions.invoke('resolvePlatformContext', {
-        shop: shopDomain
-      }), {
-        attempts: 2,
-        baseDelayMs: 300
-      });
-      const rd = resolver?.data || {};
-      if (rd?.tenant_id && rd?.integration_id) {
-        return {
-          data: {
-            authenticated: true,
-            fallback: true,
-            fallback_source: 'resolvePlatformContext',
-            shop_domain: rd.store_key || shopDomain,
-            tenant_id: rd.tenant_id,
-            tenant_name: rd.tenant?.shop_name || rd.store_key || shopDomain,
-            integration_id: rd.integration_id,
-            integration_status: rd.integration?.status || 'connected',
-            shopify_authenticated: true,
-            is_new_tenant: false,
-          }
-        };
-      }
-      if (rd?.error) {
-        return { data: { authenticated: false, ok: false, fallback: true, reason: rd.error } };
-      }
-      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
-    } catch (e) {
-      console.warn('[ShopifyEmbeddedAuthGate] resolvePlatformContext fallback failed:', e?.message || String(e));
-      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
+      console.warn(`[ShopifyEmbeddedAuthGate] Direct ${route} failed:`, e?.message || String(e));
     }
   }
+
+  // Fallback path: Base44 function invoke for compatibility with app-scoped routing.
+  try {
+    const invokeResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifySessionExchange', payload), {
+      attempts: 2,
+      baseDelayMs: 300
+    });
+    if (invokeResult && typeof invokeResult === 'object') return invokeResult;
+  } catch (e) {
+    console.warn('[ShopifyEmbeddedAuthGate] shopifySessionExchange invoke failed:', e?.message || String(e));
+  }
+
+  // Durable fallback path: shopifyAuth action-based exchange.
+  try {
+    const fallbackResult = await stabilityAgent.retry(() => base44.functions.invoke('shopifyAuth', {
+      action: 'session_exchange',
+      ...payload,
+    }), {
+      attempts: 2,
+      baseDelayMs: 300
+    });
+    if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
+  } catch (e) {
+    console.warn('[ShopifyEmbeddedAuthGate] shopifyAuth session_exchange fallback failed:', e?.message || String(e));
+  }
+
+  // Final fallback path: resolve live integration context directly.
+  try {
+    const resolver = await stabilityAgent.retry(() => base44.functions.invoke('resolvePlatformContext', {
+      shop: shopDomain
+    }), {
+      attempts: 2,
+      baseDelayMs: 300
+    });
+    const rd = resolver?.data || {};
+    if (rd?.tenant_id && rd?.integration_id) {
+      return {
+        data: {
+          authenticated: true,
+          fallback: true,
+          fallback_source: 'resolvePlatformContext',
+          shop_domain: rd.store_key || shopDomain,
+          tenant_id: rd.tenant_id,
+          tenant_name: rd.tenant?.shop_name || rd.store_key || shopDomain,
+          integration_id: rd.integration_id,
+          integration_status: rd.integration?.status || 'connected',
+          shopify_authenticated: true,
+          is_new_tenant: false,
+        }
+      };
+    }
+    if (rd?.error) {
+      return { data: { authenticated: false, ok: false, fallback: true, reason: rd.error } };
+    }
+    return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
+  } catch (e) {
+    console.warn('[ShopifyEmbeddedAuthGate] resolvePlatformContext fallback failed:', e?.message || String(e));
+    return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
+  }
+}
 
   async function runAuth() {
     if (inFlight.current) return;
