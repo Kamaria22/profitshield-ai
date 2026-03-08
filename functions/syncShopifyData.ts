@@ -4,11 +4,8 @@ import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Allow embedded/scheduler invocations where Base44 session may not exist yet.
+    try { await base44.auth.me(); } catch (_) {}
     
     const { tenant_id, days = 30 } = await req.json();
     
@@ -33,12 +30,23 @@ Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
       [],
       'syncShopifyData.token_lookup'
     );
+    const shopifyTokens = tokens.filter((t) => t.platform === 'shopify');
     
-    if (tokens.length === 0) {
+    if (shopifyTokens.length === 0) {
       return Response.json({ error: 'No valid token found' }, { status: 400 });
     }
     
-    const accessToken = await decryptToken(tokens[0].encrypted_access_token);
+    const accessToken = await decryptToken(shopifyTokens[0].encrypted_access_token);
+    const integrations = await safeFilter(
+      () => base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id, platform: 'shopify' }),
+      [],
+      'syncShopifyData.integration_lookup'
+    );
+    const integration = integrations.find((i) => i.status === 'connected') || integrations[0] || null;
+    const shopDomain = integration?.store_key || tenant.shop_domain;
+    if (!shopDomain) {
+      return Response.json({ error: 'Missing Shopify shop domain for tenant' }, { status: 400 });
+    }
     
     // Calculate date range
     const startDate = new Date();
@@ -51,10 +59,10 @@ Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
     let hasMore = true;
     
     while (hasMore && allOrders.length < 500) {
-      let url = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?status=any&limit=250&created_at_min=${startDateStr}`;
+      let url = `https://${shopDomain}/admin/api/2024-01/orders.json?status=any&limit=250&created_at_min=${startDateStr}`;
       
       if (pageInfo) {
-        url = `https://${tenant.shop_domain}/admin/api/2024-01/orders.json?page_info=${pageInfo}&limit=250`;
+        url = `https://${shopDomain}/admin/api/2024-01/orders.json?page_info=${pageInfo}&limit=250`;
       }
       
       const response = await fetch(url, {

@@ -75,8 +75,12 @@ async function shopifyFetchWithRetry(shopDomain, accessToken, path, init = {}, m
 Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    let user = null;
+    try { user = await base44.auth.me(); } catch (_) {}
+    const role = (user?.role || user?.app_role || '').toLowerCase();
+    if (user && role !== 'admin' && role !== 'owner') {
+      return Response.json({ error: 'Admin/owner only' }, { status: 403 });
+    }
 
     const { integration_id } = await req.json();
     if (!integration_id) return Response.json({ error: 'Missing integration_id' }, { status: 400 });

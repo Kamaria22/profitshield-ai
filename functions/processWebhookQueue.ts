@@ -279,8 +279,9 @@ Deno.serve(async (req) => {
     let isAutomated = false;
     try {
       const user = await base44.auth.me();
-      if (user && user.role !== 'admin') {
-        return Response.json({ error: 'Admin only' }, { status: 403 });
+      const role = (user?.role || user?.app_role || '').toLowerCase();
+      if (user && role !== 'admin' && role !== 'owner') {
+        return Response.json({ error: 'Admin/owner only' }, { status: 403 });
       }
     } catch {
       // No session = called from scheduler automation — allow
