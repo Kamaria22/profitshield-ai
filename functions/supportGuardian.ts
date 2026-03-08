@@ -1,3 +1,4 @@
+// redeploy trigger: ensure Base44 rebuilds function registry
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import {
   startAgentExecution,

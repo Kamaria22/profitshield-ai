@@ -14,6 +14,7 @@
  *
  * Special: run_watchdog = runs full 30-min health check inline
  */
+// redeploy trigger: ensure Base44 rebuilds function registry
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard } from './helpers/endpointSafety.ts';
 

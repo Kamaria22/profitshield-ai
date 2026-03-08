@@ -196,7 +196,7 @@ export default function Home() {
     gcTime: 120000,
     refetchOnMount: false,
     refetchOnWindowFocus: false
-  }, [fetchEntitySummary, dashboardSummaryKey, queryClient]);
+  });
 
   const { data: profitLeaks = [] } = useQuery({
     queryKey: profitLeaksKey,

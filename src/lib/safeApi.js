@@ -1,5 +1,9 @@
 import { base44 } from '@/api/base44Client';
 
+const FUNCTION_FALLBACKS = {
+  syncShopifyOrders: ['syncShopifyData'],
+};
+
 function extractHttpStatus(error) {
   const direct = error?.status || error?.response?.status || error?.data?.status;
   if (Number.isFinite(Number(direct))) return Number(direct);
@@ -29,10 +33,27 @@ export async function retryAsync(fn, options = {}) {
 }
 
 export async function invokeWithRetry(name, payload = {}, options = {}) {
-  return retryAsync(
-    () => base44.functions.invoke(name, payload),
-    { attempts: options.attempts || 3, baseMs: options.baseMs || 300 }
-  );
+  const attempts = options.attempts || 3;
+  const baseMs = options.baseMs || 300;
+  const candidates = [name, ...(FUNCTION_FALLBACKS[name] || [])];
+  let lastError = null;
+
+  for (const fnName of candidates) {
+    try {
+      return await retryAsync(
+        () => base44.functions.invoke(fnName, payload),
+        { attempts, baseMs }
+      );
+    } catch (error) {
+      lastError = error;
+      const status = extractHttpStatus(error);
+      if (status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error(`Function invoke failed: ${name}`);
 }
 
 export function withUiGuard(fn, onError) {

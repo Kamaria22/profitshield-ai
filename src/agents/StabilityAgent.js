@@ -3,6 +3,7 @@ class StabilityAgent {
     this.maxAttempts = 3;
     this.baseDelayMs = 250;
     this.lastSelfHealTriggerAt = 0;
+    this.selfHealUnavailableUntil = 0;
   }
 
   logError(context, error, meta = {}) {
@@ -119,9 +120,10 @@ class StabilityAgent {
 
   async triggerSelfHealRetry(status, meta = {}) {
     const now = Date.now();
+    if (now < this.selfHealUnavailableUntil) return;
     if (now - this.lastSelfHealTriggerAt < 30000) return;
     this.lastSelfHealTriggerAt = now;
-    await this.safeFetch('/api/functions/selfHeal', {
+    const result = await this.safeFetch('/api/functions/selfHeal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -136,6 +138,9 @@ class StabilityAgent {
       attempts: 2,
       baseDelayMs: 400
     });
+    if (Number(result?.status) === 404) {
+      this.selfHealUnavailableUntil = Date.now() + 10 * 60 * 1000;
+    }
   }
 }
 
