@@ -1,156 +1,108 @@
-/**
- * pages.config.js - Page routing configuration
- * 
- * This file is AUTO-GENERATED. Do not add imports or modify PAGES manually.
- * Pages are auto-registered when you create files in the ./pages/ folder.
- * 
- * THE ONLY EDITABLE VALUE: mainPage
- * This controls which page is the landing page (shown when users visit the app).
- * 
- * Example file structure:
- * 
- *   import HomePage from './pages/HomePage';
- *   import Dashboard from './pages/Dashboard';
- *   import Settings from './pages/Settings';
- *   
- *   export const PAGES = {
- *       "HomePage": HomePage,
- *       "Dashboard": Dashboard,
- *       "Settings": Settings,
- *   }
- *   
- *   export const pagesConfig = {
- *       mainPage: "HomePage",
- *       Pages: PAGES,
- *   };
- * 
- * Example with Layout (wraps all pages):
- *
- *   import Home from './pages/Home';
- *   import Settings from './pages/Settings';
- *   import __Layout from './Layout.jsx';
- *
- *   export const PAGES = {
- *       "Home": Home,
- *       "Settings": Settings,
- *   }
- *
- *   export const pagesConfig = {
- *       mainPage: "Home",
- *       Pages: PAGES,
- *       Layout: __Layout,
- *   };
- *
- * To change the main page from HomePage to Dashboard, use find_replace:
- *   Old: mainPage: "HomePage",
- *   New: mainPage: "Dashboard",
- *
- * The mainPage value must match a key in the PAGES object exactly.
- */
-import AIInsights from './pages/AIInsights';
-import AIModelGovernance from './pages/AIModelGovernance';
-import Achievements from './pages/Achievements';
-import AdminEmailCenter from './pages/AdminEmailCenter';
-import Alerts from './pages/Alerts';
-import AppStoreListing from './pages/AppStoreListing';
-import AppStoreSubmission from './pages/AppStoreSubmission';
-import AuditLogs from './pages/AuditLogs';
-import Billing from './pages/Billing';
-import CookiePolicy from './pages/CookiePolicy';
-import Customers from './pages/Customers';
-import DataCompliance from './pages/DataCompliance';
-import DataProcessingAgreement from './pages/DataProcessingAgreement';
-import Download from './pages/Download';
-import Embedded from './pages/Embedded';
-import FounderDashboard from './pages/FounderDashboard';
-import GitHubPullRequests from './pages/GitHubPullRequests';
-import HelpCenter from './pages/HelpCenter';
-import Home from './pages/Home';
-import Install from './pages/Install';
-import Integrations from './pages/Integrations';
-import Intelligence from './pages/Intelligence';
-import NativeBuildGuide from './pages/NativeBuildGuide';
-import NativeHealth from './pages/NativeHealth';
-import Onboarding from './pages/Onboarding';
-import Orders from './pages/Orders';
-import PatchReview from './pages/PatchReview';
-import PerformanceAudit from './pages/PerformanceAudit';
-import PnLAnalytics from './pages/PnLAnalytics';
-import Pricing from './pages/Pricing';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import Products from './pages/Products';
-import Referrals from './pages/Referrals';
-import ResolverTestHarness from './pages/ResolverTestHarness';
-import ReviewerProof from './pages/ReviewerProof';
-import SelectStore from './pages/SelectStore';
-import SelfHealingCenter from './pages/SelfHealingCenter';
-import Settings from './pages/Settings';
-import Shipping from './pages/Shipping';
-import ShopifyAuth from './pages/ShopifyAuth';
-import ShopifyCallback from './pages/ShopifyCallback';
-import ShopifyOnboarding from './pages/ShopifyOnboarding';
-import SupportInbox from './pages/SupportInbox';
-import SupportContact from './pages/SupportContact';
-import SystemHealth from './pages/SystemHealth';
-import Tasks from './pages/Tasks';
-import TermsOfService from './pages/TermsOfService';
-import VideoJobs from './pages/VideoJobs';
-import __Layout from './Layout.jsx';
+import { lazy } from 'react';
 
+const AIInsights = lazy(() => import('./pages/AIInsights'));
+const AIModelGovernance = lazy(() => import('./pages/AIModelGovernance'));
+const Achievements = lazy(() => import('./pages/Achievements'));
+const AdminEmailCenter = lazy(() => import('./pages/AdminEmailCenter'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const AppStoreListing = lazy(() => import('./pages/AppStoreListing'));
+const AppStoreSubmission = lazy(() => import('./pages/AppStoreSubmission'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const Billing = lazy(() => import('./pages/Billing'));
+const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
+const Customers = lazy(() => import('./pages/Customers'));
+const DataCompliance = lazy(() => import('./pages/DataCompliance'));
+const DataProcessingAgreement = lazy(() => import('./pages/DataProcessingAgreement'));
+const Download = lazy(() => import('./pages/Download'));
+const Embedded = lazy(() => import('./pages/Embedded'));
+const FounderDashboard = lazy(() => import('./pages/FounderDashboard'));
+const GitHubPullRequests = lazy(() => import('./pages/GitHubPullRequests'));
+const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+const Home = lazy(() => import('./pages/Home'));
+const Install = lazy(() => import('./pages/Install'));
+const Integrations = lazy(() => import('./pages/Integrations'));
+const Intelligence = lazy(() => import('./pages/Intelligence'));
+const NativeBuildGuide = lazy(() => import('./pages/NativeBuildGuide'));
+const NativeHealth = lazy(() => import('./pages/NativeHealth'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Orders = lazy(() => import('./pages/Orders'));
+const PatchReview = lazy(() => import('./pages/PatchReview'));
+const PerformanceAudit = lazy(() => import('./pages/PerformanceAudit'));
+const PnLAnalytics = lazy(() => import('./pages/PnLAnalytics'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Products = lazy(() => import('./pages/Products'));
+const Referrals = lazy(() => import('./pages/Referrals'));
+const ResolverTestHarness = lazy(() => import('./pages/ResolverTestHarness'));
+const ReviewerProof = lazy(() => import('./pages/ReviewerProof'));
+const SelectStore = lazy(() => import('./pages/SelectStore'));
+const SelfHealingCenter = lazy(() => import('./pages/SelfHealingCenter'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Shipping = lazy(() => import('./pages/Shipping'));
+const ShopifyAuth = lazy(() => import('./pages/ShopifyAuth'));
+const ShopifyCallback = lazy(() => import('./pages/ShopifyCallback'));
+const ShopifyOnboarding = lazy(() => import('./pages/ShopifyOnboarding'));
+const SupportInbox = lazy(() => import('./pages/SupportInbox'));
+const SupportContact = lazy(() => import('./pages/SupportContact'));
+const SystemHealth = lazy(() => import('./pages/SystemHealth'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const VideoJobs = lazy(() => import('./pages/VideoJobs'));
+const __Layout = lazy(() => import('./Layout.jsx'));
 
 export const PAGES = {
-    "AIInsights": AIInsights,
-    "AIModelGovernance": AIModelGovernance,
-    "Achievements": Achievements,
-    "AdminEmailCenter": AdminEmailCenter,
-    "Alerts": Alerts,
-    "AppStoreListing": AppStoreListing,
-    "AppStoreSubmission": AppStoreSubmission,
-    "AuditLogs": AuditLogs,
-    "Billing": Billing,
-    "CookiePolicy": CookiePolicy,
-    "Customers": Customers,
-    "DataCompliance": DataCompliance,
-    "DataProcessingAgreement": DataProcessingAgreement,
-    "Download": Download,
-    "Embedded": Embedded,
-    "FounderDashboard": FounderDashboard,
-    "GitHubPullRequests": GitHubPullRequests,
-    "HelpCenter": HelpCenter,
-    "Home": Home,
-    "Install": Install,
-    "Integrations": Integrations,
-    "Intelligence": Intelligence,
-    "NativeBuildGuide": NativeBuildGuide,
-    "NativeHealth": NativeHealth,
-    "Onboarding": Onboarding,
-    "Orders": Orders,
-    "PatchReview": PatchReview,
-    "PerformanceAudit": PerformanceAudit,
-    "PnLAnalytics": PnLAnalytics,
-    "Pricing": Pricing,
-    "PrivacyPolicy": PrivacyPolicy,
-    "Products": Products,
-    "Referrals": Referrals,
-    "ResolverTestHarness": ResolverTestHarness,
-    "ReviewerProof": ReviewerProof,
-    "SelectStore": SelectStore,
-    "SelfHealingCenter": SelfHealingCenter,
-    "Settings": Settings,
-    "Shipping": Shipping,
-    "ShopifyAuth": ShopifyAuth,
-    "ShopifyCallback": ShopifyCallback,
-    "ShopifyOnboarding": ShopifyOnboarding,
-    "SupportInbox": SupportInbox,
-    "SupportContact": SupportContact,
-    "SystemHealth": SystemHealth,
-    "Tasks": Tasks,
-    "TermsOfService": TermsOfService,
-    "VideoJobs": VideoJobs,
-}
+  AIInsights,
+  AIModelGovernance,
+  Achievements,
+  AdminEmailCenter,
+  Alerts,
+  AppStoreListing,
+  AppStoreSubmission,
+  AuditLogs,
+  Billing,
+  CookiePolicy,
+  Customers,
+  DataCompliance,
+  DataProcessingAgreement,
+  Download,
+  Embedded,
+  FounderDashboard,
+  GitHubPullRequests,
+  HelpCenter,
+  Home,
+  Install,
+  Integrations,
+  Intelligence,
+  NativeBuildGuide,
+  NativeHealth,
+  Onboarding,
+  Orders,
+  PatchReview,
+  PerformanceAudit,
+  PnLAnalytics,
+  Pricing,
+  PrivacyPolicy,
+  Products,
+  Referrals,
+  ResolverTestHarness,
+  ReviewerProof,
+  SelectStore,
+  SelfHealingCenter,
+  Settings,
+  Shipping,
+  ShopifyAuth,
+  ShopifyCallback,
+  ShopifyOnboarding,
+  SupportInbox,
+  SupportContact,
+  SystemHealth,
+  Tasks,
+  TermsOfService,
+  VideoJobs,
+};
 
 export const pagesConfig = {
-    mainPage: "Home",
-    Pages: PAGES,
-    Layout: __Layout,
+  mainPage: 'Home',
+  Pages: PAGES,
+  Layout: __Layout,
 };

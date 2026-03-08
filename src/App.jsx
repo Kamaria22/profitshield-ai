@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -11,7 +11,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+const MainPage = mainPageKey ? Pages[mainPageKey] : (() => null);
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -90,6 +90,11 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
+    <Suspense fallback={
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    }>
     <Routes>
       <Route path="/support/contact" element={
         <LayoutWrapper currentPageName="SupportContact">
@@ -204,11 +209,33 @@ const AuthenticatedApp = () => {
       ))}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 
 
 function App() {
+  useEffect(() => {
+    let timeoutId = null;
+    let idleId = null;
+    const preloadCorePages = () => {
+      import('./pages/Home');
+      import('./pages/Orders');
+      import('./pages/Integrations');
+      import('./pages/PnLAnalytics');
+    };
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(preloadCorePages, { timeout: 1200 });
+    } else {
+      timeoutId = setTimeout(preloadCorePages, 500);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (idleId && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, []);
 
   return (
     <AuthProvider>
