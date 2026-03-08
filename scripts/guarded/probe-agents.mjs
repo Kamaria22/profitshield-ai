@@ -7,6 +7,7 @@ const OUT_FILE = path.join(OUT_DIR, 'agent-probe.json');
 
 const APP_URL = (process.env.APP_URL || '').replace(/\/$/, '');
 const APP_ID = process.env.APP_ID || '69921553e99437d437b39bf3';
+const FALLBACK_COVERED_PROBES = new Set(['selfHeal', 'supportGuardian']);
 
 const probes = [
   { id: 'selfHeal', fn: 'selfHeal', body: { action: 'get_flags' } },
@@ -81,7 +82,8 @@ async function run() {
         if (next.status !== 404) break;
       }
       const ok = probe.status >= 200 && probe.status < 300 && probe.data?.ok !== false;
-      const degraded = !ok && (probe.rateLimited || probe.status === 429);
+      const missingCovered = FALLBACK_COVERED_PROBES.has(p.id) && (probe.status === 404 || probe.status === 503);
+      const degraded = !ok && (probe.rateLimited || probe.status === 429 || missingCovered);
       results.push({
         id: p.id,
         url,

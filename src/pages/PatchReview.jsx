@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/components/platformContext';
 import PatchBundleCard from '@/components/selfheal/PatchBundleCard';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { invokeSelfHealSafe } from '@/lib/safeApi';
 
 export default function PatchReview() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function PatchReview() {
     setLoading(true);
     setErrorMessage('');
     try {
-      const res = await base44.functions.invoke('selfHeal', { action: 'get_incidents' });
+      const res = await invokeSelfHealSafe({ action: 'get_incidents' });
       setPatches(res.data?.pending_patches || []);
     } catch (e) {
       console.error(e);
@@ -41,7 +42,7 @@ export default function PatchReview() {
 
   const approveP = async (id) => {
     try {
-      await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: id });
+      await invokeSelfHealSafe({ action: 'approve_patch', patch_bundle_id: id });
       await loadPatches();
       setErrorMessage('');
     } catch (e) {
@@ -50,7 +51,7 @@ export default function PatchReview() {
   };
   const rejectP = async (id) => {
     try {
-      await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: id });
+      await invokeSelfHealSafe({ action: 'reject_patch', patch_bundle_id: id });
       await loadPatches();
       setErrorMessage('');
     } catch (e) {

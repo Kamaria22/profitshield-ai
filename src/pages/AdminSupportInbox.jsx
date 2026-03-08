@@ -1,11 +1,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import SupportInbox from '@/pages/SupportInbox';
 import { usePermissions } from '@/components/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { invokeSupportGuardianSafe } from '@/lib/safeApi';
 
 function isAdminOwner(user, role) {
   const r = (role || user?.role || user?.app_role || '').toLowerCase();
@@ -18,7 +18,7 @@ export default function AdminSupportInbox() {
   const { data: diagnostics = null } = useQuery({
     queryKey: ['admin-support-diagnostics'],
     queryFn: async () => {
-      const res = await base44.functions.invoke('supportGuardian', { action: 'run_watchdog' });
+      const res = await invokeSupportGuardianSafe({ action: 'run_watchdog' });
       return res?.data || null;
     },
     refetchInterval: 60000
@@ -43,4 +43,3 @@ export default function AdminSupportInbox() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
+import { invokeSelfHealSafe } from '@/lib/safeApi';
 import { Shield, RefreshCw, Activity, AlertTriangle, CheckCircle, Zap, Loader2, Play, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,8 +37,8 @@ export default function SelfHealingCenter() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await base44.functions.invoke('selfHeal', { action: 'get_incidents', limit: 100 });
-      setData(res.data);
+      const resolved = await invokeSelfHealSafe({ action: 'get_incidents', limit: 100 });
+      setData(resolved?.data || { events: [], queue: { pending: 0, dead_letter: 0 }, pending_patches: [] });
       setLastUpdatedAt(new Date().toISOString());
       setErrorMessage('');
     } catch (e) {
@@ -50,7 +51,7 @@ export default function SelfHealingCenter() {
   const runWatchdog = async () => {
     setRunning(true);
     try {
-      const res = await base44.functions.invoke('selfHeal', { action: 'run_watchdog' });
+      const res = await invokeSelfHealSafe({ action: 'run_watchdog' });
       setWatchdogResult(res.data);
       await loadData();
       setErrorMessage('');
@@ -64,7 +65,7 @@ export default function SelfHealingCenter() {
   const healSubsystem = async (action, extra = {}) => {
     setHealingSubsystem(action);
     try {
-      await base44.functions.invoke('selfHeal', { action, ...extra });
+      await invokeSelfHealSafe({ action, ...extra });
       await loadData();
       setErrorMessage('');
     } catch (e) {
@@ -76,7 +77,7 @@ export default function SelfHealingCenter() {
 
   const acknowledgeEvent = async (eventId) => {
     try {
-      await base44.functions.invoke('selfHeal', { action: 'acknowledge_event', event_id: eventId });
+      await invokeSelfHealSafe({ action: 'acknowledge_event', event_id: eventId });
       setData(prev => prev ? {
         ...prev,
         events: prev.events.map(e => e.id === eventId ? { ...e, acknowledged: true } : e)
@@ -89,7 +90,7 @@ export default function SelfHealingCenter() {
 
   const approveP = async (patchId) => {
     try {
-      await base44.functions.invoke('selfHeal', { action: 'approve_patch', patch_bundle_id: patchId });
+      await invokeSelfHealSafe({ action: 'approve_patch', patch_bundle_id: patchId });
       await loadData();
       setErrorMessage('');
     } catch (e) {
@@ -99,7 +100,7 @@ export default function SelfHealingCenter() {
 
   const rejectP = async (patchId) => {
     try {
-      await base44.functions.invoke('selfHeal', { action: 'reject_patch', patch_bundle_id: patchId });
+      await invokeSelfHealSafe({ action: 'reject_patch', patch_bundle_id: patchId });
       await loadData();
       setErrorMessage('');
     } catch (e) {

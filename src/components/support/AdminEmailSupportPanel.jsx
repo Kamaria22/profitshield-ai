@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { DEFAULT_SUPPORT_EMAIL, EmailService } from '@/components/support/emailSupportService';
 import { useAuth } from '@/lib/AuthContext';
+import { invokeSelfHealSafe, invokeSupportGuardianSafe } from '@/lib/safeApi';
 
 function isAdminOwner(user) {
   const role = (user?.role || user?.app_role || '').toLowerCase();
@@ -54,8 +55,8 @@ export default function AdminEmailSupportPanel({ tenantId }) {
 
   const guardianMutation = useMutation({
     mutationFn: async () => {
-      const guardian = await base44.functions.invoke('supportGuardian', { action: 'run_watchdog', tenant_id: tenantId });
-      const heal = await base44.functions.invoke('selfHeal', { action: 'run_watchdog' }).catch(() => ({ data: { ok: false } }));
+      const guardian = await invokeSupportGuardianSafe({ action: 'run_watchdog', tenant_id: tenantId });
+      const heal = await invokeSelfHealSafe({ action: 'run_watchdog' }).catch(() => ({ data: { ok: false } }));
       return { guardian: guardian?.data, heal: heal?.data };
     },
     onSuccess: () => {

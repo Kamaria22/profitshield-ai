@@ -1,7 +1,7 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
 import { AlertTriangle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { invokeSelfHealSafe } from "@/lib/safeApi";
 
 export class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,7 +15,7 @@ export class AppErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     try {
-      base44.functions.invoke("selfHeal", {
+      invokeSelfHealSafe({
         action: "publish_incident",
         subsystem: "frontend",
         error: String(error?.message || error),

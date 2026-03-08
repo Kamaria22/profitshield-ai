@@ -3,7 +3,7 @@
  * Classifies errors and dispatches to selfHeal backend.
  * Non-admin users see friendly "Reconnecting..." messages only.
  */
-import { base44 } from '@/api/base44Client';
+import { invokeSelfHealSafe } from '@/lib/safeApi';
 
 const SUBSYSTEMS = {
   AUTH: 'AUTH',
@@ -45,7 +45,7 @@ async function flush() {
   const batch = publishQueue.splice(0, 10);
   try {
     for (const incident of batch) {
-      await base44.functions.invoke('selfHeal', {
+      await invokeSelfHealSafe({
         action: 'publish_incident',
         ...incident
       });

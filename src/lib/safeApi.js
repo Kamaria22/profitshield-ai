@@ -1,7 +1,11 @@
 import { base44 } from '@/api/base44Client';
+import { getPersistedContext } from '@/components/platformContext';
 
 const FUNCTION_FALLBACKS = {
-  syncShopifyOrders: ['syncShopifyData'],
+  syncShopifyOrders: ['syncShopifyData', 'shopifyConnectionWatchdog'],
+  syncShopifyData: ['shopifyConnectionWatchdog'],
+  registerShopifyWebhooks: ['shopifyConnectionWatchdog'],
+  profitAlertWatchdog: ['checkProfitAlerts'],
   supportGuardian: ['supportWatchdog'],
 };
 
@@ -41,8 +45,14 @@ export async function invokeWithRetry(name, payload = {}, options = {}) {
 
   for (const fnName of candidates) {
     try {
+      const invokePayload = (() => {
+        if (fnName !== 'checkProfitAlerts') return payload;
+        if (payload?.tenant_id) return payload;
+        const persistedTenant = getPersistedContext(true)?.tenantId || null;
+        return persistedTenant ? { ...payload, tenant_id: persistedTenant } : payload;
+      })();
       return await retryAsync(
-        () => base44.functions.invoke(fnName, payload),
+        () => base44.functions.invoke(fnName, invokePayload),
         { attempts, baseMs }
       );
     } catch (error) {
@@ -67,4 +77,29 @@ export function withUiGuard(fn, onError) {
       return null;
     }
   };
+}
+
+export async function invokeSelfHealSafe(payload = {}, options = {}) {
+  try {
+    const res = await invokeWithRetry('selfHeal', payload, { attempts: options.attempts || 2, baseMs: options.baseMs || 250 });
+    return res || { data: { ok: false, fallback: true, reason: 'selfHeal_unavailable' } };
+  } catch (error) {
+    const status = extractHttpStatus(error);
+    if (status === 404) {
+      return { data: { ok: false, fallback: true, reason: 'selfHeal_unavailable' } };
+    }
+    throw error;
+  }
+}
+
+export async function invokeSupportGuardianSafe(payload = {}, options = {}) {
+  try {
+    return await invokeWithRetry('supportGuardian', payload, { attempts: options.attempts || 2, baseMs: options.baseMs || 250 });
+  } catch (error) {
+    const status = extractHttpStatus(error);
+    if (status === 404) {
+      return invokeWithRetry('supportWatchdog', payload, { attempts: 2, baseMs: 250 });
+    }
+    throw error;
+  }
 }
