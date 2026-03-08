@@ -1,4 +1,4 @@
-// redeploy trigger: force Base44 function registry refresh
+// redeploy trigger: ensure Base44 rebuilds function registry
 /**
  * Shopify Session Token Exchange — PUBLIC ENDPOINT
  * 

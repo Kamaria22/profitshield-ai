@@ -223,15 +223,11 @@ function App() {
       import('./pages/Orders');
       import('./pages/Integrations');
       import('./pages/PnLAnalytics');
-      import('./pages/Customers');
-      import('./pages/Alerts');
-      import('./pages/Settings');
-      import('./pages/HelpCenter');
     };
     if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(preloadCorePages, { timeout: 250 });
+      idleId = window.requestIdleCallback(preloadCorePages, { timeout: 1200 });
     } else {
-      timeoutId = setTimeout(preloadCorePages, 100);
+      timeoutId = setTimeout(preloadCorePages, 500);
     }
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
