@@ -14,6 +14,7 @@ const probes = [
   { id: 'stabilityAgent', fn: 'stabilityAgent', body: { action: 'prove_live' } },
   { id: 'appStoreReadinessGuardian', fn: 'appStoreReadinessGuardian', body: { action: 'prove_live' } },
   { id: 'supportGuardian', fn: 'supportGuardian', body: { action: 'run_watchdog' } },
+  { id: 'vulnerabilityWatchdog', fn: 'vulnerabilityWatchdog', body: { action: 'watchdog', observe_only: true } },
   { id: 'buildGuardian', fn: 'buildGuardian', body: { action: 'run' } },
   { id: 'shopifyConnectionWatchdog', fn: 'shopifyConnectionWatchdog', body: {} },
 ];

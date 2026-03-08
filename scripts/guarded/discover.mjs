@@ -18,6 +18,7 @@ const SYSTEMS = [
   { id: 'feature_guardian', path: 'functions/featureGuardian.ts', role: 'feature_guardian', trigger: "base44.functions.invoke('featureGuardian', { action: 'watchdog'|'fix_feature' })" },
   { id: 'support_watchdog', path: 'functions/supportWatchdog.ts', role: 'support_watchdog', trigger: "base44.functions.invoke('supportWatchdog', { manual: true })" },
   { id: 'support_guardian', path: 'functions/supportGuardian.ts', role: 'support_guardian', trigger: "base44.functions.invoke('supportGuardian', { action: ... })" },
+  { id: 'vulnerability_watchdog', path: 'functions/vulnerabilityWatchdog.ts', role: 'security_watchdog', trigger: "base44.functions.invoke('vulnerabilityWatchdog', { action: 'watchdog' })" },
   { id: 'shopify_connection_watchdog', path: 'functions/shopifyConnectionWatchdog.ts', role: 'shopify_runtime_watchdog', trigger: 'Scheduled or admin-triggered invocation' },
   { id: 'profit_alert_watchdog', path: 'functions/profitAlertWatchdog.ts', role: 'tenant_watchdog', trigger: 'Scheduled invocation over tenants' },
   { id: 'app_store_readiness_guardian', path: 'functions/appStoreReadinessGuardian.ts', role: 'publish_guardian', trigger: "base44.functions.invoke('appStoreReadinessGuardian', { action: 'run_all' })" },

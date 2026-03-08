@@ -9,6 +9,7 @@ const LAYERS = {
   watchdog: [
     'functions/shopifyConnectionWatchdog.ts',
     'functions/supportWatchdog.ts',
+    'functions/vulnerabilityWatchdog.ts',
     'functions/profitAlertWatchdog.ts',
     'functions/appStoreReadinessGuardian.ts',
     'src/components/FrontendGuardian.jsx',

@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
         invokeSafe(base44, 'supportGuardian', { action: 'run_watchdog', observe_only: true, mode: 'observe' }),
         invokeSafe(base44, 'shopifyConnectionWatchdog', { observe_only: true, mode: 'observe' }),
         invokeSafe(base44, 'stabilityAgent', { action: 'watchdog', mode: 'watch', observe_only: true }),
+        invokeSafe(base44, 'vulnerabilityWatchdog', { action: 'watchdog', mode: 'watch', observe_only: true }),
       ]);
       calls.push(...observeCalls);
       actionsUsed += observeCalls.length;

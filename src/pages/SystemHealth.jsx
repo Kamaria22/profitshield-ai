@@ -99,6 +99,14 @@ export default function SystemHealth() {
     mutationFn: () => invokeWithRetry('supportGuardian', { action: 'run_watchdog', manual: true }, { attempts: 2, baseMs: 300 })
   });
 
+  const runVulnerabilityWatchdog = useMutation({
+    mutationFn: () => invokeWithRetry(
+      'vulnerabilityWatchdog',
+      { action: 'watchdog', manual: true, tenant_id: queryFilter?.tenant_id || undefined },
+      { attempts: 2, baseMs: 300 }
+    )
+  });
+
   const runProfitAlertWatchdog = useMutation({
     mutationFn: async () => {
       try {
@@ -182,6 +190,14 @@ export default function SystemHealth() {
                 disabled={runSupportGuardian.isPending}
               >
                 Run Support Guardian
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => runVulnerabilityWatchdog.mutate()}
+                disabled={runVulnerabilityWatchdog.isPending}
+              >
+                Run Vulnerability Watchdog
               </Button>
             </CardContent>
           </Card>
