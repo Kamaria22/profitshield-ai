@@ -1,3 +1,4 @@
+// redeploy trigger: force Base44 function registry refresh
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 

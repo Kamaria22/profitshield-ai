@@ -14,6 +14,7 @@
  * 
  * Returns: { ok, registered, deleted, already_ok, errors, webhook_url }
  */
+// redeploy trigger: force Base44 function registry refresh
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const API_VERSION = '2024-10';
