@@ -373,6 +373,12 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[shopifyConnectionWatchdog]', error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+    // Non-blocking watchdog contract: never hard-fail scheduler/UI probes.
+    return Response.json({
+      ok: false,
+      fallback: true,
+      degraded: true,
+      reason: error?.message || 'watchdog_failed'
+    }, { status: 200 });
   }
 });
