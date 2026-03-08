@@ -148,9 +148,41 @@ export default function ShopifyEmbeddedAuthGate({ children, onAuthenticated }) {
         baseDelayMs: 300
       });
       if (fallbackResult && typeof fallbackResult === 'object') return fallbackResult;
-      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
     } catch (e) {
       console.warn('[ShopifyEmbeddedAuthGate] shopifyAuth session_exchange fallback failed:', e?.message || String(e));
+    }
+
+    // Final fallback path: resolve live integration context directly.
+    try {
+      const resolver = await stabilityAgent.retry(() => base44.functions.invoke('resolvePlatformContext', {
+        shop: shopDomain
+      }), {
+        attempts: 2,
+        baseDelayMs: 300
+      });
+      const rd = resolver?.data || {};
+      if (rd?.tenant_id && rd?.integration_id) {
+        return {
+          data: {
+            authenticated: true,
+            fallback: true,
+            fallback_source: 'resolvePlatformContext',
+            shop_domain: rd.store_key || shopDomain,
+            tenant_id: rd.tenant_id,
+            tenant_name: rd.tenant?.shop_name || rd.store_key || shopDomain,
+            integration_id: rd.integration_id,
+            integration_status: rd.integration?.status || 'connected',
+            shopify_authenticated: true,
+            is_new_tenant: false,
+          }
+        };
+      }
+      if (rd?.error) {
+        return { data: { authenticated: false, ok: false, fallback: true, reason: rd.error } };
+      }
+      return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_unreachable' } };
+    } catch (e) {
+      console.warn('[ShopifyEmbeddedAuthGate] resolvePlatformContext fallback failed:', e?.message || String(e));
       return { data: { authenticated: false, ok: false, fallback: true, reason: 'session_exchange_failed' } };
     }
   }

@@ -131,10 +131,31 @@ async function invokeEmbeddedSessionExchange(shop) {
       action: 'session_exchange',
       ...payload,
     });
-    return fallback || { data: null };
+    if (fallback?.data) return fallback;
   } catch (_) {
-    return { data: null };
+    // continue to resolver fallback
   }
+  try {
+    const resolver = await base44.functions.invoke('resolvePlatformContext', { shop });
+    const rd = resolver?.data || {};
+    if (rd?.tenant_id && rd?.integration_id) {
+      return {
+        data: {
+          authenticated: true,
+          fallback: true,
+          fallback_source: 'resolvePlatformContext',
+          shop_domain: rd.store_key || shop,
+          tenant_id: rd.tenant_id,
+          integration_id: rd.integration_id,
+          integration_status: rd.integration?.status || 'connected',
+          is_new_tenant: false
+        }
+      };
+    }
+  } catch (_) {
+    // final fail-safe below
+  }
+  return { data: null };
 }
 
 /**
