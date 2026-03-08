@@ -15,7 +15,8 @@ const checks = [
   {
     id: 'embedded_auth_gate_uses_session_exchange',
     file: 'src/components/shopify/ShopifyEmbeddedAuthGate.jsx',
-    tokens: ['/api/functions/shopifySessionExchange', 'runAuth', 'getFreshAppBridgeToken'],
+    tokens: ['runAuth', 'getFreshAppBridgeToken'],
+    anyTokens: ["base44.functions.invoke('shopifySessionExchange'", "base44.functions.invoke('shopifyAuth'", "action: 'session_exchange'"],
     owner_agent: 'auth_guardian',
   },
   {

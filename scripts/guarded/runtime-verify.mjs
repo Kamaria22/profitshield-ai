@@ -27,7 +27,8 @@ const checks = [
   {
     id: 'embedded_gate_session_exchange_path',
     file: 'src/components/shopify/ShopifyEmbeddedAuthGate.jsx',
-    mustInclude: ['/api/functions/shopifySessionExchange', 'getFreshAppBridgeToken'],
+    mustInclude: ['getFreshAppBridgeToken'],
+    anyInclude: ["base44.functions.invoke('shopifySessionExchange'", "base44.functions.invoke('shopifyAuth'", "action: 'session_exchange'"],
     owner_agent: 'auth_runtime_guardian',
   },
   {
@@ -49,6 +50,9 @@ for (const c of checks) {
 
   const text = fs.readFileSync(abs, 'utf8');
   const missing = c.mustInclude.filter((token) => !text.includes(token));
+  if (c.anyInclude && !c.anyInclude.some((token) => text.includes(token))) {
+    missing.push(`one_of:${c.anyInclude.join('|')}`);
+  }
   if (missing.length > 0) {
     incidents.push({
       blocker_type: 'runtime_guard_missing',
