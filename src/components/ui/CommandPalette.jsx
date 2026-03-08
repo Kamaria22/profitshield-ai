@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import {
   Search, LayoutDashboard, ShoppingCart, AlertTriangle, Shield,
@@ -32,6 +32,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -62,10 +63,10 @@ export default function CommandPalette() {
     : COMMANDS;
 
   const handleSelect = useCallback((cmd) => {
-    navigate(createPageUrl(cmd.page));
+    navigate(createPageUrl(cmd.page, location.search));
     setOpen(false);
     setQuery('');
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(s => Math.min(s + 1, filtered.length - 1)); }

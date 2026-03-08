@@ -5,11 +5,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
+import { Link, useLocation } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
 import { MessageCircle, AlertTriangle, CheckCircle2, Clock, Mail, ExternalLink, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
+import { usePlatformResolver } from '@/components/usePlatformResolver';
 
 function isAdminOwner(user) {
   const role = (user?.role || user?.app_role || '').toLowerCase();
@@ -18,7 +19,10 @@ function isAdminOwner(user) {
 
 export default function AdminSupportInboxPanel() {
   const { user } = useAuth();
-  const canAccess = isAdminOwner(user);
+  const resolver = usePlatformResolver();
+  const location = useLocation();
+  const effectiveUser = user || resolver?.user || null;
+  const canAccess = isAdminOwner(effectiveUser);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['support-inbox-widget'],
@@ -47,6 +51,9 @@ export default function AdminSupportInboxPanel() {
     total: conversations.length,
     open: conversations.filter(c => c.status === 'open').length,
   };
+  const unresolved = conversations
+    .filter((c) => c.needs_owner_attention || c.status === 'open' || c.status === 'escalated')
+    .slice(0, 4);
 
   return (
     <div className="rounded-xl overflow-hidden"
@@ -95,8 +102,27 @@ export default function AdminSupportInboxPanel() {
       </div>
 
       {/* CTA */}
-      <div className="p-3">
-        <Link to={createPageUrl('SupportInbox')}>
+      <div className="p-3 space-y-2">
+        {unresolved.length > 0 && (
+          <div className="rounded-lg border border-white/10 p-2">
+            <p className="text-xs text-slate-400 mb-2">Needs response</p>
+            <div className="space-y-1.5">
+              {unresolved.map((ticket) => {
+                const baseUrl = createPageUrl('SupportInbox', location.search);
+                const to = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}conversation=${encodeURIComponent(ticket.id)}`;
+                return (
+                  <Link key={ticket.id} to={to} className="block">
+                    <div className="flex items-center justify-between rounded-md border border-white/10 px-2 py-1.5 hover:border-indigo-500/40">
+                      <span className="text-xs text-slate-200 truncate pr-2">{ticket.user_email || ticket.issue_summary || 'Support ticket'}</span>
+                      <span className="text-[11px] text-indigo-300">Reply</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <Link to={createPageUrl('SupportInbox', location.search)}>
           <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm" size="sm">
             <ExternalLink className="w-3.5 h-3.5 mr-2" />
             Open Support Inbox

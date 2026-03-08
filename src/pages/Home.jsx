@@ -1,5 +1,5 @@
 import React, { useState, useCallback, lazy, Suspense, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -54,6 +54,7 @@ export default function Home() {
   const resolver = usePlatformResolver();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Derive resolver values safely
   const resolverCheck = requireResolved(resolver || {});
@@ -101,6 +102,24 @@ export default function Home() {
   const tutorialTenantId = isEmbedded ? null : authTenantId;
   const shouldShowTutorial = useShouldShowTutorial(tutorialTenantId);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [showDeferredContent, setShowDeferredContent] = useState(false);
+
+  useEffect(() => {
+    let timeoutId = null;
+    let idleId = null;
+    const enableDeferred = () => setShowDeferredContent(true);
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(enableDeferred, { timeout: 800 });
+    } else {
+      timeoutId = setTimeout(enableDeferred, 350);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (idleId && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (shouldShowTutorial && authTenantId) {
@@ -117,7 +136,7 @@ export default function Home() {
   };
 
   const handleUpgrade = (_tier) => {
-    navigate(createPageUrl('Pricing'));
+    navigate(createPageUrl('Pricing', location.search));
   };
   
   const tenant = resolver?.tenant || null;
@@ -239,19 +258,19 @@ export default function Home() {
         if (matchesTenant(event)) scheduleRefresh();
       });
       if (typeof unsubOrder === 'function') unsubscribers.push(unsubOrder);
-    } catch (_) {}
+    } catch {}
 
     try {
       const unsubAlert = base44.entities.Alert.subscribe((event) => {
         if (matchesTenant(event)) scheduleRefresh();
       });
       if (typeof unsubAlert === 'function') unsubscribers.push(unsubAlert);
-    } catch (_) {}
+    } catch {}
 
     return () => {
       if (timer) clearTimeout(timer);
       unsubscribers.forEach((fn) => {
-        try { fn(); } catch (_) {}
+        try { fn(); } catch {}
       });
     };
   }, [authTenantId, queryClient, dashboardSummaryKey, profitLeaksKey]);
@@ -295,11 +314,11 @@ export default function Home() {
     }
   }, [syncMutation]);
   const handleExport = useCallback(withUiGuard(() => {
-    navigate(createPageUrl('PnLAnalytics'));
-  }, () => toast.error('Could not open analytics')), [navigate]);
+    navigate(createPageUrl('PnLAnalytics', location.search));
+  }, () => toast.error('Could not open analytics')), [navigate, location.search]);
   const handleSecurity = useCallback(withUiGuard(() => {
-    navigate(createPageUrl('Intelligence'));
-  }, () => toast.error('Could not open risk page')), [navigate]);
+    navigate(createPageUrl('Intelligence', location.search));
+  }, () => toast.error('Could not open risk page')), [navigate, location.search]);
 
   // Minimal blocking state
   if (tenantLoading) {
@@ -406,122 +425,130 @@ export default function Home() {
             profitScore={profitScore}
             loading={summaryLoading}
           />
+          {showDeferredContent ? (
+            <>
+              {/* 2️⃣ Autonomous Profit Guard */}
+              <AutonomousProfitGuard
+                metrics={metrics}
+                profitLeaks={displayProfitLeaks}
+                alerts={dashboardSummary?.alerts || []}
+                loading={summaryLoading}
+              />
 
-          {/* 2️⃣ Autonomous Profit Guard */}
-          <AutonomousProfitGuard
-            metrics={metrics}
-            profitLeaks={displayProfitLeaks}
-            alerts={dashboardSummary?.alerts || []}
-            loading={summaryLoading}
-          />
+              {/* 3️⃣ AI Profit Intelligence Summary */}
+              <AIProfitIntelligenceSummary
+                metrics={metrics}
+                profitLeaks={displayProfitLeaks}
+                loading={summaryLoading}
+              />
 
-          {/* 3️⃣ AI Profit Intelligence Summary */}
-          <AIProfitIntelligenceSummary
-            metrics={metrics}
-            profitLeaks={displayProfitLeaks}
-            loading={summaryLoading}
-          />
+              {/* Predictive Intelligence Overview */}
+              <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
 
-          {/* Predictive Intelligence Overview */}
-          <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
+              <div className="flex gap-6 h-full">
+                <div className="flex-1 min-w-0">
+                  {/* Row 1: Core profit metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <ProfitHealthPanel metrics={metrics} loading={false} />
+                    <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
+                      <RiskCommandPanel metrics={metrics} loading={false} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <MarginLeakPanel leaks={displayProfitLeaks} loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                  </div>
 
-          <div className="flex gap-6 h-full">
-            <div className="flex-1 min-w-0">
-              {/* Row 1: Core profit metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <ProfitHealthPanel metrics={metrics} loading={false} />
-                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
-                  <RiskCommandPanel metrics={metrics} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <MarginLeakPanel leaks={displayProfitLeaks} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-              </div>
+                  {/* Row 2: AI Alerts + Opportunities + Forecast */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
+                    <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
+                    <ProfitForecast metrics={metrics} loading={summaryLoading} />
+                  </div>
 
-              {/* Row 2: AI Alerts + Opportunities + Forecast */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
-                <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
-                <ProfitForecast metrics={metrics} loading={summaryLoading} />
-              </div>
+                  {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                    <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
+                      <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <CashflowPanel metrics={metrics} loading={false} />
+                    </Suspense>
+                  </div>
 
-              {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
-                  <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CashflowPanel metrics={metrics} loading={false} />
-                </Suspense>
-              </div>
+                  {/* Row 4: Fraud + AI Automations + Integrations + Reports */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <SecurityPanel loading={false} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <IntegrationsPanel loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <CustomizeLayoutPanel loading={false} />
+                    </Suspense>
+                  </div>
 
-              {/* Row 4: Fraud + AI Automations + Integrations + Reports */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <SecurityPanel loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <IntegrationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CustomizeLayoutPanel loading={false} />
-                </Suspense>
-              </div>
-
-              {/* Connect Store CTA */}
-              {isDemoMode && (
-                <div className="mt-4 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-sm">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <Sparkles className="w-5 h-5 text-indigo-400" />
-                      <div>
-                        <p className="font-medium text-indigo-300">Demo Mode Active</p>
-                        <p className="text-sm text-slate-500">Connect your store for live AI intelligence</p>
+                  {/* Connect Store CTA */}
+                  {isDemoMode && (
+                    <div className="mt-4 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="w-5 h-5 text-indigo-400" />
+                          <div>
+                            <p className="font-medium text-indigo-300">Demo Mode Active</p>
+                            <p className="text-sm text-slate-500">Connect your store for live AI intelligence</p>
+                          </div>
+                        </div>
+                        <Link to={createPageUrl('Integrations', location.search)}>
+                          <Button className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30">
+                            Connect Store
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
                       </div>
                     </div>
-                    <Link to={createPageUrl('Integrations')}>
-                      <Button className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30">
-                        Connect Store
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    </Link>
+                  )}
+                </div>
+
+                {/* Side Rail - Lazy loaded */}
+                <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
+                  <div className="sticky top-0 space-y-4">
+                    {/* Autonomous Insight Engine - always visible */}
+                    <AutonomousInsightEngine
+                      metrics={metrics}
+                      alerts={dashboardSummary?.alerts || []}
+                      profitLeaks={displayProfitLeaks}
+                    />
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
+                    </Suspense>
+                    {resolver?.user?.id && (
+                      <Suspense fallback={<PanelSkeleton />}>
+                        <CustomAlerts tenantId={authTenantId} userId={resolver.user.id} />
+                      </Suspense>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Side Rail - Lazy loaded */}
-            <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
-              <div className="sticky top-0 space-y-4">
-                {/* Autonomous Insight Engine - always visible */}
-                <AutonomousInsightEngine
-                  metrics={metrics}
-                  alerts={dashboardSummary?.alerts || []}
-                  profitLeaks={displayProfitLeaks}
-                />
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
-                </Suspense>
-                {resolver?.user?.id && (
-                  <Suspense fallback={<PanelSkeleton />}>
-                    <CustomAlerts tenantId={authTenantId} userId={resolver.user.id} />
-                  </Suspense>
-                )}
               </div>
+            </>
+          ) : (
+            <div className="space-y-4 mt-4">
+              <PanelSkeleton />
+              <PanelSkeleton />
             </div>
-          </div>
+          )}
         </div>
       </div>
     </SubscriptionGate>

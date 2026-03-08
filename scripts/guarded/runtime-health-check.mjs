@@ -51,6 +51,18 @@ const checks = [
     owner_agent: 'runtime_guardian',
   },
   {
+    id: 'command_palette_preserves_embedded_context',
+    file: 'src/components/ui/CommandPalette.jsx',
+    tokens: ['useLocation', 'createPageUrl(cmd.page, location.search)'],
+    owner_agent: 'runtime_guardian',
+  },
+  {
+    id: 'owner_support_panel_reply_link_wired',
+    file: 'src/components/support/AdminSupportInboxPanel.jsx',
+    tokens: ['conversation=', "createPageUrl('SupportInbox', location.search)"],
+    owner_agent: 'watchdog',
+  },
+  {
     id: 'self_heal_accepts_incidentbus_publish',
     file: 'functions/selfHeal.ts',
     tokens: ["action === 'publish_incident'", 'issue_code', 'details_json'],

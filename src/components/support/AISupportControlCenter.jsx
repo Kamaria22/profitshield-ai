@@ -5,15 +5,14 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useLocation } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   Shield, AlertTriangle, CheckCircle2, Clock, Wrench,
   Send, RefreshCw, User, Bot, Bell, X, Inbox, Zap,
-  Activity, Eye, Mail, MessageCircle, ChevronRight,
-  TrendingUp, BarChart3, Search, Play
+  Activity, Mail, MessageCircle, Play
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,6 +40,7 @@ export default function AISupportControlCenter() {
   const [reply, setReply] = useState('');
   const [filter, setFilter] = useState('all');
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { user } = useAuth();
   const role = (user?.role || user?.app_role || '').toLowerCase();
   const canAccess = role === 'owner' || role === 'admin';
@@ -76,6 +76,14 @@ export default function AISupportControlCenter() {
     aiResolved: conversations.filter(c => c.status === 'ai_resolved').length,
     autoFixTriggered: conversations.filter(c => c.auto_fix_triggered).length,
   };
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search || '');
+    const conversationId = params.get('conversation');
+    if (!conversationId || !Array.isArray(conversations) || !conversations.length) return;
+    const found = conversations.find((c) => c.id === conversationId);
+    if (found) setSelected(found);
+  }, [location.search, conversations]);
 
   // Run watchdog manually
   const watchdogMutation = useMutation({
