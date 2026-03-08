@@ -65,6 +65,38 @@ export default function Home() {
   const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
   const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
 
+  const fetchEntitySummary = useCallback(async (tenantId) => {
+    const [orders, alerts, leaks] = await Promise.all([
+      base44.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 20),
+      base44.entities.Alert.filter({ tenant_id: tenantId, status: 'pending' }, '-created_date', 5),
+      base44.entities.ProfitLeak.filter({ tenant_id: tenantId, is_resolved: false }, '-impact_amount', 5)
+    ]);
+
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
+    const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
+    const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
+
+    return {
+      success: true,
+      fallback: true,
+      fallback_source: 'entities',
+      metrics: {
+        totalRevenue,
+        totalProfit,
+        avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+        highRiskOrders,
+        totalOrders: orders.length,
+        pendingAlerts: alerts.length
+      },
+      profitScore: resolver?.tenant?.profit_integrity_score || 0,
+      alertsCount: alerts.length,
+      isDemoMode: false,
+      orders: orders.slice(0, 5),
+      alerts,
+      profitLeaks: leaks
+    };
+  }, [resolver?.tenant?.profit_integrity_score]);
+
   // Tutorial state - deferred to not block render
   const tutorialTenantId = isEmbedded ? null : authTenantId;
   const shouldShowTutorial = useShouldShowTutorial(tutorialTenantId);
@@ -107,14 +139,24 @@ export default function Home() {
       if (!queryFilter?.tenant_id) return null;
 
       if (isEmbedded) {
-        const { data } = await invokeWithRetry('dashboardAI', {
-          action: 'embedded_summary',
-          tenant_id: queryFilter.tenant_id,
-        }, { attempts: 2, baseMs: 250 });
-        if (!data?.success) {
-          throw new Error(data?.error || 'Failed to load embedded dashboard summary');
+        try {
+          const { data } = await invokeWithRetry('dashboardAI', {
+            action: 'embedded_summary',
+            tenant_id: queryFilter.tenant_id,
+          }, { attempts: 4, baseMs: 400 });
+          if (!data?.success) {
+            throw new Error(data?.error || 'Failed to load embedded dashboard summary');
+          }
+          return data;
+        } catch (error) {
+          const msg = String(error?.message || '');
+          const isRateLimited = msg.includes('429') || msg.toLowerCase().includes('rate limit');
+          const cached = queryClient.getQueryData(dashboardSummaryKey);
+          if (cached && isRateLimited) {
+            return { ...cached, fallback: true, fallback_source: 'cached_summary' };
+          }
+          return await fetchEntitySummary(queryFilter.tenant_id);
         }
-        return data;
       }
       
       const startTime = performance.now();
@@ -154,7 +196,7 @@ export default function Home() {
     gcTime: 120000,
     refetchOnMount: false,
     refetchOnWindowFocus: false
-  });
+  }, [fetchEntitySummary, dashboardSummaryKey, queryClient]);
 
   const { data: profitLeaks = [] } = useQuery({
     queryKey: profitLeaksKey,
