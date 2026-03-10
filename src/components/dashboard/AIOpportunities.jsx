@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
 import { Lightbulb, TrendingUp, DollarSign, Users, Package } from 'lucide-react';
 
 const fmt = (n) => {
@@ -17,6 +19,8 @@ function deriveOpportunities(metrics, profitLeaks) {
       detail: 'Margin below 25% — increase prices on low-margin products',
       impact: metrics?.totalRevenue ? metrics.totalRevenue * 0.05 : null,
       color: '#6366f1',
+      actionPage: 'Pricing',
+      actionLabel: 'Review Plan',
     });
   }
   if ((metrics?.highRiskOrders || 0) > 0) {
@@ -26,6 +30,8 @@ function deriveOpportunities(metrics, profitLeaks) {
       detail: 'Prevent chargeback losses by reviewing flagged orders',
       impact: null,
       color: '#f59e0b',
+      actionPage: 'Orders',
+      actionLabel: 'Review Orders',
     });
   }
   if (profitLeaks?.length > 0) {
@@ -35,6 +41,8 @@ function deriveOpportunities(metrics, profitLeaks) {
       detail: profitLeaks[0]?.description || 'Unresolved profit drains identified',
       impact: profitLeaks.reduce((s, l) => s + (l.impact_amount || 0), 0) || null,
       color: '#ef4444',
+      actionPage: 'Alerts',
+      actionLabel: 'Open Alerts',
     });
   }
   if ((metrics?.totalOrders || 0) > 10 && (metrics?.avgMargin || 0) >= 25) {
@@ -44,6 +52,8 @@ function deriveOpportunities(metrics, profitLeaks) {
       detail: 'Healthy margins — focus on repeat customer campaigns',
       impact: null,
       color: '#10b981',
+      actionPage: 'Customers',
+      actionLabel: 'Open Customers',
     });
   }
   if (!ops.length) {
@@ -53,13 +63,21 @@ function deriveOpportunities(metrics, profitLeaks) {
       detail: 'Connect more orders to unlock AI-driven growth suggestions',
       impact: null,
       color: '#34d399',
+      actionPage: 'Integrations',
+      actionLabel: 'Connect Store',
     });
   }
   return ops.slice(0, 4);
 }
 
 export default function AIOpportunities({ metrics = {}, profitLeaks = [], loading = false }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const opportunities = useMemo(() => deriveOpportunities(metrics, profitLeaks), [metrics, profitLeaks]);
+  const handleOpportunityClick = (op) => {
+    if (!op?.actionPage) return;
+    navigate(createPageUrl(op.actionPage, location.search));
+  };
 
   return (
     <div className="rounded-2xl overflow-hidden"
@@ -88,7 +106,17 @@ export default function AIOpportunities({ metrics = {}, profitLeaks = [], loadin
             const Icon = op.icon;
             return (
               <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl group transition-all hover:bg-white/5"
-                style={{ border: '1px solid rgba(255,255,255,0.04)' }}>
+                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+                role={op.actionPage ? 'button' : undefined}
+                tabIndex={op.actionPage ? 0 : -1}
+                onClick={op.actionPage ? () => handleOpportunityClick(op) : undefined}
+                onKeyDown={op.actionPage ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpportunityClick(op);
+                  }
+                } : undefined}
+              >
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{ background: `${op.color}18`, border: `1px solid ${op.color}30` }}>
                   <Icon className="w-3.5 h-3.5" style={{ color: op.color }} />
@@ -97,6 +125,11 @@ export default function AIOpportunities({ metrics = {}, profitLeaks = [], loadin
                   <p className="text-xs font-semibold text-slate-200 truncate">{op.title}</p>
                   <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{op.detail}</p>
                 </div>
+                {op.actionPage && (
+                  <span className="text-[11px] text-indigo-300 flex-shrink-0 mt-0.5">
+                    {op.actionLabel || 'Open'}
+                  </span>
+                )}
                 {op.impact > 0 && (
                   <span className="text-xs font-bold flex-shrink-0 px-2 py-1 rounded-lg"
                     style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>
