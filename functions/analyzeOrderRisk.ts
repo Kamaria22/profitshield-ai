@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { mlRiskProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -64,14 +65,16 @@ Deno.serve(async (req) => {
     const riskAnalysis = analyzeRisk(order, customerOrders, tenantSettings, customRules);
 
     // Update the order with risk analysis results
-    await base44.asServiceRole.entities.Order.update(order_id, {
+    await base44.asServiceRole.entities.Order.update(order.id, {
       fraud_score: riskAnalysis.fraud_score,
       return_score: riskAnalysis.return_score,
       chargeback_score: riskAnalysis.chargeback_score,
       risk_level: riskAnalysis.risk_level,
       risk_reasons: riskAnalysis.risk_reasons,
       recommended_action: riskAnalysis.recommended_action,
-      confidence: riskAnalysis.confidence
+      confidence: riskAnalysis.confidence,
+      ml_runtime_version: riskAnalysis.ml_runtime_version,
+      ml_risk_probability: riskAnalysis.ml_risk_probability
     });
 
     // Create alert if high risk
@@ -83,12 +86,14 @@ Deno.serve(async (req) => {
         title: `High Risk Order #${order.order_number}`,
         message: `Order flagged with ${riskAnalysis.risk_reasons.length} risk factors: ${riskAnalysis.risk_reasons.slice(0, 3).join(', ')}`,
         entity_type: 'order',
-        entity_id: order_id,
+        entity_id: order.id,
         recommended_action: riskAnalysis.recommended_action,
         status: 'pending',
         metadata: {
           fraud_score: riskAnalysis.fraud_score,
-          risk_reasons: riskAnalysis.risk_reasons
+          risk_reasons: riskAnalysis.risk_reasons,
+          ml_runtime_version: riskAnalysis.ml_runtime_version,
+          ml_risk_probability: riskAnalysis.ml_risk_probability
         }
       });
     }
@@ -283,10 +288,26 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     }
   }
 
+  const refundRatePct = customerOrders.length > 0
+    ? (customerOrders.filter(o => o.status === 'refunded' || o.status === 'partially_refunded').length / customerOrders.length) * 100
+    : 0;
+  const ml = mlRiskProbability({
+    firstOrder: isFirstOrder,
+    value: order.total_revenue || 0,
+    avgValue: avgOrderValue,
+    countryMismatch: !!(billingAddr.country && shippingAddr.country && billingAddr.country !== shippingAddr.country),
+    zipMismatch: !!(billingAddr.zip && shippingAddr.zip && billingAddr.zip !== shippingAddr.zip),
+    suspiciousEmail: email.includes('+') || /\d{4,}/.test(email.split('@')[0] || ''),
+    velocity24h: recentOrders.length + 1,
+    refundRatePct,
+    negativeProfit: (order.net_profit || 0) < 0
+  });
+
   // Calculate combined risk score
-  const combinedScore = Math.min(100, Math.round(
+  const baseScore = Math.min(100, Math.round(
     (fraudScore * 0.5) + (returnScore * 0.25) + (chargebackScore * 0.25)
   ));
+  const combinedScore = Math.min(100, Math.max(0, baseScore + Math.round((ml.probability - 0.5) * 20)));
 
   // Determine risk level
   let riskLevel = 'low';
@@ -337,7 +358,9 @@ function analyzeRisk(order, customerOrders, settings, customRules = []) {
     recommended_action: recommendedAction,
     confidence,
     confidence_score: confidenceScore,
-    matched_shopify_actions: matchedShopifyActions
+    matched_shopify_actions: matchedShopifyActions,
+    ml_runtime_version: ML_RUNTIME_VERSION,
+    ml_risk_probability: Number((ml.probability * 100).toFixed(1))
   };
 }
 
