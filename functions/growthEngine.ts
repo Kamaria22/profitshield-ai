@@ -582,6 +582,112 @@ Deno.serve(async (req) => {
         });
       }
 
+      // ============================================
+      // RANKING OPTIMIZATION PLANNER (ASO + SEO)
+      // ============================================
+      case 'get_ranking_optimization_plan': {
+        const { tenant_id, persist = false } = params;
+
+        const [reviews, referrals, support] = await Promise.all([
+          base44.asServiceRole.entities.ReviewRequest.filter({ tenant_id }).catch(() => []),
+          base44.asServiceRole.entities.Referral.filter({ referrer_tenant_id: tenant_id }).catch(() => []),
+          base44.asServiceRole.entities.SupportConversation.filter({ tenant_id }, '-created_date', 200).catch(() => [])
+        ]);
+
+        const submittedReviews = reviews.filter(r => r.review_submitted);
+        const positiveReviews = submittedReviews.filter(r => Number(r.rating || 0) >= 4);
+        const avgRating = submittedReviews.length
+          ? submittedReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / submittedReviews.length
+          : 0;
+
+        const unresolvedSupport = support.filter(s => s.status === 'open' || s.needs_owner_attention).length;
+        const activatedReferrals = referrals.filter(r => r.status === 'activated').length;
+        const inviteToActivatedRate = referrals.length > 0 ? (activatedReferrals / referrals.length) : 0;
+
+        const actions = [];
+
+        if (submittedReviews.length < 10) {
+          actions.push({
+            id: 'increase_review_volume',
+            channel: 'shopify_app_store',
+            priority: 'high',
+            recommendation: 'Trigger more in-app review requests after successful risk/profit outcomes.',
+            owner: 'growth_engine',
+            expected_impact: 'higher ranking velocity via fresh review volume'
+          });
+        }
+        if (avgRating > 0 && avgRating < 4.4) {
+          actions.push({
+            id: 'improve_review_rating',
+            channel: 'shopify_app_store',
+            priority: 'high',
+            recommendation: 'Suppress review prompt for unresolved support tickets; route to feedback flow first.',
+            owner: 'support_guardian',
+            expected_impact: 'protects listing conversion and rank quality score'
+          });
+        }
+        if (unresolvedSupport > 5) {
+          actions.push({
+            id: 'reduce_support_backlog',
+            channel: 'retention',
+            priority: 'high',
+            recommendation: 'Run support watchdog escalation and clear unresolved tickets before prompting reviews.',
+            owner: 'support_watchdog',
+            expected_impact: 'lower churn, better ratings'
+          });
+        }
+        if (inviteToActivatedRate < 0.15) {
+          actions.push({
+            id: 'optimize_referral_funnel',
+            channel: 'acquisition',
+            priority: 'medium',
+            recommendation: 'Refine referral CTA copy and timing after measurable savings events.',
+            owner: 'growth_engine',
+            expected_impact: 'higher install velocity from merchant referrals'
+          });
+        }
+        actions.push({
+          id: 'seo_content_refresh',
+          channel: 'google',
+          priority: 'medium',
+          recommendation: 'Refresh Help Center and App Listing pages weekly with high-intent Shopify keywords.',
+          owner: 'content_ops',
+          expected_impact: 'improved non-branded organic discovery'
+        });
+
+        const plan = {
+          tenant_id,
+          generated_at: new Date().toISOString(),
+          metrics: {
+            reviews_total: submittedReviews.length,
+            reviews_positive: positiveReviews.length,
+            avg_rating: Number(avgRating.toFixed(2)),
+            unresolved_support: unresolvedSupport,
+            referrals_total: referrals.length,
+            referrals_activated: activatedReferrals,
+            referral_activation_rate: Number((inviteToActivatedRate * 100).toFixed(1))
+          },
+          actions
+        };
+
+        if (persist) {
+          await base44.asServiceRole.entities.AuditLog.create({
+            tenant_id,
+            action: 'ranking_plan_generated',
+            entity_type: 'growth',
+            entity_id: tenant_id || 'global',
+            performed_by: user.email || 'system',
+            description: `Ranking optimization plan generated with ${actions.length} actions`,
+            severity: 'low',
+            category: 'growth',
+            is_auto_action: true,
+            metadata: plan
+          }).catch(() => {});
+        }
+
+        return Response.json({ success: true, ...plan });
+      }
+
       default:
         return Response.json({ error: 'Unknown action' }, { status: 400 });
     }
