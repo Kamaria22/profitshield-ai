@@ -21,18 +21,18 @@ import { useShouldShowTutorial, markTutorialCompleted } from '../components/onbo
 
 // Critical above-the-fold components - loaded immediately
 import AIProfitOperatingSystem from '../components/dashboard/AIProfitOperatingSystem';
-import AutonomousProfitGuard from '../components/dashboard/AutonomousProfitGuard';
-import AIProfitIntelligenceSummary from '../components/dashboard/AIProfitIntelligenceSummary';
-import AIAlerts from '../components/dashboard/AIAlerts';
-import AIOpportunities from '../components/dashboard/AIOpportunities';
-import ProfitForecast from '../components/dashboard/ProfitForecast';
 import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
-import ProfitHealthPanel from '../components/dashboard/panels/ProfitHealthPanel';
 import { PanelSkeleton } from '../components/dashboard/LazyPanel';
-import PredictiveOverviewBar from '../components/dashboard/PredictiveOverviewBar';
-import AutonomousInsightEngine from '../components/dashboard/AutonomousInsightEngine';
 
 // Heavy panels - lazy loaded with IntersectionObserver
+const AutonomousProfitGuard = lazy(() => import('../components/dashboard/AutonomousProfitGuard'));
+const AIProfitIntelligenceSummary = lazy(() => import('../components/dashboard/AIProfitIntelligenceSummary'));
+const AIAlerts = lazy(() => import('../components/dashboard/AIAlerts'));
+const AIOpportunities = lazy(() => import('../components/dashboard/AIOpportunities'));
+const ProfitForecast = lazy(() => import('../components/dashboard/ProfitForecast'));
+const ProfitHealthPanel = lazy(() => import('../components/dashboard/panels/ProfitHealthPanel'));
+const PredictiveOverviewBar = lazy(() => import('../components/dashboard/PredictiveOverviewBar'));
+const AutonomousInsightEngine = lazy(() => import('../components/dashboard/AutonomousInsightEngine'));
 const RiskCommandPanel = lazy(() => import('../components/dashboard/panels/RiskCommandPanel'));
 const AlertsPanel = lazy(() => import('../components/dashboard/panels/AlertsPanel'));
 const MarginLeakPanel = lazy(() => import('../components/dashboard/panels/MarginLeakPanel'));
@@ -183,7 +183,7 @@ export default function Home() {
       
       // Absolute minimum for first paint - fetch in parallel, smallest datasets
       const [orders, alerts] = await Promise.all([
-        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 20),
+        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 12),
         base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 5)
       ]);
 
@@ -431,28 +431,36 @@ export default function Home() {
           {showDeferredContent ? (
             <>
               {/* 2️⃣ Autonomous Profit Guard */}
-              <AutonomousProfitGuard
-                metrics={metrics}
-                profitLeaks={displayProfitLeaks}
-                alerts={dashboardSummary?.alerts || []}
-                loading={summaryLoading}
-              />
+              <Suspense fallback={<PanelSkeleton />}>
+                <AutonomousProfitGuard
+                  metrics={metrics}
+                  profitLeaks={displayProfitLeaks}
+                  alerts={dashboardSummary?.alerts || []}
+                  loading={summaryLoading}
+                />
+              </Suspense>
 
               {/* 3️⃣ AI Profit Intelligence Summary */}
-              <AIProfitIntelligenceSummary
-                metrics={metrics}
-                profitLeaks={displayProfitLeaks}
-                loading={summaryLoading}
-              />
+              <Suspense fallback={<PanelSkeleton />}>
+                <AIProfitIntelligenceSummary
+                  metrics={metrics}
+                  profitLeaks={displayProfitLeaks}
+                  loading={summaryLoading}
+                />
+              </Suspense>
 
               {/* Predictive Intelligence Overview */}
-              <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
+              <Suspense fallback={<PanelSkeleton />}>
+                <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
+              </Suspense>
 
               <div className="flex gap-6 h-full">
                 <div className="flex-1 min-w-0">
                   {/* Row 1: Core profit metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                    <ProfitHealthPanel metrics={metrics} loading={false} />
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <ProfitHealthPanel metrics={metrics} loading={false} />
+                    </Suspense>
                     <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
                       <RiskCommandPanel metrics={metrics} loading={false} />
                     </Suspense>
@@ -463,9 +471,15 @@ export default function Home() {
 
                   {/* Row 2: AI Alerts + Opportunities + Forecast */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                    <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
-                    <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
-                    <ProfitForecast metrics={metrics} loading={summaryLoading} />
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
+                    </Suspense>
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <ProfitForecast metrics={metrics} loading={summaryLoading} />
+                    </Suspense>
                   </div>
 
                   {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
@@ -529,11 +543,13 @@ export default function Home() {
                 <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
                   <div className="sticky top-0 space-y-4">
                     {/* Autonomous Insight Engine - always visible */}
-                    <AutonomousInsightEngine
-                      metrics={metrics}
-                      alerts={dashboardSummary?.alerts || []}
-                      profitLeaks={displayProfitLeaks}
-                    />
+                    <Suspense fallback={<PanelSkeleton />}>
+                      <AutonomousInsightEngine
+                        metrics={metrics}
+                        alerts={dashboardSummary?.alerts || []}
+                        profitLeaks={displayProfitLeaks}
+                      />
+                    </Suspense>
                     <Suspense fallback={<PanelSkeleton />}>
                       <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
                     </Suspense>
