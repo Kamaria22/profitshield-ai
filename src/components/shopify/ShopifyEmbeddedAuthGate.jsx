@@ -17,7 +17,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getFreshAppBridgeToken, hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
-import { persistContext } from '@/components/platformContext';
+import { persistContext, getPersistedContext } from '@/components/platformContext';
 import { stabilityAgent } from '@/agents/StabilityAgent';
 import { appParams } from '@/lib/app-params';
 import { Shield, Loader2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
@@ -71,6 +71,28 @@ function setCachedAuth(data) {
   try {
     sessionStorage.setItem(SHOPIFY_AUTH_KEY, JSON.stringify({ ...data, cachedAt: Date.now() }));
   } catch {}
+}
+
+function getPersistedAuthForShop(shopDomain) {
+  try {
+    const persisted = getPersistedContext(true) || {};
+    const persistedShop = String(persisted.shop || persisted.storeKey || '').toLowerCase();
+    const normalizedShop = String(shopDomain || '').toLowerCase();
+    if (!persistedShop || !normalizedShop || persistedShop !== normalizedShop) return null;
+    if (!persisted.tenantId || !persisted.integrationId) return null;
+    return {
+      authenticated: true,
+      tenant_id: persisted.tenantId,
+      integration_id: persisted.integrationId,
+      shop_domain: normalizedShop,
+      shopify_authenticated: true,
+      is_new_tenant: false,
+      fallback: true,
+      fallback_source: 'persisted_context',
+    };
+  } catch {
+    return null;
+  }
 }
 
 function redirectRemote(url) {
@@ -244,10 +266,20 @@ async function exchangeSession({ sessionToken, shopDomain }) {
         return;
       }
 
+      // ── 2b. Fast path: persisted embedded context for same shop ───────────
+      // This removes avoidable auth latency on every dashboard refresh.
+      const persisted = getPersistedAuthForShop(shopDomain);
+      if (persisted?.authenticated) {
+        setCachedAuth(persisted);
+        applyAuth(persisted);
+        inFlight.current = false;
+        return;
+      }
+
       // ── 3. App Bridge session token ───────────────────────────────────────
       let sessionToken = null;
       try {
-        sessionToken = await getFreshAppBridgeToken({ force: true });
+        sessionToken = await getFreshAppBridgeToken({ force: false });
       } catch (e) {
         console.warn('[ShopifyEmbeddedAuthGate] App Bridge token failed:', e.message);
         // Continue — shopifySessionExchange accepts shop-only fallback

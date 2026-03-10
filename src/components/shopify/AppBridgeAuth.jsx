@@ -10,7 +10,7 @@ import { getSessionToken } from "@shopify/app-bridge-utils";
 let cachedToken = null;
 let tokenFetchedAt = 0;
 const TOKEN_CACHE_TTL_MS = 20000; // 20 seconds
-const TOKEN_FETCH_TIMEOUT_MS = 5000;
+const TOKEN_FETCH_TIMEOUT_MS = 3000;
 
 function decodeHostParam(host) {
   if (!host || typeof host !== "string") return null;
