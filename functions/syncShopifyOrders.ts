@@ -229,6 +229,45 @@ function mapOrderStatus(order) {
   return 'pending';
 }
 
+async function shopifyFetchWithRetry(url, accessToken, init = {}, maxAttempts = 4) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+          ...(init.headers || {})
+        }
+      });
+      clearTimeout(timeout);
+      if (res.status !== 429 && res.status < 500) return res;
+      const retryAfter = Number(res.headers.get('Retry-After') || '0');
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 400 * Math.pow(2, attempt));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      attempt++;
+    } catch (error) {
+      clearTimeout(timeout);
+      if (attempt >= maxAttempts - 1) throw error;
+      const waitMs = Math.min(8000, 400 * Math.pow(2, attempt));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      attempt++;
+    }
+  }
+  return fetch(url, {
+    ...init,
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+      ...(init.headers || {})
+    }
+  });
+}
+
 Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -348,9 +387,9 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     let allOrders = [];
     // Pre-flight: verify token is still valid before full sync
-    const scopeCheck = await fetch(`https://${tenant.shop_domain}/admin/oauth/access_scopes.json`, {
-      headers: { 'X-Shopify-Access-Token': accessToken }
-    });
+    const scopeCheck = await shopifyFetchWithRetry(`https://${tenant.shop_domain}/admin/oauth/access_scopes.json`, accessToken, {
+      headers: {}
+    }, 3);
     if (!scopeCheck.ok) {
       // Invalidate token so diagnose reflects true state
       await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
@@ -364,12 +403,9 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
 
     while (pageUrl && pageCount < 10) {
       const shopifyUrl = pageUrl;
-      const shopifyRes = await fetch(shopifyUrl, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json'
-        }
-      });
+      const shopifyRes = await shopifyFetchWithRetry(shopifyUrl, accessToken, {
+        headers: {}
+      }, 4);
       
       if (!shopifyRes.ok) {
         const errorText = await shopifyRes.text();
@@ -405,6 +441,8 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     
     let created = 0;
     let updated = 0;
+    const tenantSettingsList = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id }).catch(() => []);
+    const notifyEmail = tenantSettingsList[0]?.notification_email || null;
     
     for (const orderData of shopifyOrders) {
       const profitData = calculateOrderProfit(orderData, costMappings, settings);
@@ -455,8 +493,6 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
         for (const rule of notifyRules) {
           if (evaluateCustomRule(rule, orderData, parseFloat(orderData.total_price || 0), !orderData.customer || orderData.customer.orders_count <= 1, orderData.discount_codes?.length || 0)) {
             try {
-              const tenantSettingsList = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id });
-              const notifyEmail = tenantSettingsList[0]?.notification_email;
               if (notifyEmail) {
                 await base44.asServiceRole.functions.invoke('aiRuleAssistant', {
                   action: 'notify',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,8 +14,8 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Store, ShoppingCart, Link2, RefreshCw, Settings, CheckCircle, XCircle,
-  AlertTriangle, Clock, ArrowUpDown, Trash2, Webhook, MoreVertical,
-  TrendingUp, Shield, Activity, Loader2, ExternalLink, Unplug
+  AlertTriangle, Clock, ArrowUpDown, Webhook, MoreVertical,
+  Shield, Activity, Loader2, Unplug
 } from 'lucide-react';
 import DiagnoseFixPanel from '@/components/integrations/DiagnoseFixPanel';
 import {
@@ -26,9 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
-import { parseQuery, getPersistedContext, hardResetAllContexts, listPersistedStores, createPageUrl } from '@/components/platformContext';
+import { parseQuery, getPersistedContext, hardResetAllContexts, createPageUrl } from '@/components/platformContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { invokeWithRetry } from '@/lib/safeApi';
 
@@ -105,29 +104,33 @@ export default function Integrations() {
   const { data: integrations = [], isLoading: integrationsLoading, refetch: refetchIntegrations } = useQuery({
     queryKey: ['integrations', tenantId],
     queryFn: () => base44.entities.PlatformIntegration.filter({ tenant_id: tenantId }),
-    enabled: !!tenantId
+    enabled: !!tenantId,
+    staleTime: 30000,
+    refetchOnWindowFocus: false
   });
 
   const { data: syncJobs = [], isLoading: jobsLoading } = useQuery({
     queryKey: ['syncJobs', tenantId, integrations],
     queryFn: async () => {
       if (!integrations.length) return [];
-      const jobs = [];
-      for (const integration of integrations) {
+      const jobLists = await Promise.all(integrations.map(async (integration) => {
         try {
           const result = await invokeWithRetry('syncEngine', {
             action: 'list_sync_jobs',
             integration_id: integration.id,
             limit: 10
           }, { attempts: 2, baseMs: 250 });
-          jobs.push(...(result.data?.jobs || []));
+          return result.data?.jobs || [];
         } catch (e) {
           console.error('Failed to load sync jobs:', e);
+          return [];
         }
-      }
-      return jobs.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      }));
+      return jobLists.flat().sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
     },
-    enabled: integrations.length > 0
+    enabled: integrations.length > 0,
+    staleTime: 15000,
+    refetchOnWindowFocus: false
   });
 
   const connectMutation = useMutation({

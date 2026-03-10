@@ -78,7 +78,7 @@ export default function AdminSupportInboxPanel() {
                 </span>
               )}
             </h3>
-            <p className="text-xs text-slate-500">support@profitshield.ai</p>
+            <p className="text-xs text-slate-500">support@profitshield-ai.com</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-emerald-400">

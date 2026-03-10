@@ -331,7 +331,33 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 6. Update last_ok_at on integration
+      // 6. Dashboard freshness signal: connected store but no recent orders.
+      // This catches "connected but dashboard stays zero" drift that previously went unnoticed.
+      const recentOrders = await db.entities.Order.filter({ tenant_id: tenantId, is_demo: false }, '-order_date', 25).catch(() => []);
+      const newestOrderAt = recentOrders[0]?.order_date ? new Date(recentOrders[0].order_date).getTime() : null;
+      const noRecentOrders = !newestOrderAt || (Date.now() - newestOrderAt > (48 * 60 * 60 * 1000));
+      if (noRecentOrders) {
+        result.status = 'degraded';
+        result.health_issues.push('dashboard_data_stale');
+        result.dashboard_data_stale = true;
+        result.latest_order_at = recentOrders[0]?.order_date || null;
+        if (!observeOnly) {
+          await db.entities.Alert.create({
+            tenant_id: tenantId,
+            type: 'system',
+            severity: 'medium',
+            title: `Dashboard Data Stale — ${shopDomain}`,
+            message: 'Connected Shopify integration has no recent synced orders. Dashboard metrics may appear frozen.',
+            entity_type: 'platform_integration',
+            entity_id: integration.id,
+            recommended_action: 'Run manual sync and check webhook ingestion queue.',
+            status: 'pending',
+            metadata: { shop_domain: shopDomain, latest_order_at: recentOrders[0]?.order_date || null }
+          }).catch(() => {});
+        }
+      }
+
+      // 7. Update last_ok_at on integration
       if (!observeOnly) {
         await db.entities.PlatformIntegration.update(integration.id, {
           status: result.status === 'healthy' ? 'connected' : 'degraded',

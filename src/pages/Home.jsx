@@ -212,6 +212,7 @@ export default function Home() {
       };
     },
     enabled: canQuery,
+    placeholderData: (previous) => previous ?? queryClient.getQueryData(dashboardSummaryKey) ?? null,
     retry: false,
     staleTime: 60000,
     gcTime: 120000,
@@ -353,7 +354,7 @@ export default function Home() {
     );
   }
 
-  const showDashboard = !summaryLoading || dashboardSummary;
+  const showDashboard = !!authTenantId || !summaryLoading || !!dashboardSummary;
 
   if (!showDashboard) {
     return (

@@ -1,6 +1,40 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
 
+async function shopifyFetchWithRetry(url, accessToken, init = {}, maxAttempts = 4) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          ...(init.headers || {})
+        }
+      });
+      clearTimeout(timeout);
+      if (res.status !== 429 && res.status < 500) return res;
+      const retryAfter = Number(res.headers.get('Retry-After') || '0');
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 500 * Math.pow(2, attempt));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      attempt++;
+    } catch (error) {
+      clearTimeout(timeout);
+      if (attempt >= maxAttempts - 1) throw error;
+      const waitMs = Math.min(8000, 500 * Math.pow(2, attempt));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      attempt++;
+    }
+  }
+  return fetch(url, {
+    ...init,
+    headers: { 'X-Shopify-Access-Token': accessToken, ...(init.headers || {}) }
+  });
+}
+
 Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -65,9 +99,7 @@ Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
         url = `https://${shopDomain}/admin/api/2024-01/orders.json?page_info=${pageInfo}&limit=250`;
       }
       
-      const response = await fetch(url, {
-        headers: { 'X-Shopify-Access-Token': accessToken }
-      });
+      const response = await shopifyFetchWithRetry(url, accessToken, {}, 4);
       
       if (!response.ok) {
         throw new Error(`Shopify API error: ${response.status}`);
