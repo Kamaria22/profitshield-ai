@@ -1,5 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { robustZScore, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -81,15 +80,9 @@ Deno.serve(async (req) => {
     let alertsTriggered = 0;
     const triggeredAlerts = [];
 
-    const recentMargins = ordersToCheck
-      .map((o) => Number(o.margin_pct || 0))
-      .filter((v) => Number.isFinite(v) && v !== 0);
-
     for (const order of ordersToCheck) {
       for (const rule of alertRules) {
-        const alertResult = await evaluateAlertRule(rule, order, settings, costMappings, base44, tenant_id, {
-          recentMargins
-        });
+        const alertResult = await evaluateAlertRule(rule, order, settings, costMappings, base44, tenant_id);
         
         if (alertResult.triggered) {
           alertsTriggered++;
@@ -116,9 +109,7 @@ Deno.serve(async (req) => {
               rule_id: rule.id,
               rule_type: rule.type,
               threshold: rule.threshold_value,
-              actual_value: alertResult.actual_value,
-              ml_runtime_version: ML_RUNTIME_VERSION,
-              ml_signal: alertResult.ml_signal || null
+              actual_value: alertResult.actual_value
             }
           });
 
@@ -146,27 +137,18 @@ Deno.serve(async (req) => {
   }
 });
 
-async function evaluateAlertRule(rule, order, settings, costMappings, base44, tenantId, mlContext = {}) {
+async function evaluateAlertRule(rule, order, settings, costMappings, base44, tenantId) {
   const result = { triggered: false, message: '', details: {}, actual_value: null, recommended_action: 'none' };
 
   switch (rule.type) {
     case 'low_margin': {
       const marginPct = order.margin_pct || 0;
-      const marginZ = robustZScore(marginPct, mlContext.recentMargins || []);
       if (marginPct < rule.threshold_value && marginPct !== 0) {
         result.triggered = true;
         result.actual_value = marginPct;
         result.message = `Order margin (${marginPct.toFixed(1)}%) is below ${rule.threshold_value}% threshold`;
-        result.details = { margin_pct: marginPct, threshold: rule.threshold_value, margin_z_score: Number(marginZ.toFixed(2)) };
-        result.ml_signal = { type: 'margin_anomaly', z_score: Number(marginZ.toFixed(2)) };
+        result.details = { margin_pct: marginPct, threshold: rule.threshold_value };
         result.recommended_action = marginPct < 0 ? 'verify' : 'none';
-      } else if (Math.abs(marginZ) > 2.2 && marginPct !== 0) {
-        result.triggered = true;
-        result.actual_value = marginPct;
-        result.message = `Order margin anomaly detected (${marginPct.toFixed(1)}%, z=${marginZ.toFixed(2)})`;
-        result.details = { margin_pct: marginPct, margin_z_score: Number(marginZ.toFixed(2)) };
-        result.ml_signal = { type: 'margin_anomaly', z_score: Number(marginZ.toFixed(2)) };
-        result.recommended_action = 'verify';
       }
       break;
     }

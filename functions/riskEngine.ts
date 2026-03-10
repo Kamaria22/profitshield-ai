@@ -8,7 +8,6 @@
  *   - test: insert a synthetic test order and score it (for automated verification)
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { mlRiskProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 function scoreOrder(order, customerOrders = []) {
   let fraudScore = 0;
@@ -73,26 +72,7 @@ function scoreOrder(order, customerOrders = []) {
   returnScore = Math.min(100, Math.max(0, Math.round(returnScore)));
   chargebackScore = Math.min(100, Math.max(0, Math.round(chargebackScore)));
 
-  const avg = customerOrders.length > 0
-    ? customerOrders.reduce((s, o) => s + (o.total_revenue || 0), 0) / customerOrders.length
-    : 0;
-  const refunded = customerOrders.filter(o => o.status === 'refunded' || o.status === 'partially_refunded');
-  const refundRate = customerOrders.length > 0 ? (refunded.length / customerOrders.length) * 100 : 0;
-  const ml = mlRiskProbability({
-    firstOrder: isFirst,
-    value: val,
-    avgValue: avg,
-    countryMismatch: !!(b.country && s.country && b.country !== s.country),
-    zipMismatch: !!(b.zip && s.zip && b.zip !== s.zip),
-    suspiciousEmail: email.includes('+') || /\d{4,}/.test(email.split('@')[0] || ''),
-    velocity24h: recentSame.length + 1,
-    refundRatePct: refundRate,
-    negativeProfit: (order.net_profit || 0) < 0
-  });
-
-  const baseCombined = Math.round(fraudScore * 0.5 + returnScore * 0.25 + chargebackScore * 0.25);
-  const mlBoost = Math.round((ml.probability - 0.5) * 20); // bounded +/-10ish
-  const combined = Math.min(100, Math.max(0, baseCombined + mlBoost));
+  const combined = Math.round(fraudScore * 0.5 + returnScore * 0.25 + chargebackScore * 0.25);
   const riskLevel = combined >= 70 ? 'high' : combined >= 40 ? 'medium' : 'low';
   const recommendedAction = riskLevel === 'high'
     ? (fraudScore >= 60 ? 'cancel' : 'verify')
@@ -107,9 +87,7 @@ function scoreOrder(order, customerOrders = []) {
     risk_reasons: reasons,
     recommended_action: recommendedAction,
     confidence: !order.billing_address ? 'low' : !order.customer_email ? 'medium' : 'high',
-    model_version: 'risk_engine_v2',
-    ml_runtime_version: ML_RUNTIME_VERSION,
-    ml_risk_probability: Number((ml.probability * 100).toFixed(1))
+    model_version: 'risk_engine_v2'
   };
 }
 

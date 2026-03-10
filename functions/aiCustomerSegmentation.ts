@@ -1,5 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { mlChurnProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -83,13 +82,7 @@ Deno.serve(async (req) => {
                 c.days_since_last_order <= 180 ? 2 : 1;
       const f = Math.ceil((c.order_count / maxFrequency) * 5);
       const m = Math.ceil((c.total_spent / maxSpent) * 5);
-      const churn = mlChurnProbability({
-        daysSinceLastOrder: c.days_since_last_order,
-        orderCount: c.order_count,
-        totalSpent: c.total_spent,
-        refundCount: c.refund_count
-      });
-      return { ...c, r, f, m, rfm: r + f + m, churn_probability: churn.probability };
+      return { ...c, r, f, m, rfm: r + f + m };
     });
 
     // RFM-based segments
@@ -165,12 +158,6 @@ Deno.serve(async (req) => {
           priority: s.priority,
           risk_level: s.risk_level,
           expected_roi: s.priority === 'high' ? 'High' : s.priority === 'medium' ? 'Medium' : 'Low',
-          avg_churn_probability_pct: Number(
-            (
-              s.customers.reduce((sum, c) => sum + (c.churn_probability || 0), 0) /
-              Math.max(s.customers.length, 1) * 100
-            ).toFixed(1)
-          ),
           recommended_actions: getActions(s.name)
         };
       });
@@ -212,7 +199,6 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
-      ml_runtime: { version: ML_RUNTIME_VERSION, churn_model: 'logistic_recency_frequency_value' },
       total_customers: totalCustomers,
       segments: formattedSegments,
       insights,

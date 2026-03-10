@@ -13,7 +13,6 @@ import AdminSupportInboxPanel from '@/components/support/AdminSupportInboxPanel'
 import AISupportControlCenter from '@/components/support/AISupportControlCenter';
 import EmailSystemSettings from '@/components/settings/EmailSystemSettings';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
-import { usePermissions } from '@/components/usePermissions';
 
 const DEFAULT_OWNER_PHONE = '9146894367';
 const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
@@ -25,11 +24,10 @@ function isAdminOwner(user) {
 
 export default function AdminEmailCenter() {
   const resolver = usePlatformResolver();
-  const { role: permissionRole } = usePermissions();
   const tenantId = resolver?.tenantId || resolver?.tenant?.id || null;
   const user = resolver?.user || null;
   const queryClient = useQueryClient();
-  const canAccess = isAdminOwner(user) || permissionRole === 'admin' || permissionRole === 'owner';
+  const canAccess = isAdminOwner(user);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['admin-email-center-support-count', tenantId],

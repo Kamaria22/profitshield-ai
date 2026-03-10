@@ -20,7 +20,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
-import { usePermissions } from '@/components/usePermissions';
 
 const STATUS_CONFIG = {
   open:          { label: 'Open',        color: 'bg-blue-500/15 text-blue-300 border-blue-500/20' },
@@ -44,10 +43,9 @@ export default function AISupportControlCenter() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { user } = useAuth();
-  const { role: permissionRole } = usePermissions();
   const resolver = usePlatformResolver();
+  const role = (user?.role || user?.app_role || '').toLowerCase();
   const tenantId = resolver?.tenantId || resolver?.tenant?.id || user?.tenant_id || null;
-  const role = (user?.role || user?.app_role || permissionRole || '').toLowerCase();
   const canAccess = role === 'owner' || role === 'admin';
 
   // Fetch conversations
