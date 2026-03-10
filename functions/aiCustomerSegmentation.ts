@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { mlChurnProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -82,7 +83,22 @@ Deno.serve(async (req) => {
                 c.days_since_last_order <= 180 ? 2 : 1;
       const f = Math.ceil((c.order_count / maxFrequency) * 5);
       const m = Math.ceil((c.total_spent / maxSpent) * 5);
-      return { ...c, r, f, m, rfm: r + f + m };
+      const refundRatePct = c.order_count > 0 ? (c.refund_count / c.order_count) * 100 : 0;
+      const churn = mlChurnProbability({
+        daysSinceLastOrder: c.days_since_last_order,
+        orderCount: c.order_count,
+        totalSpent: c.total_spent,
+        refundRatePct,
+        highRiskOrders: c.high_risk_orders
+      });
+      return {
+        ...c,
+        r,
+        f,
+        m,
+        rfm: r + f + m,
+        churn_probability: churn.probability
+      };
     });
 
     // RFM-based segments
@@ -142,6 +158,9 @@ Deno.serve(async (req) => {
     const avgLTV = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
     const atRiskCount = segments.find(s => s.name === 'At Risk')?.customers.length || 0;
     const churnCount = segments.find(s => s.name === 'Churn Risk')?.customers.length || 0;
+    const avgChurnProbability = scored.length > 0
+      ? scored.reduce((sum, c) => sum + (c.churn_probability || 0), 0) / scored.length
+      : 0;
 
     const formattedSegments = segments
       .filter(s => s.customers.length > 0)
@@ -199,17 +218,19 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
+      ml_runtime: ML_RUNTIME_VERSION,
       total_customers: totalCustomers,
       segments: formattedSegments,
       insights,
       health_score: healthScore,
-      churn_risk_summary: `${atRiskCount} at-risk, ${churnCount} churned out of ${totalCustomers} total customers.`,
+      churn_risk_summary: `${atRiskCount} at-risk, ${churnCount} churned out of ${totalCustomers} total customers. Avg churn probability ${(avgChurnProbability * 100).toFixed(1)}%.`,
       top_customers: scored.sort((a, b) => b.rfm - a.rfm).slice(0, 10).map(c => ({
         name: c.name,
         email: c.email,
         total_spent: c.total_spent,
         order_count: c.order_count,
-        rfm: c.rfm
+        rfm: c.rfm,
+        churn_probability: Number(((c.churn_probability || 0) * 100).toFixed(1))
       }))
     });
 

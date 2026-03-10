@@ -8,6 +8,7 @@
  *   - test: insert a synthetic test order and score it (for automated verification)
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { mlRiskProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 function scoreOrder(order, customerOrders = []) {
   let fraudScore = 0;
@@ -59,20 +60,38 @@ function scoreOrder(order, customerOrders = []) {
 
   // 8. Refund history
   const refunded = customerOrders.filter(o => o.status === 'refunded' || o.status === 'partially_refunded');
+  const refundRate = customerOrders.length > 0 ? (refunded.length / customerOrders.length) * 100 : 0;
   if (refunded.length > 0 && customerOrders.length > 1) {
-    const rate = (refunded.length / customerOrders.length) * 100;
-    if (rate > 30) { returnScore += 25; reasons.push(`High refund rate (${rate.toFixed(0)}%)`); }
-    else if (rate > 15) { returnScore += 12; reasons.push(`Moderate refund rate (${rate.toFixed(0)}%)`); }
+    if (refundRate > 30) { returnScore += 25; reasons.push(`High refund rate (${refundRate.toFixed(0)}%)`); }
+    else if (refundRate > 15) { returnScore += 12; reasons.push(`Moderate refund rate (${refundRate.toFixed(0)}%)`); }
   }
 
   // 9. Negative margin
-  if ((order.net_profit || 0) < 0) { chargebackScore += 10; reasons.push('Negative margin'); }
+  const negativeProfit = (order.net_profit || 0) < 0;
+  if (negativeProfit) { chargebackScore += 10; reasons.push('Negative margin'); }
 
   fraudScore = Math.min(100, Math.max(0, Math.round(fraudScore)));
   returnScore = Math.min(100, Math.max(0, Math.round(returnScore)));
   chargebackScore = Math.min(100, Math.max(0, Math.round(chargebackScore)));
 
-  const combined = Math.round(fraudScore * 0.5 + returnScore * 0.25 + chargebackScore * 0.25);
+  const avg = customerOrders.length > 1
+    ? customerOrders.reduce((s, o) => s + (o.total_revenue || 0), 0) / customerOrders.length
+    : 0;
+  const velocity24h = recentSame.length + 1;
+  const ml = mlRiskProbability({
+    firstOrder: isFirst,
+    value: val,
+    avgValue: avg,
+    countryMismatch: !!(b.country && s.country && b.country !== s.country),
+    zipMismatch: !!(b.zip && s.zip && b.zip !== s.zip),
+    suspiciousEmail: email.includes('+') || /\d{4,}/.test(email.split('@')[0] || ''),
+    velocity24h,
+    refundRatePct: refundRate,
+    negativeProfit
+  });
+
+  const baseCombined = Math.round(fraudScore * 0.5 + returnScore * 0.25 + chargebackScore * 0.25);
+  const combined = Math.min(100, Math.max(0, baseCombined + Math.round((ml.probability - 0.5) * 20)));
   const riskLevel = combined >= 70 ? 'high' : combined >= 40 ? 'medium' : 'low';
   const recommendedAction = riskLevel === 'high'
     ? (fraudScore >= 60 ? 'cancel' : 'verify')
@@ -87,7 +106,9 @@ function scoreOrder(order, customerOrders = []) {
     risk_reasons: reasons,
     recommended_action: recommendedAction,
     confidence: !order.billing_address ? 'low' : !order.customer_email ? 'medium' : 'high',
-    model_version: 'risk_engine_v2'
+    model_version: 'risk_engine_v2',
+    ml_runtime_version: ML_RUNTIME_VERSION,
+    ml_risk_probability: Number((ml.probability * 100).toFixed(1))
   };
 }
 
