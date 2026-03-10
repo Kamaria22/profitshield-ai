@@ -373,14 +373,15 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   
   // Derived values needed for hooks
   const activeUser = user || permUser;
-  const isAdmin = isUserAdmin(activeUser);
+  const fallbackRole = String(permissionRole || '').toLowerCase();
+  const isAdmin = isUserAdmin(activeUser) || fallbackRole === 'admin' || fallbackRole === 'owner';
   const roleLabel = typeof permissionRole === 'string' && permissionRole.trim()
     ? permissionRole
     : (activeUser?.app_role || activeUser?.role || '');
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Memoized nav items
-  const userRole = activeUser?.role || activeUser?.app_role || 'user';
+  const userRole = activeUser?.role || activeUser?.app_role || permissionRole || 'user';
   const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin, userRole);
   
   // Memoized handlers
