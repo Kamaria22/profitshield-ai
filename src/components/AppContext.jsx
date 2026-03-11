@@ -44,7 +44,6 @@ export const INTERNAL_ONLY_PAGES = [
   'SystemHealth',
   'AuditLogs',
   'SupportInbox',
-  'AdminEmailCenter',
 ];
 
 // Pages that require admin role regardless of context
