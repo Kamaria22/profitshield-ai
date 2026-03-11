@@ -1,5 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { withEndpointGuard, safeFilter } from './helpers/endpointSafety.ts';
+
+function withEndpointGuard(name, handler) {
+  return async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      });
+    }
+    try {
+      const res = await handler(req);
+      return res instanceof Response ? res : Response.json({ error: `${name}_invalid_response` }, { status: 500 });
+    } catch (error) {
+      console.error(`[${name}] unhandled`, error);
+      return Response.json({ error: 'internal_error', endpoint: name, message: error?.message || String(error) }, { status: 500 });
+    }
+  };
+}
+
+async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
+  try {
+    const rows = await filterFn();
+    return Array.isArray(rows) ? rows : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const WEBHOOK_URL = `${APP_URL}/api/functions/shopifyWebhook`;

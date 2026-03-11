@@ -1,6 +1,87 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { jsonSafe, withEndpointGuard } from './helpers/endpointSafety.ts';
-import { detectAutomatedProbe, enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
+
+const DEFAULT_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+function jsonSafe(body, status = 200, extraHeaders = {}) {
+  return Response.json(body, { status, headers: { ...DEFAULT_HEADERS, ...extraHeaders } });
+}
+
+function withEndpointGuard(name, handler, headers = {}) {
+  return async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: { ...DEFAULT_HEADERS, ...headers } });
+    }
+    try {
+      const res = await handler(req);
+      return res instanceof Response ? res : jsonSafe({ error: `${name}_invalid_response` }, 500, headers);
+    } catch (error) {
+      console.error(`[${name}] unhandled`, error);
+      return jsonSafe({ error: 'internal_error', endpoint: name, message: error?.message || String(error) }, 500, headers);
+    }
+  };
+}
+
+const WINDOW_MS = 60 * 1000;
+const ipCounters = new Map();
+const probeCounters = new Map();
+function cleanupExpired(map, ttlMs = WINDOW_MS) {
+  const now = Date.now();
+  for (const [k, v] of map.entries()) {
+    const t = typeof v === 'number' ? v : v?.resetAt;
+    if (!t || t <= now - ttlMs) map.delete(k);
+  }
+}
+function getClientKey(req) {
+  const fwd = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
+  const first = fwd.split(',').map((s) => s.trim()).filter(Boolean)[0];
+  return first || 'unknown';
+}
+function enforcePayloadLimit(req, maxBytes) {
+  const len = Number(req.headers.get('content-length') || '0');
+  if (!Number.isFinite(len) || len <= 0) return { ok: true };
+  if (len > maxBytes) return { ok: false, reason: 'payload_too_large', status: 413 };
+  return { ok: true };
+}
+function enforceRateLimit(key, maxPerWindow, windowMs = WINDOW_MS) {
+  cleanupExpired(ipCounters, windowMs);
+  const now = Date.now();
+  const row = ipCounters.get(key);
+  if (!row || row.resetAt <= now) {
+    ipCounters.set(key, { count: 1, resetAt: now + windowMs });
+    return { ok: true, remaining: maxPerWindow - 1 };
+  }
+  if (row.count >= maxPerWindow) {
+    return { ok: false, reason: 'rate_limited', status: 429, retry_after_ms: Math.max(0, row.resetAt - now) };
+  }
+  row.count += 1;
+  ipCounters.set(key, row);
+  return { ok: true, remaining: Math.max(0, maxPerWindow - row.count) };
+}
+const SCANNER_UA_PATTERNS = [/sqlmap/i, /nikto/i, /acunetix/i, /masscan/i, /zgrab/i, /nmap/i, /nessus/i, /wpscan/i, /dirbuster/i];
+const PROBE_PATH_PATTERNS = [/\/wp-admin/i, /\/wp-login\.php/i, /\/\.env/i, /\/phpmyadmin/i, /\/cgi-bin\//i, /\/\.git\//i, /\/etc\/passwd/i, /union\s+select/i, /<script/i, /%3cscript/i];
+function detectAutomatedProbe(req, endpointTag = 'endpoint') {
+  cleanupExpired(probeCounters, 10 * 60 * 1000);
+  const ip = getClientKey(req);
+  const ua = req.headers.get('user-agent') || '';
+  const url = new URL(req.url);
+  const signal = `${url.pathname}${url.search}`;
+  const uaHit = SCANNER_UA_PATTERNS.find((re) => re.test(ua));
+  const pathHit = PROBE_PATH_PATTERNS.find((re) => re.test(signal));
+  if (!uaHit && !pathHit) return { ok: true };
+  const key = `${endpointTag}:${ip}`;
+  const now = Date.now();
+  const row = probeCounters.get(key);
+  if (!row || row.resetAt <= now) probeCounters.set(key, { count: 1, resetAt: now + 10 * 60 * 1000 });
+  else {
+    row.count += 1;
+    probeCounters.set(key, row);
+  }
+  return { ok: false, status: 403, reason: 'automated_probe_detected' };
+}
 
 const VERSION = 'submit_review_rating_v1';
 
