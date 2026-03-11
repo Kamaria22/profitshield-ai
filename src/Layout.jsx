@@ -174,6 +174,10 @@ function isUserAdmin(user) {
   return role === 'owner' || role === 'admin';
 }
 
+function isOwnerAllowlisted(email) {
+  return String(email || '').trim().toLowerCase() === 'rohan.a.roberts@gmail.com';
+}
+
 // Debug Panel with full trace visibility - 100% null-safe + memoized
 const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search }) {
   const [visible, setVisible] = React.useState(() => {
@@ -346,7 +350,7 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
 });
 
 // Memoized nav items filtering
-const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
+const useFilteredNavItems = (hasPermission, isAdmin, userRole, ownerAllowlisted = false) => {
   return useMemo(() => {
     return navItems.filter(item => {
       // Keep Shopify-public sidebar minimal and predictable.
@@ -355,19 +359,25 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
       }
       // Permission check
       if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) {
-        return false;
+        if (!(ownerAllowlisted && item.page === 'AdminEmailCenter')) {
+          return false;
+        }
       }
       // Admin-only items require BOTH adminOnly flag AND admin role
       if (item.adminOnly && !isAdmin) {
-        return false;
+        if (!(ownerAllowlisted && item.page === 'AdminEmailCenter')) {
+          return false;
+        }
       }
       // APP_CONTEXT + role guard: internal-only pages hidden in shopify_public OR for non-admins
       if (!canAccessPage(item.page, userRole || 'user', APP_CONTEXT)) {
-        return false;
+        if (!(ownerAllowlisted && item.page === 'AdminEmailCenter')) {
+          return false;
+        }
       }
       return true;
     });
-  }, [hasPermission, isAdmin, userRole]);
+  }, [hasPermission, isAdmin, userRole, ownerAllowlisted]);
 };
 
 function LayoutContent({ children, currentPageName, resolver = {} }) {
@@ -402,11 +412,19 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const roleLabel = typeof permissionRole === 'string' && permissionRole.trim()
     ? permissionRole
     : (activeUser?.app_role || activeUser?.role || '');
+  const ownerAllowlisted = isOwnerAllowlisted(activeUser?.email);
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   // Memoized nav items
   const userRole = activeUser?.role || activeUser?.app_role || permissionRole || 'user';
-  const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin, userRole);
+  const baseFilteredNavItems = useFilteredNavItems(hasPermission, isAdmin, userRole, ownerAllowlisted);
+  const filteredNavItems = useMemo(() => {
+    if (ownerAllowlisted) {
+      return baseFilteredNavItems.map((item) => (item.page === 'AdminEmailCenter' ? { ...item, adminOnly: false } : item));
+    }
+    return baseFilteredNavItems;
+  }, [baseFilteredNavItems, ownerAllowlisted]);
+
   
   // Memoized handlers
   const handleLogoutMemo = useCallback(() => {

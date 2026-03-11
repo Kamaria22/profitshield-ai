@@ -14,7 +14,8 @@ import { invokeSelfHealSafe, invokeSupportGuardianSafe } from '@/lib/safeApi';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
-  return role === 'owner' || role === 'admin';
+  const email = String(user?.email || '').trim().toLowerCase();
+  return role === 'owner' || role === 'admin' || email === 'rohan.a.roberts@gmail.com';
 }
 
 function StatCard({ title, value, icon: Icon, tone = 'text-slate-200' }) {

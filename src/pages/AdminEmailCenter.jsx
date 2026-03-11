@@ -20,7 +20,8 @@ const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
-  return role === 'admin' || role === 'owner';
+  const email = String(user?.email || '').trim().toLowerCase();
+  return role === 'admin' || role === 'owner' || email === 'rohan.a.roberts@gmail.com';
 }
 
 export default function AdminEmailCenter() {
