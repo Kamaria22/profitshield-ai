@@ -129,6 +129,26 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
+// Shopify App Store-facing sidebar should stay focused on merchant runtime actions.
+const SHOPIFY_PUBLIC_NAV_ALLOWLIST = new Set([
+  'Home',
+  'AIInsights',
+  'PnLAnalytics',
+  'Orders',
+  'Intelligence',
+  'Customers',
+  'Products',
+  'Shipping',
+  'Tasks',
+  'Alerts',
+  'Billing',
+  'Integrations',
+  'HelpCenter',
+  'Settings',
+  // Owner/admin-only entry (still role-gated below)
+  'AdminEmailCenter',
+]);
+
 // Bypass layout for these pages (public-facing or special flow)
 const bypassLayoutPages = ['Onboarding', 'ShopifyAuth', 'ShopifyCallback', 'SelectStore', 'Pricing'];
 
@@ -329,6 +349,10 @@ const DebugPanel = React.memo(function DebugPanel({ resolver, userEmail, search 
 const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
   return useMemo(() => {
     return navItems.filter(item => {
+      // Keep Shopify-public sidebar minimal and predictable.
+      if (APP_CONTEXT === 'shopify_public' && !SHOPIFY_PUBLIC_NAV_ALLOWLIST.has(item.page)) {
+        return false;
+      }
       // Permission check
       if (item.permission && typeof hasPermission === 'function' && !hasPermission(item.permission)) {
         return false;
