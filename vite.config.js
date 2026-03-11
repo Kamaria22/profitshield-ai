@@ -2,9 +2,29 @@ import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+// Keep build logs actionable while suppressing known stale-data advisories.
+const originalWarn = console.warn.bind(console);
+console.warn = (...args) => {
+  const msg = String(args?.[0] || '');
+  if (
+    msg.includes('[baseline-browser-mapping] The data in this module is over two months old') ||
+    msg.includes('Browserslist: browsers data (caniuse-lite) is')
+  ) {
+    return;
+  }
+  originalWarn(...args);
+};
+
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
+  if (!process.env.VITE_BASE44_APP_BASE_URL) {
+    process.env.VITE_BASE44_APP_BASE_URL =
+      process.env.SHOPIFY_APP_URL || process.env.APP_URL || 'https://profit-shield-ai.base44.app';
+  }
+  if (!process.env.BROWSERSLIST_IGNORE_OLD_DATA) {
+    process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';
+  }
   return {
     logLevel: 'error', // Suppress warnings, only show errors
     plugins: [
