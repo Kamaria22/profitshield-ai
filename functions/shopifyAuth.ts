@@ -7,7 +7,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { withEndpointGuard, validateEnv, jsonSafe } from './helpers/endpointSafety.ts';
-import { enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
+import { detectAutomatedProbe, enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
 
 // Shopify-safe response headers (allows iframe embedding + CSP frame-ancestors via HTTP)
 const SHOPIFY_FRAME_ANCESTORS = "https://admin.shopify.com https://*.myshopify.com";
@@ -38,6 +38,11 @@ function jsonResponse(body, status = 200) {
 
 const handler = withEndpointGuard('shopifyAuth', async (req) => {
   try {
+    const probeCheck = detectAutomatedProbe(req, 'shopify_auth');
+    if (!probeCheck.ok) {
+      return jsonResponse({ ok: false, reason: probeCheck.reason }, probeCheck.status || 403);
+    }
+
     const payloadLimit = enforcePayloadLimit(req, 24 * 1024); // 24KB
     if (!payloadLimit.ok) {
       return jsonResponse({ ok: false, reason: payloadLimit.reason }, payloadLimit.status || 413);

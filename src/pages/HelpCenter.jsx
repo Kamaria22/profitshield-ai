@@ -8,7 +8,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { createPageUrl } from '@/components/platformContext';
+import { Textarea } from '@/components/ui/textarea';
+import { base44 } from '@/api/base44Client';
+import { createPageUrl, getPersistedContext, parseQuery } from '@/components/platformContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -248,9 +250,15 @@ function GuideCard({ guide }) {
 export default function HelpCenter() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewResult, setReviewResult] = useState({ ok: false, message: '', error: '' });
   const location = useLocation();
   const navigate = useNavigate();
   const supportContactUrl = createPageUrl('support/contact', location.search);
+  const queryContext = useMemo(() => parseQuery(location.search), [location.search]);
+  const persistedContext = useMemo(() => getPersistedContext(true), []);
 
   const filteredFAQs = useMemo(() => {
     let result = FAQS;
@@ -271,6 +279,33 @@ export default function HelpCenter() {
     }
     return result;
   }, [search, activeCategory]);
+
+  const submitReview = async () => {
+    if (selectedRating < 1 || reviewSubmitting) return;
+    setReviewSubmitting(true);
+    setReviewResult({ ok: false, message: '', error: '' });
+    try {
+      const payload = {
+        rating: selectedRating,
+        feedback_text: reviewFeedback.trim(),
+        platform: 'shopify',
+        source: 'help_center_manual_review',
+        tenant_id: queryContext.tenantId || persistedContext.tenantId || undefined,
+        shop: queryContext.shop || persistedContext.shop || undefined,
+      };
+      const res = await base44.functions.invoke('submitReviewRating', payload);
+      if (res?.data?.ok) {
+        setReviewResult({ ok: true, message: 'Thanks for your feedback. Your rating was submitted.', error: '' });
+        setReviewFeedback('');
+      } else {
+        setReviewResult({ ok: false, message: '', error: 'Unable to submit rating right now. Please try again.' });
+      }
+    } catch {
+      setReviewResult({ ok: false, message: '', error: 'Unable to submit rating right now. Please try again.' });
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -411,6 +446,53 @@ export default function HelpCenter() {
               Settings
             </Button>
           </Link>
+        </div>
+      </div>
+
+      <div className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-slate-100 font-semibold">Rate ProfitShield</p>
+            <p className="text-slate-500 text-sm">Share a quick rating and feedback so we can keep improving.</p>
+          </div>
+          <a href="https://apps.shopify.com/profitshield/reviews" target="_blank" rel="noreferrer">
+            <Button variant="outline" size="sm" className="text-xs">
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+              Open Shopify Reviews
+            </Button>
+          </a>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              type="button"
+              key={star}
+              className="p-1 rounded-md hover:bg-white/10 transition-colors"
+              onClick={() => setSelectedRating(star)}
+              aria-label={`Rate ${star} stars`}
+            >
+              <Star className={`w-5 h-5 ${star <= selectedRating ? 'fill-amber-400 text-amber-400' : 'text-slate-500'}`} />
+            </button>
+          ))}
+        </div>
+        <Textarea
+          value={reviewFeedback}
+          onChange={(e) => setReviewFeedback(e.target.value)}
+          placeholder="Optional feedback"
+          className="mt-3 bg-white/5 border-white/10 text-slate-200 placeholder:text-slate-600"
+        />
+        <div className="mt-3 flex items-center gap-3">
+          <Button
+            size="sm"
+            onClick={submitReview}
+            disabled={selectedRating < 1 || reviewSubmitting}
+            className="text-xs"
+          >
+            <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+            {reviewSubmitting ? 'Submitting...' : 'Submit Rating'}
+          </Button>
+          {reviewResult.ok && <span className="text-xs text-emerald-400">{reviewResult.message}</span>}
+          {!reviewResult.ok && reviewResult.error && <span className="text-xs text-rose-400">{reviewResult.error}</span>}
         </div>
       </div>
     </div>

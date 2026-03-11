@@ -1,6 +1,33 @@
 const WINDOW_MS = 60 * 1000;
 const ipCounters = new Map<string, { count: number; resetAt: number }>();
 const replayCache = new Map<string, number>();
+const probeCounters = new Map<string, { count: number; resetAt: number }>();
+
+const SCANNER_UA_PATTERNS = [
+  /sqlmap/i,
+  /nikto/i,
+  /acunetix/i,
+  /masscan/i,
+  /zgrab/i,
+  /nmap/i,
+  /nessus/i,
+  /wpscan/i,
+  /dirbuster/i,
+];
+
+const PROBE_PATH_PATTERNS = [
+  /\/wp-admin/i,
+  /\/wp-login\.php/i,
+  /\/\.env/i,
+  /\/phpmyadmin/i,
+  /\/cgi-bin\//i,
+  /\/\.git\//i,
+  /\/boaform\//i,
+  /\/etc\/passwd/i,
+  /union\s+select/i,
+  /<script/i,
+  /%3cscript/i,
+];
 
 function nowMs() {
   return Date.now();
@@ -52,4 +79,37 @@ export function checkReplay(cacheKey: string, ttlMs = 10 * 60 * 1000) {
   }
   replayCache.set(cacheKey, now);
   return { replay: false };
+}
+
+export function detectAutomatedProbe(req: Request, endpointTag = 'endpoint') {
+  cleanupExpired(probeCounters, 10 * 60 * 1000);
+
+  const ip = getClientKey(req);
+  const ua = req.headers.get('user-agent') || '';
+  const url = new URL(req.url);
+  const signal = `${url.pathname}${url.search}`;
+
+  const uaHit = SCANNER_UA_PATTERNS.find((re) => re.test(ua));
+  const pathHit = PROBE_PATH_PATTERNS.find((re) => re.test(signal));
+
+  if (!uaHit && !pathHit) {
+    return { ok: true };
+  }
+
+  const key = `${endpointTag}:${ip}`;
+  const now = nowMs();
+  const row = probeCounters.get(key);
+  if (!row || row.resetAt <= now) {
+    probeCounters.set(key, { count: 1, resetAt: now + 10 * 60 * 1000 });
+  } else {
+    row.count += 1;
+    probeCounters.set(key, row);
+  }
+
+  return {
+    ok: false,
+    status: 403,
+    reason: 'automated_probe_detected',
+    indicator: uaHit ? `ua:${uaHit}` : `path:${pathHit}`,
+  };
 }

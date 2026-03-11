@@ -19,7 +19,7 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { withEndpointGuard, validateEnv, safeFilter, jsonSafe } from './helpers/endpointSafety.ts';
-import { enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
+import { detectAutomatedProbe, enforcePayloadLimit, enforceRateLimit, getClientKey } from './helpers/requestGuards.ts';
 
 // ── Inline token decrypt (no local imports allowed in Deno Deploy) ─────────────
 async function decryptToken(encryptedToken) {
@@ -187,6 +187,11 @@ const handler = withEndpointGuard('shopifySessionExchange', async (req) => {
   const path = url.pathname;
 
   try {
+    const probeCheck = detectAutomatedProbe(req, 'shopify_session_exchange');
+    if (!probeCheck.ok) {
+      return jsonResponse({ ok: false, reason: probeCheck.reason }, probeCheck.status || 403);
+    }
+
     const payloadLimit = enforcePayloadLimit(req, 20 * 1024); // 20KB max for exchange payload
     if (!payloadLimit.ok) {
       return jsonResponse({ ok: false, reason: payloadLimit.reason }, payloadLimit.status || 413);

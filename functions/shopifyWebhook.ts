@@ -8,7 +8,7 @@
  */
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.20";
-import { checkReplay, enforcePayloadLimit, enforceRateLimit, getClientKey } from "./helpers/requestGuards.ts";
+import { checkReplay, detectAutomatedProbe, enforcePayloadLimit, enforceRateLimit, getClientKey } from "./helpers/requestGuards.ts";
 
 function json(res, status = 200) {
   return Response.json(res, { status });
@@ -55,6 +55,9 @@ async function hmacSha256Base64(secret, message) {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const db = base44.asServiceRole.entities;
+
+  const probeCheck = detectAutomatedProbe(req, 'shopify_webhook');
+  if (!probeCheck.ok) return json({ ok: false, error: probeCheck.reason }, probeCheck.status || 403);
 
   const payloadLimit = enforcePayloadLimit(req, 1024 * 1024); // 1MB
   if (!payloadLimit.ok) return json({ ok: false, error: payloadLimit.reason }, payloadLimit.status || 413);
