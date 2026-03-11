@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
+import { getPersistedContext, parseQuery } from '@/components/platformContext';
 import { SupportTicketQueue } from '@/components/support/emailSupportService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,8 +55,12 @@ export default function MerchantSupportForm() {
   const resolver = usePlatformResolver();
   const { user } = useAuth();
 
-  const tenantId = resolver?.tenantId || user?.tenant_id || null;
-  const userEmail = user?.email || resolver?.user?.email || null;
+  const queryCtx = parseQuery(typeof window !== 'undefined' ? window.location.search : '');
+  const persistedCtx = getPersistedContext(true);
+  const shopDomain = queryCtx.shop || persistedCtx.shop || persistedCtx.storeKey || null;
+
+  const tenantId = resolver?.tenantId || user?.tenant_id || queryCtx.tenantId || persistedCtx.tenantId || null;
+  const userEmail = user?.email || resolver?.user?.email || (shopDomain ? `merchant@${shopDomain}` : null);
   const userName = user?.full_name || user?.name || null;
 
   const [category, setCategory] = useState('general');
@@ -67,16 +72,17 @@ export default function MerchantSupportForm() {
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: listQueryKey,
     queryFn: async () => {
-      if (!tenantId || !userEmail) return [];
+      if (!tenantId) return [];
+      if (!userEmail) return base44.entities.SupportConversation.filter({ tenant_id: tenantId }, '-created_date', 50);
       return base44.entities.SupportConversation.filter({ tenant_id: tenantId, user_email: userEmail }, '-created_date', 50);
     },
-    enabled: !!tenantId && !!userEmail,
+    enabled: !!tenantId,
     refetchInterval: 30000,
   });
 
   const submitTicket = useMutation({
     mutationFn: async () => {
-      if (!tenantId || !userEmail) throw new Error('Unable to identify your tenant or account.');
+      if (!tenantId) throw new Error('Unable to identify your store context.');
       const trimmed = message.trim();
       if (!trimmed) throw new Error('Please enter a support message.');
 
@@ -103,18 +109,38 @@ export default function MerchantSupportForm() {
         };
       }
 
-      await SupportTicketQueue.createTicket({
-        tenantId,
-        userEmail,
-        userName,
-        issueSummary: trimmed.slice(0, 140),
-        issueType: category,
-        priority: category === 'bug' ? 'high' : 'medium',
-        messages: [userMessage, aiMessage],
-        aiResolution,
-        autoFixTriggered: false,
-        needsOwnerAttention: false,
-      });
+      try {
+        await SupportTicketQueue.createTicket({
+          tenantId,
+          userEmail,
+          userName,
+          issueSummary: trimmed.slice(0, 140),
+          issueType: category,
+          priority: category === 'bug' ? 'high' : 'medium',
+          messages: [userMessage, aiMessage],
+          aiResolution,
+          autoFixTriggered: false,
+          needsOwnerAttention: false,
+        });
+      } catch (error) {
+        const msg = String(error?.message || '').toLowerCase();
+        if (!msg.includes('403') && !msg.includes('unauthorized') && !msg.includes('forbidden')) {
+          throw error;
+        }
+        const fallback = await base44.functions.invoke('submitSupportMessage', {
+          tenant_id: tenantId,
+          shop: shopDomain,
+          user_email: userEmail,
+          user_name: userName,
+          issue_type: category,
+          message: trimmed,
+          messages: [userMessage, aiMessage],
+          ai_resolution: aiResolution,
+        });
+        if (!fallback?.data?.ok) {
+          throw new Error(fallback?.data?.reason || 'Failed to submit support request');
+        }
+      }
     },
     onSuccess: () => {
       toast.success('Support request submitted. AI response added to your ticket.');
