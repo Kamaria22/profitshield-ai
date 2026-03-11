@@ -9,10 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { DEFAULT_SUPPORT_EMAIL, EmailService } from '@/components/support/emailSupportService';
 import { useAuth } from '@/lib/AuthContext';
+import { usePermissions } from '@/components/usePermissions';
 import { invokeSelfHealSafe, invokeSupportGuardianSafe } from '@/lib/safeApi';
 
-function isAdminOwner(user) {
-  const role = (user?.role || user?.app_role || '').toLowerCase();
+function isAdminOwner(user, fallbackRole = null) {
+  const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
   return role === 'owner' || role === 'admin';
 }
 
@@ -36,7 +37,8 @@ export default function AdminEmailSupportPanel({ tenantId }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canAccess = isAdminOwner(user);
+  const { role: permissionRole } = usePermissions();
+  const canAccess = isAdminOwner(user, permissionRole);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['admin-email-support-conversations', tenantId],
