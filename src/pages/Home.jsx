@@ -65,6 +65,7 @@ export default function Home() {
   const queryFilter = getTenantFilter(resolverCheck) || (authTenantId ? { tenant_id: authTenantId } : null);
   const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
   const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
+  const summaryCacheKey = `ps:dashboard-summary:${authTenantId || 'none'}`;
 
   const fetchEntitySummary = useCallback(async (tenantId) => {
     const [orders, alerts, leaks] = await Promise.all([
@@ -109,9 +110,9 @@ export default function Home() {
     let idleId = null;
     const enableDeferred = () => setShowDeferredContent(true);
     if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(enableDeferred, { timeout: 800 });
+      idleId = window.requestIdleCallback(enableDeferred, { timeout: 1200 });
     } else {
-      timeoutId = setTimeout(enableDeferred, 350);
+      timeoutId = setTimeout(enableDeferred, 700);
     }
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -183,8 +184,8 @@ export default function Home() {
       
       // Absolute minimum for first paint - fetch in parallel, smallest datasets
       const [orders, alerts] = await Promise.all([
-        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 12),
-        base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 5)
+        base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 8),
+        base44.entities.Alert.filter({ tenant_id: queryFilter.tenant_id, status: 'pending' }, '-created_date', 3)
       ]);
 
       const fetchTime = performance.now() - startTime;
@@ -212,6 +213,16 @@ export default function Home() {
       };
     },
     enabled: canQuery,
+    initialData: () => {
+      const inMemory = queryClient.getQueryData(dashboardSummaryKey);
+      if (inMemory) return inMemory;
+      try {
+        const raw = sessionStorage.getItem(summaryCacheKey);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    },
     placeholderData: (previous) => previous ?? queryClient.getQueryData(dashboardSummaryKey) ?? null,
     retry: false,
     staleTime: 60000,
@@ -219,6 +230,13 @@ export default function Home() {
     refetchOnMount: false,
     refetchOnWindowFocus: false
   });
+
+  useEffect(() => {
+    if (!dashboardSummary || !authTenantId) return;
+    try {
+      sessionStorage.setItem(summaryCacheKey, JSON.stringify(dashboardSummary));
+    } catch {}
+  }, [dashboardSummary, authTenantId, summaryCacheKey]);
 
   const { data: profitLeaks = [] } = useQuery({
     queryKey: profitLeaksKey,

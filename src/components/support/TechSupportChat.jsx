@@ -12,6 +12,7 @@ import {
   Shield
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { invokeSelfHealSafe, invokeSupportGuardianSafe } from '@/lib/safeApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +67,7 @@ How can I help you today?`,
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const lastSentAtRef = useRef(0);
+  const invokedRemediationRef = useRef(new Set());
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -140,8 +142,23 @@ How can I help you today?`,
 
   const triggerAutonomousFix = async (issueDescription, isCritical = false) => {
     setIsFixing(true);
+    const issueKey = String(issueDescription || '').trim().slice(0, 120).toLowerCase();
+    if (!issueKey) {
+      setIsFixing(false);
+      return false;
+    }
+    if (invokedRemediationRef.current.has(issueKey)) {
+      setIsFixing(false);
+      return true;
+    }
+    invokedRemediationRef.current.add(issueKey);
     
     try {
+      const runBounded = async (fn) => {
+        const timeout = new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 5000));
+        return Promise.race([fn(), timeout]);
+      };
+
       await base44.entities.Task.create({
         tenant_id: tenantId,
         title: `[AUTO-FIX] ${issueDescription.slice(0, 50)}...`,
@@ -167,8 +184,32 @@ How can I help you today?`,
       if (isCritical) {
         await escalateToOwner(issueDescription, tenantId);
       }
+
+      // Relay to autonomous protection stack with bounded execution.
+      await Promise.allSettled([
+        runBounded(() => invokeSupportGuardianSafe({
+          action: 'run_watchdog',
+          tenant_id: tenantId,
+          source: 'support_chat_auto_fix',
+          issue_summary: issueDescription.slice(0, 200),
+          priority: isCritical ? 'critical' : 'high',
+        })),
+        runBounded(() => base44.functions.invoke('supportWatchdog', {
+          manual: true,
+          tenant_id: tenantId,
+          source: 'support_chat_auto_fix',
+        })),
+        runBounded(() => invokeSelfHealSafe({
+          action: 'watchdog',
+          tenant_id: tenantId,
+          source: 'support_chat_auto_fix',
+          issue_summary: issueDescription.slice(0, 200),
+          mode: 'safe',
+        })),
+      ]);
     } catch (e) {
       console.error('Failed to create fix task:', e);
+      invokedRemediationRef.current.delete(issueKey);
     }
     
     setIsFixing(false);
