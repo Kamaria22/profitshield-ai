@@ -703,7 +703,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           <div className="px-4 py-2 flex flex-wrap gap-x-3 border-t border-white/5">
             <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Privacy</Link>
             <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Terms</Link>
+            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">EULA</Link>
             <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Cookies</Link>
+            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">GDPR/CCPA</Link>
+            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Refunds</Link>
           </div>
 
           {/* User Menu */}

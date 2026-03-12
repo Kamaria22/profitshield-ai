@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield, Printer } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 
 export default function LegalPageLayout({ title, lastUpdated, children }) {
@@ -49,8 +48,11 @@ export default function LegalPageLayout({ title, lastUpdated, children }) {
         <div className="mt-16 pt-8 border-t border-slate-200 flex flex-wrap gap-4 text-sm text-slate-500">
           <Link to={createPageUrl('PrivacyPolicy')} className="hover:text-emerald-600 transition-colors">Privacy Policy</Link>
           <Link to={createPageUrl('TermsOfService')} className="hover:text-emerald-600 transition-colors">Terms of Service</Link>
+          <Link to={createPageUrl('EndUserLicenseAgreement')} className="hover:text-emerald-600 transition-colors">EULA</Link>
           <Link to={createPageUrl('CookiePolicy')} className="hover:text-emerald-600 transition-colors">Cookie Policy</Link>
+          <Link to={createPageUrl('ComplianceNotice')} className="hover:text-emerald-600 transition-colors">GDPR/CCPA Notice</Link>
           <Link to={createPageUrl('DataProcessingAgreement')} className="hover:text-emerald-600 transition-colors">DPA</Link>
+          <Link to={createPageUrl('RefundPolicy')} className="hover:text-emerald-600 transition-colors">Return & Refund Policy</Link>
           <a href="mailto:legal@profitshield.ai" className="hover:text-emerald-600 transition-colors">legal@profitshield.ai</a>
         </div>
       </main>

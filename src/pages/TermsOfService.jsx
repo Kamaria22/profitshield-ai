@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
 
 export default function TermsOfService() {
@@ -42,6 +44,10 @@ export default function TermsOfService() {
       </ul>
       <p>
         Payments are processed by Stripe Inc. By subscribing, you agree to Stripe's Terms of Service.
+      </p>
+      <p>
+        Refund and billing review terms are described in our{' '}
+        <Link to={createPageUrl('RefundPolicy')}>Return &amp; Refund Policy</Link>.
       </p>
 
       <h2>5. Acceptable Use</h2>

@@ -11,8 +11,11 @@ export default function LegalFooter() {
         <div className="flex flex-wrap items-center gap-4">
           <Link to={createPageUrl('PrivacyPolicy')} className="hover:text-emerald-600 transition-colors">Privacy</Link>
           <Link to={createPageUrl('TermsOfService')} className="hover:text-emerald-600 transition-colors">Terms</Link>
+          <Link to={createPageUrl('EndUserLicenseAgreement')} className="hover:text-emerald-600 transition-colors">EULA</Link>
           <Link to={createPageUrl('CookiePolicy')} className="hover:text-emerald-600 transition-colors">Cookies</Link>
+          <Link to={createPageUrl('ComplianceNotice')} className="hover:text-emerald-600 transition-colors">GDPR/CCPA</Link>
           <Link to={createPageUrl('DataProcessingAgreement')} className="hover:text-emerald-600 transition-colors">DPA</Link>
+          <Link to={createPageUrl('RefundPolicy')} className="hover:text-emerald-600 transition-colors">Refunds</Link>
           <a href="mailto:support@profitshield.ai" className="hover:text-emerald-600 transition-colors">Support</a>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('ps:manage-cookies'))}

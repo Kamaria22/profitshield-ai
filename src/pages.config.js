@@ -10,10 +10,12 @@ const AppStoreSubmission = lazy(() => import('./pages/AppStoreSubmission'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const Billing = lazy(() => import('./pages/Billing'));
 const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
+const ComplianceNotice = lazy(() => import('./pages/ComplianceNotice'));
 const Customers = lazy(() => import('./pages/Customers'));
 const DataCompliance = lazy(() => import('./pages/DataCompliance'));
 const DataProcessingAgreement = lazy(() => import('./pages/DataProcessingAgreement'));
 const Download = lazy(() => import('./pages/Download'));
+const EndUserLicenseAgreement = lazy(() => import('./pages/EndUserLicenseAgreement'));
 const Embedded = lazy(() => import('./pages/Embedded'));
 const FounderDashboard = lazy(() => import('./pages/FounderDashboard'));
 const GitHubPullRequests = lazy(() => import('./pages/GitHubPullRequests'));
@@ -33,6 +35,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Products = lazy(() => import('./pages/Products'));
 const Referrals = lazy(() => import('./pages/Referrals'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const ResolverTestHarness = lazy(() => import('./pages/ResolverTestHarness'));
 const ReviewerProof = lazy(() => import('./pages/ReviewerProof'));
 const SelectStore = lazy(() => import('./pages/SelectStore'));
@@ -61,10 +64,12 @@ export const PAGES = {
   AuditLogs,
   Billing,
   CookiePolicy,
+  ComplianceNotice,
   Customers,
   DataCompliance,
   DataProcessingAgreement,
   Download,
+  EndUserLicenseAgreement,
   Embedded,
   FounderDashboard,
   GitHubPullRequests,
@@ -84,6 +89,7 @@ export const PAGES = {
   PrivacyPolicy,
   Products,
   Referrals,
+  RefundPolicy,
   ResolverTestHarness,
   ReviewerProof,
   SelectStore,
