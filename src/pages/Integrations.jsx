@@ -69,7 +69,8 @@ export default function Integrations() {
   const location = useLocation();
   const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
-  const tenantId = resolverCheck.tenantId;
+  const persistedContext = getPersistedContext(true);
+  const tenantId = resolverCheck.tenantId || persistedContext?.tenantId || null;
   const { status, user } = resolver;
   
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);

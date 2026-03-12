@@ -354,7 +354,7 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole, ownerAllowlisted 
   return useMemo(() => {
     return navItems.filter(item => {
       // Keep Shopify-public sidebar minimal and predictable.
-      if (APP_CONTEXT === 'shopify_public' && !SHOPIFY_PUBLIC_NAV_ALLOWLIST.has(item.page)) {
+      if (APP_CONTEXT === 'shopify_public' && !isAdmin && !ownerAllowlisted && !SHOPIFY_PUBLIC_NAV_ALLOWLIST.has(item.page)) {
         return false;
       }
       // Permission check
@@ -394,10 +394,11 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   // Platform resolver - single source of truth
   const resolverCheck = requireResolved(resolver || {});
   const isEmbedded = detectEmbedded();
+  const persistedContext = getPersistedContext(true);
   
   // ONLY use resolverCheck for gated data - these are the authoritative values
   const isResolved = resolverCheck.ok;
-  const authTenantId = resolverCheck.tenantId;
+  const authTenantId = resolverCheck.tenantId || persistedContext?.tenantId || null;
   const authIntegrationId = resolverCheck.integrationId;
   
   // Raw resolver values ONLY for display when resolved

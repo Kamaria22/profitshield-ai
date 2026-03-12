@@ -5,6 +5,7 @@ import { getPersistedContext } from '@/components/platformContext';
 const OWNER_IDENTITY = {
   email: 'rohan.a.roberts@gmail.com',
   tenantId: '6992474f670f6ec0570302f0',
+  storeKey: 'profitshield-dev.myshopify.com',
   phoneDigits: '9146894367',
   role: 'owner',
 };
@@ -54,14 +55,20 @@ function isStrictOwnerProfile(user) {
 
 function isOwnerFromPersistedContext(persisted, ownerProof) {
   const tenantMatches = String(persisted?.tenantId || '') === OWNER_IDENTITY.tenantId;
+  const storeKey = String(persisted?.storeKey || persisted?.shop || '').trim().toLowerCase();
+  const storeMatches = storeKey === OWNER_IDENTITY.storeKey;
   const hintedEmail = String(persisted?.userHintEmail || '').trim().toLowerCase();
   const proofEmail = String(ownerProof?.email || '').trim().toLowerCase();
   const proofTenant = String(ownerProof?.tenantId || '').trim();
   const proofPhone = normalizePhoneDigits(ownerProof?.verifiedPhone);
   return (
     tenantMatches &&
+    storeMatches &&
     (
       hintedEmail === OWNER_IDENTITY.email ||
+      // Embedded-owner fallback: if tenant + store match the protected owner profile,
+      // allow owner role without forcing a Base44 auth.me() round-trip in iframe mode.
+      (!hintedEmail && !proofEmail) ||
       (proofEmail === OWNER_IDENTITY.email &&
         proofTenant === OWNER_IDENTITY.tenantId &&
         proofPhone === OWNER_IDENTITY.phoneDigits)
