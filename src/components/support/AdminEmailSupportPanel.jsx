@@ -11,6 +11,7 @@ import { DEFAULT_SUPPORT_EMAIL, EmailService } from '@/components/support/emailS
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/components/usePermissions';
 import { invokeSelfHealSafe, invokeSupportGuardianSafe } from '@/lib/safeApi';
+import { createPageUrl } from '@/components/platformContext';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
@@ -122,11 +123,11 @@ export default function AdminEmailSupportPanel({ tenantId }) {
 
       <Card>
         <CardContent className="pt-6 flex flex-wrap gap-3">
-          <Button onClick={() => navigate('/admin/support-inbox')} className="gap-2">
+          <Button onClick={() => navigate(createPageUrl('SupportInbox'))} className="gap-2">
             <Inbox className="w-4 h-4" />
             Open Inbox
           </Button>
-          <Button variant="outline" onClick={() => navigate('/SelfHealingCenter')} className="gap-2">
+          <Button variant="outline" onClick={() => navigate(createPageUrl('SelfHealingCenter'))} className="gap-2">
             <Wrench className="w-4 h-4" />
             View AI Logs
           </Button>

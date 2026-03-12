@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
+import { createPageUrl } from '@/components/platformContext';
 import { usePermissions } from '@/components/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -155,7 +156,7 @@ export default function EmailSystemSettings() {
               size="sm"
               variant="outline"
               className="border-white/10"
-              onClick={() => navigate('/admin/support-inbox')}
+              onClick={() => navigate(createPageUrl('SupportInbox'))}
             >
               Open Support Inbox
             </Button>

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/components/platformContext';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, Video, Download, Share2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export default function VideoJobNotifications() {
   const [lastChecked, setLastChecked] = useState(Date.now());
@@ -26,7 +26,7 @@ export default function VideoJobNotifications() {
                 duration: 8000,
                 action: {
                   label: 'View',
-                  onClick: () => window.location.href = '/VideoJobs',
+                  onClick: () => window.location.href = createPageUrl('VideoJobs', window.location.search || ''),
                 },
               }
             );

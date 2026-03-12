@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
 
 export default function PrivacyPolicy() {
@@ -58,7 +60,7 @@ export default function PrivacyPolicy() {
       </ul>
       <p>
         A full list of sub-processors is available in our{' '}
-        <a href="/dpa">Data Processing Agreement</a>.
+        <Link to={createPageUrl('DataProcessingAgreement')}>Data Processing Agreement</Link>.
       </p>
 
       <h2>4. Data Retention</h2>
@@ -99,7 +101,7 @@ export default function PrivacyPolicy() {
       </p>
 
       <h2>7. Cookies</h2>
-      <p>We use cookies and similar technologies. See our full <a href="/cookies">Cookie Policy</a>.</p>
+      <p>We use cookies and similar technologies. See our full <Link to={createPageUrl('CookiePolicy')}>Cookie Policy</Link>.</p>
 
       <h2>8. Children's Privacy</h2>
       <p>

@@ -10,7 +10,6 @@
 function detectAppContext() {
   if (typeof window === 'undefined') return 'shopify_public';
   const params = new URLSearchParams(window.location.search);
-  const host = window.location.hostname;
 
   // If installed via Shopify OAuth flow (has ?shop= or ?hmac=)
   if (params.get('shop') || params.get('hmac') || params.get('embedded')) {
@@ -43,7 +42,6 @@ export const INTERNAL_ONLY_PAGES = [
   'ResolverTestHarness',
   'SystemHealth',
   'AuditLogs',
-  'SupportInbox',
 ];
 
 // Pages that require admin role regardless of context

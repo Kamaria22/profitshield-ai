@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { createPageUrl } from '@/components/platformContext';
 
 /**
  * SUBSCRIPTION GUARD
@@ -40,7 +41,7 @@ export function SubscriptionGuard({ children }) {
   });
 
   // Auto-start trial for new users
-  const { data: trialInit } = useQuery({
+  useQuery({
     queryKey: ['trial-init', user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -61,7 +62,7 @@ export function SubscriptionGuard({ children }) {
     const isPublicRoute = publicRoutes.some(route => location.pathname.includes(route));
     
     if (!userLoading && !user && !isPublicRoute) {
-      navigate('/login');
+      navigate(createPageUrl('Home', location.search), { replace: true });
     }
   }, [user, userLoading, navigate, location]);
 

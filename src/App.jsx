@@ -106,6 +106,11 @@ const AuthenticatedApp = () => {
           <Pages.AdminEmailCenter />
         </LayoutWrapper>
       } />
+      <Route path="/admin/support-inbox" element={
+        <LayoutWrapper currentPageName="SupportInbox">
+          <Pages.SupportInbox />
+        </LayoutWrapper>
+      } />
       <Route path="/dashboard" element={
         <LayoutWrapper currentPageName="Home">
           <Pages.Home />

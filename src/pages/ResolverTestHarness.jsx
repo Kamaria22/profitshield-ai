@@ -130,7 +130,7 @@ export default function ResolverTestHarness() {
   const handleSimulateMultiStore = () => {
     // Clear context to trigger NEEDS_SELECTION if user has multiple stores
     clearContext();
-    navigate('/home');
+    navigate(createPageUrl('Home', location.search));
   };
   
   const handleRunSelfTest = async () => {
