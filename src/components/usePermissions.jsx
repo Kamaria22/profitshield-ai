@@ -2,6 +2,73 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getPersistedContext } from '@/components/platformContext';
 
+const OWNER_IDENTITY = {
+  email: 'rohan.a.roberts@gmail.com',
+  tenantId: '6992474f670f6ec0570302f0',
+  phoneDigits: '9146894367',
+  role: 'owner',
+};
+const OWNER_PROOF_KEY = 'profitshield_owner_identity_v1';
+
+function normalizePhoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function readOwnerProof() {
+  try {
+    const raw = localStorage.getItem(OWNER_PROOF_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistOwnerProof(user) {
+  try {
+    localStorage.setItem(OWNER_PROOF_KEY, JSON.stringify({
+      email: String(user?.email || '').trim().toLowerCase(),
+      tenantId: user?.tenant_id || null,
+      verifiedPhone: normalizePhoneDigits(user?.verified_phone),
+      savedAt: Date.now(),
+    }));
+  } catch {
+    // no-op
+  }
+}
+
+function isStrictOwnerProfile(user) {
+  if (!user) return false;
+  const email = String(user?.email || '').trim().toLowerCase();
+  const tenantId = String(user?.tenant_id || '').trim();
+  const verifiedPhone = normalizePhoneDigits(user?.verified_phone);
+  const twoFactorEnabled = Boolean(user?.two_factor_enabled);
+  const twoFactorMethod = String(user?.two_factor_method || '').toLowerCase();
+  return (
+    email === OWNER_IDENTITY.email &&
+    tenantId === OWNER_IDENTITY.tenantId &&
+    verifiedPhone === OWNER_IDENTITY.phoneDigits &&
+    twoFactorEnabled &&
+    twoFactorMethod === 'sms'
+  );
+}
+
+function isOwnerFromPersistedContext(persisted, ownerProof) {
+  const tenantMatches = String(persisted?.tenantId || '') === OWNER_IDENTITY.tenantId;
+  const hintedEmail = String(persisted?.userHintEmail || '').trim().toLowerCase();
+  const proofEmail = String(ownerProof?.email || '').trim().toLowerCase();
+  const proofTenant = String(ownerProof?.tenantId || '').trim();
+  const proofPhone = normalizePhoneDigits(ownerProof?.verifiedPhone);
+  return (
+    tenantMatches &&
+    (
+      hintedEmail === OWNER_IDENTITY.email ||
+      (proofEmail === OWNER_IDENTITY.email &&
+        proofTenant === OWNER_IDENTITY.tenantId &&
+        proofPhone === OWNER_IDENTITY.phoneDigits)
+    )
+  );
+}
+
 // Default permissions for built-in roles
 const DEFAULT_ROLE_PERMISSIONS = {
   owner: {
@@ -132,15 +199,18 @@ export function PermissionsProvider({ children }) {
   }, []);
 
   const loadUserPermissions = async () => {
+    const persisted = getPersistedContext(true);
+    const ownerProof = readOwnerProof();
+
     // In Shopify embedded mode, Base44 auth.me() will 403 — skip it entirely.
-    // The ShopifyEmbeddedAuthGate is the identity source; grant admin-level perms.
+    // The ShopifyEmbeddedAuthGate is the identity source; only grant owner/admin
+    // if strict owner profile proof is available.
     const isEmbedded = (() => {
       try {
         const p = new URLSearchParams(window.location.search);
         if (p.get('shop') && (p.get('host') || p.get('embedded') === '1')) {
           return true;
         }
-        const persisted = getPersistedContext(true);
         if (persisted?.platform === 'shopify' && !!persisted?.tenantId) {
           return true;
         }
@@ -149,10 +219,25 @@ export function PermissionsProvider({ children }) {
     })();
 
     if (isEmbedded) {
+      if (isOwnerFromPersistedContext(persisted, ownerProof)) {
+        setState({
+          user: {
+            email: OWNER_IDENTITY.email,
+            tenant_id: OWNER_IDENTITY.tenantId,
+            app_role: OWNER_IDENTITY.role,
+            role: OWNER_IDENTITY.role,
+            verified_phone: OWNER_IDENTITY.phoneDigits,
+          },
+          permissions: DEFAULT_ROLE_PERMISSIONS.owner,
+          role: OWNER_IDENTITY.role,
+          loading: false
+        });
+        return;
+      }
       setState({
         user: null,
-        permissions: DEFAULT_ROLE_PERMISSIONS.admin,
-        role: 'admin',
+        permissions: DEFAULT_ROLE_PERMISSIONS.viewer,
+        role: 'viewer',
         loading: false
       });
       return;
@@ -172,8 +257,15 @@ export function PermissionsProvider({ children }) {
 
       // Check for built-in roles first
       if (appRole === 'owner' || appRole === 'admin') {
-        permissions = DEFAULT_ROLE_PERMISSIONS[appRole] || DEFAULT_ROLE_PERMISSIONS.admin;
-        roleName = appRole;
+        if (isStrictOwnerProfile(user)) {
+          persistOwnerProof(user);
+          permissions = DEFAULT_ROLE_PERMISSIONS.owner;
+          roleName = 'owner';
+        } else {
+          // Enforce owner/admin as a protected profile only.
+          permissions = DEFAULT_ROLE_PERMISSIONS.manager;
+          roleName = 'manager';
+        }
       } else if (user.custom_role_id) {
         // Load custom role from database
         try {
