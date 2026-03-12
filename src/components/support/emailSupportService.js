@@ -41,11 +41,32 @@ export class SupportTicketQueue {
     autoFixTriggered = false,
     needsOwnerAttention = false
   }) {
+    const safeTenantId = tenantId || 'unknown';
+    const safeEmail = userEmail || null;
+    const summary = issueSummary || 'Support request';
+    const duplicateWindowMs = 2 * 60 * 1000;
+
+    try {
+      const filter = { tenant_id: safeTenantId };
+      if (safeEmail) filter.user_email = safeEmail;
+      const recent = await base44.entities.SupportConversation.filter(filter, '-created_date', 25).catch(() => []);
+      const existing = recent.find((row) => {
+        const sameSummary = String(row?.issue_summary || '').trim() === String(summary).trim();
+        if (!sameSummary) return false;
+        const createdAt = row?.created_date ? new Date(row.created_date).getTime() : 0;
+        if (!createdAt) return false;
+        return Date.now() - createdAt < duplicateWindowMs;
+      });
+      if (existing) return existing;
+    } catch {
+      // Continue with normal create if dedupe read fails.
+    }
+
     return base44.entities.SupportConversation.create({
-      tenant_id: tenantId || 'unknown',
-      user_email: userEmail || null,
+      tenant_id: safeTenantId,
+      user_email: safeEmail,
       user_name: userName || null,
-      issue_summary: issueSummary || 'Support request',
+      issue_summary: summary,
       issue_type: issueType,
       priority,
       status: needsOwnerAttention ? 'escalated' : 'open',
@@ -67,4 +88,3 @@ export class SupportInboxEntity {
     return base44.entities.SupportConversation.update(id, patch);
   }
 }
-

@@ -51,6 +51,23 @@ Deno.serve(async (req) => {
 
     const aiResolution = String(body?.ai_resolution || '').trim() || null;
     const messages = Array.isArray(body?.messages) ? body.messages : [];
+    const duplicateWindowMs = 2 * 60 * 1000;
+
+    const recent = await db.SupportConversation.filter(
+      { tenant_id: tenantId, ...(userEmail ? { user_email: userEmail } : {}) },
+      '-created_date',
+      25
+    ).catch(() => []);
+    const duplicate = recent.find((row) => {
+      const sameSummary = String(row?.issue_summary || '').trim() === trimmedMessage.slice(0, 140).trim();
+      if (!sameSummary) return false;
+      const createdAt = row?.created_date ? new Date(row.created_date).getTime() : 0;
+      if (!createdAt) return false;
+      return Date.now() - createdAt < duplicateWindowMs;
+    });
+    if (duplicate?.id) {
+      return Response.json({ ok: true, id: duplicate.id, deduped: true, version: VERSION }, { status: 200 });
+    }
 
     const created = await db.SupportConversation.create({
       tenant_id: tenantId,
@@ -76,4 +93,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
