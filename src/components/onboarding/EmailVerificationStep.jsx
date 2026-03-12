@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Shield, CheckCircle, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { createPageUrl } from '@/components/platformContext';
 
 export default function EmailVerificationStep({ user, onComplete }) {
+  const location = useLocation();
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState('collect'); // collect, verify, 2fa_setup, 2fa_verify
@@ -177,7 +180,11 @@ export default function EmailVerificationStep({ user, onComplete }) {
                 </Button>
 
                 <p className="text-xs text-slate-400 text-center">
-                  By continuing, you agree to our Terms of Service and Privacy Policy
+                  By continuing, you agree to our{' '}
+                  <Link to={createPageUrl('TermsOfService', location.search)} className="underline hover:text-slate-600">Terms</Link>,{' '}
+                  <Link to={createPageUrl('PrivacyPolicy', location.search)} className="underline hover:text-slate-600">Privacy Policy</Link>,{' '}
+                  <Link to={createPageUrl('CookiePolicy', location.search)} className="underline hover:text-slate-600">Cookie Policy</Link>, and{' '}
+                  <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="underline hover:text-slate-600">EULA</Link>.
                 </p>
               </div>
             </div>

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/components/platformContext';
 import { Shield, Store, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ function redirectWithAppBridge(url) {
 }
 
 export default function Install() {
+  const location = useLocation();
   const [shopDomain, setShopDomain] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -171,7 +174,14 @@ export default function Install() {
 
             <div className="mt-6 pt-6 border-t border-slate-200">
               <p className="text-xs text-slate-500 text-center">
-                By installing, you agree to our Terms of Service and Privacy Policy.
+                By installing, you agree to our{' '}
+                <Link to={createPageUrl('TermsOfService', location.search)} className="underline hover:text-slate-700">Terms</Link>,{' '}
+                <Link to={createPageUrl('PrivacyPolicy', location.search)} className="underline hover:text-slate-700">Privacy Policy</Link>,{' '}
+                <Link to={createPageUrl('CookiePolicy', location.search)} className="underline hover:text-slate-700">Cookie Policy</Link>, and{' '}
+                <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="underline hover:text-slate-700">EULA</Link>.
+                <br />
+                Additional notices: <Link to={createPageUrl('ComplianceNotice', location.search)} className="underline hover:text-slate-700">GDPR/CCPA</Link> and{' '}
+                <Link to={createPageUrl('RefundPolicy', location.search)} className="underline hover:text-slate-700">Refund Policy</Link>.
                 <br />
                 14-day free trial · No credit card required
               </p>

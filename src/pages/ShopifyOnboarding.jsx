@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Zap, TrendingUp, CheckCircle, ArrowRight,
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/components/platformContext';
 
 const STEPS = [
   { id: 'welcome',    label: 'Welcome',    icon: Shield },
@@ -55,6 +57,7 @@ const VALUE_PROPS = [
 ];
 
 export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain, onComplete }) {
+  const location = useLocation();
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState({
     discount_protection: true,
@@ -291,6 +294,13 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
             </motion.div>
           )}
         </AnimatePresence>
+        <p className="text-[11px] text-slate-500 text-center mt-4">
+          Setup is governed by our{' '}
+          <Link to={createPageUrl('TermsOfService', location.search)} className="underline hover:text-slate-300">Terms</Link>,{' '}
+          <Link to={createPageUrl('PrivacyPolicy', location.search)} className="underline hover:text-slate-300">Privacy Policy</Link>,{' '}
+          <Link to={createPageUrl('CookiePolicy', location.search)} className="underline hover:text-slate-300">Cookie Policy</Link>, and{' '}
+          <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="underline hover:text-slate-300">EULA</Link>.
+        </p>
       </div>
     </div>
   );
