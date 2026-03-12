@@ -20,41 +20,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 // Owner escalation email for critical issues
 const OWNER_ESCALATION_EMAIL = 'support@profitshield-ai.com';
 
-const SYSTEM_CONTEXT = `You are ProfitShield's expert AI Support Assistant.
-
-CORE IDENTITY:
-- You are an absolute expert on every feature of ProfitShield
-- You provide precise, professional, and effective support
-- You can diagnose issues and trigger automatic fixes
-- You represent the highest standard of customer support
-- You are strictly limited to support for the ProfitShield app only
-
-APP KNOWLEDGE:
-- Dashboard: Central hub with Profit Integrity Score, metrics, alerts
-- AI Insights: Customer segmentation, marketing campaigns, profit forensics
-- Orders: Real-time risk scoring, fraud detection, profitability analysis
-- Products: Cost mapping, margin tracking, pricing optimization
-- Alerts: Smart notifications, customizable rules, multi-channel delivery
-- Settings: Notification preferences, integrations, user management
-- Automations: Auto-hold risky orders, dynamic pricing, discount creation
-
-TIER FEATURES:
-- Trial: Basic dashboard, 100 orders/month, email support
-- Starter: 500 orders, risk scoring, basic reports
-- Growth: 2000 orders, AI insights, segmentation, campaigns
-- Pro: 10000 orders, full automation, priority support
-- Enterprise: Unlimited, dedicated support, custom integrations
-
-SUPPORT GUIDELINES:
-1. Always be helpful, professional, and precise
-2. Diagnose issues thoroughly before suggesting solutions
-3. For technical issues, collect details then escalate to autonomous fix
-4. Never make users wait - provide immediate value
-5. If you detect a system issue, mark it for auto-fix
-6. Always confirm resolution with the user
-7. If a request is not about ProfitShield app usage, troubleshooting, billing, settings, integrations, alerts, automations, or data inside the app, refuse politely and redirect the user back to app support topics only.
-8. Never provide advice on unrelated domains (medical, legal, finance outside app billing, general coding, personal matters, external products).`;
-
 const APP_SCOPE_KEYWORDS = [
   'profitshield', 'dashboard', 'order', 'orders', 'risk', 'alert', 'billing', 'plan', 'subscription', 'trial',
   'integration', 'shopify', 'sync', 'ticket', 'support', 'automation', 'analytics', 'customer', 'email', 'settings'
@@ -63,6 +28,8 @@ const OUT_OF_SCOPE_KEYWORDS = [
   'bitcoin', 'crypto', 'stocks', 'investment advice', 'medical', 'doctor', 'diagnosis', 'lawyer', 'legal advice',
   'recipe', 'diet', 'workout', 'relationship', 'school', 'homework', 'travel', 'flight', 'hotel', 'weather'
 ];
+const CLIENT_SEND_COOLDOWN_MS = 1200;
+const CLIENT_MAX_MESSAGE_LEN = 1200;
 
 function isAppScopeMessage(message = '') {
   const text = String(message || '').toLowerCase();
@@ -98,6 +65,7 @@ How can I help you today?`,
   const [conversationId, setConversationId] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const lastSentAtRef = useRef(0);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -240,8 +208,11 @@ ProfitShield AI Autonomous Support System`
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+    const now = Date.now();
+    if (now - lastSentAtRef.current < CLIENT_SEND_COOLDOWN_MS) return;
+    lastSentAtRef.current = now;
 
-    const userMessage = input.trim();
+    const userMessage = input.trim().slice(0, CLIENT_MAX_MESSAGE_LEN);
     setInput('');
     
     const userMsg = { role: 'user', content: userMessage, timestamp: new Date() };
@@ -271,57 +242,27 @@ ProfitShield AI Autonomous Support System`
       }
 
       const issueType = detectIssueType(userMessage);
-      const conversationHistory = messages.slice(-6).map(m => 
-        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
-      ).join('\n');
-
-      const prompt = `${SYSTEM_CONTEXT}
-
-CONVERSATION HISTORY:
-${conversationHistory}
-
-USER MESSAGE: ${userMessage}
-
-DETECTED ISSUE TYPE: ${issueType}
-
-${issueType === 'technical' ? `
-IMPORTANT: This appears to be a technical issue. 
-1. Acknowledge the issue professionally
-2. Ask clarifying questions if needed
-3. If the issue is confirmed, indicate that you're initiating an automatic fix
-4. Provide immediate workarounds if possible
-5. Include "[AUTO_FIX_NEEDED]" in your response if automatic fixing is required
-6. For CRITICAL issues (data loss, security, payments broken), add "[ESCALATE_OWNER]" to alert the founder
-` : ''}
-
-Respond helpfully and professionally. Be concise but thorough.`;
-
-      const response = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            response: { type: "string" },
-            needs_auto_fix: { type: "boolean" },
-            issue_summary: { type: "string" },
-            confidence: { type: "number" }
-          }
-        }
-      });
-
-      let aiResponse = response.response || response;
-      let needsFix = response.needs_auto_fix || aiResponse.includes('[AUTO_FIX_NEEDED]');
-      let needsOwnerEscalation = aiResponse.includes('[ESCALATE_OWNER]');
-      
-      // Clean up response
-      if (typeof aiResponse === 'object') {
-        aiResponse = aiResponse.response || JSON.stringify(aiResponse);
+      const historyPayload = messages.slice(-6).map((m) => ({
+        role: m.role,
+        content: String(m.content || '').slice(0, 300),
+      }));
+      const agentResult = await base44.functions.invoke('supportAiAgent', {
+        tenant_id: tenantId,
+        message: userMessage,
+        history: historyPayload,
+      }).catch(() => ({ data: null }));
+      const aiData = agentResult?.data || {};
+      let aiResponse = String(aiData.response || '').trim();
+      const needsFix = Boolean(aiData.needs_auto_fix || issueType === 'technical');
+      const needsOwnerEscalation = Boolean(aiData.needs_owner_attention);
+      const issueSummary = String(aiData.issue_summary || userMessage.slice(0, 120));
+      if (!aiResponse) {
+        aiResponse = 'I can help with ProfitShield app support. Please share what you see in the app so I can diagnose it.';
       }
-      aiResponse = aiResponse.replace('[AUTO_FIX_NEEDED]', '').replace('[ESCALATE_OWNER]', '').trim();
 
       // If technical issue detected, trigger autonomous fix
       if (needsFix && issueType === 'technical') {
-        await triggerAutonomousFix(response.issue_summary || userMessage, needsOwnerEscalation);
+        await triggerAutonomousFix(issueSummary || userMessage, needsOwnerEscalation);
         aiResponse += `\n\n🔧 **Automatic Fix Initiated**\nI've escalated this to our autonomous repair system. The issue will be analyzed and fixed automatically. You'll receive a notification when complete.`;
         
         if (needsOwnerEscalation) {
@@ -342,13 +283,13 @@ Respond helpfully and professionally. Be concise but thorough.`;
 
       // Persist to SupportConversation entity for owner inbox
       await saveConversation(updatedMessages, {
-        issue_type: issueType,
-        issue_summary: response.issue_summary || userMessage.slice(0, 120),
+        issue_type: String(aiData.issue_type || issueType),
+        issue_summary: issueSummary,
         auto_fix_triggered: needsFix,
         needs_owner_attention: needsOwnerEscalation,
         priority: needsOwnerEscalation ? 'critical' : issueType === 'technical' ? 'high' : 'medium',
         status: needsOwnerEscalation ? 'escalated' : needsFix ? 'open' : 'open',
-        ai_resolution: needsFix ? `Auto-fix triggered for: ${response.issue_summary || userMessage.slice(0, 100)}` : null,
+        ai_resolution: needsFix ? `Auto-fix triggered for: ${issueSummary || userMessage.slice(0, 100)}` : null,
       });
 
     } catch (error) {
