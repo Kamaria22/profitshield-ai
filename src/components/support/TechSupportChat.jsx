@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  MessageCircle, 
   X, 
   Send, 
   Bot, 
   User, 
   Loader2, 
-  AlertTriangle,
-  CheckCircle2,
   Wrench,
   Sparkles,
   HelpCircle,
-  Shield,
-  Mail
+  Shield
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -22,15 +18,16 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Owner escalation email for critical issues
-const OWNER_ESCALATION_EMAIL = 'support@profitshield.ai';
+const OWNER_ESCALATION_EMAIL = 'support@profitshield-ai.com';
 
-const SYSTEM_CONTEXT = `You are ProfitShield's expert AI Support Assistant - the most knowledgeable and helpful support agent ever created.
+const SYSTEM_CONTEXT = `You are ProfitShield's expert AI Support Assistant.
 
 CORE IDENTITY:
 - You are an absolute expert on every feature of ProfitShield
 - You provide precise, professional, and effective support
 - You can diagnose issues and trigger automatic fixes
 - You represent the highest standard of customer support
+- You are strictly limited to support for the ProfitShield app only
 
 APP KNOWLEDGE:
 - Dashboard: Central hub with Profit Integrity Score, metrics, alerts
@@ -54,7 +51,29 @@ SUPPORT GUIDELINES:
 3. For technical issues, collect details then escalate to autonomous fix
 4. Never make users wait - provide immediate value
 5. If you detect a system issue, mark it for auto-fix
-6. Always confirm resolution with the user`;
+6. Always confirm resolution with the user
+7. If a request is not about ProfitShield app usage, troubleshooting, billing, settings, integrations, alerts, automations, or data inside the app, refuse politely and redirect the user back to app support topics only.
+8. Never provide advice on unrelated domains (medical, legal, finance outside app billing, general coding, personal matters, external products).`;
+
+const APP_SCOPE_KEYWORDS = [
+  'profitshield', 'dashboard', 'order', 'orders', 'risk', 'alert', 'billing', 'plan', 'subscription', 'trial',
+  'integration', 'shopify', 'sync', 'ticket', 'support', 'automation', 'analytics', 'customer', 'email', 'settings'
+];
+const OUT_OF_SCOPE_KEYWORDS = [
+  'bitcoin', 'crypto', 'stocks', 'investment advice', 'medical', 'doctor', 'diagnosis', 'lawyer', 'legal advice',
+  'recipe', 'diet', 'workout', 'relationship', 'school', 'homework', 'travel', 'flight', 'hotel', 'weather'
+];
+
+function isAppScopeMessage(message = '') {
+  const text = String(message || '').toLowerCase();
+  if (!text) return true;
+  if (OUT_OF_SCOPE_KEYWORDS.some((k) => text.includes(k))) return false;
+  return APP_SCOPE_KEYWORDS.some((k) => text.includes(k));
+}
+
+function outOfScopeReply() {
+  return "I can only help with ProfitShield app support (dashboard, alerts, orders, billing, integrations, automations, and troubleshooting). Please ask a question related to the app, and I’ll help immediately.";
+}
 
 export default function TechSupportChat({ tenantId, isOpen, onClose, onOpen }) {
   const [messages, setMessages] = useState([
@@ -231,6 +250,26 @@ ProfitShield AI Autonomous Support System`
     setIsLoading(true);
 
     try {
+      if (!isAppScopeMessage(userMessage)) {
+        const guardReply = {
+          role: 'assistant',
+          content: outOfScopeReply(),
+          timestamp: new Date(),
+        };
+        const updatedMessages = [...messages, { role: 'user', content: userMessage, timestamp: new Date() }, guardReply];
+        setMessages(prev => [...prev, guardReply]);
+        await saveConversation(updatedMessages, {
+          issue_type: 'out_of_scope',
+          issue_summary: userMessage.slice(0, 120),
+          auto_fix_triggered: false,
+          needs_owner_attention: false,
+          priority: 'low',
+          status: 'open',
+          ai_resolution: 'Out-of-scope request. Redirected user to ProfitShield app support scope.',
+        });
+        return;
+      }
+
       const issueType = detectIssueType(userMessage);
       const conversationHistory = messages.slice(-6).map(m => 
         `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`

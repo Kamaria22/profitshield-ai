@@ -12,6 +12,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 const OWNER_EMAIL = 'support@profitshield.ai';
 const ADMIN_EMAIL = 'rohan.a.roberts@gmail.com';
 const DEFAULT_OWNER_PHONE = '9146894367';
+const APP_SCOPE_KEYWORDS = [
+  'profitshield', 'dashboard', 'order', 'orders', 'risk', 'alert', 'billing', 'plan', 'subscription',
+  'integration', 'shopify', 'sync', 'ticket', 'support', 'automation', 'analytics', 'customer', 'email', 'settings'
+];
 
 // Issue patterns that can be auto-resolved
 const AUTO_RESOLVABLE_PATTERNS = [
@@ -20,6 +24,26 @@ const AUTO_RESOLVABLE_PATTERNS = [
   { pattern: /dashboard.*not.*load|page.*blank|screen.*empty/i, type: 'ui_rendering', action: 'check_frontend' },
   { pattern: /automation.*fail|alert.*not.*trigger/i, type: 'automation_failure', action: 'check_automations' },
 ];
+
+function isAppScopedSupport(text = '') {
+  const content = String(text || '').toLowerCase();
+  if (!content) return true;
+  return APP_SCOPE_KEYWORDS.some((k) => content.includes(k));
+}
+
+function buildSupportAutoReply(conversation) {
+  const summary = String(conversation?.issue_summary || '').toLowerCase();
+  if (/billing|plan|subscription|trial/.test(summary)) {
+    return 'Thanks for contacting ProfitShield support. I checked your billing-related request and logged it for follow-up. Please review Billing & Plan in-app, and if anything still looks off, we will escalate to an admin.';
+  }
+  if (/integration|shopify|sync|order/.test(summary)) {
+    return 'Thanks for contacting ProfitShield support. I started an integration and sync health review for your store. Please check Integrations and Sync status in the app while diagnostics complete.';
+  }
+  if (/dashboard|analytics|data|alert/.test(summary)) {
+    return 'Thanks for contacting ProfitShield support. I logged your dashboard/data issue and started diagnostics. Please refresh once and check Alerts + Dashboard panels for updates.';
+  }
+  return 'Thanks for contacting ProfitShield support. Your issue is logged and initial AI diagnostics have started. If additional human action is needed, this ticket will be escalated automatically.';
+}
 
 async function invokeSelfHealSafe(base44, payload) {
   try {
@@ -113,6 +137,54 @@ Deno.serve(async (req) => {
 
     report.open_count = conversations.length;
     report.escalated_count = escalated.length;
+
+    const tenantSettingsCache = new Map();
+    const getTenantSettings = async (tenantId) => {
+      if (!tenantId) return null;
+      if (tenantSettingsCache.has(tenantId)) return tenantSettingsCache.get(tenantId);
+      const rows = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []);
+      const settings = rows?.[0] || null;
+      tenantSettingsCache.set(tenantId, settings);
+      return settings;
+    };
+
+    // --- 1b. AI auto-reply for new open tickets (tenant setting controlled) ---
+    for (const conv of conversations.slice(0, 60)) {
+      if (conv?.ai_resolution) continue;
+      if (conv?.needs_owner_attention) continue;
+      const settings = await getTenantSettings(conv?.tenant_id);
+      if (settings?.ai_auto_reply_enabled === false) continue;
+
+      const transcript = `${conv.issue_summary || ''} ${(conv.messages || []).map((m) => m.content || '').join(' ')}`;
+      if (!isAppScopedSupport(transcript)) {
+        await base44.asServiceRole.entities.SupportConversation.update(conv.id, {
+          status: 'escalated',
+          needs_owner_attention: true,
+          ai_resolution: 'Out-of-scope request. AI support is limited to ProfitShield app topics only.'
+        }).catch(() => {});
+        report.actions_taken.push(`Escalated out-of-scope ticket: ${conv.id}`);
+        continue;
+      }
+
+      const aiReply = buildSupportAutoReply(conv);
+      const existingMessages = Array.isArray(conv.messages) ? conv.messages : [];
+      const hasAssistantMessage = existingMessages.some((m) => String(m?.role || '').toLowerCase() === 'assistant');
+      const nextMessages = hasAssistantMessage ? existingMessages : [
+        ...existingMessages,
+        {
+          role: 'assistant',
+          content: aiReply,
+          timestamp: new Date().toISOString(),
+          sender_name: 'ProfitShield AI Support',
+        }
+      ];
+
+      await base44.asServiceRole.entities.SupportConversation.update(conv.id, {
+        messages: nextMessages,
+        ai_resolution: aiReply
+      }).catch(() => {});
+      report.actions_taken.push(`AI auto-replied to open ticket: ${conv.id}`);
+    }
 
     // --- 2. Cluster repeated issues (watchdog pattern detection) ---
     const patternCounts = {};

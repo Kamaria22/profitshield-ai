@@ -1,8 +1,10 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { usePlatformResolver } from '@/components/usePlatformResolver';
+import { usePermissions } from '@/components/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,17 +16,21 @@ import { Mail, Phone, Bot, Megaphone } from 'lucide-react';
 const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
 const DEFAULT_OWNER_PHONE = '9146894367';
 
-function isAdminOwner(user) {
-  const role = (user?.role || user?.app_role || '').toLowerCase();
-  return role === 'owner' || role === 'admin';
+function isAdminOwner(user, fallbackRole = null) {
+  const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
+  const email = String(user?.email || '').trim().toLowerCase();
+  return role === 'owner' || role === 'admin' || email === 'rohan.a.roberts@gmail.com';
 }
 
 export default function EmailSystemSettings() {
+  const navigate = useNavigate();
   const resolver = usePlatformResolver();
   const { user } = useAuth();
+  const { role: permissionRole } = usePermissions();
   const queryClient = useQueryClient();
   const tenantId = resolver?.tenantId || user?.tenant_id || null;
-  const canAccess = isAdminOwner(user || resolver?.user);
+  const effectiveUser = user || resolver?.user || null;
+  const canAccess = isAdminOwner(effectiveUser, permissionRole);
 
   const queryKey = ['email-system-settings', tenantId];
 
@@ -144,6 +150,14 @@ export default function EmailSystemSettings() {
               onClick={() => queryClient.invalidateQueries({ queryKey })}
             >
               Refresh
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/10"
+              onClick={() => navigate('/admin/support-inbox')}
+            >
+              Open Support Inbox
             </Button>
             <Button
               size="sm"
