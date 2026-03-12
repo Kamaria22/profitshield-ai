@@ -341,6 +341,32 @@ export default function Home() {
     navigate(createPageUrl('Intelligence', location.search));
   }, () => toast.error('Could not open risk page')), [navigate, location.search]);
 
+  // Embedded recovery path: if store is connected but dashboard has zero orders,
+  // run one lightweight sync attempt per tenant/session to self-heal stale data.
+  useEffect(() => {
+    if (!isEmbedded || !authTenantId || summaryLoading || syncMutation.isPending) return;
+    const totalOrders = Number(metrics?.totalOrders || 0);
+    if (totalOrders > 0) return;
+
+    const key = `ps:embedded-autosync:${authTenantId}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+
+    (async () => {
+      try {
+        await invokeWithRetry('syncShopifyOrders', { tenant_id: authTenantId, days: 30 }, { attempts: 2, baseMs: 300 });
+        queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+        queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+      } catch {
+        // Keep UI responsive; manual Sync remains available.
+      }
+    })();
+  }, [isEmbedded, authTenantId, summaryLoading, syncMutation.isPending, metrics?.totalOrders, queryClient, dashboardSummaryKey, profitLeaksKey]);
+
   // Minimal blocking state
   if (tenantLoading) {
     return (

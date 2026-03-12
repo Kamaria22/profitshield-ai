@@ -24,6 +24,7 @@ export default function SyncHealthCard({
   onSync,
   syncing = false
 }) {
+  const isRecoverable = integration?.status === 'connected' || integration?.status === 'degraded';
   if (!integration) {
     return (
       <Card>
@@ -63,16 +64,16 @@ export default function SyncHealthCard({
   
   // Health score
   const isHealthy = 
-    integration.status === 'connected' && 
+    isRecoverable && 
     lastSyncStatus !== 'failed' &&
     failedJobs.length === 0;
   
   const isWarning = 
-    integration.status === 'connected' && 
+    isRecoverable && 
     (lastSyncStatus === 'partial' || failedJobs.length > 0);
   
   const isError = 
-    integration.status !== 'connected' || 
+    !isRecoverable || 
     lastSyncStatus === 'failed';
   
   return (
@@ -99,7 +100,7 @@ export default function SyncHealthCard({
               variant="outline" 
               size="sm"
               onClick={() => onSync(integration.id)}
-              disabled={syncing || integration.status !== 'connected'}
+              disabled={syncing || !isRecoverable}
             >
               {syncing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

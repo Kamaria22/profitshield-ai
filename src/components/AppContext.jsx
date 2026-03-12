@@ -67,8 +67,8 @@ export function canAccessPage(pageName, userRole, appContext = APP_CONTEXT) {
   // Admin-only pages — block non-admins always
   if (ADMIN_ONLY_PAGES.includes(pageName) && !isAdmin) return false;
 
-  // Internal-only pages — block in shopify_public context
-  if (INTERNAL_ONLY_PAGES.includes(pageName) && appContext === 'shopify_public') return false;
+  // Internal-only pages — block in shopify_public context for non-admins only.
+  if (INTERNAL_ONLY_PAGES.includes(pageName) && appContext === 'shopify_public' && !isAdmin) return false;
 
   return true;
 }

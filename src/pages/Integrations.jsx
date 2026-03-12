@@ -64,6 +64,11 @@ const SYNC_FREQUENCIES = [
   { value: 1440, label: 'Once daily' }
 ];
 
+const isSyncRecoverable = (integration) => {
+  const status = String(integration?.status || '').toLowerCase();
+  return status === 'connected' || status === 'degraded';
+};
+
 export default function Integrations() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -490,6 +495,7 @@ export default function Integrations() {
   const getStatusBadge = (status) => {
     const configs = {
       connected: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+      degraded: { color: 'bg-amber-100 text-amber-800', icon: AlertTriangle },
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
       error: { color: 'bg-red-100 text-red-800', icon: XCircle },
       disconnected: { color: 'bg-gray-100 text-gray-800', icon: Unplug },
@@ -780,7 +786,7 @@ export default function Integrations() {
               </div>
               <div>
                 <p className="text-sm text-slate-500">Connected</p>
-                <p className="text-2xl font-bold">{integrations.filter(i => i.status === 'connected').length}</p>
+                <p className="text-2xl font-bold">{integrations.filter(i => isSyncRecoverable(i)).length}</p>
               </div>
             </div>
           </CardContent>
@@ -844,10 +850,10 @@ export default function Integrations() {
                 size="sm"
                 onClick={() => {
                   integrations
-                    .filter(i => i.status === 'connected')
+                    .filter(i => isSyncRecoverable(i))
                     .forEach(i => syncMutation.mutate({ integration_id: i.id, job_type: 'incremental_sync' }));
                 }}
-                disabled={syncMutation.isPending || integrations.filter(i => i.status === 'connected').length === 0}
+                disabled={syncMutation.isPending || integrations.filter(i => isSyncRecoverable(i)).length === 0}
               >
                 {syncMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -909,7 +915,7 @@ export default function Integrations() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {integration.status === 'connected' && (
+                      {isSyncRecoverable(integration) && (
                         <>
                           <Button
                             variant="outline"
@@ -1024,7 +1030,7 @@ export default function Integrations() {
                           onFixed={() => refetchIntegrations()}
                         />
                       )}
-                      {integration.status === 'connected' && (
+                      {isSyncRecoverable(integration) && (
                         <>
                           <Button
                             variant="outline"
@@ -1135,12 +1141,12 @@ export default function Integrations() {
                       <span>{PLATFORM_INFO[integration.platform]?.icon}</span>
                       {integration.store_name || integration.store_url}
                     </CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => registerWebhooksMutation.mutate(integration.id)}
-                      disabled={registerWebhooksMutation.isPending || integration.status !== 'connected'}
-                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => registerWebhooksMutation.mutate(integration.id)}
+                        disabled={registerWebhooksMutation.isPending || !isSyncRecoverable(integration)}
+                      >
                       {registerWebhooksMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-1" />
                       ) : (
@@ -1459,7 +1465,7 @@ export default function Integrations() {
                 <p className="font-medium mb-2">Current State:</p>
                 <p>Tenant ID: {tenantId ? `${tenantId.slice(0, 8)}...` : 'None'}</p>
                 <p>Integrations: {integrations.length}</p>
-                <p>Connected: {integrations.filter(i => i.status === 'connected').length}</p>
+                <p>Connected: {integrations.filter(i => isSyncRecoverable(i)).length}</p>
               </div>
               
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
