@@ -46,11 +46,11 @@ export default function ExecutiveSummaryBar({
 
   return (
     <div className="bg-slate-950/80 backdrop-blur-xl border-b border-white/5 px-4 py-2.5 sticky top-0 z-20">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         {/* Left: Store Identity */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-100 truncate max-w-[150px]" style={{ textShadow: '0 0 12px rgba(129,140,248,0.3)' }}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-slate-100 truncate max-w-[55vw] sm:max-w-[180px]" style={{ textShadow: '0 0 12px rgba(129,140,248,0.3)' }}>
               {tenant?.shop_name || 'My Store'}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
@@ -74,7 +74,7 @@ export default function ExecutiveSummaryBar({
         </div>
 
         {/* Center: Metrics */}
-        <div className="flex items-center gap-5">
+        <div className="grid grid-cols-3 gap-3 sm:flex sm:items-center sm:gap-5 w-full sm:w-auto">
           <MetricChip
             label="Net Profit"
             value={`$${totalProfit >= 1000 ? `${(totalProfit / 1000).toFixed(1)}k` : totalProfit.toFixed(0)}`}
@@ -97,7 +97,7 @@ export default function ExecutiveSummaryBar({
         {/* Right: Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2 text-xs h-8 border-0"
+            <Button size="sm" className="gap-2 text-xs h-8 border-0 w-full sm:w-auto"
               style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.25)', color: '#a5b4fc' }}>
               Actions
               <ChevronDown className="w-3.5 h-3.5" />

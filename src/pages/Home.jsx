@@ -69,10 +69,18 @@ export default function Home() {
   const lastVisibilityRefreshRef = useRef(0);
 
   const fetchEntitySummary = useCallback(async (tenantId) => {
+    const safeFilter = async (entity, query, sort, limit) => {
+      try {
+        const rows = await entity.filter(query, sort, limit);
+        return Array.isArray(rows) ? rows : [];
+      } catch {
+        return [];
+      }
+    };
     const [orders, alerts, leaks] = await Promise.all([
-      base44.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 20),
-      base44.entities.Alert.filter({ tenant_id: tenantId, status: 'pending' }, '-created_date', 5),
-      base44.entities.ProfitLeak.filter({ tenant_id: tenantId, is_resolved: false }, '-impact_amount', 5)
+      safeFilter(base44.entities.Order, { tenant_id: tenantId }, '-order_date', 20),
+      safeFilter(base44.entities.Alert, { tenant_id: tenantId, status: 'pending' }, '-created_date', 5),
+      safeFilter(base44.entities.ProfitLeak, { tenant_id: tenantId, is_resolved: false }, '-impact_amount', 5)
     ]);
 
     const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
