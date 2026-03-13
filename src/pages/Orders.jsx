@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -166,12 +166,13 @@ export default function Orders() {
     // Search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
+      const toSearchable = (v) => String(v ?? '').toLowerCase();
       result = result.filter(o => 
-        o.order_number?.toLowerCase().includes(term) ||
-        o.platform_order_id?.toLowerCase().includes(term) ||
-        o.customer_name?.toLowerCase().includes(term) ||
-        o.customer_email?.toLowerCase().includes(term) ||
-        o.notes?.toLowerCase().includes(term)
+        toSearchable(o.order_number).includes(term) ||
+        toSearchable(o.platform_order_id).includes(term) ||
+        toSearchable(o.customer_name).includes(term) ||
+        toSearchable(o.customer_email).includes(term) ||
+        toSearchable(o.notes).includes(term)
       );
     }
 

@@ -144,7 +144,9 @@ export default function Home() {
   const hasConnectedStore = !!authTenantId;
   const tenantForGate = tenant || (hasConnectedStore ? { id: authTenantId } : null);
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
-  const tenantLoading = status === RESOLVER_STATUS.RESOLVING;
+  // If embedded context already has a persisted tenant, don't block initial paint
+  // on resolver completion.
+  const tenantLoading = status === RESOLVER_STATUS.RESOLVING && !authTenantId;
 
   // PERFORMANCE: Ultra-fast summary query - minimal data for instant render
   const {

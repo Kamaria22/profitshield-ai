@@ -51,7 +51,8 @@ export default function OrderSearchBox({ value, onChange, orders = [] }) {
 
       for (const c of candidates) {
         const key = `${c.type}:${c.value}`;
-        if (!seen.has(key) && c.value?.toLowerCase().includes(term)) {
+        const candidateText = String(c.value || '').toLowerCase();
+        if (!seen.has(key) && candidateText.includes(term)) {
           seen.add(key);
           results.push(c);
         }
