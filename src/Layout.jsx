@@ -524,9 +524,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     return <>{children}</>;
   }
 
-  // In embedded mode, hold the loading screen while gate is authenticating.
-  // This prevents any auth redirect or login screen from flashing.
-  if (status === RESOLVER_STATUS.RESOLVING) {
+  // In embedded mode, if tenant context is already available, do not block first paint.
+  // This avoids unnecessary spinner time before dashboard shell appears.
+  const hasEmbeddedTenantContext = isEmbedded && !!authTenantId;
+  if (status === RESOLVER_STATUS.RESOLVING && !hasEmbeddedTenantContext) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
