@@ -571,8 +571,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     ? resolver.tenant.shop_name 
     : isResolved && resolver.storeKey 
     ? resolver.storeKey 
-    : null;
-  const platformDisplay = isResolved ? resolver.platform : null;
+    : persistedContext?.storeKey || persistedContext?.shop || null;
+  const platformDisplay = isResolved ? resolver.platform : (persistedContext?.platform || (isEmbedded ? 'shopify' : null));
   const subscriptionTier = isResolved && resolver.tenant?.subscription_tier ? resolver.tenant.subscription_tier : null;
   const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 

@@ -469,7 +469,7 @@ export default function Home() {
         />
       )}
 
-      <div className="h-full flex flex-col -m-4 lg:-m-6">
+      <div className="min-h-full flex flex-col">
         {/* Executive Summary Bar - Critical above-the-fold */}
         <ExecutiveSummaryBar 
           tenant={tenant}
@@ -483,7 +483,7 @@ export default function Home() {
         />
 
         {/* Main Grid */}
-          <div className="flex-1 p-4 lg:p-6">
+          <div className="flex-1">
           <WelcomeChecklist />
 
           <div className="flex items-center justify-between mb-4">
