@@ -450,6 +450,24 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
 
+  // Fail-safe: keep document scrolling unlocked unless an explicit modal handles it.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflowY;
+    const prevBodyOverflow = body.style.overflowY;
+    const prevBodyPosition = body.style.position;
+    html.style.overflowY = 'auto';
+    body.style.overflowY = 'auto';
+    body.style.position = 'static';
+    return () => {
+      html.style.overflowY = prevHtmlOverflow;
+      body.style.overflowY = prevBodyOverflow;
+      body.style.position = prevBodyPosition;
+    };
+  }, []);
+
   // Load alerts with useCallback to prevent recreation on every render
   const loadAlerts = useCallback(async (tid) => {
     if (!tid) return;
@@ -928,7 +946,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         )}
 
         {/* Page content */}
-        <main className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6 bg-slate-950 overflow-x-hidden overflow-y-auto" role="main" aria-label="App content">
+        <main
+          className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6 bg-slate-950 overflow-x-hidden overflow-y-auto"
+          style={{ height: 'calc(100dvh - 4rem)' }}
+          role="main"
+          aria-label="App content"
+        >
           <MobileDeepWrapper>
           {showMissingContextBanner && (
             <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
