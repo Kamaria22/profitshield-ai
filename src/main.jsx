@@ -289,7 +289,22 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_XHR_GUARD__) 
 // Shopify App Bridge requires the PUBLIC API key (Client ID).
 // Set it in external JS (not inline HTML) so CSP can remain strict.
 if (typeof window !== 'undefined' && !window.__SHOPIFY_API_KEY__) {
-  const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY || '';
+  const apiKeyFromEnv = import.meta.env.VITE_SHOPIFY_API_KEY || '';
+  let apiKeyFromToken = '';
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    const idToken = params.get('id_token') || '';
+    const payloadB64 = idToken.split('.')[1] || '';
+    if (payloadB64) {
+      const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+      const payload = JSON.parse(atob(padded));
+      apiKeyFromToken = String(payload?.aud || '').trim();
+    }
+  } catch {
+    apiKeyFromToken = '';
+  }
+  const apiKey = apiKeyFromEnv || apiKeyFromToken;
   if (apiKey) {
     window.__SHOPIFY_API_KEY__ = apiKey;
   } else {

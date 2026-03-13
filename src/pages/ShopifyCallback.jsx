@@ -68,6 +68,24 @@ export default function ShopifyCallback() {
       const state = urlParams.get('state');
       const host = urlParams.get('host');
 
+      const attemptSessionRecovery = async () => {
+        try {
+          const sessionPayload = { shop };
+          const direct = await base44.functions.invoke('shopifySessionExchange', sessionPayload);
+          const data = direct?.data || {};
+          if (data?.authenticated && data?.tenant_id) return data;
+        } catch {}
+        try {
+          const fallback = await base44.functions.invoke('shopifyAuth', {
+            action: 'session_exchange',
+            shop,
+          });
+          const data = fallback?.data || {};
+          if (data?.authenticated && data?.tenant_id) return data;
+        } catch {}
+        return null;
+      };
+
       if (!code || !shop) {
         setError('Missing authorization code or shop domain');
         setStatus('error');
@@ -111,12 +129,56 @@ export default function ShopifyCallback() {
           }
         }, 800);
       } else {
+        const recovered = await attemptSessionRecovery();
+        if (recovered) {
+          setStatus('success');
+          setTimeout(() => {
+            const params = new URLSearchParams({ shop: recovered.shop_domain || shop, embedded: '1' });
+            if (host) params.set('host', host);
+            const redirectUrl = withEmbeddedParams(`/Home?${params.toString()}`);
+            try {
+              if (!redirectWithAppBridge(redirectUrl)) {
+                window.location.assign(redirectUrl);
+              }
+            } catch {
+              window.location.assign(redirectUrl);
+            }
+          }, 600);
+          return;
+        }
         const errMsg = data?.error || 'Installation failed';
         console.error('[ShopifyCallback] callback failure — shop:', shop, '| error:', errMsg);
         setError(errMsg);
         setStatus('error');
       }
     } catch (err) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const shop = urlParams.get('shop');
+      const host = urlParams.get('host');
+      let recovered = null;
+      if (shop) {
+        try {
+          const direct = await base44.functions.invoke('shopifySessionExchange', { shop });
+          const data = direct?.data || {};
+          if (data?.authenticated && data?.tenant_id) recovered = data;
+        } catch {}
+      }
+      if (recovered) {
+        setStatus('success');
+        setTimeout(() => {
+          const params = new URLSearchParams({ shop: recovered.shop_domain || shop, embedded: '1' });
+          if (host) params.set('host', host);
+          const redirectUrl = withEmbeddedParams(`/Home?${params.toString()}`);
+          try {
+            if (!redirectWithAppBridge(redirectUrl)) {
+              window.location.assign(redirectUrl);
+            }
+          } catch {
+            window.location.assign(redirectUrl);
+          }
+        }, 600);
+        return;
+      }
       console.error('[ShopifyCallback] Exception during callback:', err.message);
       setError(err.message || 'Failed to complete installation');
       setStatus('error');
