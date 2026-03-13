@@ -62,6 +62,7 @@ import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import ShopifyEmbeddedAuthGate from '@/components/shopify/ShopifyEmbeddedAuthGate';
 import ShopifyNavMenu from '@/components/shopify/ShopifyNavMenu';
+import { invokeSupportGuardianSafe } from '@/lib/safeApi';
 
 // Debug: log embedded entry decisions at the React layer
 (function logEmbeddedEntry() {
@@ -461,6 +462,17 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       return;
     }
     try {
+      if (isEmbedded) {
+        const result = await invokeSupportGuardianSafe({
+          action: 'run_watchdog',
+          tenant_id: tid,
+          observe_only: true,
+          mode: 'observe'
+        }, { attempts: 2, baseMs: 250 });
+        const unread = Number(result?.data?.unread_count ?? result?.data?.open_count ?? 0);
+        setSupportUnread(Number.isFinite(unread) ? unread : 0);
+        return;
+      }
       const rows = await base44.entities.SupportConversation.filter({ tenant_id: tid }, '-created_date', 300);
       const unread = (rows || []).filter((c) => c.status === 'open' || c.needs_owner_attention).length;
       setSupportUnread(unread);
@@ -468,7 +480,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       console.warn('[Layout] Error loading support unread count:', e.message);
       setSupportUnread(0);
     }
-  }, []);
+  }, [isEmbedded]);
 
   // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
