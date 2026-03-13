@@ -73,6 +73,11 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
+      // Root public entry should show install experience instead of
+      // auth-loop throttle messaging.
+      if (isBareRootEntry && Pages.Install) {
+        return <Pages.Install />;
+      }
       if (redirectBlocked) {
         return (
           <div className="fixed inset-0 flex items-center justify-center p-4">
