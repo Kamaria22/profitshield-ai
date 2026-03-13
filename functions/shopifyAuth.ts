@@ -375,6 +375,34 @@ async function handleCallback(base44, body) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error(`[shopifyAuth/handleCallback] Token exchange failed (${tokenResponse.status}): ${error}`);
+      // Idempotent callback recovery: if OAuth code is already consumed but
+      // this shop is already installed, continue with existing tenant context.
+      const db = base44.entities;
+      const existingTenants = await db.Tenant.filter({ shop_domain: normalizedShop }).catch(() => []);
+      const existingTenant = existingTenants[0] || null;
+      if (existingTenant) {
+        const existingIntegrations = await db.PlatformIntegration.filter({
+          tenant_id: existingTenant.id,
+          platform: 'shopify',
+          store_key: normalizedShop
+        }).catch(() => []);
+        const connected = existingIntegrations.find((i) => i.status === 'connected') || existingIntegrations[0] || null;
+        if (connected) {
+          const redirectParams = new URLSearchParams({ shop: normalizedShop, embedded: '1' });
+          if (host) redirectParams.set('host', host);
+          const redirectUrl = `${appUrl}/Home?${redirectParams.toString()}`;
+          return jsonResponse({
+            success: true,
+            recovered: true,
+            recover_reason: 'oauth_code_already_consumed',
+            tenant_id: existingTenant.id,
+            shop_domain: normalizedShop,
+            shop_name: existingTenant.shop_name || normalizedShop,
+            redirect_url: redirectUrl,
+            message: 'Shopify already authorized. Continuing with existing installation.'
+          });
+        }
+      }
       return jsonResponse({ error: `Token exchange failed: ${error}` }, 400);
     }
 
