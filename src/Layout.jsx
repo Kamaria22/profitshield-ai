@@ -426,6 +426,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     }
     return baseFilteredNavItems;
   }, [baseFilteredNavItems, ownerAllowlisted]);
+  const mobileQuickNav = useMemo(() => {
+    const allowed = new Set(['Home', 'Orders', 'PnLAnalytics', 'Alerts', 'Integrations']);
+    return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 5);
+  }, [filteredNavItems]);
 
   
   // Memoized handlers
@@ -848,7 +852,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6 min-h-screen bg-slate-950">
+        <main className="p-4 pb-24 lg:p-6 lg:pb-6 min-h-screen bg-slate-950" role="main" aria-label="App content">
           {showMissingContextBanner && (
             <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
               <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
@@ -877,6 +881,35 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </ErrorBoundary>
         )}
       </div>
+
+      {mobileQuickNav.length > 0 && (
+        <nav
+          className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-slate-950/95 backdrop-blur-xl lg:hidden"
+          role="navigation"
+          aria-label="Mobile quick navigation"
+        >
+          <ul className="grid grid-cols-5">
+            {mobileQuickNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPageName === item.page;
+              return (
+                <li key={`mobile-${item.page}`}>
+                  <Link
+                    to={item.path || createPageUrl(item.page, location.search)}
+                    className={`flex flex-col items-center justify-center py-2 text-[11px] ${
+                      isActive ? 'text-indigo-300' : 'text-slate-400'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className={`w-4 h-4 mb-0.5 ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} aria-hidden="true" />
+                    <span className="truncate max-w-[56px]">{item.name.replace(' & Plan', '')}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
 
       {/* Debug Panel */}
       <DebugPanel 

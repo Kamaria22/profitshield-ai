@@ -117,6 +117,23 @@ function shouldIndexPath(pathname = '/') {
   return indexablePublicPaths.has(normalized);
 }
 
+function isEmbeddedRuntime() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return !!(
+      p.get('embedded') === '1' ||
+      p.get('host') ||
+      p.get('shop') ||
+      p.get('hmac') ||
+      p.get('id_token') ||
+      p.get('session')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function SeoMeta({ currentPageName, pathname }) {
   useEffect(() => {
     const page = PAGE_SEO[currentPageName] || {
@@ -125,7 +142,7 @@ export default function SeoMeta({ currentPageName, pathname }) {
       keywords: 'shopify app, ecommerce analytics, fraud prevention, profit intelligence'
     };
     const url = `${BASE_URL}${pathname || '/'}`;
-    const indexable = shouldIndexPath(pathname || '/');
+    const indexable = shouldIndexPath(pathname || '/') && !isEmbeddedRuntime();
 
     document.title = page.title;
     upsertMeta('name', 'description', page.description);
