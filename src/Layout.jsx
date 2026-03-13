@@ -789,7 +789,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64 overflow-x-hidden">
+      <div className="lg:pl-64 overflow-x-hidden min-h-screen flex flex-col">
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 lg:px-6">
           <button 
@@ -928,7 +928,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         )}
 
         {/* Page content */}
-        <main className="p-4 pb-24 lg:p-6 lg:pb-6 min-h-screen bg-slate-950 overflow-x-hidden" role="main" aria-label="App content">
+        <main className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6 bg-slate-950 overflow-x-hidden overflow-y-auto" role="main" aria-label="App content">
           <MobileDeepWrapper>
           {showMissingContextBanner && (
             <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">

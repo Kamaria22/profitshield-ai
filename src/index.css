@@ -96,6 +96,10 @@
     min-height: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    touch-action: manipulation;
+  }
+
+  #root {
+    min-height: 100vh;
   }
 }
