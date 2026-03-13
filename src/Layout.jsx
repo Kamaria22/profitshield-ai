@@ -430,6 +430,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     const allowed = new Set(['Home', 'Orders', 'PnLAnalytics', 'Alerts', 'Integrations']);
     return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 5);
   }, [filteredNavItems]);
+  const mobileMenuItems = filteredNavItems;
 
   
   // Memoized handlers
@@ -443,22 +444,11 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   }, []);
   
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
-  const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
+  const handleSidebarOpen = useCallback(() => setSidebarOpen((prev) => !prev), []);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (sidebarOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-    document.body.style.overflow = '';
-  }, [sidebarOpen]);
 
   // Load alerts with useCallback to prevent recreation on every render
   const loadAlerts = useCallback(async (tid) => {
@@ -605,13 +595,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <aside className={`
-        fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw]
+        hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw]
         bg-slate-950/95 backdrop-blur-2xl border-r border-white/5
         transform transition-transform duration-200 ease-in-out
-        lg:translate-x-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        translate-x-0
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -878,6 +867,44 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </Link>
           </div>
         </header>
+
+        {/* Mobile dropdown navigation panel */}
+        {sidebarOpen && (
+          <div className="lg:hidden fixed top-16 left-3 right-3 z-50 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+            <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
+              {mobileMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPageName === item.page;
+                return (
+                  <Link
+                    key={`dropdown-${item.page}`}
+                    to={item.path || createPageUrl(item.page, location.search)}
+                    onClick={handleSidebarClose}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                      isActive
+                        ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
+                        : 'text-slate-300 hover:bg-white/5 border border-transparent'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} aria-hidden="true" />
+                    {item.name}
+                    {item.page === 'Alerts' && pendingAlerts > 0 && (
+                      <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5">
+                        {pendingAlerts}
+                      </Badge>
+                    )}
+                    {item.page === 'AdminEmailCenter' && supportUnread > 0 && (
+                      <Badge className="ml-auto bg-indigo-500/90 text-white text-xs px-1.5 py-0.5">
+                        {supportUnread}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="p-4 pb-24 lg:p-6 lg:pb-6 min-h-screen bg-slate-950 overflow-x-hidden" role="main" aria-label="App content">
