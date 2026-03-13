@@ -179,7 +179,18 @@ const handler = withEndpointGuard('shopifyAuth', async (req) => {
     }
 
     const action = body.action || 'install';
-    const shop = body.shop;
+    let shop = body.shop;
+
+    // Accept both "store.myshopify.com" and full URL inputs from install forms.
+    if (typeof shop === 'string') {
+      shop = shop
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '')
+        .replace(/\?.*$/, '')
+        .replace(/#.*$/, '');
+    }
 
     if (!shop) {
       return jsonResponse({ error: 'shop parameter required' }, 400);

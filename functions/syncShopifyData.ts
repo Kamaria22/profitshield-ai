@@ -89,12 +89,22 @@ Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
     
     const tenant = tenants[0];
     
-    const tokens = await safeFilter(
+    let tokens = await safeFilter(
       () => base44.asServiceRole.entities.OAuthToken.filter({ tenant_id, is_valid: true }),
       [],
       'syncShopifyData.token_lookup'
     );
-    const shopifyTokens = tokens.filter((t) => t.platform === 'shopify');
+    let shopifyTokens = tokens.filter((t) => t.platform === 'shopify');
+
+    if (shopifyTokens.length === 0) {
+      // Fallback: allow tokens without is_valid flag set yet.
+      tokens = await safeFilter(
+        () => base44.asServiceRole.entities.OAuthToken.filter({ tenant_id }),
+        [],
+        'syncShopifyData.token_fallback'
+      );
+      shopifyTokens = tokens.filter((t) => t.platform === 'shopify');
+    }
     
     if (shopifyTokens.length === 0) {
       return Response.json({ error: 'No valid token found' }, { status: 400 });

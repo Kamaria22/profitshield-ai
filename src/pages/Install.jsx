@@ -52,9 +52,17 @@ export default function Install() {
     setLoading(true);
 
     try {
+      const normalizedShopInput = shopDomain
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '')
+        .replace(/\?.*$/, '')
+        .replace(/#.*$/, '');
+
       const { data } = await base44.functions.invoke('shopifyAuth', {
         action: 'install',
-        shop: shopDomain.trim()
+        shop: normalizedShopInput
       });
 
       if (data?.install_url) {
