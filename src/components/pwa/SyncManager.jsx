@@ -1,10 +1,11 @@
-import React, { useEffect, useCallback, useState, createContext, useContext } from 'react';
+import React, { useEffect, useCallback, useState, createContext, useContext, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useNotifications } from './NotificationManager';
 import { Cloud, CloudOff, RefreshCw, Check, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 const SyncContext = createContext(null);
 
@@ -19,6 +20,7 @@ export function SyncProvider({ children, tenantId }) {
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingChanges, setPendingChanges] = useState(0);
+  const lastBackendSyncRef = useRef(0);
 
   // Monitor online status - with defensive checks
   useEffect(() => {
@@ -203,13 +205,36 @@ export function SyncProvider({ children, tenantId }) {
     setSyncStatus('syncing');
 
     try {
+      const now = Date.now();
+      const canRunBackendSync = tenantId && (now - lastBackendSyncRef.current > 120000);
+      if (canRunBackendSync) {
+        try {
+          await invokeWithRetry('syncShopifyData', {
+            tenant_id: tenantId,
+            days: 2
+          }, { attempts: silent ? 1 : 2, baseMs: 250 });
+          lastBackendSyncRef.current = now;
+        } catch (_) {
+          // Keep UI responsive even if backend sync endpoint is temporarily unavailable.
+        }
+      }
+
       // Invalidate all relevant queries to refresh data - with individual error handling
       const invalidations = [
-        queryClient.invalidateQueries({ queryKey: ['orders'] }).catch(() => null),
-        queryClient.invalidateQueries({ queryKey: ['alerts'] }).catch(() => null),
-        queryClient.invalidateQueries({ queryKey: ['profitLeaks'] }).catch(() => null),
-        queryClient.invalidateQueries({ queryKey: ['tenantSettings'] }).catch(() => null),
-        queryClient.invalidateQueries({ queryKey: ['syncJobs'] }).catch(() => null)
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = Array.isArray(query.queryKey) ? String(query.queryKey[0] || '') : '';
+            return (
+              key.includes('orders') ||
+              key.includes('alerts') ||
+              key.includes('profitLeaks') ||
+              key.includes('tenantSettings') ||
+              key.includes('syncJobs') ||
+              key.includes('dashboard-summary') ||
+              key.includes('integrations')
+            );
+          }
+        }).catch(() => null)
       ];
       
       await Promise.all(invalidations);

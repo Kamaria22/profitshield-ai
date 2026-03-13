@@ -107,12 +107,12 @@ export default function Integrations() {
 
   const queryClient = useQueryClient();
 
-  const { data: integrations = [], isLoading: integrationsLoading, refetch: refetchIntegrations } = useQuery({
+  const { data: integrations = [], isLoading: integrationsLoading } = useQuery({
     queryKey: ['integrations', tenantId],
     queryFn: () => base44.entities.PlatformIntegration.filter({ tenant_id: tenantId }),
     enabled: !!tenantId,
     staleTime: 30000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: true
   });
 
   const { data: syncJobs = [], isLoading: jobsLoading } = useQuery({
@@ -136,8 +136,9 @@ export default function Integrations() {
     },
     enabled: integrations.length > 0,
     staleTime: 15000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: true
   });
+
 
   const connectMutation = useMutation({
     mutationFn: async (data) => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, lazy, Suspense, useEffect } from 'react';
+import React, { useState, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
@@ -66,6 +66,7 @@ export default function Home() {
   const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
   const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
   const summaryCacheKey = `ps:dashboard-summary:${authTenantId || 'none'}`;
+  const lastVisibilityRefreshRef = useRef(0);
 
   const fetchEntitySummary = useCallback(async (tenantId) => {
     const [orders, alerts, leaks] = await Promise.all([
@@ -255,6 +256,27 @@ export default function Home() {
     refetchOnMount: false,
     refetchOnWindowFocus: false
   });
+
+  // Keep mobile/web dashboard data fresh when returning to the tab.
+  useEffect(() => {
+    if (!canQuery) return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastVisibilityRefreshRef.current < 45000) return;
+      lastVisibilityRefreshRef.current = now;
+      refetchSummary();
+      if (!isEmbedded) {
+        queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [canQuery, refetchSummary, queryClient, profitLeaksKey, isEmbedded]);
 
   // Real-time dashboard freshness: webhook/order updates should refresh dashboard data.
   useEffect(() => {
