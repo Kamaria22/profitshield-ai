@@ -39,6 +39,31 @@ const PAGE_SEO = {
     description: 'Get ProfitShield AI on desktop and mobile to monitor your Shopify store anywhere.',
     keywords: 'profitshield download, shopify dashboard mobile app'
   },
+  PrivacyPolicy: {
+    title: 'Privacy Policy | ProfitShield AI',
+    description: 'Learn how ProfitShield AI collects, uses, and safeguards merchant and customer data.',
+    keywords: 'privacy policy, data protection, shopify app privacy'
+  },
+  TermsOfService: {
+    title: 'Terms of Service | ProfitShield AI',
+    description: 'Read the terms governing use of ProfitShield AI and Shopify embedded app services.',
+    keywords: 'terms of service, ecommerce software terms, shopify app terms'
+  },
+  CookiePolicy: {
+    title: 'Cookie Policy | ProfitShield AI',
+    description: 'See how ProfitShield AI uses cookies and similar technologies for app operation and analytics.',
+    keywords: 'cookie policy, ecommerce app cookies, privacy notice'
+  },
+  RefundPolicy: {
+    title: 'Refund Policy | ProfitShield AI',
+    description: 'Understand refund eligibility, billing windows, and support channels for ProfitShield AI plans.',
+    keywords: 'refund policy, subscription refunds, shopify app billing'
+  },
+  ComplianceNotice: {
+    title: 'GDPR & CCPA Compliance Notice | ProfitShield AI',
+    description: 'Compliance notice for GDPR and CCPA rights, requests, and data handling practices.',
+    keywords: 'gdpr, ccpa, compliance notice, data subject rights'
+  },
 };
 
 function upsertMeta(attr, key, content) {
@@ -84,6 +109,8 @@ function shouldIndexPath(pathname = '/') {
     '/privacypolicy',
     '/termsofservice',
     '/cookiepolicy',
+    '/refundpolicy',
+    '/compliancenotice',
     '/appstorelisting'
   ]);
   const normalized = pathname.toLowerCase();
@@ -109,9 +136,13 @@ export default function SeoMeta({ currentPageName, pathname }) {
     upsertMeta('property', 'og:url', url);
     upsertMeta('property', 'og:type', 'website');
     upsertMeta('property', 'og:site_name', SITE_NAME);
+    upsertMeta('property', 'og:image', `${BASE_URL}/favicon.svg`);
+    upsertMeta('property', 'og:image:alt', 'ProfitShield AI logo');
     upsertMeta('name', 'twitter:title', page.title);
     upsertMeta('name', 'twitter:description', page.description);
     upsertMeta('name', 'twitter:card', 'summary_large_image');
+    upsertMeta('name', 'twitter:image', `${BASE_URL}/favicon.svg`);
+    upsertMeta('name', 'twitter:site', '@ProfitShieldAI');
     upsertCanonical(url);
 
     upsertJsonLd('org', {
@@ -130,6 +161,18 @@ export default function SeoMeta({ currentPageName, pathname }) {
       operatingSystem: 'Web',
       url: BASE_URL,
       description: page.description
+    });
+
+    upsertJsonLd('website', {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: SITE_NAME,
+      url: BASE_URL,
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: `${BASE_URL}/helpcenter?query={search_term_string}`,
+        'query-input': 'required name=search_term_string'
+      }
     });
   }, [currentPageName, pathname]);
 

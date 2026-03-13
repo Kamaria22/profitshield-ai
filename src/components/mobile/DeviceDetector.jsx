@@ -4,18 +4,20 @@
  */
 
 export const detectDevice = () => {
-  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const nav = typeof navigator !== 'undefined' ? navigator : { userAgent: '', vendor: '' };
+  const win = typeof window !== 'undefined' ? window : {};
+  const ua = nav.userAgent || nav.vendor || win.opera || '';
   
   return {
-    isIOS: /iPad|iPhone|iPod/.test(ua) && !window.MSStream,
+    isIOS: /iPad|iPhone|iPod/.test(ua) && !win.MSStream,
     isAndroid: /android/i.test(ua),
     isMobile: /iPhone|iPad|iPod|Android/i.test(ua),
     isDesktop: !/iPhone|iPad|iPod|Android/i.test(ua),
     isMacOS: /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua),
     isWindows: /Win32|Win64|Windows|WinCE/.test(ua),
     isLinux: /Linux/.test(ua) && !/Android/.test(ua),
-    isPWAInstalled: window.matchMedia('(display-mode: standalone)').matches,
-    supportsInstall: 'BeforeInstallPromptEvent' in window
+    isPWAInstalled: typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches,
+    supportsInstall: typeof window !== 'undefined' && 'onbeforeinstallprompt' in window
   };
 };
 
@@ -67,9 +69,9 @@ export const openDeepLink = (path = '') => {
   const timeout = setTimeout(() => {
     // Fallback to store if app not installed
     if (device.isIOS) {
-      window.location.href = 'https://apps.apple.com/app/profitshield';
+      window.location.href = 'https://apps.apple.com/app/profitshield-ai/id6741820887';
     } else if (device.isAndroid) {
-      window.location.href = 'https://play.google.com/store/apps/details?id=com.profitshield.app';
+      window.location.href = 'https://play.google.com/store/apps/details?id=ai.profitshield.app';
     }
   }, 2000);
   

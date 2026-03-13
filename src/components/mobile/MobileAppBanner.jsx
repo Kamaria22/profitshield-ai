@@ -11,9 +11,20 @@ export default function MobileAppBanner() {
   const [platform, setPlatform] = useState(null);
 
   useEffect(() => {
+    // Never show app-store banner inside Shopify embedded app iframe.
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const isEmbedded = !!(params.get('shop') && (params.get('host') || params.get('embedded') === '1'));
+      if (isEmbedded) return;
+    } catch {}
+
     // Check if already dismissed
-    const dismissed = localStorage.getItem('mobile_banner_dismissed');
-    if (dismissed) return;
+    const dismissed = Number(localStorage.getItem('mobile_banner_dismissed') || 0);
+    const DISMISS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+    if (dismissed && (Date.now() - dismissed) < DISMISS_TTL) return;
+    if (dismissed && (Date.now() - dismissed) >= DISMISS_TTL) {
+      localStorage.removeItem('mobile_banner_dismissed');
+    }
 
     // Detect mobile platform
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -43,7 +54,7 @@ export default function MobileAppBanner() {
   if (!isVisible || !platform) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-2xl animate-slide-up">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-2xl animate-slide-up pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0">
