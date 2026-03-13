@@ -3,7 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 /**
  * SUBSCRIPTION GATING SYSTEM
  * Controls access to features based on subscription tier and trial status
- * Handles 30-day trial period enforcement
+ * Handles 14-day trial period enforcement
  *
  * TRIAL LOGIC:
  * - New tenants always get 14 days from install.
@@ -18,7 +18,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * - If tenant was created in the last 15 minutes, never block (billing sync lag).
  */
 
-const TRIAL_DAYS = 30;
+const TRIAL_DAYS = 14;
 const BILLING_SYNC_GRACE_MINUTES = 15;
 const REVIEW_MODE_DAYS = 7;
 
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
             subject: '⚠️ Your ProfitShield Trial Has Ended',
             body: `Hi,
 
-Your 30-day ProfitShield trial has ended. Your account has been temporarily locked.
+Your 14-day ProfitShield trial has ended. Your account has been temporarily locked.
 
 To continue protecting your profits and accessing all features, please subscribe to a plan:
 
@@ -301,7 +301,7 @@ function checkAccess(tenant, feature) {
     return {
       allowed: false,
       reason: 'trial_expired',
-      message: 'Your 30-day trial has ended. Subscribe to continue protecting your profits.',
+      message: 'Your 14-day trial has ended. Subscribe to continue protecting your profits.',
       upgrade_required: true
     };
   }
@@ -453,5 +453,5 @@ async function scheduleTrialReminders(base44, tenantId, email, trialEnd) {
 }
 
 function getAppUrl() {
-  return 'https://app.profitshield.ai'; // Replace with actual app URL
+  return (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 }
