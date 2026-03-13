@@ -871,6 +871,27 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         {/* Mobile dropdown navigation panel */}
         {sidebarOpen && (
           <div className="lg:hidden fixed top-16 left-3 right-3 z-50 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+            <div className="px-3 py-2 border-b border-white/10">
+              <p className="text-[11px] uppercase tracking-wider text-slate-500">Store</p>
+              <p className="text-sm font-semibold text-slate-100 truncate">{storeDisplayName || 'No store selected'}</p>
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                {platformDisplay && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border border-emerald-400/30 bg-emerald-500/10 text-emerald-300">
+                    {platformDisplay}
+                  </span>
+                )}
+                {subscriptionTier && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border border-amber-400/30 bg-amber-500/10 text-amber-300">
+                    {subscriptionTier}
+                  </span>
+                )}
+                {roleLabel && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 capitalize">
+                    {roleLabel}
+                  </span>
+                )}
+              </div>
+            </div>
             <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
               {mobileMenuItems.map((item) => {
                 const Icon = item.icon;

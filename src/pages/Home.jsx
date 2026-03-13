@@ -483,7 +483,7 @@ export default function Home() {
         />
 
         {/* Main Grid */}
-        <div className="flex-1 p-4 lg:p-6 overflow-auto">
+          <div className="flex-1 p-4 lg:p-6">
           <WelcomeChecklist />
 
           <div className="flex items-center justify-between mb-4">
