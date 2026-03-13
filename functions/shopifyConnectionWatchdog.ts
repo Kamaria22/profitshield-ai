@@ -336,7 +336,9 @@ Deno.serve(async (req) => {
       const recentOrders = await db.entities.Order.filter({ tenant_id: tenantId, is_demo: false }, '-order_date', 25).catch(() => []);
       const newestOrderAt = recentOrders[0]?.order_date ? new Date(recentOrders[0].order_date).getTime() : null;
       const noRecentOrders = !newestOrderAt || (Date.now() - newestOrderAt > (48 * 60 * 60 * 1000));
-      if (noRecentOrders) {
+      // Mark as degraded only when data is stale AND sync itself is stale.
+      // Fresh successful syncs should not stay degraded just because order volume is low.
+      if (noRecentOrders && syncStale) {
         result.status = 'degraded';
         result.health_issues.push('dashboard_data_stale');
         result.dashboard_data_stale = true;

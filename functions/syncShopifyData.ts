@@ -186,6 +186,20 @@ Deno.serve(withEndpointGuard('syncShopifyData', async (req) => {
       orders_this_month: processedCount,
       status: 'active'
     });
+
+    // Promote degraded integrations back to connected after a successful sync.
+    if (integration?.id) {
+      await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+        status: 'connected',
+        last_sync_at: new Date().toISOString(),
+        last_sync_status: errorCount > 0 ? 'partial' : 'success',
+        last_sync_stats: {
+          orders_synced: processedCount,
+          orders_fetched: allOrders.length,
+          errors_count: errorCount
+        }
+      }).catch(() => {});
+    }
     
     return Response.json({
       success: true,

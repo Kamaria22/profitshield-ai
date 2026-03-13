@@ -560,6 +560,7 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     // Update integration's last_sync_at and stats
     if (integrationId) {
       await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
+        status: 'connected',
         last_sync_at: syncedAt,
         last_sync_status: 'success',
         last_sync_stats: {
