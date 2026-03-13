@@ -34,7 +34,6 @@ import {
   Settings,
   Shield,
   ShieldCheck,
-  Menu,
   X,
   LogOut,
   ChevronDown,
@@ -59,6 +58,7 @@ import {
   GitPullRequest
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
+import MobileDeepWrapper from '@/components/mobile/MobileDeepWrapper';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import ShopifyEmbeddedAuthGate from '@/components/shopify/ShopifyEmbeddedAuthGate';
 import ShopifyNavMenu from '@/components/shopify/ShopifyNavMenu';
@@ -445,6 +445,21 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
   const handleSidebarOpen = useCallback(() => setSidebarOpen(true), []);
 
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+    document.body.style.overflow = '';
+  }, [sidebarOpen]);
+
   // Load alerts with useCallback to prevent recreation on every render
   const loadAlerts = useCallback(async (tid) => {
     if (!tid) return;
@@ -572,7 +587,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-slate-950 overflow-x-hidden">
       <SeoMeta currentPageName={currentPageName} pathname={location.pathname} />
       {/* Shopify App Bridge Navigation Menu */}
       {detectEmbedded() && isResolved && (
@@ -592,7 +607,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 z-50 h-full w-64
+        fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw]
         bg-slate-950/95 backdrop-blur-2xl border-r border-white/5
         transform transition-transform duration-200 ease-in-out
         lg:translate-x-0
@@ -785,15 +800,22 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 overflow-x-hidden">
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 lg:px-6">
           <button 
             onClick={handleSidebarOpen}
-            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            aria-label="Open navigation menu"
+            className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-slate-900/70 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Open tab navigation menu"
+            title="Open tab navigation"
           >
-            <Menu className="w-5 h-5" />
+            <span className="sr-only">Open tab navigation</span>
+            <span className="grid grid-cols-2 gap-0.5">
+              <span className="block h-0.5 w-2 rounded bg-slate-200" />
+              <span className="block h-0.5 w-2 rounded bg-slate-200" />
+              <span className="block h-0.5 w-2 rounded bg-slate-200" />
+              <span className="block h-0.5 w-2 rounded bg-slate-200" />
+            </span>
           </button>
 
           <div className="flex-1 flex items-center gap-4 lg:ml-4">
@@ -852,7 +874,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 pb-24 lg:p-6 lg:pb-6 min-h-screen bg-slate-950" role="main" aria-label="App content">
+        <main className="p-4 pb-24 lg:p-6 lg:pb-6 min-h-screen bg-slate-950 overflow-x-hidden" role="main" aria-label="App content">
+          <MobileDeepWrapper>
           {showMissingContextBanner && (
             <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
               <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
@@ -867,6 +890,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
           {children}
+          </MobileDeepWrapper>
         </main>
 
         {/* MerchantAI Chat - DEFERRED: only when resolved + lazy loaded */}
