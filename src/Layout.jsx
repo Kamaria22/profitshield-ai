@@ -113,7 +113,6 @@ const navItems = [
   { name: 'Integrations', page: 'Integrations', icon: Link2, permission: 'integrations_view' },
   { name: 'Help Center', page: 'HelpCenter', icon: HelpCircle, permission: 'dashboard_view' },
   { name: 'Email & Support', page: 'AdminEmailCenter', path: '/admin/email', icon: Mail, permission: 'settings_view', adminOnly: true },
-  { name: 'Achievements', page: 'Achievements', icon: Gift, permission: 'dashboard_view' },
   { name: 'Referrals', page: 'Referrals', icon: Gift, permission: 'dashboard_view' },
   { name: 'Desktop App', page: 'Download', icon: Download, permission: 'dashboard_view' },
   { name: 'Audit Logs', page: 'AuditLogs', icon: ClipboardList, permission: 'audit_logs_view' },
