@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { detectDevice } from '@/components/mobile/DeviceDetector';
 
 /**
  * MOBILE APP BANNER
@@ -26,13 +27,14 @@ export default function MobileAppBanner() {
       localStorage.removeItem('mobile_banner_dismissed');
     }
 
-    // Detect mobile platform
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-    
-    if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+    const device = detectDevice();
+    // Show install banner only on phones (not tablets/desktop).
+    if (!device.isMobile || device.isTablet) return;
+
+    if (device.isIOS) {
       setPlatform('ios');
       setIsVisible(true);
-    } else if (/android/i.test(userAgent)) {
+    } else if (device.isAndroid) {
       setPlatform('android');
       setIsVisible(true);
     }

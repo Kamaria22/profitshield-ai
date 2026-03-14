@@ -433,6 +433,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 5);
   }, [filteredNavItems]);
   const mobileMenuItems = filteredNavItems;
+  const showPhoneQuickNav = device.isMobile && mobileQuickNav.length > 0;
 
   
   // Memoized handlers
@@ -968,7 +969,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Page content */}
         <main
-          className={`flex-1 ${device.isMobile ? 'p-3 pb-24' : 'p-4 pb-24 lg:p-6 lg:pb-6'} bg-slate-950 overflow-x-hidden overflow-y-auto`}
+          className={`flex-1 ${device.isMobile ? 'p-3' : device.isTablet ? 'p-4' : 'p-4 lg:p-6'} ${showPhoneQuickNav ? 'pb-24' : 'pb-6'} bg-slate-950 overflow-x-hidden overflow-y-auto`}
           style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
           aria-label="App content"
@@ -1004,7 +1005,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         )}
       </div>
 
-      {mobileQuickNav.length > 0 && (
+      {showPhoneQuickNav && (
         <nav
           className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-slate-950/95 backdrop-blur-xl lg:hidden"
           role="navigation"

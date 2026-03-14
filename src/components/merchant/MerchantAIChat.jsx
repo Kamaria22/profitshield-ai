@@ -3,8 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sheet,
@@ -21,8 +20,7 @@ import {
   AlertTriangle,
   TrendingDown,
   ShoppingCart,
-  Lightbulb,
-  X
+  Lightbulb
 } from 'lucide-react';
 
 const quickActions = [
@@ -58,7 +56,7 @@ export default function MerchantAIChat({ tenantId, currentPage, selectedOrderId 
         actions: data.suggested_actions
       }]);
     },
-    onError: (error) => {
+    onError: () => {
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'Sorry, I encountered an error. Please try again.',
@@ -105,7 +103,7 @@ export default function MerchantAIChat({ tenantId, currentPage, selectedOrderId 
           <MessageCircle className="w-6 h-6" />
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[450px] p-0 flex flex-col">
+      <SheetContent className="w-[min(92vw,450px)] sm:w-[450px] p-0 flex flex-col">
         <SheetHeader className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600">
           <SheetTitle className="text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
