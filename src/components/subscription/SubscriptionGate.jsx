@@ -17,6 +17,25 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
+function deriveFallbackStatus(tenant) {
+  if (!tenant) return { allowed: true };
+  const tier = tenant.subscription_tier || 'trial';
+  const trialEnds = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
+  const now = new Date();
+  const isInTrial = tier === 'trial' && trialEnds && now < trialEnds;
+  const trialExpired = tier === 'trial' && trialEnds && now >= trialEnds;
+  const daysRemaining = isInTrial
+    ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  return {
+    allowed: !trialExpired,
+    reason: trialExpired ? 'trial_expired' : null,
+    is_in_trial: isInTrial,
+    days_remaining: daysRemaining,
+    is_trial: tier === 'trial'
+  };
+}
+
 export default function SubscriptionGate({ tenant, children, feature = null }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,9 +58,13 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
           action: feature ? 'check_access' : 'get_status',
           feature
         });
-        if (mounted) setStatus(response.data);
+        const next = response?.data && typeof response.data === 'object'
+          ? response.data
+          : deriveFallbackStatus(tenant);
+        if (mounted) setStatus(next);
       } catch (e) {
         console.error('Subscription check failed:', e);
+        if (mounted) setStatus(deriveFallbackStatus(tenant));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -121,7 +144,7 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
               tenant_id: tenant.id,
               action: 'restore_access'
             });
-            setStatus(res.data);
+            setStatus((res?.data && typeof res.data === 'object') ? res.data : deriveFallbackStatus(tenant));
           } finally {
             setLoading(false);
           }

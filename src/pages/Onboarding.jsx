@@ -131,7 +131,7 @@ export default function Onboarding() {
         try {
           const tenants = await base44.entities.Tenant.filter({ id: currentUser.tenant_id });
           if (tenants.length > 0 && tenants[0].onboarding_completed) {
-            navigate(createPageUrl('Home'));
+            navigate(createPageUrl('Home', location.search));
           }
         } catch (e) {
           // If tenant access fails, try to repair it
@@ -332,7 +332,7 @@ export default function Onboarding() {
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
-    navigate(createPageUrl('Home'));
+    navigate(createPageUrl('Home', location.search));
   };
 
   return (
