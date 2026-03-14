@@ -251,6 +251,10 @@ Deno.serve(async (req) => {
       }
 
       // 4. Check for stale webhook events
+      const syncStaleMs = SYNC_STALE_HOURS * 60 * 60 * 1000;
+      const lastSyncAt = integration.last_sync_at ? new Date(integration.last_sync_at).getTime() : null;
+      const syncStale = !lastSyncAt || (Date.now() - lastSyncAt > syncStaleMs);
+
       const webhookStaleMs = WEBHOOK_STALE_HOURS * 60 * 60 * 1000;
       const recentEvents = await db.entities.WebhookQueue.filter(
         { tenant_id: tenantId },
@@ -264,9 +268,15 @@ Deno.serve(async (req) => {
 
       if (webhookStale) {
         result.webhook_stale = true;
-        result.status = 'degraded';
-        result.health_issues.push('webhook_stale');
-        if (!observeOnly) {
+        // Do not degrade healthy integrations that are actively syncing.
+        // Only degrade when BOTH webhook ingestion and sync recency are stale.
+        if (syncStale) {
+          result.status = 'degraded';
+          result.health_issues.push('webhook_stale');
+        } else {
+          result.health_issues.push('webhook_stale_observe');
+        }
+        if (!observeOnly && syncStale) {
           await db.entities.Alert.create({
             tenant_id: tenantId,
             type: 'system',
@@ -283,9 +293,6 @@ Deno.serve(async (req) => {
       }
 
       // 5. Auto-sync if stale
-      const syncStaleMs = SYNC_STALE_HOURS * 60 * 60 * 1000;
-      const lastSyncAt = integration.last_sync_at ? new Date(integration.last_sync_at).getTime() : null;
-      const syncStale = !lastSyncAt || (Date.now() - lastSyncAt > syncStaleMs);
 
       if (syncStale) {
         result.sync_stale = true;

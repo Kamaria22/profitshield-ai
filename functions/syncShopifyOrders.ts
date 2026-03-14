@@ -393,10 +393,20 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
       tenant_id: tenant.id,
       platform: 'shopify'
     });
-    const integration = integrations[0] || null;
-    const integrationId = integration?.id || null;
+    let integration = null;
+    if (reqIntegrationId) {
+      integration = integrations.find((row) => row.id === reqIntegrationId) || null;
+    }
+    if (!integration) {
+      integration = integrations.find((row) => row.status === 'connected' || row.status === 'degraded') || integrations[0] || null;
+    }
+    const integrationId = integration?.id || reqIntegrationId || null;
+    const shopDomain = integration?.store_key || tenant.shop_domain;
+    if (!shopDomain) {
+      return Response.json({ error: 'Missing Shopify shop domain for tenant' }, { status: 400 });
+    }
 
-    console.log('[syncShopifyOrders] Fetching orders from Shopify for:', tenant.shop_domain, 'days:', days);
+    console.log('[syncShopifyOrders] Fetching orders from Shopify for:', shopDomain, 'days:', days);
     
     // Create / update SyncJob record to track this run
     let syncJob = null;
@@ -417,18 +427,22 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
     let allOrders = [];
     // Pre-flight: verify token is still valid before full sync
-    const scopeCheck = await shopifyFetchWithRetry(`https://${tenant.shop_domain}/admin/oauth/access_scopes.json`, accessToken, {
+    const scopeCheck = await shopifyFetchWithRetry(`https://${shopDomain}/admin/oauth/access_scopes.json`, accessToken, {
       headers: {}
     }, 3);
     if (!scopeCheck.ok) {
       // Invalidate token so diagnose reflects true state
       await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
-      const integrationList = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
-      if (integrationList[0]) await base44.asServiceRole.entities.PlatformIntegration.update(integrationList[0].id, { status: 'disconnected' }).catch(() => {});
+      if (integrationId) {
+        await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, { status: 'disconnected' }).catch(() => {});
+      } else {
+        const integrationList = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
+        if (integrationList[0]) await base44.asServiceRole.entities.PlatformIntegration.update(integrationList[0].id, { status: 'disconnected' }).catch(() => {});
+      }
       return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth.` }, { status: 400 });
     }
 
-    let pageUrl = `https://${tenant.shop_domain}/admin/api/2024-10/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
+    let pageUrl = `https://${shopDomain}/admin/api/2024-10/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
     let pageCount = 0;
 
     while (pageUrl && pageCount < 10) {
@@ -486,7 +500,7 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
       const orderRecord = {
         tenant_id: tenant.id,
         integration_id: integrationId,
-        shop_domain: tenant.shop_domain,
+        shop_domain: shopDomain,
         platform_order_id: orderData.id.toString(),
         order_number: orderData.order_number?.toString() || orderData.name,
         customer_email: orderData.email,
@@ -593,7 +607,7 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     
     return Response.json({ 
       success: true,
-      shopDomain: tenant.shop_domain,
+      shopDomain,
       tenantId: tenant.id,
       integrationId,
       fetchedCount: shopifyOrders.length,
