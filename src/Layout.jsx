@@ -59,6 +59,7 @@ import {
 } from 'lucide-react';
 import DeepLinkHandler from '@/components/mobile/DeepLinkHandler';
 import MobileDeepWrapper from '@/components/mobile/MobileDeepWrapper';
+import { useDeviceProfile } from '@/components/mobile/DeviceDetector';
 import { APP_CONTEXT, canAccessPage } from '@/components/AppContext';
 import ShopifyEmbeddedAuthGate from '@/components/shopify/ShopifyEmbeddedAuthGate';
 import ShopifyNavMenu from '@/components/shopify/ShopifyNavMenu';
@@ -386,6 +387,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [supportUnread, setSupportUnread] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
+  const device = useDeviceProfile();
+  const topBarHeight = device.isMobile ? '3.5rem' : '4rem';
   
   // Safe permissions
   const permissionsData = usePermissions() || {};
@@ -448,6 +451,14 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.dataset.deviceType = device.formFactor || device.className || 'desktop';
+    document.documentElement.dataset.deviceKind = device.kind || 'desktop';
+    document.documentElement.dataset.deviceInput = device.input || 'pointer';
+    document.documentElement.dataset.viewportClass = device.viewportClass || 'large';
+  }, [device.formFactor, device.className, device.kind, device.input, device.viewportClass]);
 
   // Fail-safe: keep document scrolling unlocked unless an explicit modal handles it.
   useEffect(() => {
@@ -594,7 +605,18 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const profitScore = isResolved && resolver.tenant?.profit_integrity_score ? resolver.tenant.profit_integrity_score : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 overflow-x-hidden">
+    <div
+      className={`min-h-screen bg-slate-950 overflow-x-hidden ${
+        device.isMobile ? 'mobile-shell' : device.isTablet ? 'tablet-shell' : 'desktop-shell'
+      }`}
+      data-device={device.className}
+      data-device-kind={device.kind}
+      data-device-input={device.input}
+      data-viewport-class={device.viewportClass}
+      data-touch={device.isTouch ? '1' : '0'}
+      data-embedded={device.isEmbedded ? '1' : '0'}
+      style={{ '--ps-topbar-h': topBarHeight }}
+    >
       <SeoMeta currentPageName={currentPageName} pathname={location.pathname} />
       {/* Shopify App Bridge Navigation Menu */}
       {detectEmbedded() && isResolved && (
@@ -808,7 +830,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="lg:pl-64 overflow-x-hidden min-h-screen flex flex-col">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 lg:px-6">
+        <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
           <button 
             onClick={handleSidebarOpen}
             className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-slate-900/70 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
@@ -824,7 +846,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </span>
           </button>
 
-          <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-4 lg:ml-4">
+          <div className={`flex-1 min-w-0 flex items-center ${device.isMobile ? 'gap-1.5' : 'gap-2 sm:gap-4'} lg:ml-4`}>
             <ResolverHealthIndicator />
             {/* StoreSwitcher only when RESOLVED and multiple stores */}
             {isResolved && stores.length > 1 && <StoreSwitcher />}
@@ -838,7 +860,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className={`flex items-center ${device.isMobile ? 'gap-1' : 'gap-1.5 sm:gap-3'}`}>
             {/* Upgrade Button */}
             {activeUser && <UpgradeButton userId={activeUser.id} />}
 
@@ -887,7 +909,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Mobile dropdown navigation panel */}
         {sidebarOpen && (
-          <div className="lg:hidden fixed top-16 left-3 right-3 z-50 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+          <div className={`lg:hidden fixed ${device.isMobile ? 'top-14 left-2 right-2 max-h-[74vh]' : 'top-16 left-3 right-3 max-h-[70vh]'} z-50 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-2xl overflow-y-auto`}>
             <div className="px-3 py-2 border-b border-white/10">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Store</p>
               <p className="text-sm font-semibold text-slate-100 truncate">{storeDisplayName || 'No store selected'}</p>
@@ -946,8 +968,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Page content */}
         <main
-          className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6 bg-slate-950 overflow-x-hidden overflow-y-auto"
-          style={{ height: 'calc(100dvh - 4rem)' }}
+          className={`flex-1 ${device.isMobile ? 'p-3 pb-24' : 'p-4 pb-24 lg:p-6 lg:pb-6'} bg-slate-950 overflow-x-hidden overflow-y-auto`}
+          style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
           aria-label="App content"
         >

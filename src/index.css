@@ -102,4 +102,46 @@
   #root {
     min-height: 100vh;
   }
+
+  html[data-device-type="phone"] {
+    --ps-density: 0.92;
+  }
+
+  html[data-device-type="tablet"] {
+    --ps-density: 0.97;
+  }
+
+  html[data-device-type="desktop"] {
+    --ps-density: 1;
+  }
+
+  html[data-device-input="touch"] body {
+    overscroll-behavior-y: contain;
+  }
+
+  [data-device="phone"] .desktop-only,
+  [data-device="tablet"] .desktop-only {
+    display: none !important;
+  }
+
+  [data-device="desktop"] .mobile-only {
+    display: none !important;
+  }
+
+  [data-device="phone"] {
+    font-size: calc(15px * var(--ps-density, 1));
+  }
+
+  [data-device="tablet"] {
+    font-size: calc(15.5px * var(--ps-density, 1));
+  }
+
+  [data-device-kind="touch-laptop"] [role="main"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-viewport-class="compact"] [role="main"] {
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
+  }
 }

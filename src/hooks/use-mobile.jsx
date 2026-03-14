@@ -7,12 +7,20 @@ export function useIsMobile() {
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const touchMql = window.matchMedia('(pointer: coarse)')
     const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+      const shortestSide = Math.min(window.innerWidth, window.innerHeight)
+      const coarseTouch = touchMql.matches
+      setIsMobile(shortestSide < MOBILE_BREAKPOINT || (coarseTouch && shortestSide <= 1024))
     }
     mql.addEventListener("change", onChange)
+    touchMql.addEventListener("change", onChange)
     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    return () => mql.removeEventListener("change", onChange);
+    onChange()
+    return () => {
+      mql.removeEventListener("change", onChange);
+      touchMql.removeEventListener("change", onChange);
+    };
   }, [])
 
   return !!isMobile
