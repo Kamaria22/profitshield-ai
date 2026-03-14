@@ -27,6 +27,7 @@ async function postProbe(url, body, maxAttempts = 3) {
   let lastStatus = 0;
   let lastData = {};
   let rateLimited = false;
+  let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(url, {
@@ -46,6 +47,7 @@ async function postProbe(url, body, maxAttempts = 3) {
       }
       return { status: res.status, data, rateLimited };
     } catch (error) {
+      lastError = error;
       lastStatus = 0;
       lastData = { error: error.message };
       if (attempt < maxAttempts) {
@@ -54,7 +56,15 @@ async function postProbe(url, body, maxAttempts = 3) {
       }
     }
   }
-  return { status: lastStatus, data: lastData, rateLimited };
+  const errorMessage = String(lastError?.message || lastData?.error || '');
+  const isDnsError = /enotfound|getaddrinfo|could not resolve host|failed to lookup/i.test(errorMessage);
+  const isNetworkError = /network|fetch failed|econnrefused|etimedout|socket|tls/i.test(errorMessage);
+  return {
+    status: lastStatus,
+    data: lastData,
+    rateLimited,
+    reachability: isDnsError ? 'dns_unreachable' : (isNetworkError ? 'network_unreachable' : 'unknown')
+  };
 }
 
 async function run() {
@@ -99,6 +109,7 @@ async function run() {
         status: probe.status,
         ok,
         degraded,
+        reachability: probe.reachability || null,
         data_preview: probe.data?.version || probe.data?.function || probe.data?.error || null
       });
       await delay(250);
@@ -111,10 +122,16 @@ async function run() {
   fs.writeFileSync(OUT_FILE, JSON.stringify({ ts: new Date().toISOString(), app_url: APP_URL, results }, null, 2));
 
   const failed = results.filter((r) => !r.ok && !r.degraded).length;
+  const unreachable = results.filter((r) => r.status === 0).length;
   console.log(`[probe-agents] app_url=${APP_URL} total=${results.length} failed=${failed}`);
+  if (unreachable === results.length) {
+    const reason = results[0]?.reachability || 'network_unreachable';
+    console.log(`[probe-agents] external_blocker: all probes unreachable (${reason})`);
+  }
   for (const r of results) {
     const statusText = r.ok ? 'ok' : (r.degraded ? 'degraded' : 'fail');
-    console.log(`- ${r.id}: ${statusText} (${r.status})`);
+    const suffix = r.status === 0 && r.reachability ? ` ${r.reachability}` : '';
+    console.log(`- ${r.id}: ${statusText} (${r.status})${suffix}`);
   }
 
   process.exit(failed > 0 ? 2 : 0);
