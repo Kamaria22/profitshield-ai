@@ -19,6 +19,7 @@ export default function HelpButton() {
     background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     boxShadow: '0 0 20px rgba(99,102,241,0.45), 0 4px 16px rgba(0,0,0,0.4)',
     bottom: isPhoneLike ? 'calc(env(safe-area-inset-bottom, 0px) + 5.25rem)' : undefined,
+    right: isPhoneLike ? 'calc(env(safe-area-inset-right, 0px) + 4.5rem)' : undefined,
   };
 
   return (
