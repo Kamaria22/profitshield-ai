@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, parseQuery, getPersistedContext } from '@/components/platformContext';
@@ -129,6 +129,20 @@ const navItems = [
   { name: 'Build Guide', page: 'NativeBuildGuide', icon: Download, permission: 'settings_manage', adminOnly: true },
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
+
+const MOBILE_NAV_LABELS = {
+  Home: 'Home',
+  Orders: 'Orders',
+  Alerts: 'Alerts',
+  Integrations: 'Apps',
+  PnLAnalytics: 'P&L',
+  AIInsights: 'AI'
+};
+
+function getMobileNavLabel(item) {
+  if (!item?.page) return item?.name || '';
+  return MOBILE_NAV_LABELS[item.page] || item.name?.split(' ')[0] || item.name || '';
+}
 
 // Shopify App Store-facing sidebar should stay focused on merchant runtime actions.
 const SHOPIFY_PUBLIC_NAV_ALLOWLIST = new Set([
@@ -385,9 +399,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const [supportUnread, setSupportUnread] = useState(0);
+  const [isBottomNavHidden, setIsBottomNavHidden] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const device = useDeviceProfile();
+  const mainScrollRef = useRef(null);
+  const lastScrollTopRef = useRef(0);
   const topBarHeight = device.isMobile ? '3.5rem' : '4rem';
   
   // Safe permissions
@@ -429,11 +446,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     return baseFilteredNavItems;
   }, [baseFilteredNavItems, ownerAllowlisted]);
   const mobileQuickNav = useMemo(() => {
-    const allowed = new Set(['Home', 'Orders', 'PnLAnalytics', 'Alerts', 'Integrations']);
-    return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 5);
+    const allowed = new Set(['Home', 'Orders', 'Alerts', 'Integrations']);
+    return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 4);
   }, [filteredNavItems]);
   const mobileMenuItems = filteredNavItems;
   const showPhoneQuickNav = device.isMobile && mobileQuickNav.length > 0;
+  const menuAttentionCount = pendingAlerts + (isAdmin ? supportUnread : 0);
 
   
   // Memoized handlers
@@ -452,6 +470,29 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!showPhoneQuickNav) {
+      setIsBottomNavHidden(false);
+      lastScrollTopRef.current = 0;
+    }
+  }, [showPhoneQuickNav]);
+
+  const handleMainScroll = useCallback((event) => {
+    if (!showPhoneQuickNav) return;
+    const target = event?.currentTarget;
+    const currentTop = Number(target?.scrollTop || 0);
+    const delta = currentTop - lastScrollTopRef.current;
+
+    if (currentTop < 18) {
+      setIsBottomNavHidden(false);
+    } else if (delta > 8) {
+      setIsBottomNavHidden(true);
+    } else if (delta < -8) {
+      setIsBottomNavHidden(false);
+    }
+    lastScrollTopRef.current = currentTop;
+  }, [showPhoneQuickNav]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -834,17 +875,25 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
           <button 
             onClick={handleSidebarOpen}
-            className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-slate-900/70 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className={`lg:hidden relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+              sidebarOpen
+                ? 'border-indigo-400/40 bg-indigo-500/20 shadow-[0_0_18px_rgba(99,102,241,0.35)]'
+                : 'border-white/15 bg-slate-900/70 hover:bg-slate-800 shadow-[0_0_10px_rgba(15,23,42,0.4)]'
+            }`}
             aria-label="Open tab navigation menu"
             title="Open tab navigation"
           >
             <span className="sr-only">Open tab navigation</span>
-            <span className="grid grid-cols-2 gap-0.5">
-              <span className="block h-0.5 w-2 rounded bg-slate-200" />
-              <span className="block h-0.5 w-2 rounded bg-slate-200" />
-              <span className="block h-0.5 w-2 rounded bg-slate-200" />
-              <span className="block h-0.5 w-2 rounded bg-slate-200" />
+            <span className="relative h-4 w-4">
+              <span className={`absolute left-0 top-0 h-0.5 w-4 rounded bg-slate-100 transition-all duration-200 ${sidebarOpen ? 'translate-y-[6px] rotate-45' : ''}`} />
+              <span className={`absolute left-0 top-[6px] h-0.5 w-4 rounded bg-slate-100 transition-all duration-200 ${sidebarOpen ? 'opacity-0' : 'opacity-100'}`} />
+              <span className={`absolute left-0 top-3 h-0.5 w-4 rounded bg-slate-100 transition-all duration-200 ${sidebarOpen ? '-translate-y-[6px] -rotate-45' : ''}`} />
             </span>
+            {menuAttentionCount > 0 && !sidebarOpen && (
+              <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {menuAttentionCount > 9 ? '9+' : menuAttentionCount}
+              </span>
+            )}
           </button>
 
           <div className={`flex-1 min-w-0 flex items-center ${device.isMobile ? 'gap-1.5' : 'gap-2 sm:gap-4'} lg:ml-4`}>
@@ -910,8 +959,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Mobile dropdown navigation panel */}
         {sidebarOpen && (
-          <div className={`lg:hidden fixed ${device.isMobile ? 'top-14 left-2 right-2 max-h-[74vh]' : 'top-16 left-3 right-3 max-h-[70vh]'} z-50 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-2xl overflow-y-auto`}>
-            <div className="px-3 py-2 border-b border-white/10">
+          <div className={`lg:hidden fixed ${device.isMobile ? 'top-14 left-2 right-2 max-h-[78vh]' : 'top-16 left-3 right-3 max-h-[72vh]'} z-50 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_20px_60px_rgba(2,6,23,0.7)] overflow-y-auto`}>
+            <div className="sticky top-0 z-10 px-3 py-2 border-b border-white/10 bg-slate-950/95 backdrop-blur-xl">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Store</p>
               <p className="text-sm font-semibold text-slate-100 truncate">{storeDisplayName || 'No store selected'}</p>
               <div className="mt-1.5 flex items-center gap-2 flex-wrap">
@@ -931,6 +980,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                   </span>
                 )}
               </div>
+            </div>
+            <div className="px-3 pt-2">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 mb-1">Core</p>
             </div>
             <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
               {mobileMenuItems.map((item) => {
@@ -969,6 +1021,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Page content */}
         <main
+          ref={mainScrollRef}
+          onScroll={handleMainScroll}
           className={`flex-1 ${device.isMobile ? 'p-3' : device.isTablet ? 'p-4' : 'p-4 lg:p-6'} ${showPhoneQuickNav ? 'pb-24' : 'pb-6'} bg-slate-950 overflow-x-hidden overflow-y-auto`}
           style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
@@ -1007,11 +1061,14 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {showPhoneQuickNav && (
         <nav
-          className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-slate-950/95 backdrop-blur-xl lg:hidden"
+          className={`fixed left-1/2 z-40 w-[min(96vw,430px)] -translate-x-1/2 lg:hidden transition-transform duration-200 ${
+            isBottomNavHidden ? 'translate-y-24' : 'translate-y-0'
+          }`}
+          style={{ bottom: 'max(env(safe-area-inset-bottom), 0.5rem)' }}
           role="navigation"
           aria-label="Mobile quick navigation"
         >
-          <ul className="grid grid-cols-5">
+          <ul className="grid grid-cols-4 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(2,6,23,0.65)]">
             {mobileQuickNav.map((item) => {
               const Icon = item.icon;
               const isActive = currentPageName === item.page;
@@ -1019,13 +1076,14 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                 <li key={`mobile-${item.page}`}>
                   <Link
                     to={item.path || createPageUrl(item.page, location.search)}
-                    className={`flex flex-col items-center justify-center py-2 text-[11px] ${
+                    className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] ${
                       isActive ? 'text-indigo-300' : 'text-slate-400'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <Icon className={`w-4 h-4 mb-0.5 ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} aria-hidden="true" />
-                    <span className="truncate max-w-[56px]">{item.name.replace(' & Plan', '')}</span>
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} aria-hidden="true" />
+                    <span className="truncate max-w-[64px]">{getMobileNavLabel(item)}</span>
+                    {isActive && <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]" />}
                   </Link>
                 </li>
               );
