@@ -38,10 +38,12 @@ async function postProbe(url, body, maxAttempts = 3) {
       const data = await res.json().catch(() => ({}));
       lastStatus = res.status;
       lastData = data;
-      if (res.status === 429) {
+      if (res.status === 429 || res.status === 503) {
         rateLimited = true;
         if (attempt < maxAttempts) {
-          await delay(Math.min(5000, 600 * 2 ** (attempt - 1)));
+          const retryAfter = Number(res.headers.get('Retry-After') || '0');
+          const retryMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 700 * 2 ** (attempt - 1));
+          await delay(retryMs);
           continue;
         }
       }
@@ -100,9 +102,10 @@ async function run() {
           url = `${fallbackUrl} (fallback for vulnerabilityWatchdog)`;
         }
       }
-      const ok = probe.status >= 200 && probe.status < 300 && probe.data?.ok !== false;
+      const explicitDegraded = probe?.data?.degraded === true || probe?.data?.blocked === true;
+      const ok = probe.status >= 200 && probe.status < 300 && probe.data?.ok !== false && !explicitDegraded;
       const missingCovered = FALLBACK_COVERED_PROBES.has(p.id) && (probe.status === 404 || probe.status === 503);
-      const degraded = !ok && (probe.rateLimited || probe.status === 429 || missingCovered);
+      const degraded = explicitDegraded || (!ok && (probe.rateLimited || probe.status === 429 || probe.status === 503 || missingCovered));
       results.push({
         id: p.id,
         url,
