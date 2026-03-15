@@ -118,6 +118,8 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
     try {
       const { data } = await base44.functions.invoke('syncShopifyOrders', {
         tenant_id: tenantId,
+        integration_id: integration?.id || undefined,
+        shop: integration?.store_key || shopDomain || undefined,
         days: parseInt(syncDays)
       });
       if (data?.success) {
@@ -137,7 +139,9 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
     setReconciling(true);
     try {
       const { data } = await base44.functions.invoke('shopifyReconcileWebhooks', {
-        tenant_id: tenantId
+        tenant_id: tenantId,
+        integration_id: integration?.id || undefined,
+        shop_domain: integration?.store_key || shopDomain || undefined
       });
       if (data?.ok !== false) {
         toast.success(`Webhooks reconciled — ${data?.topics_ok || 0}/${data?.topics_required || 7} topics active, ${data?.registered_count || 0} registered, ${data?.deleted_count || 0} stale removed`);

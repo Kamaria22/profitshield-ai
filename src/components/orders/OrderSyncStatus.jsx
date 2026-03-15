@@ -3,7 +3,7 @@
  * Shows real-time sync health: last sync, queue depth, webhook status
  * and a manual "Sync Now" button that calls syncShopifyOrders directly.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,8 @@ export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
     mutationFn: async () => {
       const resp = await base44.functions.invoke('syncShopifyOrders', {
         tenant_id: tenantId,
+        integration_id: integrationId || undefined,
+        shop: integration?.store_key || undefined,
         days: 30,
       });
       if (resp.data?.error) throw new Error(resp.data.error);

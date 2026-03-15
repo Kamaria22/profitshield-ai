@@ -46,10 +46,30 @@ export async function invokeWithRetry(name, payload = {}, options = {}) {
   for (const fnName of candidates) {
     try {
       const invokePayload = (() => {
-        if (fnName !== 'checkProfitAlerts') return payload;
-        if (payload?.tenant_id) return payload;
-        const persistedTenant = getPersistedContext(true)?.tenantId || null;
-        return persistedTenant ? { ...payload, tenant_id: persistedTenant } : payload;
+        const persisted = getPersistedContext(true) || {};
+
+        if (fnName === 'checkProfitAlerts') {
+          if (payload?.tenant_id) return payload;
+          const persistedTenant = persisted?.tenantId || null;
+          return persistedTenant ? { ...payload, tenant_id: persistedTenant } : payload;
+        }
+
+        if (
+          fnName === 'syncShopifyOrders' ||
+          fnName === 'syncShopifyData' ||
+          fnName === 'registerShopifyWebhooks' ||
+          fnName === 'shopifyReconcileWebhooks'
+        ) {
+          const next = { ...payload };
+          if (!next.tenant_id && persisted?.tenantId) next.tenant_id = persisted.tenantId;
+          if (!next.integration_id && persisted?.integrationId) next.integration_id = persisted.integrationId;
+          if (!next.shop && (persisted?.shop || persisted?.storeKey)) {
+            next.shop = persisted.shop || persisted.storeKey;
+          }
+          return next;
+        }
+
+        return payload;
       })();
       return await retryAsync(
         () => base44.functions.invoke(fnName, invokePayload),

@@ -31,6 +31,25 @@ async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
   }
 }
 
+function normalizeTenantId(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
+function clampDays(value, fallback = 90) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(365, Math.trunc(parsed)));
+}
+
+async function readJsonBody(req) {
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
+}
+
 // Calculate profit for an order
 function calculateOrderProfit(order, costMappings, settings) {
   const revenue = parseFloat(order.total_price) || 0;
@@ -301,14 +320,34 @@ async function shopifyFetchWithRetry(url, accessToken, init = {}, maxAttempts = 
 Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    // Embedded Shopify startup may invoke sync before Base44 session is established.
-    // Keep this endpoint tenant-scoped and service-role-backed; auth is optional here.
-    try { await base44.auth.me(); } catch (_) {}
-    
-    const { tenant_id, days = 90, integration_id: reqIntegrationId } = await req.json();
-    
+    const body = await readJsonBody(req);
+    if (!body || typeof body !== 'object') {
+      return Response.json({ error: 'Invalid JSON body', error_code: 'invalid_json' }, { status: 400 });
+    }
+
+    const tenant_id = normalizeTenantId(body.tenant_id);
+    const days = clampDays(body.days, 90);
+    const reqIntegrationId = typeof body.integration_id === 'string' ? body.integration_id.trim() : '';
+    const requestedShop = typeof body.shop === 'string' ? body.shop.toLowerCase().trim() : null;
+
     if (!tenant_id) {
       return Response.json({ error: 'Missing tenant_id' }, { status: 400 });
+    }
+
+    // Embedded Shopify startup may invoke sync before Base44 session is established.
+    // If a user session is present, enforce tenant ownership (except owner/admin).
+    let requester = null;
+    try { requester = await base44.auth.me(); } catch (_) {}
+    const requesterRole = String(requester?.role || requester?.app_role || '').toLowerCase();
+    const requesterTenant = String(requester?.tenant_id || '').trim();
+    if (
+      requester &&
+      requesterRole !== 'owner' &&
+      requesterRole !== 'admin' &&
+      requesterTenant &&
+      requesterTenant !== tenant_id
+    ) {
+      return Response.json({ error: 'Forbidden tenant access', error_code: 'tenant_forbidden' }, { status: 403 });
     }
     
     // Get tenant
@@ -402,6 +441,12 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     }
     const integrationId = integration?.id || reqIntegrationId || null;
     const shopDomain = integration?.store_key || tenant.shop_domain;
+    if (requestedShop && shopDomain && requestedShop !== shopDomain) {
+      return Response.json(
+        { error: 'Shop mismatch for tenant integration', error_code: 'shop_mismatch' },
+        { status: 403 }
+      );
+    }
     if (!shopDomain) {
       return Response.json({ error: 'Missing Shopify shop domain for tenant' }, { status: 400 });
     }
@@ -624,7 +669,10 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     
   } catch (error) {
     console.error('[syncShopifyOrders] Error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json(
+      { error: error.message, error_code: 'sync_shopify_orders_failed' },
+      { status: 500 }
+    );
   }
 }));
 
