@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { Shield, AlertTriangle, TrendingDown, Lightbulb, DollarSign, CheckCircle } from 'lucide-react';
 

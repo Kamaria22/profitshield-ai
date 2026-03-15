@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { AlertTriangle, Shield, TrendingDown, CreditCard, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { Bell, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';

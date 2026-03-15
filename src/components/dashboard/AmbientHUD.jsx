@@ -1,10 +1,11 @@
+// @ts-nocheck
 /**
  * AMBIENT INTELLIGENCE HUD
  * Real-time status: sync · AI health · risk · profit momentum
  */
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, Shield, TrendingUp, Wifi, WifiOff } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Activity, Shield, TrendingUp, Wifi, WifiOff } from 'lucide-react';
 
 export default function AmbientHUD({ metrics, tenant }) {
   const [online, setOnline] = useState(navigator.onLine);

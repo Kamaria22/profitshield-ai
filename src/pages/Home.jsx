@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';

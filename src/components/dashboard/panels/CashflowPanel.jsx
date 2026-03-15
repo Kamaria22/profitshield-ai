@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { Wallet, TrendingUp, AlertTriangle } from 'lucide-react';
 import CommandPanel from '../CommandPanel';

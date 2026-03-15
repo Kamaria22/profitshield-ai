@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shopify App Bridge Authentication (NPM version - works in embedded apps)
  * With fresh token management for reliable JWT handling

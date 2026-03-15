@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,13 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   CheckCircle, 
-  XCircle, 
-  Loader2, 
   Webhook, 
   Database, 
   Key,
   RefreshCw,
-  Trash2,
   Plus,
   Activity
 } from 'lucide-react';

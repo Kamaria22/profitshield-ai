@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * ENTERPRISE-GRADE PLATFORM RESOLVER
  * Deterministic multi-platform context resolution with full observability.

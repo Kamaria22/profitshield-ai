@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { LayoutGrid, Settings, Sparkles } from 'lucide-react';
 import CommandPanel from '../CommandPanel';

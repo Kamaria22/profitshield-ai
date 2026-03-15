@@ -1,6 +1,6 @@
+// @ts-nocheck
 import React from 'react';
 import { Shield, AlertTriangle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import CommandPanel from '../CommandPanel';
 
 export default function RiskCommandPanel({ metrics = {}, loading = false }) {

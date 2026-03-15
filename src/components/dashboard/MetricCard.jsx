@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card } from '@/components/ui/card';

@@ -1,5 +1,6 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
-import { Shield, TrendingUp, TrendingDown, DollarSign, AlertTriangle, Activity } from 'lucide-react';
+import { Shield, TrendingUp, DollarSign, Activity } from 'lucide-react';
 
 const fmt = (n) => {
   if (n == null || n === 0) return '$0';

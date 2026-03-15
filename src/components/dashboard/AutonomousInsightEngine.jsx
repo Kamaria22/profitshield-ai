@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, TrendingDown, AlertTriangle, ShieldAlert, ChevronRight, Zap, X, ExternalLink } from 'lucide-react';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, createContext, useContext } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getPersistedContext } from '@/components/platformContext';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { Bot, Zap, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';

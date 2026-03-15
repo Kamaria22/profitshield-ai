@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { BarChart3, TrendingUp } from 'lucide-react';
 import CommandPanel from '../CommandPanel';

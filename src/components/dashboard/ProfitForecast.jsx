@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 

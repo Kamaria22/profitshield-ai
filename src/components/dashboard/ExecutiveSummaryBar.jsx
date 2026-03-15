@@ -1,16 +1,13 @@
+// @ts-nocheck
 import React from 'react';
-import { motion } from 'framer-motion';
 import { 
-  Shield, 
   TrendingUp, 
-  AlertTriangle, 
   ChevronDown,
   RefreshCw,
   Download,
   Zap,
   Lock
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

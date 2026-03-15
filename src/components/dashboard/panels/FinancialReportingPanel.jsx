@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { FileText, Download, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';

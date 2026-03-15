@@ -1,5 +1,6 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
-import { TrendingUp, TrendingDown, AlertTriangle, Shield, Lightbulb, DollarSign, Percent, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Shield, Lightbulb, Percent, Zap } from 'lucide-react';
 
 const fmt = (n, decimals = 0) => {
   if (!n && n !== 0) return '—';

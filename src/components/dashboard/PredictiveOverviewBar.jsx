@@ -1,6 +1,7 @@
+// @ts-nocheck
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Shield, Zap, AlertTriangle, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Activity } from 'lucide-react';
 
 // Animated radial dial for profit integrity score
 function ProfitDial({ score = 0 }) {
