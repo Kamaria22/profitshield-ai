@@ -461,7 +461,7 @@ async function handleCallback(base44, body) {
       store_key: storeKey
     }).catch(() => []);
 
-    const encrypted_token = encryptToken(accessToken);
+    const encrypted_token = await encryptToken(accessToken);
 
     if (oauthTokens.length > 0) {
       // Update existing token
@@ -565,12 +565,34 @@ async function handleCallback(base44, body) {
 // TOKEN ENCRYPTION (simple base64 for now)
 // ─────────────────────────────────────────────
 
-function encryptToken(token) {
+async function encryptToken(token) {
   const key = Deno.env.get('ENCRYPTION_KEY');
   if (!key) {
-    // Fallback: base64 encode (NOT PRODUCTION SAFE)
+    // Legacy fallback for environments that haven't set ENCRYPTION_KEY yet.
     return btoa(token);
   }
-  // TODO: Use AES-GCM for proper encryption
-  return btoa(token);
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(key.padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      cryptoKey,
+      encoder.encode(token)
+    );
+    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encrypted), iv.length);
+    return btoa(String.fromCharCode(...combined));
+  } catch (error) {
+    console.warn('[shopifyAuth] AES token encryption failed, falling back to base64:', error?.message || String(error));
+    return btoa(token);
+  }
 }

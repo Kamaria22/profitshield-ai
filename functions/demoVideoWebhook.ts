@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.6";
 
-const WEBHOOK_SECRET = Deno.env.get("DEMO_VIDEO_WEBHOOK_SECRET") || "default-secret";
+const WEBHOOK_SECRET = Deno.env.get("DEMO_VIDEO_WEBHOOK_SECRET") || "";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -8,6 +8,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (!WEBHOOK_SECRET) {
+      console.error("[demoVideoWebhook] missing DEMO_VIDEO_WEBHOOK_SECRET");
+      return Response.json({ error: "Server misconfigured" }, { status: 500 });
+    }
     const secret = req.headers.get("x-webhook-secret");
     if (secret !== WEBHOOK_SECRET) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
