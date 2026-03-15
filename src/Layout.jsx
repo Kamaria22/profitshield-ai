@@ -81,7 +81,6 @@ import CookieConsent from '@/components/gdpr/CookieConsent';
 import UpgradeButton from '@/components/subscription/UpgradeButton';
 import CommandPalette, { CommandPaletteTrigger } from '@/components/ui/CommandPalette';
 import AmbientHUD from '@/components/dashboard/AmbientHUD';
-import HelpButton from '@/components/help/HelpButton';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -1098,9 +1097,6 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         userEmail={activeUser?.email} 
         search={location.search}
       />
-
-      {/* Floating Help Button */}
-      <HelpButton />
 
       {/* PWA Install Prompt */}
       {activeUser && <InstallPrompt userId={activeUser.id} />}

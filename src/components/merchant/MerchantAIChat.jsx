@@ -97,7 +97,7 @@ export default function MerchantAIChat({ tenantId, currentPage, selectedOrderId 
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button 
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 z-50"
+          className="fixed right-4 h-14 w-14 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 z-40 bottom-[calc(env(safe-area-inset-bottom,0px)+5.25rem)] sm:bottom-6 sm:right-6"
           size="icon"
         >
           <MessageCircle className="w-6 h-6" />
