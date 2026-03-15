@@ -17,8 +17,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const API_VERSION = '2024-10';
-const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
-const WEBHOOK_ENDPOINT_CANONICAL = `${APP_URL}/api/functions/shopifyWebhook`;
 const REQUIRED_TOPICS = [
   'orders/create','orders/updated','orders/paid','orders/cancelled',
   'refunds/create','products/update',
@@ -26,6 +24,17 @@ const REQUIRED_TOPICS = [
   'customers/data_request','customers/redact','shop/redact',
   'app_subscriptions/update',
 ];
+
+function resolveCanonicalWebhookEndpoint(req) {
+  try {
+    const url = new URL(req.url);
+    if (url.hostname.toLowerCase().endsWith('.base44.app')) {
+      return `${url.origin.replace(/\/$/, '')}/api/functions/shopifyWebhook`;
+    }
+  } catch {}
+  const appUrl = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+  return `${appUrl}/api/functions/shopifyWebhook`;
+}
 
 function canonicalizeShopDomain(shop) {
   if (!shop) return null;
@@ -48,7 +57,7 @@ async function decryptToken(encryptedToken) {
   } catch { try { return atob(encryptedToken); } catch { return null; } }
 }
 
-async function reconcile(shopDomain, accessToken, integrationId, db) {
+async function reconcile(shopDomain, accessToken, integrationId, db, webhookEndpointCanonical) {
   const now = new Date().toISOString();
 
   // 1. Fetch existing webhooks from Shopify
@@ -67,9 +76,9 @@ async function reconcile(shopDomain, accessToken, integrationId, db) {
   console.log(`[reconcile] Found ${webhooks.length} webhooks in Shopify for ${shopDomain}`);
 
   // 2. Classify webhooks
-  const ours = webhooks.filter(w => w.address === WEBHOOK_ENDPOINT_CANONICAL);
+  const ours = webhooks.filter(w => w.address === webhookEndpointCanonical);
   const stale = webhooks.filter(w => {
-    if (w.address === WEBHOOK_ENDPOINT_CANONICAL) return false;
+    if (w.address === webhookEndpointCanonical) return false;
     // Stale = points to any ProfitShield-looking endpoint on wrong domain
     return w.address.includes('shopifyWebhook') || w.address.includes('profit-shield');
   });
@@ -106,7 +115,7 @@ async function reconcile(shopDomain, accessToken, integrationId, db) {
       const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-        body: JSON.stringify({ webhook: { topic, address: WEBHOOK_ENDPOINT_CANONICAL, format: 'json' } })
+        body: JSON.stringify({ webhook: { topic, address: webhookEndpointCanonical, format: 'json' } })
       });
       const data = await res.json();
       if (data.webhook?.id) {
@@ -144,7 +153,7 @@ async function reconcile(shopDomain, accessToken, integrationId, db) {
 
   return {
     ok: errors.length === 0,
-    webhook_url: WEBHOOK_ENDPOINT_CANONICAL,
+    webhook_url: webhookEndpointCanonical,
     topics_required: REQUIRED_TOPICS.length,
     topics_ok: totalOk,
     already_ok: alreadyOkTopics,
@@ -161,6 +170,7 @@ async function reconcile(shopDomain, accessToken, integrationId, db) {
 
 Deno.serve(async (req) => {
   try {
+    const webhookEndpointCanonical = resolveCanonicalWebhookEndpoint(req);
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole;
 
@@ -220,7 +230,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token invalid. Reconnect OAuth.`, needs_reauth: true }, { status: 400 });
     }
 
-    const result = await reconcile(shopDomain, accessToken, integration.id, db);
+    const result = await reconcile(shopDomain, accessToken, integration.id, db, webhookEndpointCanonical);
 
     // Audit log
     await db.entities.AuditLog.create({
@@ -229,7 +239,7 @@ Deno.serve(async (req) => {
       entity_type: 'platform_integration',
       entity_id: integration.id,
       performed_by: user?.email || 'system',
-      description: `Webhook reconciliation: ${result.registered_count} registered, ${result.deleted_count} deleted, ${result.error_count} errors. Endpoint: ${WEBHOOK_ENDPOINT_CANONICAL}`,
+      description: `Webhook reconciliation: ${result.registered_count} registered, ${result.deleted_count} deleted, ${result.error_count} errors. Endpoint: ${webhookEndpointCanonical}`,
       severity: result.error_count > 0 ? 'medium' : 'low',
       category: 'integration',
       is_auto_action: isAutomated,
@@ -249,7 +259,15 @@ Deno.serve(async (req) => {
     return Response.json(result);
 
   } catch (error) {
-    console.error('[shopifyReconcileWebhooks]', error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = String(error?.message || 'Unknown error');
+    console.error('[shopifyReconcileWebhooks]', message);
+    const lower = message.toLowerCase();
+    if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('429')) {
+      return Response.json({ error: 'Shopify rate limit exceeded. Retry shortly.', error_code: 'shopify_rate_limited' }, {
+        status: 429,
+        headers: { 'Retry-After': '2' }
+      });
+    }
+    return Response.json({ error: message }, { status: 500 });
   }
 });

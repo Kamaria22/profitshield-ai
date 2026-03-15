@@ -31,16 +31,17 @@ async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
   }
 }
 
-const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
-const WEBHOOK_URL = `${APP_URL}/api/functions/shopifyWebhook`;
 const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
 const API_VERSION = '2024-10';
 
-// All known old endpoints to clean up (including wrong domain)
-const STALE_ENDPOINTS = [
-  WEBHOOK_URL,
-  'https://profit-shield-ai.com/api/functions/shopifyWebhook',
-];
+function resolveAppUrl(req) {
+  try {
+    const origin = new URL(req.url).origin;
+    const host = new URL(req.url).hostname.toLowerCase();
+    if (host.endsWith('.base44.app')) return origin.replace(/\/$/, '');
+  } catch {}
+  return (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
+}
 
 const TOPICS = [
   'orders/create',
@@ -104,6 +105,14 @@ async function shopifyFetchWithRetry(shopDomain, accessToken, path, init = {}, m
 
 Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
   try {
+    const appUrl = resolveAppUrl(req);
+    const webhookUrl = `${appUrl}/api/functions/shopifyWebhook`;
+    const staleEndpoints = [
+      webhookUrl,
+      'https://profit-shield-ai.com/api/functions/shopifyWebhook',
+      'https://profit-shield-ai.base44.app/api/functions/shopifyWebhook',
+    ];
+
     const base44 = createClientFromRequest(req);
     let user = null;
     try { user = await base44.auth.me(); } catch (_) {}
@@ -170,7 +179,7 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
       if (listRes.ok) {
         const { webhooks } = await listRes.json();
         for (const wh of (webhooks || [])) {
-          if (STALE_ENDPOINTS.some(ep => wh.address.includes('shopifyWebhook'))) {
+          if (staleEndpoints.some(ep => wh.address.includes('shopifyWebhook') || wh.address === ep)) {
             await shopifyFetchWithRetry(shopDomain, accessToken, `/webhooks/${wh.id}.json`, {
               method: 'DELETE',
             }).catch(() => {});
@@ -191,7 +200,7 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
         const res = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ webhook: { topic, address: WEBHOOK_URL, format: 'json' } })
+          body: JSON.stringify({ webhook: { topic, address: webhookUrl, format: 'json' } })
         });
         const data = await res.json();
         if (data.webhook?.id) {
@@ -202,7 +211,7 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
             shop_domain: shopDomain,
             tenant_id: integration.tenant_id,
             topic,
-            address: WEBHOOK_URL,
+            address: webhookUrl,
             webhook_id: webhookId,
             status: 'active',
             last_checked_at: new Date().toISOString()

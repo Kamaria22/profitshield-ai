@@ -669,8 +669,16 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
     
   } catch (error) {
     console.error('[syncShopifyOrders] Error:', error);
+    const message = String(error?.message || 'Unknown error');
+    const lower = message.toLowerCase();
+    if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('429')) {
+      return Response.json(
+        { error: 'Shopify rate limit exceeded. Retry shortly.', error_code: 'shopify_rate_limited' },
+        { status: 429, headers: { 'Retry-After': '2' } }
+      );
+    }
     return Response.json(
-      { error: error.message, error_code: 'sync_shopify_orders_failed' },
+      { error: message, error_code: 'sync_shopify_orders_failed' },
       { status: 500 }
     );
   }
