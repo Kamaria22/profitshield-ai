@@ -21,6 +21,10 @@ function detectSignature(source) {
   return 'unknown';
 }
 
+function isRoutable(signature) {
+  return signature === 'deno_serve_only' || signature === 'deno_serve+export_default' || signature === 'export_default_only';
+}
+
 function toRoute(name) {
   return `/api/functions/${name}`;
 }
@@ -40,21 +44,32 @@ function main() {
     const full = path.join(FUNCTIONS_DIR, file);
     const source = readFileSafe(full);
     const name = file.replace(/\.(ts|js|tsx|jsx)$/i, '');
+    const signature = detectSignature(source);
+    const routable = isRoutable(signature);
     return {
       file: `functions/${file}`,
       functionName: name,
-      route: toRoute(name),
-      signature: detectSignature(source),
+      route: routable ? toRoute(name) : null,
+      signature,
+      routable,
       hasDenoServe: source.includes('Deno.serve('),
       hasExportDefault: /export\s+default\s+/.test(source),
     };
   });
 
-  console.log('[function-registry-check] detected functions:', report.length);
+  const routableCount = report.filter((r) => r.routable).length;
+  const nonRoutable = report.filter((r) => !r.routable);
+  console.log('[function-registry-check] detected routable functions:', routableCount);
+  if (nonRoutable.length > 0) {
+    console.log('[function-registry-check] non-routable helper modules:', nonRoutable.length);
+  }
   for (const row of report) {
-    console.log(`- ${row.functionName} -> ${row.route} [${row.signature}]`);
+    if (row.routable) {
+      console.log(`- ${row.functionName} -> ${row.route} [${row.signature}]`);
+    } else {
+      console.log(`- ${row.functionName} -> (helper module) [${row.signature}]`);
+    }
   }
 }
 
 main();
-
