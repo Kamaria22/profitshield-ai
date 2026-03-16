@@ -153,11 +153,12 @@ async function exchangeSession({ sessionToken, shopDomain }) {
 
   const appId = appParams?.appId;
   const preferredRoute = sessionStorage.getItem(SESSION_EXCHANGE_ROUTE_KEY);
-  const routeCandidates = [
-    preferredRoute,
+  const orderedRoutes = [
     appId ? `/api/apps/${appId}/functions/shopifySessionExchange` : null,
-    '/api/functions/shopifySessionExchange'
+    '/api/functions/shopifySessionExchange',
+    preferredRoute,
   ].filter(Boolean);
+  const routeCandidates = Array.from(new Set(orderedRoutes));
 
   // Primary path: public Base44 function routes.
   for (const route of routeCandidates) {
@@ -177,6 +178,9 @@ async function exchangeSession({ sessionToken, shopDomain }) {
       if (directRes?.status && directRes.status !== 404 && directRes?.data && typeof directRes.data === 'object') {
         sessionStorage.setItem(SESSION_EXCHANGE_ROUTE_KEY, route);
         return { data: directRes.data };
+      }
+      if (directRes?.status === 404 && preferredRoute === route) {
+        sessionStorage.removeItem(SESSION_EXCHANGE_ROUTE_KEY);
       }
     } catch (e) {
       console.warn(`[ShopifyEmbeddedAuthGate] Direct ${route} failed:`, e?.message || String(e));
