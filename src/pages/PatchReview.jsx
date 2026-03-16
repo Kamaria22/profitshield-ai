@@ -1,31 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Shield, Loader2, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/components/platformContext';
 import PatchBundleCard from '@/components/selfheal/PatchBundleCard';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { invokeSelfHealSafe } from '@/lib/safeApi';
+import { usePermissions } from '@/components/usePermissions';
 
 export default function PatchReview() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, loading: permissionsLoading } = usePermissions();
   const [patches, setPatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      const role = (u?.role || u?.app_role || '').toLowerCase();
-      if (role !== 'admin' && role !== 'owner') {
-        navigate(createPageUrl('Home', location.search), { replace: true });
-        return;
-      }
-      loadPatches();
-    }).catch(() => {
+    if (permissionsLoading) return;
+    const normalizedRole = String(role || '').toLowerCase();
+    if (normalizedRole !== 'admin' && normalizedRole !== 'owner') {
       navigate(createPageUrl('Home', location.search), { replace: true });
-    });
-  }, [navigate, location.search]);
+      return;
+    }
+    loadPatches();
+  }, [permissionsLoading, role, navigate, location.search]);
 
   const loadPatches = async () => {
     setLoading(true);
