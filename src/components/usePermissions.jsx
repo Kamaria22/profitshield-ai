@@ -67,9 +67,6 @@ function isOwnerFromPersistedContext(persisted, ownerProof) {
     storeMatches &&
     (
       hintedEmail === OWNER_IDENTITY.email ||
-      // Embedded-owner fallback: if tenant + store match the protected owner profile,
-      // allow owner role without forcing a Base44 auth.me() round-trip in iframe mode.
-      (!hintedEmail && !proofEmail) ||
       (proofEmail === OWNER_IDENTITY.email &&
         proofTenant === OWNER_IDENTITY.tenantId &&
         proofPhone === OWNER_IDENTITY.phoneDigits)
