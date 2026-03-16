@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { invokeSelfHealSafe } from '@/lib/safeApi';
+import { usePermissions } from '@/components/usePermissions';
 import { Shield, RefreshCw, Activity, AlertTriangle, CheckCircle, Zap, Loader2, Play, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import PatchBundleCard from '@/components/selfheal/PatchBundleCard';
 export default function SelfHealingCenter() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, loading: permissionsLoading } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [healingSubsystem, setHealingSubsystem] = useState(null);
@@ -38,15 +39,14 @@ export default function SelfHealingCenter() {
   }, []);
 
   useEffect(() => {
-    base44.auth.me().then((u) => {
-      const role = (u?.role || u?.app_role || '').toLowerCase();
-      if (role !== 'admin' && role !== 'owner') {
-        navigate(createPageUrl('Home', location.search), { replace: true });
-        return;
-      }
-      loadData();
-    }).catch(() => { navigate(createPageUrl('Home', location.search), { replace: true }); });
-  }, [loadData, navigate, location.search]);
+    if (permissionsLoading) return;
+    const normalizedRole = String(role || '').toLowerCase();
+    if (normalizedRole !== 'admin' && normalizedRole !== 'owner') {
+      navigate(createPageUrl('Home', location.search), { replace: true });
+      return;
+    }
+    loadData();
+  }, [permissionsLoading, role, loadData, navigate, location.search]);
 
   const runWatchdog = async () => {
     setRunning(true);
