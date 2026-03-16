@@ -23,17 +23,6 @@ export default function SelfHealingCenter() {
   const [errorMessage, setErrorMessage] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
-  useEffect(() => {
-    base44.auth.me().then((u) => {
-      const role = (u?.role || u?.app_role || '').toLowerCase();
-      if (role !== 'admin' && role !== 'owner') {
-        navigate(createPageUrl('Home', location.search), { replace: true });
-        return;
-      }
-      loadData();
-    }).catch(() => { navigate(createPageUrl('Home', location.search), { replace: true }); });
-  }, [loadData, navigate, location.search]);
-
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -47,6 +36,17 @@ export default function SelfHealingCenter() {
     }
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    base44.auth.me().then((u) => {
+      const role = (u?.role || u?.app_role || '').toLowerCase();
+      if (role !== 'admin' && role !== 'owner') {
+        navigate(createPageUrl('Home', location.search), { replace: true });
+        return;
+      }
+      loadData();
+    }).catch(() => { navigate(createPageUrl('Home', location.search), { replace: true }); });
+  }, [loadData, navigate, location.search]);
 
   const runWatchdog = async () => {
     setRunning(true);
