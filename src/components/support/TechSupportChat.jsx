@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Owner escalation email for critical issues
-const OWNER_ESCALATION_EMAIL = 'support@profitshield-ai.com';
+const OWNER_ESCALATION_EMAIL = 'support@profitshield.ai';
 
 const APP_SCOPE_KEYWORDS = [
   'profitshield', 'dashboard', 'order', 'orders', 'risk', 'alert', 'billing', 'plan', 'subscription', 'trial',

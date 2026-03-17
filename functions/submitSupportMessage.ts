@@ -23,6 +23,8 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole.entities;
+    let requester = null;
+    try { requester = await base44.auth.me(); } catch {}
     const body = await req.json().catch(() => ({}));
 
     const trimmedMessage = String(body?.message || '').trim();
@@ -33,13 +35,41 @@ Deno.serve(async (req) => {
     let tenantId = String(body?.tenant_id || '').trim();
     const shopDomain = normalizeShop(body?.shop || body?.shop_domain || body?.store_key);
 
-    if (!tenantId && shopDomain) {
-      const tenants = await db.Tenant.filter({ shop_domain: shopDomain }).catch(() => []);
-      if (tenants.length) tenantId = tenants[0].id;
+    let tenantFromId = null;
+    if (tenantId) {
+      const tenantsById = await db.Tenant.filter({ id: tenantId }).catch(() => []);
+      tenantFromId = tenantsById[0] || null;
+      if (!tenantFromId) {
+        return Response.json({ ok: false, reason: 'invalid_tenant', version: VERSION }, { status: 400 });
+      }
+    }
+
+    let tenantFromShop = null;
+    if (shopDomain) {
+      const tenantsByShop = await db.Tenant.filter({ shop_domain: shopDomain }).catch(() => []);
+      tenantFromShop = tenantsByShop[0] || null;
+      if (!tenantId && tenantFromShop?.id) tenantId = tenantFromShop.id;
+    }
+
+    // Security guard: prevent tenant spoofing for anonymous support submissions.
+    // Require either a valid shop->tenant mapping, or an authenticated requester bound to the tenant.
+    if (tenantId && shopDomain) {
+      const resolvedTenant = tenantFromId || tenantFromShop;
+      const resolvedShop = String(resolvedTenant?.shop_domain || '').trim().toLowerCase();
+      if (!resolvedShop || resolvedShop !== shopDomain) {
+        return Response.json({ ok: false, reason: 'tenant_shop_mismatch', version: VERSION }, { status: 403 });
+      }
     }
 
     if (!tenantId) {
       return Response.json({ ok: false, reason: 'missing_tenant', version: VERSION }, { status: 400 });
+    }
+
+    if (!shopDomain) {
+      const requesterTenant = String(requester?.tenant_id || '').trim();
+      if (!requesterTenant || requesterTenant !== tenantId) {
+        return Response.json({ ok: false, reason: 'forbidden_tenant_context', version: VERSION }, { status: 403 });
+      }
     }
 
     const userEmail =

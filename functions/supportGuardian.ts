@@ -2,7 +2,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const VERSION = 'supportGuardian_v2026_03_08_safe';
-const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
+const DEFAULT_SUPPORT_EMAIL = 'support@profitshield.ai';
 
 function pct(num, den) {
   if (!den) return 0;

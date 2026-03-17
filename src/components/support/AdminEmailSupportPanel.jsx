@@ -15,8 +15,7 @@ import { createPageUrl } from '@/components/platformContext';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
-  const email = String(user?.email || '').trim().toLowerCase();
-  return role === 'owner' || role === 'admin' || email === 'rohan.a.roberts@gmail.com';
+  return role === 'owner' || role === 'admin';
 }
 
 function StatCard({ title, value, icon: Icon, tone = 'text-slate-200' }) {

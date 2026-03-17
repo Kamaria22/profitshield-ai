@@ -15,8 +15,7 @@ import { usePermissions } from '@/components/usePermissions';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
-  const email = String(user?.email || '').trim().toLowerCase();
-  return role === 'owner' || role === 'admin' || email === 'rohan.a.roberts@gmail.com';
+  return role === 'owner' || role === 'admin';
 }
 
 export default function AdminSupportInboxPanel() {
@@ -81,7 +80,7 @@ export default function AdminSupportInboxPanel() {
                 </span>
               )}
             </h3>
-            <p className="text-xs text-slate-500">support@profitshield-ai.com</p>
+            <p className="text-xs text-slate-500">support@profitshield.ai</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-emerald-400">

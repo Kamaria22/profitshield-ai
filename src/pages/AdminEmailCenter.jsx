@@ -16,12 +16,11 @@ import { usePlatformResolver } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 
 const DEFAULT_OWNER_PHONE = '9146894367';
-const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
+const DEFAULT_SUPPORT_EMAIL = 'support@profitshield.ai';
 
 function isAdminOwner(user, fallbackRole = null) {
   const role = (user?.role || user?.app_role || fallbackRole || '').toLowerCase();
-  const email = String(user?.email || '').trim().toLowerCase();
-  return role === 'admin' || role === 'owner' || email === 'rohan.a.roberts@gmail.com';
+  return role === 'admin' || role === 'owner';
 }
 
 export default function AdminEmailCenter() {

@@ -47,9 +47,8 @@ export default function AISupportControlCenter() {
   const { role: permissionRole } = usePermissions();
   const resolver = usePlatformResolver();
   const role = (user?.role || user?.app_role || permissionRole || '').toLowerCase();
-  const email = String(user?.email || resolver?.user?.email || '').trim().toLowerCase();
   const tenantId = resolver?.tenantId || resolver?.tenant?.id || user?.tenant_id || null;
-  const canAccess = role === 'owner' || role === 'admin' || email === 'rohan.a.roberts@gmail.com';
+  const canAccess = role === 'owner' || role === 'admin';
 
   // Fetch conversations
   const { data: conversations = [], isLoading } = useQuery({

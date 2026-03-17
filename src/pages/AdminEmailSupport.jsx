@@ -5,9 +5,8 @@ import { usePlatformResolver } from '@/components/usePlatformResolver';
 import { usePermissions } from '@/components/usePermissions';
 
 function isAdminOwner(user, role) {
-  const email = String(user?.email || '').trim().toLowerCase();
   const r = (role || user?.role || user?.app_role || '').toLowerCase();
-  return r === 'admin' || r === 'owner' || email === 'rohan.a.roberts@gmail.com';
+  return r === 'admin' || r === 'owner';
 }
 
 export default function AdminEmailSupport() {

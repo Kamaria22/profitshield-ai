@@ -14,7 +14,7 @@ export const APP_CONFIG = {
   termsUrl: 'https://profit-shield-ai.base44.app/?page=TermsOfService',
   cookiesUrl: 'https://profit-shield-ai.base44.app/?page=CookiePolicy',
   dpaUrl: 'https://profit-shield-ai.base44.app/?page=DataProcessingAgreement',
-  contactEmail: 'support@profitshield-ai.com',
+  contactEmail: 'support@profitshield.ai',
   legalEmail: 'legal@profitshield.ai',
   privacyEmail: 'privacy@profitshield.ai',
 

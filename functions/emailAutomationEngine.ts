@@ -7,7 +7,7 @@ import {
 } from './helpers/agentRuntime';
 
 const VERSION = 'emailAutomationEngine_v2026_03_05';
-const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
+const DEFAULT_SUPPORT_EMAIL = 'support@profitshield.ai';
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const TEMPLATE_BY_EVENT = {

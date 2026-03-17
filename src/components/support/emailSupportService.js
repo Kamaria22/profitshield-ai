@@ -1,6 +1,6 @@
 import { base44 } from '@/api/base44Client';
 
-export const DEFAULT_SUPPORT_EMAIL = 'support@profitshield-ai.com';
+export const DEFAULT_SUPPORT_EMAIL = 'support@profitshield.ai';
 
 export class EmailService {
   static async ensureDefaultSystemEmail(tenantId) {
