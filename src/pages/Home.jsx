@@ -6,6 +6,7 @@ import { createPageUrl, getPersistedContext } from '@/components/platformContext
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { invokeWithRetry, withUiGuard } from '@/lib/safeApi';
+import { usePermissions } from '@/components/usePermissions';
 import { 
   Sparkles,
   ArrowRight,
@@ -53,6 +54,7 @@ const CustomAlerts = lazy(() => import('../components/dashboard/CustomAlerts'));
 
 export default function Home() {
   const resolver = usePlatformResolver();
+  const { role: permissionRole } = usePermissions();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,7 +112,9 @@ export default function Home() {
   }, [resolver?.tenant?.profit_integrity_score]);
 
   // Tutorial state - deferred to not block render
-  const tutorialTenantId = isEmbedded ? null : authTenantId;
+  const effectiveRole = String(permissionRole || resolver?.user?.app_role || resolver?.user?.role || '').toLowerCase();
+  const isOwnerAdmin = effectiveRole === 'owner' || effectiveRole === 'admin';
+  const tutorialTenantId = isEmbedded || isOwnerAdmin ? null : authTenantId;
   const shouldShowTutorial = useShouldShowTutorial(tutorialTenantId);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [showDeferredContent, setShowDeferredContent] = useState(false);
@@ -133,11 +137,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (shouldShowTutorial && authTenantId) {
+    if (!isOwnerAdmin && shouldShowTutorial && authTenantId) {
       const timer = setTimeout(() => setTutorialOpen(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [shouldShowTutorial, authTenantId]);
+  }, [isOwnerAdmin, shouldShowTutorial, authTenantId]);
 
   const handleTutorialClose = async () => {
     setTutorialOpen(false);
