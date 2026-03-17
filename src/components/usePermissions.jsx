@@ -62,6 +62,24 @@ function isOwnerFromPersistedContext(persisted, ownerProof) {
   const proofEmail = String(ownerProof?.email || '').trim().toLowerCase();
   const proofTenant = String(ownerProof?.tenantId || '').trim();
   const proofPhone = normalizePhoneDigits(ownerProof?.verifiedPhone);
+  const hasTrustedEmbeddedOwnerStore = (() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const shop = String(params.get('shop') || '').trim().toLowerCase();
+      const host = String(params.get('host') || '').trim();
+      const embedded = params.get('embedded');
+      const normalizedShop = shop && (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`);
+      if (normalizedShop !== OWNER_IDENTITY.storeKey) return false;
+      if (!(embedded === '1' || host)) return false;
+      if (!host) return true;
+      const padded = host + '='.repeat((4 - (host.length % 4)) % 4);
+      const decoded = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+      return decoded.startsWith('admin.shopify.com/store/profitshield-dev');
+    } catch {
+      return false;
+    }
+  })();
   return (
     tenantMatches &&
     storeMatches &&
@@ -69,7 +87,8 @@ function isOwnerFromPersistedContext(persisted, ownerProof) {
       hintedEmail === OWNER_IDENTITY.email ||
       (proofEmail === OWNER_IDENTITY.email &&
         proofTenant === OWNER_IDENTITY.tenantId &&
-        proofPhone === OWNER_IDENTITY.phoneDigits)
+        proofPhone === OWNER_IDENTITY.phoneDigits) ||
+      hasTrustedEmbeddedOwnerStore
     )
   );
 }
