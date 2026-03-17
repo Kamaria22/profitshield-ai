@@ -50,7 +50,13 @@ export default function Customers() {
   // Fetch segments (standard)
   const { data: segments = [], isLoading: segmentsLoading } = useQuery({
     queryKey: segmentsQueryKey,
-    queryFn: () => base44.entities.CustomerSegment.filter({ tenant_id: queryFilter.tenant_id }),
+    queryFn: async () => {
+      try {
+        return await base44.entities.CustomerSegment.filter({ tenant_id: queryFilter.tenant_id });
+      } catch {
+        return [];
+      }
+    },
     enabled: canQuery,
     ...queryDefaults.standard
   });
@@ -58,10 +64,83 @@ export default function Customers() {
   // Fetch all customers (heavy list)
   const { data: allCustomers = [], isLoading: customersLoading } = useQuery({
     queryKey: customersQueryKey,
-    queryFn: () => base44.entities.Customer.filter({ tenant_id: queryFilter.tenant_id }),
+    queryFn: async () => {
+      try {
+        return await base44.entities.Customer.filter({ tenant_id: queryFilter.tenant_id });
+      } catch {
+        return [];
+      }
+    },
     enabled: canQuery,
     ...queryDefaults.heavyList
   });
+
+  // Fallback source of truth for embedded/runtime consistency:
+  // derive customers directly from synced orders when Customer entity is stale or empty.
+  const { data: orderRows = [] } = useQuery({
+    queryKey: buildQueryKey('customers-orders-fallback', resolverCheck),
+    queryFn: async () => {
+      try {
+        return await base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id, is_demo: false }, '-order_date', 500);
+      } catch {
+        return [];
+      }
+    },
+    enabled: canQuery,
+    ...queryDefaults.heavyList
+  });
+
+  const derivedCustomers = useMemo(() => {
+    if (!Array.isArray(orderRows) || orderRows.length === 0) return [];
+    const grouped = new Map();
+    for (const order of orderRows) {
+      const email = String(order?.customer_email || '').trim().toLowerCase();
+      const key = email || `guest:${order?.customer_name || order?.id || Math.random()}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: `derived_${key}`,
+          email: email || null,
+          name: order?.customer_name || 'Guest Customer',
+          total_orders: 0,
+          total_spent: 0,
+          total_profit: 0,
+          avg_order_value: 0,
+          refund_count: 0,
+          high_risk_orders: 0,
+          last_order_at: null
+        });
+      }
+      const customer = grouped.get(key);
+      const revenue = Number(order?.total_revenue || 0) || 0;
+      const profit = Number(order?.total_profit || 0) || 0;
+      const fraudScore = Number(order?.fraud_score || order?.risk_score || 0) || 0;
+      customer.total_orders += 1;
+      customer.total_spent += revenue;
+      customer.total_profit += profit;
+      if (String(order?.status || '').toLowerCase().includes('refund')) customer.refund_count += 1;
+      if (fraudScore >= 70) customer.high_risk_orders += 1;
+      const orderTs = order?.order_date ? new Date(order.order_date).getTime() : 0;
+      const lastTs = customer.last_order_at ? new Date(customer.last_order_at).getTime() : 0;
+      if (orderTs > lastTs) customer.last_order_at = order?.order_date || null;
+    }
+    return Array.from(grouped.values()).map((c) => {
+      const avg = c.total_orders > 0 ? c.total_spent / c.total_orders : 0;
+      const highRiskRatio = c.total_orders > 0 ? c.high_risk_orders / c.total_orders : 0;
+      let riskProfile = 'low';
+      if (highRiskRatio >= 0.35) riskProfile = 'high';
+      else if (highRiskRatio >= 0.15) riskProfile = 'medium';
+      return {
+        ...c,
+        avg_order_value: avg,
+        risk_profile: riskProfile
+      };
+    });
+  }, [orderRows]);
+
+  const effectiveCustomers = useMemo(() => {
+    if (Array.isArray(allCustomers) && allCustomers.length > 0) return allCustomers;
+    return derivedCustomers;
+  }, [allCustomers, derivedCustomers]);
 
   // Create segment mutation
   const createSegmentMutation = useMutation({
@@ -83,11 +162,11 @@ export default function Customers() {
 
   // Filter customers based on segment criteria
   const getSegmentCustomers = (segment) => {
-    if (!segment?.criteria || !allCustomers.length) return allCustomers;
+    if (!segment?.criteria || !effectiveCustomers.length) return effectiveCustomers;
     
     const { min_orders, max_orders, min_spent, max_spent, min_profit, max_profit, risk_profile } = segment.criteria;
     
-    return allCustomers.filter(c => {
+    return effectiveCustomers.filter(c => {
       if (min_orders !== undefined && c.total_orders < min_orders) return false;
       if (max_orders !== undefined && c.total_orders > max_orders) return false;
       if (min_spent !== undefined && c.total_spent < min_spent) return false;
@@ -102,7 +181,7 @@ export default function Customers() {
   // Get customers for selected segment or all
   const displayedCustomers = useMemo(() => {
     if (!canQuery) return [];
-    let customers = selectedSegment ? getSegmentCustomers(selectedSegment) : allCustomers;
+    let customers = selectedSegment ? getSegmentCustomers(selectedSegment) : effectiveCustomers;
     
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -113,7 +192,7 @@ export default function Customers() {
     }
     
     return customers;
-  }, [selectedSegment, allCustomers, searchTerm, canQuery]);
+  }, [selectedSegment, effectiveCustomers, searchTerm, canQuery]);
 
   // Calculate segment stats
   const segmentsWithStats = useMemo(() => {
@@ -126,16 +205,16 @@ export default function Customers() {
         total_profit: customers.reduce((sum, c) => sum + (c.total_profit || 0), 0)
       };
     });
-  }, [segments, allCustomers]);
+  }, [segments, effectiveCustomers]);
 
   // Summary stats
   const summaryStats = useMemo(() => {
-    const totalCustomers = allCustomers.length;
-    const totalRevenue = allCustomers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
-    const totalProfit = allCustomers.reduce((sum, c) => sum + (c.total_profit || 0), 0);
-    const highRiskCount = allCustomers.filter(c => c.risk_profile === 'high').length;
+    const totalCustomers = effectiveCustomers.length;
+    const totalRevenue = effectiveCustomers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
+    const totalProfit = effectiveCustomers.reduce((sum, c) => sum + (c.total_profit || 0), 0);
+    const highRiskCount = effectiveCustomers.filter(c => c.risk_profile === 'high').length;
     return { totalCustomers, totalRevenue, totalProfit, highRiskCount };
-  }, [allCustomers]);
+  }, [effectiveCustomers]);
 
   const handleSegmentAction = (segment, action) => {
     setActionDialog({ segment, action });

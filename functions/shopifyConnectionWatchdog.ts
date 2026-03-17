@@ -366,6 +366,42 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 6b. Customer projection integrity:
+      // Learn and surface recurring gaps where orders sync exists but Customer entity is empty.
+      const customerRows = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
+      const hasOrders = recentOrders.length > 0;
+      if (hasOrders && customerRows.length === 0) {
+        result.health_issues.push('customer_projection_gap');
+        result.customer_projection_gap = true;
+        const previousGapCount = Number(integration?.metadata?.customer_projection_gap_count || 0) || 0;
+        const nextGapCount = previousGapCount + 1;
+        result.customer_projection_gap_count = nextGapCount;
+        if (!observeOnly) {
+          await db.entities.PlatformIntegration.update(integration.id, {
+            metadata: {
+              ...(integration.metadata || {}),
+              customer_projection_gap_count: nextGapCount,
+              customer_projection_gap_last_seen_at: nowIso
+            }
+          }).catch(() => {});
+          await db.entities.Alert.create({
+            tenant_id: tenantId,
+            type: 'system',
+            severity: nextGapCount >= 3 ? 'medium' : 'low',
+            title: `Customer Data Projection Active — ${shopDomain}`,
+            message: 'Orders are syncing, but customer aggregate records are missing. UI fallback projection is active.',
+            entity_type: 'platform_integration',
+            entity_id: integration.id,
+            recommended_action: 'Run full sync and verify customer aggregate persistence.',
+            status: 'pending',
+            metadata: {
+              shop_domain: shopDomain,
+              customer_projection_gap_count: nextGapCount
+            }
+          }).catch(() => {});
+        }
+      }
+
       // 7. Update last_ok_at on integration
       if (!observeOnly) {
         await db.entities.PlatformIntegration.update(integration.id, {
