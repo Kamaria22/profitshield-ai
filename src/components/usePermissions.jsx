@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getPersistedContext } from '@/components/platformContext';
 
@@ -217,9 +217,17 @@ export function PermissionsProvider({ children }) {
     role: null,
     loading: true
   });
+  const embeddedRetryRef = useRef(0);
+  const retryTimerRef = useRef(null);
 
   useEffect(() => {
     loadUserPermissions();
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, []);
 
   const loadUserPermissions = async () => {
@@ -244,6 +252,7 @@ export function PermissionsProvider({ children }) {
 
     if (isEmbedded) {
       if (isOwnerFromPersistedContext(persisted, ownerProof)) {
+        embeddedRetryRef.current = 0;
         setState({
           user: {
             email: OWNER_IDENTITY.email,
@@ -258,6 +267,20 @@ export function PermissionsProvider({ children }) {
         });
         return;
       }
+
+      // Embedded context may be persisted moments after first mount.
+      // Re-check a few times before finalizing viewer role.
+      if (!persisted?.tenantId && embeddedRetryRef.current < 6) {
+        embeddedRetryRef.current += 1;
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          loadUserPermissions();
+        }, 250);
+        return;
+      }
+
+      embeddedRetryRef.current = 0;
       setState({
         user: null,
         permissions: DEFAULT_ROLE_PERMISSIONS.viewer,
