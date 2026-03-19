@@ -12,6 +12,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
+const JOB_CONCURRENCY = 4;
 
 // Classify errors: transient = worth retrying, permanent = dead-letter immediately
 function classifyError(err) {
@@ -35,7 +36,7 @@ function calculateOrderProfit(order, costMappings, settings) {
   let hasAllCosts = true;
   for (const item of order.line_items || []) {
     const sku = item.sku || item.variant_id?.toString();
-    const cm = costMappings.find(m => m.sku === sku);
+    const cm = costMappings instanceof Map ? costMappings.get(sku) : costMappings.find(m => m.sku === sku);
     if (cm) totalCogs += (cm.cost_per_unit || 0) * (item.quantity || 1);
     else hasAllCosts = false;
   }
@@ -92,14 +93,44 @@ function mapStatus(order) {
   return 'pending';
 }
 
+async function runInBatches(items, batchSize, worker) {
+  const size = Math.max(1, Math.trunc(batchSize || 1));
+  for (let index = 0; index < items.length; index += size) {
+    const batch = items.slice(index, index + size);
+    await Promise.all(batch.map(worker));
+  }
+}
+
+function createTenantCache() {
+  const cache = new Map();
+  return {
+    async get(db, tenantId) {
+      if (cache.has(tenantId)) return cache.get(tenantId);
+      const promise = (async () => {
+        const [costMappings, settingsData, integrations] = await Promise.all([
+          db.entities.CostMapping.filter({ tenant_id: tenantId }).catch(() => []),
+          db.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []),
+          db.entities.PlatformIntegration.filter({ tenant_id: tenantId, platform: 'shopify' }).catch(() => [])
+        ]);
+        return {
+          costMappings,
+          costMappingMap: new Map(
+            (costMappings || []).filter((row) => row?.sku).map((row) => [row.sku, row])
+          ),
+          settings: settingsData[0] || {},
+          integrationId: integrations[0]?.id || null
+        };
+      })();
+      cache.set(tenantId, promise);
+      return promise;
+    }
+  };
+}
+
 // ─── Process a single order job ──────────────────────────────────────────────
-async function processOrderJob(db, tenant, payload, job) {
-  const [costMappings, settingsData] = await Promise.all([
-    db.entities.CostMapping.filter({ tenant_id: tenant.id }),
-    db.entities.TenantSettings.filter({ tenant_id: tenant.id })
-  ]);
-  const settings = settingsData[0] || {};
-  const profitData = calculateOrderProfit(payload, costMappings, settings);
+async function processOrderJob(db, tenant, payload, job, tenantCtx) {
+  const settings = tenantCtx?.settings || {};
+  const profitData = calculateOrderProfit(payload, tenantCtx?.costMappingMap || tenantCtx?.costMappings || [], settings);
   const riskData = calculateRiskScores(payload, settings);
 
   const existing = await db.entities.Order.filter({
@@ -110,10 +141,7 @@ async function processOrderJob(db, tenant, payload, job) {
   // Resolve integration_id for this job
   let integrationId = job.integration_id || null;
   if (!integrationId) {
-    try {
-      const integrations = await db.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
-      integrationId = integrations[0]?.id || null;
-    } catch (_) {}
+    integrationId = tenantCtx?.integrationId || null;
   }
 
   const rec = {
@@ -274,6 +302,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db = base44.asServiceRole;
+    const tenantCache = createTenantCache();
 
     // Auth check: admin user OR automated (no auth = service role caller from scheduler)
     let isAutomated = false;
@@ -308,7 +337,7 @@ Deno.serve(async (req) => {
 
     const stats = { processed: 0, failed: 0, dead_lettered: 0 };
 
-    for (const job of jobs) {
+    await runInBatches(jobs, JOB_CONCURRENCY, async (job) => {
       const t0 = Date.now();
       // Mark as processing
       await db.entities.WebhookQueue.update(job.id, {
@@ -321,12 +350,13 @@ Deno.serve(async (req) => {
         const tenants = await db.entities.Tenant.filter({ id: job.tenant_id });
         if (!tenants[0]) throw new Error(`Tenant not found: ${job.tenant_id}`);
         const tenant = tenants[0];
+        const tenantCtx = await tenantCache.get(db, tenant.id);
 
         const topic = job.event_type;
         const payload = job.payload;
 
         if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
-          const orderResult = await processOrderJob(db, tenant, payload, job);
+          const orderResult = await processOrderJob(db, tenant, payload, job, tenantCtx);
           // Fire-and-forget async risk scoring after order is saved
           if (orderResult?.order_id) {
             base44.asServiceRole.functions.invoke('riskEngine', {
@@ -404,7 +434,7 @@ Deno.serve(async (req) => {
           stats.failed++;
         }
       }
-    }
+    });
 
     console.log(`[processWebhookQueue] Done: processed=${stats.processed} failed=${stats.failed} dead_lettered=${stats.dead_lettered}`);
     return Response.json({ ...stats, total_jobs: jobs.length });

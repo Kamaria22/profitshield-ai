@@ -31,6 +31,17 @@ async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
   }
 }
 
+async function runInBatches(items, batchSize, worker) {
+  const size = Math.max(1, Math.trunc(batchSize || 1));
+  const results = [];
+  for (let index = 0; index < items.length; index += size) {
+    const batch = items.slice(index, index + size);
+    const batchResults = await Promise.all(batch.map(worker));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 function normalizeTenantId(value) {
   if (typeof value !== 'string') return '';
   return value.trim();
@@ -63,7 +74,7 @@ function calculateOrderProfit(order, costMappings, settings) {
   const lineItems = order.line_items || [];
   for (const item of lineItems) {
     const sku = item.sku || item.variant_id?.toString();
-    const costMapping = costMappings.find(m => m.sku === sku);
+    const costMapping = costMappings instanceof Map ? costMappings.get(sku) : costMappings.find(m => m.sku === sku);
     if (costMapping) {
       totalCogs += (costMapping.cost_per_unit || 0) * (item.quantity || 1);
     } else {
@@ -527,14 +538,19 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
       base44.asServiceRole.entities.RiskRule.filter({ tenant_id: tenant.id, is_active: true })
     ]);
     const settings = settingsData[0] || {};
+    const costMappingMap = new Map(
+      (costMappings || [])
+        .filter((row) => row?.sku)
+        .map((row) => [row.sku, row])
+    );
     
     let created = 0;
     let updated = 0;
     const tenantSettingsList = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id }).catch(() => []);
     const notifyEmail = tenantSettingsList[0]?.notification_email || null;
-    
-    for (const orderData of shopifyOrders) {
-      const profitData = calculateOrderProfit(orderData, costMappings, settings);
+
+    await runInBatches(shopifyOrders, 8, async (orderData) => {
+      const profitData = calculateOrderProfit(orderData, costMappingMap, settings);
       const riskData = calculateRiskScores(orderData, settings, customRules);
       
       const existingOrders = await base44.asServiceRole.entities.Order.filter({
@@ -581,28 +597,26 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
         const notifyRules = customRules.filter(r => r.notification && r.is_active);
         for (const rule of notifyRules) {
           if (evaluateCustomRule(rule, orderData, parseFloat(orderData.total_price || 0), !orderData.customer || orderData.customer.orders_count <= 1, orderData.discount_codes?.length || 0)) {
-            try {
-              if (notifyEmail) {
-                await base44.asServiceRole.functions.invoke('aiRuleAssistant', {
-                  action: 'notify',
-                  tenant_id: tenant.id,
-                  rule_name: rule.name,
-                  order_number: orderData.order_number?.toString() || orderData.name,
-                  order_value: orderData.total_price,
-                  risk_score: riskData.fraud_score,
-                  triggered_action: riskData.recommended_action,
-                  email: notifyEmail,
-                  conditions_matched: riskData.risk_reasons
-                });
-              }
-            } catch (notifyErr) {
-              console.warn('[syncShopifyOrders] Notification failed:', notifyErr.message);
+            if (notifyEmail) {
+              base44.asServiceRole.functions.invoke('aiRuleAssistant', {
+                action: 'notify',
+                tenant_id: tenant.id,
+                rule_name: rule.name,
+                order_number: orderData.order_number?.toString() || orderData.name,
+                order_value: orderData.total_price,
+                risk_score: riskData.fraud_score,
+                triggered_action: riskData.recommended_action,
+                email: notifyEmail,
+                conditions_matched: riskData.risk_reasons
+              }).catch((notifyErr) => {
+                console.warn('[syncShopifyOrders] Notification failed:', notifyErr.message);
+              });
             }
             break; // Only one notification per order
           }
         }
       }
-    }
+    });
     
     // Find newest order number
     let newestOrderNumber = null;
