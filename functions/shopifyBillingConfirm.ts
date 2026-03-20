@@ -187,7 +187,12 @@ Deno.serve(async (req) => {
         else await db.ShopifySubscriptionState.create(sp).catch(() => {});
 
         // Update tenant
-        await db.Tenant.update(tenant_id, { plan_status: 'active', subscription_tier: resolvedPlan }).catch(() => {});
+        await db.Tenant.update(tenant_id, {
+          plan_status: 'active',
+          subscription_tier: resolvedPlan,
+          onboarding_completed: true,
+          status: 'active'
+        }).catch(() => {});
         await triggerTenantBootstrap(base44, tenant_id, 'shopify_billing_confirm');
 
         return Response.json({ ok: true, status: 'active', plan: resolvedPlan, shop_domain: resolvedShop });

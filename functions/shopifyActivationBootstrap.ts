@@ -74,6 +74,17 @@ Deno.serve(withEndpointGuard('shopifyActivationBootstrap', async (req) => {
     return json({ ok: false, error: 'Tenant not found', version: VERSION }, 404);
   }
 
+  if (!tenant.onboarding_completed) {
+    return json({
+      ok: true,
+      skipped: true,
+      reason: 'onboarding_incomplete',
+      version: VERSION,
+      source,
+      tenant_id: tenantId
+    });
+  }
+
   const integration = integrations.find((row) => row.status === 'connected' || row.status === 'degraded') || integrations[0] || null;
   if (!integration?.id) {
     return json({

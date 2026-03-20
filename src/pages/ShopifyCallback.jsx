@@ -112,11 +112,22 @@ export default function ShopifyCallback() {
           '| token_saved:', tokenSaved);
 
         setStatus('success');
+        const isNewTenant = Boolean(data?.is_new_tenant);
 
         // Use redirect_url from backend (includes shop context)
         // Fallback to Home if not provided
         setTimeout(() => {
-          const redirectUrl = withEmbeddedParams(data.redirect_url || '/Home');
+          const onboardingParams = new URLSearchParams({
+            shop: data.shop_domain || shop,
+            embedded: '1',
+          });
+          if (host) onboardingParams.set('host', host);
+          if (data?.tenant_id) onboardingParams.set('tenantId', data.tenant_id);
+          if (data?.integration_id) onboardingParams.set('integrationId', data.integration_id);
+          const redirectTarget = isNewTenant
+            ? `/ShopifyOnboarding?${onboardingParams.toString()}`
+            : (data.redirect_url || '/Home');
+          const redirectUrl = withEmbeddedParams(redirectTarget);
           console.log('[ShopifyCallback] Redirecting to:', redirectUrl);
           try {
             if (!redirectWithAppBridge(redirectUrl)) {

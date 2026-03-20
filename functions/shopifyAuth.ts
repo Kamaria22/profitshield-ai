@@ -551,6 +551,8 @@ async function handleCallback(base44, body) {
     return jsonResponse({
       success: true,
       tenant_id: tenant.id,
+      integration_id: integrations[0]?.id || null,
+      is_new_tenant: !tenant.onboarding_completed,
       shop_domain: storeKey,
       shop_name: shopName,
       redirect_url: redirectUrl,

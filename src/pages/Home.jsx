@@ -162,6 +162,12 @@ export default function Home() {
   // on resolver completion.
   const tenantLoading = status === RESOLVER_STATUS.RESOLVING && !authTenantId;
 
+  useEffect(() => {
+    if (!isEmbedded || !authTenantId || tenantLoading) return;
+    if (!tenant || tenant.onboarding_completed) return;
+    navigate(createPageUrl('ShopifyOnboarding', location.search));
+  }, [isEmbedded, authTenantId, tenantLoading, tenant, navigate, location.search]);
+
   // PERFORMANCE: Ultra-fast summary query - minimal data for instant render
   const {
     data: dashboardSummary,
@@ -383,6 +389,7 @@ export default function Home() {
   // for the user to click Sync.
   useEffect(() => {
     if (!authTenantId || summaryLoading || syncMutation.isPending) return;
+    if (!tenant?.onboarding_completed) return;
     const totalOrders = Number(metrics?.totalOrders || 0);
     const bootstrapRecommended = Boolean(dashboardSummary?.bootstrapRecommended);
     if (!bootstrapRecommended && totalOrders > 0) return;
@@ -409,7 +416,7 @@ export default function Home() {
         // Keep UI responsive; manual Sync remains available.
       }
     })();
-  }, [authTenantId, summaryLoading, syncMutation.isPending, metrics?.totalOrders, dashboardSummary?.bootstrapRecommended, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
+  }, [authTenantId, summaryLoading, syncMutation.isPending, tenant?.onboarding_completed, metrics?.totalOrders, dashboardSummary?.bootstrapRecommended, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Minimal blocking state
   if (tenantLoading) {

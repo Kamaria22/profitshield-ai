@@ -196,7 +196,17 @@ export default function Pricing() {
     }
 
     if (tier.id === 'trial') {
-      navigate(createPageUrl('Onboarding'));
+      if (resolverCheck.tenantId && tenant) {
+        await base44.entities.Tenant.update(tenant.id, {
+          onboarding_completed: true,
+          status: 'active',
+          subscription_tier: tenant.subscription_tier || 'trial'
+        });
+        toast.success('Trial activated. Starting automated protection.');
+        navigate(createPageUrl('Home'));
+      } else {
+        navigate(createPageUrl('Onboarding'));
+      }
       return;
     }
 
@@ -208,7 +218,9 @@ export default function Pricing() {
       if (resolverCheck.tenantId) {
         await base44.entities.Tenant.update(tenant.id, {
           subscription_tier: tier.id,
-          monthly_order_limit: tier.orderLimit
+          monthly_order_limit: tier.orderLimit,
+          onboarding_completed: true,
+          status: 'active'
         });
         toast.success(`Upgraded to ${tier.name}!`);
         navigate(createPageUrl('Home'));

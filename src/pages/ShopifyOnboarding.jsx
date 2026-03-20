@@ -4,8 +4,8 @@
  * Works inside the Shopify Admin iframe.
  */
 
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Zap, TrendingUp, CheckCircle, ArrowRight,
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/components/platformContext';
+import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 
 const STEPS = [
   { id: 'welcome',    label: 'Welcome',    icon: Shield },
@@ -58,6 +58,16 @@ const VALUE_PROPS = [
 
 export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain, onComplete }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const resolvedContext = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    const persisted = getPersistedContext(true) || {};
+    return {
+      tenantId: tenantId || params.get('tenantId') || persisted.tenantId || null,
+      integrationId: integrationId || params.get('integrationId') || persisted.integrationId || null,
+      shopDomain: shopDomain || params.get('shop') || persisted.shop || persisted.storeKey || null,
+    };
+  }, [tenantId, integrationId, shopDomain, location.search]);
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState({
     discount_protection: true,
@@ -77,20 +87,11 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
     setSaving(true);
     setSaveError('');
     try {
-      if (tenantId) {
-        // Mark onboarding complete
-        const tenants = await base44.entities.Tenant.filter({ id: tenantId });
-        if (tenants.length > 0) {
-          await base44.entities.Tenant.update(tenants[0].id, {
-            onboarding_completed: true,
-            status: 'active',
-          });
-        }
-
+      if (resolvedContext.tenantId) {
         // Save settings
-        const existing = await base44.entities.TenantSettings.filter({ tenant_id: tenantId });
+        const existing = await base44.entities.TenantSettings.filter({ tenant_id: resolvedContext.tenantId });
         const settingsPayload = {
-          tenant_id: tenantId,
+          tenant_id: resolvedContext.tenantId,
           notifications_enabled: config.risk_alerts,
           auto_hold_high_risk: config.auto_hold_high_risk,
         };
@@ -101,8 +102,8 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
         }
 
         // Update integration two-way sync
-        if (integrationId) {
-          await base44.entities.PlatformIntegration.update(integrationId, {
+        if (resolvedContext.integrationId) {
+          await base44.entities.PlatformIntegration.update(resolvedContext.integrationId, {
             two_way_sync: {
               enabled: config.push_tags,
               push_tags: config.push_tags,
@@ -113,6 +114,7 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
         }
       }
       onComplete?.();
+      navigate(createPageUrl('Pricing', location.search));
     } catch (e) {
       console.warn('[ShopifyOnboarding] Save error:', e.message);
       setSaveError(e?.message || 'Failed to save onboarding settings. Please try again.');
@@ -269,7 +271,7 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
               </motion.div>
               <h1 className="text-2xl font-bold text-white mb-2">You're All Set!</h1>
               <p className="text-slate-400 text-sm mb-6">
-                ProfitShield AI is now protecting <span className="text-indigo-300 font-medium">{shopDomain}</span>.
+                Choose your plan to activate automated sync and live Shopify protection for <span className="text-indigo-300 font-medium">{resolvedContext.shopDomain}</span>.
               </p>
               <div className="grid grid-cols-2 gap-3 mb-8 text-left">
                 {[
@@ -285,7 +287,7 @@ export default function ShopifyOnboarding({ tenantId, integrationId, shopDomain,
                 ))}
               </div>
               <Button className="w-full bg-emerald-600 hover:bg-emerald-700 h-11" onClick={finish} disabled={saving}>
-                {saving ? 'Saving...' : 'Open Dashboard'}
+                {saving ? 'Saving...' : 'Choose Plan'}
                 {!saving && <ArrowRight className="w-4 h-4 ml-1" />}
               </Button>
               {saveError && (
