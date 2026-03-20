@@ -291,6 +291,23 @@ export default function Pricing() {
             Scale as you grow.
           </p>
 
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button
+              size="lg"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => {
+                const el = document.getElementById('pricing-cards');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              Choose Plan Now
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            <div className="text-sm text-slate-500">
+              Pick a plan to unlock the fastest sync, webhooks, and AI automation.
+            </div>
+          </div>
+
           {/* Billing Toggle */}
           <div className="flex items-center justify-center gap-4 mt-8">
             <span className={`text-sm font-medium ${!isYearly ? 'text-slate-900' : 'text-slate-500'}`}>
@@ -309,7 +326,27 @@ export default function Pricing() {
         </motion.div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-16">
+        <div className="sticky top-3 z-20 mb-6">
+          <div className="mx-auto max-w-4xl rounded-2xl border border-emerald-200 bg-white/92 backdrop-blur px-4 py-3 shadow-lg">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Plan selection activates autonomous sync</p>
+                <p className="text-xs text-slate-500">Choose a plan here to start instant webhook refresh, order sync, and AI automation.</p>
+              </div>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  const el = document.getElementById('pricing-cards');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              >
+                View Plans
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pricing-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-16 scroll-mt-28">
           {PRICING_TIERS.map((tier, index) => {
             const Icon = tier.icon;
             const isCurrentPlan = currentTier === tier.id;

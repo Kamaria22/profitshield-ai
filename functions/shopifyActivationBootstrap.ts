@@ -112,32 +112,30 @@ Deno.serve(withEndpointGuard('shopifyActivationBootstrap', async (req) => {
     actions: {}
   };
 
-  if (shouldRefreshWebhooks) {
-    results.actions.registerShopifyWebhooks = await safeInvoke(base44, 'registerShopifyWebhooks', {
-      integration_id: integration.id
-    });
-  } else {
-    results.actions.registerShopifyWebhooks = { ok: true, skipped: true, reason: 'fresh_webhooks' };
-  }
+  const [webhookResult, syncResult] = await Promise.all([
+    shouldRefreshWebhooks
+      ? safeInvoke(base44, 'registerShopifyWebhooks', { integration_id: integration.id })
+      : Promise.resolve({ ok: true, skipped: true, reason: 'fresh_webhooks' }),
+    shouldRunFullSync
+      ? safeInvoke(base44, 'syncShopifyOrders', {
+          tenant_id: tenantId,
+          integration_id: integration.id,
+          shop: integration.store_key || tenant.shop_domain || undefined,
+          days: syncDays
+        })
+      : Promise.resolve({ ok: true, skipped: true, reason: 'fresh_sync' }),
+  ]);
+  results.actions.registerShopifyWebhooks = webhookResult;
+  results.actions.syncShopifyOrders = syncResult;
 
-  if (shouldRunFullSync) {
-    results.actions.syncShopifyOrders = await safeInvoke(base44, 'syncShopifyOrders', {
-      tenant_id: tenantId,
-      integration_id: integration.id,
-      shop: integration.store_key || tenant.shop_domain || undefined,
-      days: syncDays
-    });
-  } else {
-    results.actions.syncShopifyOrders = { ok: true, skipped: true, reason: 'fresh_sync' };
-  }
-
-  if ((pendingQueue?.length || 0) > 0 || shouldRunFullSync || force) {
-    results.actions.processWebhookQueue = await safeInvoke(base44, 'processWebhookQueue', { action: 'process' });
-  } else {
-    results.actions.processWebhookQueue = { ok: true, skipped: true, reason: 'queue_empty' };
-  }
-
-  results.actions.processShopifyDeferredJobs = await safeInvoke(base44, 'processShopifyDeferredJobs', { limit: 25 });
+  const [queueResult, deferredResult] = await Promise.all([
+    (pendingQueue?.length || 0) > 0 || shouldRunFullSync || force
+      ? safeInvoke(base44, 'processWebhookQueue', { action: 'process' })
+      : Promise.resolve({ ok: true, skipped: true, reason: 'queue_empty' }),
+    safeInvoke(base44, 'processShopifyDeferredJobs', { limit: 25 }),
+  ]);
+  results.actions.processWebhookQueue = queueResult;
+  results.actions.processShopifyDeferredJobs = deferredResult;
 
   const refreshed = await base44.asServiceRole.entities.PlatformIntegration.filter({ id: integration.id }).then((rows) => rows?.[0] || integration).catch(() => integration);
   const latestOrders = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 5).catch(() => orders || []);

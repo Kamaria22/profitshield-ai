@@ -33,6 +33,19 @@ function getSegmentIcon(name) {
 function CustomerSegmentationPanel({ tenantId }) {
   const queryClient = useQueryClient();
 
+  React.useEffect(() => {
+    if (!tenantId) return;
+    queryClient.prefetchQuery({
+      queryKey: ['customerSegmentation', tenantId],
+      queryFn: async () => {
+        const res = await base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId });
+        if (res.data?.error) throw new Error(res.data.error);
+        return res.data;
+      },
+      staleTime: 5 * 60 * 1000,
+    }).catch(() => {});
+  }, [tenantId, queryClient]);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
     queryFn: async () => {
@@ -47,7 +60,11 @@ function CustomerSegmentationPanel({ tenantId }) {
 
   const handleRefresh = () => {
     queryClient.removeQueries({ queryKey: ['customerSegmentation', tenantId] });
-    toast.promise(refetch(), {
+    toast.promise(base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId, force_refresh: true }).then((res) => {
+      if (res.data?.error) throw new Error(res.data.error);
+      queryClient.setQueryData(['customerSegmentation', tenantId], res.data);
+      return res.data;
+    }), {
       loading: 'Re-analyzing customers...',
       success: 'Segmentation updated!',
       error: 'Analysis failed'
@@ -90,15 +107,20 @@ function CustomerSegmentationPanel({ tenantId }) {
           <div className="space-y-4">
             {/* Summary bar */}
             <div className="flex items-center gap-4 p-3 bg-violet-50 rounded-lg border border-violet-100">
-              <div className="text-center min-w-[60px]">
-                <div className="text-2xl font-bold text-violet-700">{data.health_score ?? '—'}</div>
-                <div className="text-xs text-violet-500">Health Score</div>
+                <div className="text-center min-w-[60px]">
+                  <div className="text-2xl font-bold text-violet-700">{data.health_score ?? '—'}</div>
+                  <div className="text-xs text-violet-500">Health Score</div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-slate-500 mb-0.5">{data.total_customers} customers analyzed</p>
+                  <p className="text-sm text-slate-600">{data.churn_risk_summary}</p>
+                  {data.computed_at && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {data.cached ? 'Instant cache' : 'Fresh analysis'} · {new Date(data.computed_at).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="text-xs text-slate-500 mb-0.5">{data.total_customers} customers analyzed</p>
-                <p className="text-sm text-slate-600">{data.churn_risk_summary}</p>
-              </div>
-            </div>
 
             {/* Segments grid */}
             <div className="grid gap-3 sm:grid-cols-2">

@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { mlChurnProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
+const SNAPSHOT_TTL_MS = 10 * 60 * 1000;
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -8,13 +10,35 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { tenant_id } = body;
+    const { tenant_id, force_refresh = false } = body;
     if (!tenant_id) return Response.json({ error: 'tenant_id required' }, { status: 400 });
 
     const db = base44.asServiceRole;
 
+    if (!force_refresh) {
+      const snapshots = await db.entities.CustomerSegmentSnapshot
+        .filter({ tenant_id }, '-computed_at', 1)
+        .catch(() => []);
+      const latestSnapshot = snapshots?.[0] || null;
+      const computedAtMs = latestSnapshot?.computed_at ? new Date(latestSnapshot.computed_at).getTime() : 0;
+      if (latestSnapshot && computedAtMs && (Date.now() - computedAtMs) < SNAPSHOT_TTL_MS) {
+        return Response.json({
+          success: true,
+          cached: true,
+          ml_runtime: ML_RUNTIME_VERSION,
+          total_customers: latestSnapshot.row_count || 0,
+          segments: latestSnapshot.segments || [],
+          insights: latestSnapshot.insights || [],
+          health_score: latestSnapshot.health_score || 0,
+          churn_risk_summary: latestSnapshot.churn_risk_summary || 'Customer segmentation loaded from cache.',
+          top_customers: latestSnapshot.top_customers || [],
+          computed_at: latestSnapshot.computed_at
+        });
+      }
+    }
+
     // Fetch all real orders for this tenant
-    const orders = await db.entities.Order.filter({ tenant_id, is_demo: false }, '-order_date', 500);
+    const orders = await db.entities.Order.filter({ tenant_id, is_demo: false }, '-order_date', 800);
 
     if (!orders || orders.length === 0) {
       return Response.json({
@@ -212,14 +236,6 @@ Deno.serve(async (req) => {
       computed_at: new Date().toISOString(),
       window_days: 365,
       row_count: totalCustomers,
-      segments: formattedSegments
-    };
-    await db.entities.CustomerSegmentSnapshot.create(snapshot);
-
-    return Response.json({
-      success: true,
-      ml_runtime: ML_RUNTIME_VERSION,
-      total_customers: totalCustomers,
       segments: formattedSegments,
       insights,
       health_score: healthScore,
@@ -232,6 +248,20 @@ Deno.serve(async (req) => {
         rfm: c.rfm,
         churn_probability: Number(((c.churn_probability || 0) * 100).toFixed(1))
       }))
+    };
+    await db.entities.CustomerSegmentSnapshot.create(snapshot);
+
+    return Response.json({
+      success: true,
+      cached: false,
+      ml_runtime: ML_RUNTIME_VERSION,
+      total_customers: totalCustomers,
+      segments: formattedSegments,
+      insights,
+      health_score: healthScore,
+      churn_risk_summary: snapshot.churn_risk_summary,
+      top_customers: snapshot.top_customers,
+      computed_at: snapshot.computed_at
     });
 
   } catch (error) {
