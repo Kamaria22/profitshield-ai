@@ -37,7 +37,7 @@ function deriveFallbackStatus(tenant) {
 }
 
 export default function SubscriptionGate({ tenant, children, feature = null }) {
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(() => deriveFallbackStatus(tenant));
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { role } = usePermissions();
@@ -45,6 +45,11 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
 
   useEffect(() => {
     let mounted = true;
+    const fallbackStatus = deriveFallbackStatus(tenant);
+    if (mounted) {
+      setLoading(true);
+      setStatus(fallbackStatus);
+    }
     
     const checkAccess = async () => {
       if (!tenant?.id) {
@@ -60,11 +65,11 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
         });
         const next = response?.data && typeof response.data === 'object'
           ? response.data
-          : deriveFallbackStatus(tenant);
+          : fallbackStatus;
         if (mounted) setStatus(next);
       } catch (e) {
         console.error('Subscription check failed:', e);
-        if (mounted) setStatus(deriveFallbackStatus(tenant));
+        if (mounted) setStatus(fallbackStatus);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -80,7 +85,7 @@ export default function SubscriptionGate({ tenant, children, feature = null }) {
     return <>{children}</>;
   }
 
-  if (loading) {
+  if (loading && status?.allowed === false) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full" />

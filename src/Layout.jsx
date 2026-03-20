@@ -395,6 +395,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const device = useDeviceProfile();
   const mainScrollRef = useRef(null);
   const lastScrollTopRef = useRef(0);
+  const alertsLoadTimerRef = useRef(null);
+  const supportLoadTimerRef = useRef(null);
   const topBarHeight = device.isMobile ? '3.5rem' : '4rem';
   
   // Safe permissions
@@ -545,25 +547,51 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   // Load alerts ONLY when resolved and tenantId is valid
   useEffect(() => {
+    if (alertsLoadTimerRef.current) {
+      clearTimeout(alertsLoadTimerRef.current);
+      alertsLoadTimerRef.current = null;
+    }
     if (isEmbedded) {
       setPendingAlerts(0);
       return;
     }
     if (isResolved && authTenantId) {
-      loadAlerts(authTenantId);
+      alertsLoadTimerRef.current = setTimeout(() => {
+        loadAlerts(authTenantId);
+        alertsLoadTimerRef.current = null;
+      }, currentPageName === 'Home' ? 1200 : 350);
     } else {
       setPendingAlerts(0);
     }
-  }, [isEmbedded, isResolved, authTenantId, loadAlerts]);
+    return () => {
+      if (alertsLoadTimerRef.current) {
+        clearTimeout(alertsLoadTimerRef.current);
+        alertsLoadTimerRef.current = null;
+      }
+    };
+  }, [isEmbedded, isResolved, authTenantId, loadAlerts, currentPageName]);
 
   useEffect(() => {
+    if (supportLoadTimerRef.current) {
+      clearTimeout(supportLoadTimerRef.current);
+      supportLoadTimerRef.current = null;
+    }
     if (isAdmin && authTenantId) {
-      loadSupportUnread(authTenantId);
+      supportLoadTimerRef.current = setTimeout(() => {
+        loadSupportUnread(authTenantId);
+        supportLoadTimerRef.current = null;
+      }, currentPageName === 'Home' ? 1800 : 500);
       const t = setInterval(() => loadSupportUnread(authTenantId), 30000);
-      return () => clearInterval(t);
+      return () => {
+        if (supportLoadTimerRef.current) {
+          clearTimeout(supportLoadTimerRef.current);
+          supportLoadTimerRef.current = null;
+        }
+        clearInterval(t);
+      };
     }
     setSupportUnread(0);
-  }, [isAdmin, authTenantId, loadSupportUnread]);
+  }, [isAdmin, authTenantId, loadSupportUnread, currentPageName]);
 
   // Safe redirect to SelectStore — NEVER redirect Shopify install flows
   useEffect(() => {
@@ -879,7 +907,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </button>
 
           <div className={`flex-1 min-w-0 flex items-center ${device.isMobile ? 'gap-1.5' : 'gap-2 sm:gap-4'} lg:ml-4`}>
-            <ResolverHealthIndicator />
+            <ResolverHealthIndicator resolver={resolver} />
             {/* StoreSwitcher only when RESOLVED and multiple stores */}
             {isResolved && stores.length > 1 && <StoreSwitcher />}
             {/* Command Palette trigger */}
@@ -1120,10 +1148,7 @@ class ErrorBoundary extends React.Component {
 }
 
 // Wrapper that captures resolver context for error boundary
-function LayoutWithErrorBoundary({ children, currentPageName }) {
-  // Get resolver to pass to error boundary
-  const resolver = usePlatformResolver() || {};
-  
+function LayoutWithErrorBoundary({ children, currentPageName, resolver = {} }) {
   // Build context for error boundary
   const resolverContext = useMemo(() => ({
     status: resolver.status,
@@ -1207,7 +1232,7 @@ function LayoutWithProviders({ children, currentPageName }) {
           </div>
         </div>
       }>
-        <LayoutWithErrorBoundary currentPageName={currentPageName}>
+        <LayoutWithErrorBoundary currentPageName={currentPageName} resolver={resolver}>
           {children}
         </LayoutWithErrorBoundary>
       </HealthErrorBoundary>

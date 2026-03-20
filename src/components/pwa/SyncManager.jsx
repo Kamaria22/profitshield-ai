@@ -8,6 +8,38 @@ import { Badge } from '@/components/ui/badge';
 import { invokeWithRetry } from '@/lib/safeApi';
 
 const SyncContext = createContext(null);
+const SYNC_THROTTLE_MS = 3 * 60 * 1000;
+
+function getSyncStorageKey(tenantId) {
+  return tenantId ? `ps:last-background-sync:${tenantId}` : null;
+}
+
+function readLastBackgroundSync(tenantId) {
+  if (!tenantId || typeof window === 'undefined') return 0;
+  const key = getSyncStorageKey(tenantId);
+  if (!key) return 0;
+  try {
+    const sessionValue = Number(sessionStorage.getItem(key) || 0);
+    if (sessionValue) return sessionValue;
+  } catch {}
+  try {
+    return Number(localStorage.getItem(key) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function persistLastBackgroundSync(tenantId, ts) {
+  if (!tenantId || typeof window === 'undefined') return;
+  const key = getSyncStorageKey(tenantId);
+  if (!key) return;
+  try {
+    sessionStorage.setItem(key, String(ts));
+  } catch {}
+  try {
+    localStorage.setItem(key, String(ts));
+  } catch {}
+}
 
 export function useSyncManager() {
   return useContext(SyncContext);
@@ -18,18 +50,23 @@ export function SyncProvider({ children, tenantId }) {
   const notifications = useNotifications();
   const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, synced, error, offline
   const [lastSyncTime, setLastSyncTime] = useState(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [pendingChanges, setPendingChanges] = useState(0);
-  const lastBackendSyncRef = useRef(0);
+  const lastBackendSyncRef = useRef(readLastBackgroundSync(tenantId));
 
   // Monitor online status - with defensive checks
+  useEffect(() => {
+    lastBackendSyncRef.current = readLastBackgroundSync(tenantId);
+    setLastSyncTime(lastBackendSyncRef.current || null);
+  }, [tenantId]);
+
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncStatus('idle');
       // Trigger sync when coming back online (with delay to avoid race)
       if (tenantId) {
-        setTimeout(() => triggerSync(true), 1000);
+        setTimeout(() => triggerSync(true), 1500);
       }
     };
 
@@ -55,11 +92,15 @@ export function SyncProvider({ children, tenantId }) {
   // Auto-sync on login/mount - with debounce to prevent excessive calls
   useEffect(() => {
     if (tenantId && isOnline) {
-      // Small delay to allow other hooks to settle
-      const timer = setTimeout(() => triggerSync(true), 500);
+      const lastSync = readLastBackgroundSync(tenantId);
+      if (lastSync && Date.now() - lastSync < SYNC_THROTTLE_MS) {
+        return;
+      }
+      // Let the dashboard summary/bootstrap path win first.
+      const timer = setTimeout(() => triggerSync(true), 2500);
       return () => clearTimeout(timer);
     }
-  }, [tenantId]);
+  }, [tenantId, isOnline]);
 
   // Set up real-time subscriptions for auto-sync - with defensive error handling
   useEffect(() => {
@@ -185,7 +226,7 @@ export function SyncProvider({ children, tenantId }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && tenantId && isOnline) {
         // Only sync if last sync was more than 1 minute ago
-        if (!lastSyncTime || Date.now() - lastSyncTime > 60000) {
+        if (!lastSyncTime || Date.now() - lastSyncTime > SYNC_THROTTLE_MS) {
           triggerSync(true);
         }
       }
@@ -206,7 +247,7 @@ export function SyncProvider({ children, tenantId }) {
 
     try {
       const now = Date.now();
-      const canRunBackendSync = tenantId && (now - lastBackendSyncRef.current > 120000);
+      const canRunBackendSync = tenantId && (now - lastBackendSyncRef.current > SYNC_THROTTLE_MS);
       if (canRunBackendSync) {
         try {
           await invokeWithRetry('syncShopifyData', {
@@ -214,6 +255,7 @@ export function SyncProvider({ children, tenantId }) {
             days: 2
           }, { attempts: silent ? 1 : 2, baseMs: 250 });
           lastBackendSyncRef.current = now;
+          persistLastBackgroundSync(tenantId, now);
         } catch (_) {
           // Keep UI responsive even if backend sync endpoint is temporarily unavailable.
         }
@@ -240,7 +282,7 @@ export function SyncProvider({ children, tenantId }) {
       await Promise.all(invalidations);
 
       setSyncStatus('synced');
-      setLastSyncTime(Date.now());
+      setLastSyncTime(now);
       setPendingChanges(0);
 
       if (!silent && notifications?.sendNotification) {

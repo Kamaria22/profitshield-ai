@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
+import React, { useState, useCallback, lazy, Suspense, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
@@ -66,10 +66,58 @@ export default function Home() {
   const authTenantId = resolverCheck.tenantId || (isEmbedded ? persistedContext?.tenantId : null);
   const canQuery = canQueryTenant(resolverCheck) || !!authTenantId;
   const queryFilter = getTenantFilter(resolverCheck) || (authTenantId ? { tenant_id: authTenantId } : null);
-  const dashboardSummaryKey = buildQueryKey('dashboard-summary', resolverCheck);
-  const profitLeaksKey = buildQueryKey('profitLeaks', resolverCheck);
+  const dashboardSummaryKey = useMemo(() => ([
+    'dashboard-summary',
+    resolverCheck?.platform || persistedContext?.platform || (isEmbedded ? 'shopify' : null),
+    resolverCheck?.storeKey || persistedContext?.storeKey || persistedContext?.shop || null,
+    resolverCheck?.integrationId || persistedContext?.integrationId || null,
+    authTenantId || null
+  ]), [
+    resolverCheck?.platform,
+    resolverCheck?.storeKey,
+    resolverCheck?.integrationId,
+    persistedContext?.platform,
+    persistedContext?.storeKey,
+    persistedContext?.shop,
+    persistedContext?.integrationId,
+    isEmbedded,
+    authTenantId
+  ]);
+  const profitLeaksKey = useMemo(() => ([
+    'profitLeaks',
+    resolverCheck?.platform || persistedContext?.platform || (isEmbedded ? 'shopify' : null),
+    resolverCheck?.storeKey || persistedContext?.storeKey || persistedContext?.shop || null,
+    resolverCheck?.integrationId || persistedContext?.integrationId || null,
+    authTenantId || null
+  ]), [
+    resolverCheck?.platform,
+    resolverCheck?.storeKey,
+    resolverCheck?.integrationId,
+    persistedContext?.platform,
+    persistedContext?.storeKey,
+    persistedContext?.shop,
+    persistedContext?.integrationId,
+    isEmbedded,
+    authTenantId
+  ]);
   const summaryCacheKey = `ps:dashboard-summary:${authTenantId || 'none'}`;
+  const summaryDurableCacheKey = `ps:dashboard-summary:durable:${authTenantId || 'none'}`;
   const lastVisibilityRefreshRef = useRef(0);
+
+  const readCachedSummary = useCallback(() => {
+    const inMemory = queryClient.getQueryData(dashboardSummaryKey);
+    if (inMemory) return inMemory;
+    if (typeof window === 'undefined') return null;
+    try {
+      const sessionRaw = sessionStorage.getItem(summaryCacheKey);
+      if (sessionRaw) return JSON.parse(sessionRaw);
+    } catch {}
+    try {
+      const localRaw = localStorage.getItem(summaryDurableCacheKey);
+      if (localRaw) return JSON.parse(localRaw);
+    } catch {}
+    return null;
+  }, [dashboardSummaryKey, queryClient, summaryCacheKey, summaryDurableCacheKey]);
 
   const fetchEntitySummary = useCallback(async (tenantId) => {
     const safeFilter = async (entity, query, sort, limit) => {
@@ -154,9 +202,14 @@ export default function Home() {
     navigate(createPageUrl('Pricing', location.search));
   };
   
-  const tenant = resolver?.tenant || null;
   const hasConnectedStore = !!authTenantId;
-  const tenantForGate = tenant || (hasConnectedStore ? { id: authTenantId } : null);
+  const tenant = resolver?.tenant || null;
+  const displayTenant = tenant || (hasConnectedStore ? {
+    id: authTenantId,
+    shop_name: persistedContext?.shop ? persistedContext.shop.replace('.myshopify.com', '') : null,
+    platform: resolver?.platform || persistedContext?.platform || 'shopify'
+  } : null);
+  const tenantForGate = tenant || (hasConnectedStore ? { id: authTenantId, ...displayTenant } : null);
   const status = resolver?.status || RESOLVER_STATUS.RESOLVING;
   // If embedded context already has a persisted tenant, don't block initial paint
   // on resolver completion.
@@ -235,21 +288,12 @@ export default function Home() {
       };
     },
     enabled: canQuery,
-    initialData: () => {
-      const inMemory = queryClient.getQueryData(dashboardSummaryKey);
-      if (inMemory) return inMemory;
-      try {
-        const raw = sessionStorage.getItem(summaryCacheKey);
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
-    },
-    placeholderData: (previous) => previous ?? queryClient.getQueryData(dashboardSummaryKey) ?? null,
+    initialData: readCachedSummary,
+    placeholderData: (previous) => previous ?? readCachedSummary(),
     retry: false,
     staleTime: 60000,
     gcTime: 120000,
-    refetchOnMount: false,
+    refetchOnMount: (query) => !query.state.data,
     refetchOnWindowFocus: false
   });
 
@@ -258,7 +302,10 @@ export default function Home() {
     try {
       sessionStorage.setItem(summaryCacheKey, JSON.stringify(dashboardSummary));
     } catch {}
-  }, [dashboardSummary, authTenantId, summaryCacheKey]);
+    try {
+      localStorage.setItem(summaryDurableCacheKey, JSON.stringify(dashboardSummary));
+    } catch {}
+  }, [dashboardSummary, authTenantId, summaryCacheKey, summaryDurableCacheKey]);
 
   const { data: profitLeaks = [] } = useQuery({
     queryKey: profitLeaksKey,
@@ -491,7 +538,7 @@ export default function Home() {
       <div className="min-h-full flex flex-col">
         {/* Executive Summary Bar - Critical above-the-fold */}
         <ExecutiveSummaryBar 
-          tenant={tenant}
+          tenant={displayTenant}
           metrics={metrics}
           onSync={handleSync}
           onScan={handleScan}

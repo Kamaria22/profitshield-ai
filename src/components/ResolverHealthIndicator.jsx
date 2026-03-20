@@ -47,13 +47,8 @@ const PLATFORM_NAMES = {
   stripe: 'Stripe'
 };
 
-/**
- * ResolverHealthIndicator - Accessible chip showing resolver status
- * Routes: RESOLVED->Orders, NEEDS_SELECTION->SelectStore, ERROR->Integrations
- */
-export default function ResolverHealthIndicator() {
+function ResolverHealthIndicatorContent({ resolver }) {
   const location = useLocation();
-  const resolver = usePlatformResolver();
   const resolverCheck = requireResolved(resolver);
   
   // Safe access with defaults
@@ -141,5 +136,16 @@ export default function ResolverHealthIndicator() {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  );
+}
+
+/**
+ * ResolverHealthIndicator - Accessible chip showing resolver status
+ * Routes: RESOLVED->Orders, NEEDS_SELECTION->SelectStore, ERROR->Integrations
+ */
+export default function ResolverHealthIndicator({ resolver: providedResolver = null }) {
+  const resolver = usePlatformResolver();
+  return (
+    <ResolverHealthIndicatorContent resolver={providedResolver || resolver} />
   );
 }
