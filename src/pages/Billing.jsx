@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { usePlatformResolver, requireResolved } from '@/components/usePlatformResolver';
+import { useLocation } from 'react-router-dom';
 import HolographicCard from '@/components/quantum/HolographicCard';
 import QuantumButton from '@/components/quantum/QuantumButton';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +74,7 @@ export default function Billing() {
   const resolverCheck = requireResolved(resolver);
   const tenantId = resolverCheck.tenantId;
   const user = resolver.user;
+  const location = useLocation();
   const [billingCycle, setBillingCycle] = useState('monthly');
 
   // Check which price IDs are configured
@@ -157,6 +159,40 @@ export default function Billing() {
       }
     }
   });
+
+  useEffect(() => {
+    if (!tenantId) return;
+    const params = new URLSearchParams(location.search || '');
+    if (params.get('checkout') !== 'success') return;
+
+    let cancelled = false;
+    const key = `ps:billing-bootstrap:${tenantId}:${params.get('session_id') || 'latest'}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {}
+
+    (async () => {
+      try {
+        await base44.functions.invoke('shopifyActivationBootstrap', {
+          tenant_id: tenantId,
+          source: 'billing_checkout_success',
+          force: true,
+          days: 30
+        });
+      } catch {}
+
+      if (!cancelled) {
+        refetchSubscription();
+        refetchTrialStatus();
+        toast.success('Plan activated. Syncing store and refreshing dashboard.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId, location.search, refetchSubscription, refetchTrialStatus]);
 
   return (
     <div className="space-y-8">

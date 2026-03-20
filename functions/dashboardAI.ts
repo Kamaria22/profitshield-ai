@@ -80,6 +80,9 @@ const handler = withEndpointGuard('dashboardAI', async (req) => {
         profitScore: tenant?.profit_integrity_score || 0,
         alertsCount: alerts.length,
         isDemoMode: !integration,
+        integrationStatus: integration?.status || null,
+        lastSyncAt: integration?.last_sync_at || null,
+        bootstrapRecommended: !integration || !integration?.last_sync_at || orders.length === 0,
         orders: orders.slice(0, 5),
         alerts,
         profitLeaks: leaks

@@ -49,6 +49,20 @@ function parsePlanTier(inputPlan) {
   return null;
 }
 
+async function triggerTenantBootstrap(base44, tenantId, source) {
+  if (!tenantId) return;
+  try {
+    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrap', {
+      tenant_id: tenantId,
+      source,
+      force: true,
+      days: 30,
+    });
+  } catch (error) {
+    console.warn('[shopifyBillingConfirm] bootstrap skipped:', error?.message || String(error));
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -174,6 +188,7 @@ Deno.serve(async (req) => {
 
         // Update tenant
         await db.Tenant.update(tenant_id, { plan_status: 'active', subscription_tier: resolvedPlan }).catch(() => {});
+        await triggerTenantBootstrap(base44, tenant_id, 'shopify_billing_confirm');
 
         return Response.json({ ok: true, status: 'active', plan: resolvedPlan, shop_domain: resolvedShop });
       }

@@ -20,6 +20,20 @@ const TIER_ORDER_LIMITS = {
   trial: 100, starter: 500, growth: 2500, pro: 10000, enterprise: -1
 };
 
+async function triggerTenantBootstrap(base44, tenantId, source) {
+  if (!tenantId) return;
+  try {
+    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrap', {
+      tenant_id: tenantId,
+      source,
+      force: true,
+      days: 30,
+    });
+  } catch (error) {
+    console.warn('[stripeWebhook] bootstrap skipped:', error?.message || String(error));
+  }
+}
+
 Deno.serve(async (req) => {
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
   const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
@@ -185,6 +199,7 @@ async function handleCheckoutCompleted(base44, stripe, session, eventId) {
   }).catch(() => {});
 
   console.log(`[stripeWebhook] ✅ Access granted: tenant=${tenantId} tier=${tier}`);
+  await triggerTenantBootstrap(base44, tenantId, 'stripe_checkout_completed');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -259,6 +274,9 @@ async function handleSubscriptionUpdated(base44, subscription, eventId) {
         status: mappedStatus === 'ACTIVE' ? 'active' : tenants[0].status,
         monthly_order_limit: TIER_ORDER_LIMITS[newTier] || 500,
       });
+    }
+    if (mappedStatus === 'ACTIVE') {
+      await triggerTenantBootstrap(base44, subs[0].tenant_id, 'stripe_subscription_updated');
     }
   }
 }

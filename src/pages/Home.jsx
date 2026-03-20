@@ -378,14 +378,16 @@ export default function Home() {
     navigate(createPageUrl('Intelligence', location.search));
   }, () => toast.error('Could not open risk page')), [navigate, location.search]);
 
-  // Embedded recovery path: if store is connected but dashboard has zero orders,
-  // run one lightweight sync attempt per tenant/session to self-heal stale data.
+  // Autonomous recovery path: as soon as a store is available, run one bounded
+  // bootstrap to register webhooks, drain queue, and sync orders without waiting
+  // for the user to click Sync.
   useEffect(() => {
-    if (!isEmbedded || !authTenantId || summaryLoading || syncMutation.isPending) return;
+    if (!authTenantId || summaryLoading || syncMutation.isPending) return;
     const totalOrders = Number(metrics?.totalOrders || 0);
-    if (totalOrders > 0) return;
+    const bootstrapRecommended = Boolean(dashboardSummary?.bootstrapRecommended);
+    if (!bootstrapRecommended && totalOrders > 0) return;
 
-    const key = `ps:embedded-autosync:${authTenantId}`;
+    const key = `ps:dashboard-bootstrap:${authTenantId}`;
     try {
       if (sessionStorage.getItem(key) === '1') return;
       sessionStorage.setItem(key, '1');
@@ -395,14 +397,19 @@ export default function Home() {
 
     (async () => {
       try {
-        await invokeWithRetry('syncShopifyOrders', { tenant_id: authTenantId, days: 30 }, { attempts: 2, baseMs: 300 });
+        await invokeWithRetry('shopifyActivationBootstrap', {
+          tenant_id: authTenantId,
+          source: isEmbedded ? 'embedded_dashboard_boot' : 'dashboard_boot',
+          force: totalOrders === 0,
+          days: 30
+        }, { attempts: 2, baseMs: 250 });
         queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
         queryClient.invalidateQueries({ queryKey: profitLeaksKey });
       } catch {
         // Keep UI responsive; manual Sync remains available.
       }
     })();
-  }, [isEmbedded, authTenantId, summaryLoading, syncMutation.isPending, metrics?.totalOrders, queryClient, dashboardSummaryKey, profitLeaksKey]);
+  }, [authTenantId, summaryLoading, syncMutation.isPending, metrics?.totalOrders, dashboardSummary?.bootstrapRecommended, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Minimal blocking state
   if (tenantLoading) {
