@@ -40,6 +40,18 @@ async function getShopifyCredentials(base44, tenant_id) {
   return { tenant: tenants[0], accessToken };
 }
 
+function normalizeRole(user) {
+  return String(user?.role || user?.app_role || '').toLowerCase();
+}
+
+function requireTenantAdmin(user, tenantId) {
+  if (!user) throw new Error('Unauthorized');
+  const role = normalizeRole(user);
+  if ((role !== 'owner' && role !== 'admin') || String(user?.tenant_id || '').trim() !== String(tenantId || '').trim()) {
+    throw new Error('Forbidden tenant access');
+  }
+}
+
 function shopifyHeaders(accessToken) {
   return {
     'X-Shopify-Access-Token': accessToken,
@@ -167,24 +179,34 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
+  let user = null;
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
     const { action, tenant_id } = body;
 
     if (!tenant_id) return Response.json({ error: 'tenant_id required' }, { status: 400 });
+    requireTenantAdmin(user, tenant_id);
 
     const { tenant, accessToken } = await getShopifyCredentials(base44, tenant_id);
     const shopDomain = tenant.shop_domain;
 
     // ── sync_inventory ───────────────────────────────────────────────────────
     if (action === 'sync_inventory') {
-      const { variant_id, quantity, product_id } = body;
+      const { variant_id, quantity } = body;
       if (!variant_id || quantity === undefined) {
         return Response.json({ error: 'variant_id and quantity required' }, { status: 400 });
+      }
+
+      const localVariants = await base44.asServiceRole.entities.ProductVariant.filter({
+        tenant_id,
+        platform_variant_id: String(variant_id)
+      });
+      if (!localVariants[0]) {
+        return Response.json({ error: 'Variant not found for tenant integration' }, { status: 404 });
       }
 
       const [inventoryItemId, locationId] = await Promise.all([
@@ -255,6 +277,18 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'platform_order_id required' }, { status: 400 });
       }
 
+      const localOrders = await base44.asServiceRole.entities.Order.filter({
+        tenant_id,
+        platform_order_id: String(platform_order_id)
+      });
+      const localOrder = localOrders[0] || null;
+      if (!localOrder) {
+        return Response.json({ error: 'Local order not found for tenant integration' }, { status: 404 });
+      }
+      if (order_id && String(localOrder.id) !== String(order_id)) {
+        return Response.json({ error: 'order_id does not match platform_order_id for tenant' }, { status: 400 });
+      }
+
       const result = await fulfillShopifyOrder(shopDomain, accessToken, platform_order_id, {
         number: tracking_number,
         url: tracking_url,
@@ -262,9 +296,9 @@ Deno.serve(async (req) => {
         notify_customer: notify_customer !== false
       });
 
-      if (result.success && order_id) {
+      if (result.success) {
         // Update local order record
-        await base44.asServiceRole.entities.Order.update(order_id, {
+        await base44.asServiceRole.entities.Order.update(localOrder.id, {
           fulfillment_status: 'fulfilled',
           status: 'fulfilled'
         });
@@ -273,7 +307,7 @@ Deno.serve(async (req) => {
           tenant_id,
           action: 'shopify_order_fulfilled',
           entity_type: 'Order',
-          entity_id: order_id,
+          entity_id: localOrder.id,
           performed_by: user.email,
           description: `Order fulfilled in Shopify: ${platform_order_id}${tracking_number ? ` (tracking: ${tracking_number})` : ''}`,
           category: 'integration',
@@ -288,6 +322,9 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[shopifyTwoWaySync] Error:', error.message);
+    if (error?.message === 'Forbidden tenant access') {
+      return Response.json({ error: error.message }, { status: 403 });
+    }
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

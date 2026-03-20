@@ -13,6 +13,10 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+function jobTopic(job) {
+  return job?.event_type || job?.topic || 'unknown';
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -40,6 +44,7 @@ Deno.serve(async (req) => {
       await db.entities.WebhookQueue.update(job_id, {
         status: 'pending',
         retry_count: 0,
+        attempts: 0,
         error_message: null,
         next_attempt_at: null,
         last_attempt_at: null
@@ -50,7 +55,7 @@ Deno.serve(async (req) => {
         entity_type: 'webhook_queue',
         entity_id: job_id,
         performed_by: user.email,
-        description: `Manual retry of dead-letter job ${job_id} (topic: ${job.event_type})`,
+        description: `Manual retry of dead-letter job ${job_id} (topic: ${jobTopic(job)})`,
         severity: 'low',
         category: 'integration'
       }).catch(() => {});
@@ -72,7 +77,7 @@ Deno.serve(async (req) => {
         entity_type: 'webhook_queue',
         entity_id: job_id,
         performed_by: user.email,
-        description: `Discarded dead-letter job ${job_id} (topic: ${job.event_type})`,
+        description: `Discarded dead-letter job ${job_id} (topic: ${jobTopic(job)})`,
         severity: 'low',
         category: 'integration'
       }).catch(() => {});
@@ -89,6 +94,7 @@ Deno.serve(async (req) => {
         await db.entities.WebhookQueue.update(job.id, {
           status: 'pending',
           retry_count: 0,
+          attempts: 0,
           error_message: null,
           next_attempt_at: null,
           last_attempt_at: null

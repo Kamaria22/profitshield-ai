@@ -127,6 +127,28 @@ function createTenantCache() {
   };
 }
 
+function normalizeQueueJob(job) {
+  const topic = String(job?.event_type || job?.topic || '').trim();
+  let payload = job?.payload ?? null;
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      throw new Error('invalid webhook payload');
+    }
+  }
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('invalid webhook payload');
+  }
+  return {
+    ...job,
+    event_type: topic,
+    topic,
+    payload,
+    retry_count: Number(job?.retry_count ?? job?.attempts ?? 0) || 0,
+  };
+}
+
 // ─── Process a single order job ──────────────────────────────────────────────
 async function processOrderJob(db, tenant, payload, job, tenantCtx) {
   const settings = tenantCtx?.settings || {};
@@ -338,22 +360,29 @@ Deno.serve(async (req) => {
     const stats = { processed: 0, failed: 0, dead_lettered: 0 };
 
     await runInBatches(jobs, JOB_CONCURRENCY, async (job) => {
+      let normalizedJob = {
+        ...job,
+        event_type: String(job?.event_type || job?.topic || '').trim(),
+        retry_count: Number(job?.retry_count ?? job?.attempts ?? 0) || 0,
+      };
       const t0 = Date.now();
-      // Mark as processing
-      await db.entities.WebhookQueue.update(job.id, {
-        status: 'processing',
-        last_attempt_at: nowIso
-      }).catch(() => {});
 
       try {
+        normalizedJob = normalizeQueueJob(job);
+        // Mark as processing only after the payload is known-good
+        await db.entities.WebhookQueue.update(normalizedJob.id, {
+          status: 'processing',
+          last_attempt_at: nowIso
+        }).catch(() => {});
+
         // Resolve tenant
-        const tenants = await db.entities.Tenant.filter({ id: job.tenant_id });
-        if (!tenants[0]) throw new Error(`Tenant not found: ${job.tenant_id}`);
+        const tenants = await db.entities.Tenant.filter({ id: normalizedJob.tenant_id });
+        if (!tenants[0]) throw new Error(`Tenant not found: ${normalizedJob.tenant_id}`);
         const tenant = tenants[0];
         const tenantCtx = await tenantCache.get(db, tenant.id);
 
-        const topic = job.event_type;
-        const payload = job.payload;
+        const topic = normalizedJob.event_type;
+        const payload = normalizedJob.payload;
 
         if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
           const orderResult = await processOrderJob(db, tenant, payload, job, tenantCtx);
@@ -376,7 +405,7 @@ Deno.serve(async (req) => {
         }
 
         const duration = Date.now() - t0;
-        await db.entities.WebhookQueue.update(job.id, {
+        await db.entities.WebhookQueue.update(normalizedJob.id, {
           status: 'complete',
           processed_at: new Date().toISOString(),
           processing_duration_ms: duration
@@ -384,9 +413,9 @@ Deno.serve(async (req) => {
         stats.processed++;
 
       } catch (err) {
-        const retries = (job.retry_count || 0) + 1;
+        const retries = (normalizedJob.retry_count || 0) + 1;
         const errorClass = classifyError(err);
-        console.error(`[processWebhookQueue] Job ${job.id} failed (attempt ${retries}, ${errorClass}):`, err.message);
+        console.error(`[processWebhookQueue] Job ${normalizedJob.id} failed (attempt ${retries}, ${errorClass}):`, err.message);
 
         const deadLetter = retries >= MAX_RETRIES || errorClass === 'permanent';
 
@@ -394,9 +423,10 @@ Deno.serve(async (req) => {
           const reason = errorClass === 'permanent'
             ? `[permanent] ${err.message}`
             : `[max retries exhausted after ${retries} attempts] ${err.message}`;
-          await db.entities.WebhookQueue.update(job.id, {
+          await db.entities.WebhookQueue.update(normalizedJob.id, {
             status: 'dead_letter',
             retry_count: retries,
+            attempts: retries,
             error_message: reason,
             last_attempt_at: nowIso
           });
@@ -404,29 +434,30 @@ Deno.serve(async (req) => {
 
           // Emit an audit trail entry so dead-letters are visible without digging into queue
           await db.entities.AuditLog.create({
-            tenant_id: job.tenant_id,
+            tenant_id: normalizedJob.tenant_id,
             action: 'webhook_dead_lettered',
             entity_type: 'webhook_queue',
-            entity_id: job.id,
+            entity_id: normalizedJob.id,
             performed_by: 'system',
-            description: `Webhook job dead-lettered after ${retries} attempts (topic: ${job.event_type}): ${err.message}`,
+            description: `Webhook job dead-lettered after ${retries} attempts (topic: ${normalizedJob.event_type}): ${err.message}`,
             severity: 'medium',
             category: 'integration',
             is_auto_action: true,
             metadata: {
-              event_type: job.event_type,
+              event_type: normalizedJob.event_type,
               retry_count: retries,
               error_class: errorClass,
-              idempotency_key: job.idempotency_key
+              idempotency_key: normalizedJob.idempotency_key
             }
           }).catch(() => {});
         } else {
           // Exponential backoff: 30s, 60s, 120s, 240s, 480s
           const backoffMs = 30000 * Math.pow(2, retries - 1);
           const nextAttempt = new Date(Date.now() + backoffMs).toISOString();
-          await db.entities.WebhookQueue.update(job.id, {
+          await db.entities.WebhookQueue.update(normalizedJob.id, {
             status: 'failed',
             retry_count: retries,
+            attempts: retries,
             error_message: err.message,
             last_attempt_at: nowIso,
             next_attempt_at: nextAttempt
