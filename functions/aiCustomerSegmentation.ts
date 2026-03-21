@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { mlChurnProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 const SNAPSHOT_TTL_MS = 10 * 60 * 1000;
-const VERSION = '2026-03-17.customer-segmentation-v2';
+const VERSION = '2026-03-17.customer-segmentation-v3';
 
 async function safeUser(base44) {
   try {
