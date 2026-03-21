@@ -6,7 +6,9 @@ import {
   RefreshCw,
   Download,
   Zap,
-  Lock
+  Lock,
+  Radar,
+  Cpu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,38 +42,50 @@ export default function ExecutiveSummaryBar({
                     highRiskOrders > 0 ? 'Medium' : 'Low';
   const riskColor = riskLevel === 'High' ? 'bg-red-500' : 
                     riskLevel === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500';
+  const systemPulse = totalProfit >= 0 ? 'Positive velocity' : 'Negative drag';
+  const systemTone = totalProfit >= 0 ? '#34d399' : '#f87171';
 
   return (
-    <div className="bg-slate-950/80 backdrop-blur-xl border-b border-white/5 px-4 py-2.5 sticky top-0 z-20">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        {/* Left: Store Identity */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold text-slate-100 truncate max-w-[55vw] sm:max-w-[180px]" style={{ textShadow: '0 0 12px rgba(129,140,248,0.3)' }}>
-              {tenant?.shop_name || 'My Store'}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
-              style={{ background: 'rgba(149,196,105,0.12)', border: '1px solid rgba(149,196,105,0.3)', color: '#a8d982', textShadow: '0 0 8px rgba(149,196,105,0.4)' }}>
-              {tenant?.platform || 'shopify'}
-            </span>
+    <div className="sticky top-0 z-20 px-2 py-2 sm:px-4">
+      <div className="future-panel future-scan rounded-[1.6rem] px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-200">
+                <Radar className="h-3.5 w-3.5" />
+                Command Mesh
+              </span>
+              <span className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-200">
+                <Cpu className="h-3.5 w-3.5" />
+                {tenant?.platform || 'shopify'}
+              </span>
+              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]"
+                style={{ color: tier === 'trial' ? '#fcd34d' : '#6ee7b7' }}>
+                {tier === 'trial' ? `Trial ${trialDays}d` : tier}
+              </span>
+              {isDemo && (
+                <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-indigo-200">
+                  Demo
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Merchant Runtime</p>
+                <h2 className="truncate text-xl font-semibold text-white sm:text-2xl" style={{ textShadow: '0 0 18px rgba(125,211,252,0.14)' }}>
+                  {tenant?.shop_name || 'My Store'}
+                </h2>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Pulse</p>
+                <p className="text-sm font-medium" style={{ color: systemTone, textShadow: `0 0 10px ${systemTone}40` }}>
+                  {systemPulse}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="h-4 w-px bg-white/8" />
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
-            style={tier === 'trial'
-              ? { background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.28)', color: '#fcd34d', textShadow: '0 0 8px rgba(251,191,36,0.35)' }
-              : { background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', color: '#6ee7b7', textShadow: '0 0 8px rgba(52,211,153,0.35)' }}>
-            {tier === 'trial' ? `Trial · ${trialDays}d` : tier}
-          </span>
-          {isDemo && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
-              style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.3)', color: '#a5b4fc' }}>
-              Demo
-            </span>
-          )}
-        </div>
 
-        {/* Center: Metrics */}
-        <div className="grid grid-cols-3 gap-3 sm:flex sm:items-center sm:gap-5 w-full sm:w-auto">
+          <div className="grid grid-cols-3 gap-3 xl:mx-6 xl:min-w-[360px]">
           <MetricChip
             label="Net Profit"
             value={`$${totalProfit >= 1000 ? `${(totalProfit / 1000).toFixed(1)}k` : totalProfit.toFixed(0)}`}
@@ -89,36 +103,41 @@ export default function ExecutiveSummaryBar({
             value={riskLevel}
             dotColor={riskColor}
           />
-        </div>
+          </div>
 
-        {/* Right: Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2 text-xs h-8 border-0 w-full sm:w-auto"
-              style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(129,140,248,0.25)', color: '#a5b4fc' }}>
-              Actions
-              <ChevronDown className="w-3.5 h-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={onScan} className="gap-2">
-              <Zap className="w-4 h-4 text-emerald-500" />
+          <div className="flex flex-col gap-2 sm:flex-row xl:flex-col xl:items-end">
+            <Button
+              size="sm"
+              onClick={onScan}
+              className="h-10 gap-2 rounded-2xl border-0 bg-emerald-500/18 px-4 text-xs font-medium text-emerald-200 hover:bg-emerald-500/26"
+            >
+              <Zap className="h-4 w-4" />
               Run Profit Scan
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onSync} disabled={syncing} className="gap-2">
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Now'}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExport} className="gap-2">
-              <Download className="w-4 h-4" />
-              Export Report
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onSecurity} className="gap-2">
-              <Lock className="w-4 h-4" />
-              Security Center
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-10 gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 text-xs font-medium text-cyan-100 hover:bg-cyan-400/16">
+                  Action Console
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={onSync} disabled={syncing} className="gap-2">
+                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Syncing...' : 'Sync Now'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExport} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Export Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onSecurity} className="gap-2">
+                  <Lock className="w-4 h-4" />
+                  Security Center
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -134,13 +153,13 @@ function MetricChip({ label, value, suffix = '', trend, color = 'slate', dotColo
   const col = colorMap[color] || colorMap.slate;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {dotColor && (
-        <div className="w-2 h-2 rounded-full" style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
+        <div className="mb-2 h-2 w-2 rounded-full" style={{ background: dotColor, boxShadow: `0 0 8px ${dotColor}` }} />
       )}
-      <div className="text-center">
-        <p className="text-[10px] text-slate-500">{label}</p>
-        <p className="font-semibold text-sm" style={{ color: col, textShadow: `0 0 8px ${col}60` }}>
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
+        <p className="mt-1 font-semibold text-base" style={{ color: col, textShadow: `0 0 10px ${col}60` }}>
           {value}{suffix}
           {trend && (
             <TrendingUp className={`w-3 h-3 inline ml-1 ${trend === 'up' ? 'text-emerald-400' : 'text-red-400 rotate-180'}`} />

@@ -14,7 +14,11 @@
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #0a0f1e;
+    background:
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%),
+      radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.12), transparent 22%),
+      radial-gradient(circle at 50% 100%, rgba(129, 140, 248, 0.16), transparent 32%),
+      #0a0f1e;
     color: #e2e8f0;
   }
 
@@ -75,6 +79,58 @@
   .shadow-premium {
     box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
   }
+
+  .future-grid {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .future-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  .future-panel {
+    position: relative;
+    background:
+      linear-gradient(145deg, rgba(7, 14, 27, 0.92), rgba(14, 26, 45, 0.84)),
+      radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 30%);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    box-shadow:
+      0 20px 60px rgba(2, 6, 23, 0.48),
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 0 0 1px rgba(14, 165, 233, 0.04);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+  }
+
+  .future-badge {
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(125, 211, 252, 0.22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .future-scan {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .future-scan::before {
+    content: "";
+    position: absolute;
+    inset: -40% 0;
+    background: linear-gradient(180deg, transparent, rgba(56, 189, 248, 0.08), transparent);
+    animation: future-scan 7s linear infinite;
+    pointer-events: none;
+  }
 }
 
 @keyframes shimmer {
@@ -90,6 +146,11 @@
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
+}
+
+@keyframes future-scan {
+  0% { transform: translateY(-55%); }
+  100% { transform: translateY(55%); }
 }
 
 /* Scrollbar — dark theme */
