@@ -36,16 +36,33 @@ function getErrorMessage(error) {
   return msg;
 }
 
+async function invokeSegmentation(tenantId, extra = {}) {
+  const payload = { tenant_id: tenantId, ...extra };
+  const functionNames = ['aiCustomerSegmentation', 'customerSegmentationRuntime'];
+  let lastError = null;
+
+  for (const name of functionNames) {
+    try {
+      const res = await base44.functions.invoke(name, payload);
+      if (res.data?.error) throw new Error(res.data?.detail || res.data?.message || res.data.error);
+      return res.data;
+    } catch (error) {
+      lastError = error;
+      if (!/404|does not exist/i.test(error?.message || '')) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error('Customer segmentation endpoint unavailable');
+}
+
 function CustomerSegmentationPanel({ tenantId }) {
   const queryClient = useQueryClient();
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
-    queryFn: async () => {
-      const res = await base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId });
-      if (res.data?.error) throw new Error(res.data?.detail || res.data?.message || res.data.error);
-      return res.data;
-    },
+    queryFn: () => invokeSegmentation(tenantId),
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -54,10 +71,9 @@ function CustomerSegmentationPanel({ tenantId }) {
 
   const handleRefresh = () => {
     queryClient.removeQueries({ queryKey: ['customerSegmentation', tenantId] });
-    toast.promise(base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId, force_refresh: true }).then((res) => {
-      if (res.data?.error) throw new Error(res.data?.detail || res.data?.message || res.data.error);
-      queryClient.setQueryData(['customerSegmentation', tenantId], res.data);
-      return res.data;
+    toast.promise(invokeSegmentation(tenantId, { force_refresh: true }).then((data) => {
+      queryClient.setQueryData(['customerSegmentation', tenantId], data);
+      return data;
     }), {
       loading: 'Re-analyzing customers...',
       success: 'Segmentation updated!',
