@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Brain, Users, Megaphone, Search, Sparkles } from 'lucide-react';
+import { Brain, Users, Megaphone, Search, Sparkles, Radar, Shield, Orbit } from 'lucide-react';
 import { usePlatformResolver, requireResolved } from '../components/usePlatformResolver';
 import { usePermissions } from '../components/usePermissions';
 import CustomerSegmentationPanel from '../components/ai/CustomerSegmentationPanel';
@@ -61,74 +61,142 @@ export default function AIInsights() {
       animate="animate"
       variants={staggerContainer}
     >
-      {/* Header */}
       <motion.div variants={fadeInUp}>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
-            <Brain className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">AI Insights Hub</h1>
-            <p className="text-slate-500">Advanced AI-powered analytics and automation</p>
+        <div className="future-panel future-grid future-scan overflow-hidden rounded-[2rem] p-6 sm:p-8">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                  <Radar className="h-3.5 w-3.5" />
+                  AI Signal Command
+                </span>
+                <span className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Autonomous Insight Grid
+                </span>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-[linear-gradient(135deg,#38bdf8,#818cf8,#34d399)] shadow-[0_0_28px_rgba(56,189,248,0.32)]">
+                  <Brain className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Strategic AI Runtime</p>
+                  <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl" style={{ textShadow: '0 0 26px rgba(56,189,248,0.16)' }}>
+                    AI Insights Hub
+                  </h1>
+                  <p className="mt-3 max-w-xl text-sm text-slate-400 sm:text-base">
+                    Customer intelligence, profit leak forensics, and growth automation arranged as a real operator cockpit instead of a report dump.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3 xl:w-[420px] xl:grid-cols-1">
+              <SignalStrip icon={Users} label="Segments" value="Behavior clusters" tone="#a78bfa" />
+              <SignalStrip icon={Search} label="Forensics" value="Leak detection priority" tone="#f59e0b" />
+              <SignalStrip icon={Megaphone} label="Campaigns" value={isAdmin ? 'Admin launch controls' : 'Owner-only locked'} tone={isAdmin ? '#fb7185' : '#64748b'} />
+            </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Feature Cards */}
       <motion.div variants={fadeInUp} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-violet-50 to-white border-violet-200">
+        <Card className="future-panel border-white/10 bg-white/[0.03] text-white">
           <CardContent className="py-4">
             <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-violet-600" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/15">
+                <Users className="w-6 h-6 text-violet-300" />
+              </div>
               <div>
-                <h3 className="font-semibold text-violet-900">Customer Segmentation</h3>
-                <p className="text-xs text-violet-600">AI-powered RFM analysis</p>
+                <h3 className="font-semibold text-violet-100">Customer Segmentation</h3>
+                <p className="text-xs text-violet-200/70">AI-powered RFM analysis</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="future-panel border-white/10 bg-white/[0.03] text-white">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15">
+                <Search className="w-6 h-6 text-amber-300" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-100">Leak Forensics</h3>
+                <p className="text-xs text-amber-200/70">Deep profit analysis</p>
               </div>
             </div>
           </CardContent>
         </Card>
         {isAdmin && (
-          <Card className="bg-gradient-to-br from-pink-50 to-white border-pink-200">
+          <Card className="future-panel border-white/10 bg-white/[0.03] text-white">
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
-                <Megaphone className="w-8 h-8 text-pink-600" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink-500/15">
+                  <Megaphone className="w-6 h-6 text-pink-300" />
+                </div>
                 <div>
-                  <h3 className="font-semibold text-pink-900">Marketing Automation</h3>
-                  <p className="text-xs text-pink-600">AI-generated campaigns</p>
+                  <h3 className="font-semibold text-pink-100">Marketing Automation</h3>
+                  <p className="text-xs text-pink-200/70">AI-generated campaigns</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
-        <Card className="bg-gradient-to-br from-slate-50 to-white border-slate-200">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3">
-              <Search className="w-8 h-8 text-slate-600" />
-              <div>
-                <h3 className="font-semibold text-slate-900">Leak Forensics</h3>
-                <p className="text-xs text-slate-600">Deep profit analysis</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </motion.div>
 
-      {/* Main Panels */}
-      <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : ''} gap-6`}>
+      <motion.div variants={fadeInUp}>
+        <div className="future-panel rounded-[1.8rem] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Priority Module</p>
+              <h2 className="text-lg font-semibold text-white">Profit Leak Forensics</h2>
+            </div>
+            <div className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-100">
+              <Shield className="h-3.5 w-3.5" />
+              Above The Fold
+            </div>
+          </div>
+          <ProfitLeakForensicsPanel tenantId={authTenantId} />
+        </div>
+      </motion.div>
+
+      <div className={`grid grid-cols-1 ${isAdmin ? 'xl:grid-cols-[1.1fr_0.9fr]' : ''} gap-6`}>
         <motion.div variants={fadeInUp}>
           <CustomerSegmentationPanel tenantId={authTenantId} />
         </motion.div>
         {isAdmin && (
           <motion.div variants={fadeInUp}>
-            <MarketingCampaignsPanel tenantId={authTenantId} />
+            <div className="future-panel rounded-[1.8rem] p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Automation Wing</p>
+                  <h2 className="text-lg font-semibold text-white">AI Marketing Campaigns</h2>
+                </div>
+                <div className="future-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-pink-100">
+                  <Orbit className="h-3.5 w-3.5" />
+                  Launch Layer
+                </div>
+              </div>
+              <MarketingCampaignsPanel tenantId={authTenantId} />
+            </div>
           </motion.div>
         )}
       </div>
-
-      {/* Forensics Panel - Full Width */}
-      <motion.div variants={fadeInUp}>
-        <ProfitLeakForensicsPanel tenantId={authTenantId} />
-      </motion.div>
     </motion.div>
+  );
+}
+
+function SignalStrip({ icon: Icon, label, value, tone }) {
+  return (
+    <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.04]">
+          <Icon className="h-5 w-5" style={{ color: tone }} />
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
+          <p className="text-sm font-semibold" style={{ color: tone }}>{value}</p>
+        </div>
+      </div>
+    </div>
   );
 }

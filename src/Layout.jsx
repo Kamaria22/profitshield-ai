@@ -658,7 +658,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
   return (
     <div
-      className={`min-h-screen bg-slate-950 overflow-x-hidden ${
+      className={`future-grid min-h-screen bg-slate-950 overflow-x-hidden ${
         device.isMobile ? 'mobile-shell' : device.isTablet ? 'tablet-shell' : 'desktop-shell'
       }`}
       data-device={device.className}
@@ -689,18 +689,21 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Desktop Sidebar */}
       <aside className={`
         hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw]
-        bg-slate-950/95 backdrop-blur-2xl border-r border-white/5
+        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-2xl border-r border-cyan-400/10 shadow-[0_0_50px_rgba(8,47,73,0.18)]
         transform transition-transform duration-200 ease-in-out
         translate-x-0
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-white/5">
+          <div className="flex items-center justify-between h-16 px-6 border-b border-white/8">
             <Link to={createPageUrl('Home', location.search)} className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-lg" style={{boxShadow:'0 0 20px rgba(99,102,241,0.4)'}}>
+              <div className="w-8 h-8 rounded-xl bg-[linear-gradient(135deg,#38bdf8,#818cf8,#34d399)] flex items-center justify-center shadow-[0_0_22px_rgba(56,189,248,0.28)]">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-lg bg-gradient-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent">ProfitShield</span>
+              <div>
+                <span className="block font-bold text-lg bg-gradient-to-r from-cyan-300 via-indigo-300 to-emerald-300 bg-clip-text text-transparent">ProfitShield</span>
+                <span className="block text-[10px] uppercase tracking-[0.24em] text-slate-500">Command Surface</span>
+              </div>
             </Link>
             <button 
               onClick={handleSidebarClose}
@@ -713,7 +716,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
           {/* Store Info - only when resolved */}
           {isResolved && storeDisplayName ? (
-            <div className="px-4 py-3 border-b border-white/5">
+            <div className="px-4 py-3 border-b border-white/8">
               <p className="text-xs text-slate-500 uppercase tracking-wide tracking-widest mb-1">Store</p>
               <p className="text-sm font-semibold text-slate-100 truncate" style={{textShadow:'0 0 12px rgba(129,140,248,0.3)'}}>
                 {storeDisplayName}
@@ -756,7 +759,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </div>
             </div>
           ) : !isResolved && (
-            <div className="px-4 py-3 border-b border-white/5">
+            <div className="px-4 py-3 border-b border-white/8">
               <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Store</p>
               <p className="text-sm text-slate-500">No store selected</p>
               <Link 
@@ -770,7 +773,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" role="navigation" aria-label="Main navigation">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
             {filteredNavItems.map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
@@ -783,13 +786,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-all duration-150
                     ${isActive
-                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
-                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
+                      ? 'bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(129,140,248,0.14))] text-cyan-100 border border-cyan-400/20 shadow-[0_0_18px_rgba(56,189,248,0.10)]'
+                      : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 border border-transparent'
                     }
                   `}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} aria-hidden="true" />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} aria-hidden="true" />
                   {item.name}
                   {item.adminBadge && (
                     <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
@@ -813,21 +816,21 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </nav>
 
           {/* Legal Footer Links */}
-          <div className="px-4 py-2 flex flex-wrap gap-x-3 border-t border-white/5">
-            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Privacy</Link>
-            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Terms</Link>
-            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">EULA</Link>
-            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Cookies</Link>
-            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">GDPR/CCPA</Link>
-            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-indigo-400 transition-colors">Refunds</Link>
+          <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-white/8">
+            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
+            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
+            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
+            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
+            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
+            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
           </div>
 
           {/* User Menu */}
           {activeUser && (
-            <div className="p-4 border-t border-white/5">
+            <div className="p-4 border-t border-white/8">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                  <button className="flex items-center gap-3 w-full px-3 py-2 rounded-xl border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)', boxShadow:'0 0 12px rgba(99,102,241,0.35)'}}>
                       <span className="text-sm font-semibold text-white">
@@ -882,7 +885,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="lg:pl-64 overflow-x-hidden min-h-screen flex flex-col">
         {/* Top bar */}
-        <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-slate-950/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
+        <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.88),rgba(8,15,30,0.78))] backdrop-blur-xl border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
           <button 
             onClick={handleSidebarOpen}
             className={`lg:hidden relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
@@ -969,8 +972,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
         {/* Mobile dropdown navigation panel */}
         {sidebarOpen && (
-          <div className={`lg:hidden fixed ${device.isMobile ? 'top-14 left-2 right-2 max-h-[78vh]' : 'top-16 left-3 right-3 max-h-[72vh]'} z-50 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_20px_60px_rgba(2,6,23,0.7)] overflow-y-auto`}>
-            <div className="sticky top-0 z-10 px-3 py-2 border-b border-white/10 bg-slate-950/95 backdrop-blur-xl">
+          <div className={`lg:hidden fixed ${device.isMobile ? 'top-14 left-2 right-2 max-h-[78vh]' : 'top-16 left-3 right-3 max-h-[72vh]'} z-50 rounded-2xl border border-cyan-400/12 bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-2xl shadow-[0_20px_60px_rgba(2,6,23,0.7)] overflow-y-auto`}>
+            <div className="sticky top-0 z-10 px-3 py-2 border-b border-white/10 bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-xl">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Store</p>
               <p className="text-sm font-semibold text-slate-100 truncate">{storeDisplayName || 'No store selected'}</p>
               <div className="mt-1.5 flex items-center gap-2 flex-wrap">
@@ -1005,12 +1008,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                     onClick={handleSidebarClose}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
                       isActive
-                        ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
-                        : 'text-slate-300 hover:bg-white/5 border border-transparent'
+                        ? 'bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(129,140,248,0.14))] text-cyan-100 border border-cyan-400/20'
+                        : 'text-slate-300 hover:bg-white/[0.04] border border-transparent'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-300' : 'text-slate-500'}`} aria-hidden="true" />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} aria-hidden="true" />
                     {item.name}
                     {item.page === 'Alerts' && pendingAlerts > 0 && (
                       <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5">
@@ -1033,7 +1036,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         <main
           ref={mainScrollRef}
           onScroll={handleMainScroll}
-          className={`flex-1 ${device.isMobile ? 'p-3' : device.isTablet ? 'p-4' : 'p-4 lg:p-6'} ${showPhoneQuickNav ? 'pb-24' : 'pb-6'} bg-slate-950 overflow-x-hidden overflow-y-auto`}
+          className={`future-grid flex-1 ${device.isMobile ? 'p-3' : device.isTablet ? 'p-4' : 'p-4 lg:p-6'} ${showPhoneQuickNav ? 'pb-24' : 'pb-6'} bg-transparent overflow-x-hidden overflow-y-auto`}
           style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
           aria-label="App content"
@@ -1052,7 +1055,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          {children}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.10),transparent_65%)]" />
+          <div className="relative z-[1]">
+            {children}
+          </div>
           </MobileDeepWrapper>
         </main>
 
