@@ -46,7 +46,7 @@ function CustomerSegmentationPanel({ tenantId }) {
     }).catch(() => {});
   }, [tenantId, queryClient]);
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
     queryFn: async () => {
       const res = await base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId });
@@ -102,6 +102,19 @@ function CustomerSegmentationPanel({ tenantId }) {
           <div className="flex items-center justify-center py-8 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-violet-500" />
             <span className="text-slate-500 text-sm">Analyzing customer base...</span>
+          </div>
+        ) : isError && !hasData ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+            <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-red-500" />
+            <p className="text-sm font-medium text-red-700">Customer segmentation failed to load.</p>
+            <p className="mt-1 text-xs text-red-600">{error?.message || 'Unknown error'}</p>
+            <Button
+              size="sm"
+              className="mt-3 bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => refetch()}
+            >
+              Retry
+            </Button>
           </div>
         ) : hasData ? (
           <div className="space-y-4">

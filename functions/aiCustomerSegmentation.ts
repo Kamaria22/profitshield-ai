@@ -2,18 +2,43 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { mlChurnProbability, ML_RUNTIME_VERSION } from './helpers/mlRuntime.ts';
 
 const SNAPSHOT_TTL_MS = 10 * 60 * 1000;
+const VERSION = '2026-03-17.customer-segmentation-v2';
+
+async function safeUser(base44) {
+  try {
+    return await base44.auth.me();
+  } catch {
+    return null;
+  }
+}
+
+async function loadTenantOrders(db, tenant_id) {
+  const rows = await db.entities.Order.filter({ tenant_id }, '-order_date', 800).catch(() => []);
+  return Array.isArray(rows) ? rows.filter((order) => order?.is_demo !== true) : [];
+}
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
     const body = await req.json().catch(() => ({}));
     const { tenant_id, force_refresh = false } = body;
     if (!tenant_id) return Response.json({ error: 'tenant_id required' }, { status: 400 });
+    const user = await safeUser(base44);
 
     const db = base44.asServiceRole;
+
+    if (user) {
+      const userRole = String(user?.role || user?.app_role || '').toLowerCase();
+      const userTenant = String(user?.tenant_id || '').trim();
+      if (
+        userRole !== 'owner' &&
+        userRole !== 'admin' &&
+        userTenant &&
+        userTenant !== tenant_id
+      ) {
+        return Response.json({ error: 'Forbidden tenant access', version: VERSION }, { status: 403 });
+      }
+    }
 
     if (!force_refresh) {
       const snapshots = await db.entities.CustomerSegmentSnapshot
@@ -25,6 +50,7 @@ Deno.serve(async (req) => {
         return Response.json({
           success: true,
           cached: true,
+          version: VERSION,
           ml_runtime: ML_RUNTIME_VERSION,
           total_customers: latestSnapshot.row_count || 0,
           segments: latestSnapshot.segments || [],
@@ -37,12 +63,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch all real orders for this tenant
-    const orders = await db.entities.Order.filter({ tenant_id, is_demo: false }, '-order_date', 800);
+    // Fetch tenant orders and exclude demo rows in memory because many live orders do not
+    // explicitly persist is_demo=false.
+    const orders = await loadTenantOrders(db, tenant_id);
 
     if (!orders || orders.length === 0) {
       return Response.json({
         success: true,
+        version: VERSION,
         total_customers: 0,
         segments: [],
         insights: [],
@@ -254,6 +282,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       cached: false,
+      version: VERSION,
       ml_runtime: ML_RUNTIME_VERSION,
       total_customers: totalCustomers,
       segments: formattedSegments,
@@ -266,7 +295,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[aiCustomerSegmentation] error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message, version: VERSION }, { status: 500 });
   }
 });
 
