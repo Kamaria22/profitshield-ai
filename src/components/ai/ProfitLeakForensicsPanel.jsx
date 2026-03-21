@@ -36,18 +36,26 @@ const priorityIcons = {
   this_month: Eye
 };
 
+function parseError(data) {
+  if (!data?.error && !data?.message) return null;
+  return data?.detail || data?.message || data?.error;
+}
+
 export default function ProfitLeakForensicsPanel({ tenantId }) {
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch, isFetching, isError, error } = useQuery({
     queryKey: ['profitLeakForensics', tenantId],
     queryFn: async () => {
       const response = await base44.functions.invoke('aiProfitLeakForensics', {
         tenant_id: tenantId
       });
+      const maybeError = parseError(response.data);
+      if (maybeError) throw new Error(maybeError);
       return response.data;
     },
     enabled: !!tenantId,
     staleTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err) => !/rate limit/i.test(err?.message || '') && failureCount < 1
   });
 
   const handleRefresh = () => {
@@ -86,6 +94,16 @@ export default function ProfitLeakForensicsPanel({ tenantId }) {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
             <span className="ml-2 text-slate-500">Running deep analysis...</span>
+          </div>
+        ) : isError ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+            <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-amber-500" />
+            <p className="text-sm font-medium text-amber-800">Profit leak forensics is temporarily unavailable.</p>
+            <p className="mt-1 text-xs text-amber-700">
+              {/rate limit/i.test(error?.message || '')
+                ? 'The AI forensics service is rate-limited right now. Retry in a moment.'
+                : (error?.message || 'Unknown error')}
+            </p>
           </div>
         ) : data?.summary ? (
           <Tabs defaultValue="summary" className="space-y-4">

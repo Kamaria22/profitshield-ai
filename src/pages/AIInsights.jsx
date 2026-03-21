@@ -23,11 +23,23 @@ export default function AIInsights() {
   const resolverCheck = requireResolved(resolver);
   const authTenantId = resolverCheck.tenantId;
   const { user } = usePermissions();
+  const [showSegments, setShowSegments] = React.useState(false);
+  const [showMarketing, setShowMarketing] = React.useState(false);
 
   // SEO: update document title
   React.useEffect(() => {
     document.title = 'AI Insights – ProfitShield AI | Real-Time Profit Intelligence for Shopify';
   }, []);
+
+  React.useEffect(() => {
+    if (!authTenantId) return undefined;
+    const segmentsTimer = window.setTimeout(() => setShowSegments(true), 250);
+    const marketingTimer = window.setTimeout(() => setShowMarketing(true), 1400);
+    return () => {
+      window.clearTimeout(segmentsTimer);
+      window.clearTimeout(marketingTimer);
+    };
+  }, [authTenantId]);
   
   // Check if user is admin/owner
   const isAdmin = user && (user.role === 'admin' || user.role === 'owner' || user.app_role === 'admin' || user.app_role === 'owner');
@@ -161,7 +173,15 @@ export default function AIInsights() {
 
       <div className={`grid grid-cols-1 ${isAdmin ? 'xl:grid-cols-[1.1fr_0.9fr]' : ''} gap-6`}>
         <motion.div variants={fadeInUp}>
-          <CustomerSegmentationPanel tenantId={authTenantId} />
+          {showSegments ? (
+            <CustomerSegmentationPanel tenantId={authTenantId} />
+          ) : (
+            <DeferredPanel
+              title="AI Customer Segments"
+              copy="Queuing segmentation analysis behind the primary forensic pass."
+              tone="violet"
+            />
+          )}
         </motion.div>
         {isAdmin && (
           <motion.div variants={fadeInUp}>
@@ -176,7 +196,15 @@ export default function AIInsights() {
                   Launch Layer
                 </div>
               </div>
-              <MarketingCampaignsPanel tenantId={authTenantId} />
+              {showMarketing ? (
+                <MarketingCampaignsPanel tenantId={authTenantId} />
+              ) : (
+                <DeferredPanel
+                  title="AI Marketing Campaigns"
+                  copy="Delaying campaign generation until the core analytics channels settle."
+                  tone="pink"
+                />
+              )}
             </div>
           </motion.div>
         )}
@@ -195,6 +223,26 @@ function SignalStrip({ icon: Icon, label, value, tone }) {
         <div>
           <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
           <p className="text-sm font-semibold" style={{ color: tone }}>{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeferredPanel({ title, copy, tone }) {
+  const toneMap = {
+    violet: 'text-violet-300 bg-violet-500/15',
+    pink: 'text-pink-300 bg-pink-500/15'
+  };
+  return (
+    <div className="rounded-[1.6rem] border border-white/8 bg-white/[0.03] p-5">
+      <div className="flex items-center gap-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneMap[tone] || toneMap.violet}`}>
+          <Sparkles className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="text-xs text-slate-400">{copy}</p>
         </div>
       </div>
     </div>

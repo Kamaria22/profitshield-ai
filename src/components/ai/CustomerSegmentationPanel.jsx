@@ -30,38 +30,32 @@ function getSegmentIcon(name) {
   return Users;
 }
 
+function getErrorMessage(error) {
+  const msg = error?.message || 'Unknown error';
+  if (/rate limit/i.test(msg)) return 'AI analysis is being rate-limited right now. Wait a moment and retry.';
+  return msg;
+}
+
 function CustomerSegmentationPanel({ tenantId }) {
   const queryClient = useQueryClient();
-
-  React.useEffect(() => {
-    if (!tenantId) return;
-    queryClient.prefetchQuery({
-      queryKey: ['customerSegmentation', tenantId],
-      queryFn: async () => {
-        const res = await base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId });
-        if (res.data?.error) throw new Error(res.data.error);
-        return res.data;
-      },
-      staleTime: 5 * 60 * 1000,
-    }).catch(() => {});
-  }, [tenantId, queryClient]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
     queryFn: async () => {
       const res = await base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId });
-      if (res.data?.error) throw new Error(res.data.error);
+      if (res.data?.error) throw new Error(res.data?.detail || res.data?.message || res.data.error);
       return res.data;
     },
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err) => !/rate limit/i.test(err?.message || '') && failureCount < 1
   });
 
   const handleRefresh = () => {
     queryClient.removeQueries({ queryKey: ['customerSegmentation', tenantId] });
     toast.promise(base44.functions.invoke('aiCustomerSegmentation', { tenant_id: tenantId, force_refresh: true }).then((res) => {
-      if (res.data?.error) throw new Error(res.data.error);
+      if (res.data?.error) throw new Error(res.data?.detail || res.data?.message || res.data.error);
       queryClient.setQueryData(['customerSegmentation', tenantId], res.data);
       return res.data;
     }), {
@@ -107,7 +101,7 @@ function CustomerSegmentationPanel({ tenantId }) {
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
             <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-red-500" />
             <p className="text-sm font-medium text-red-700">Customer segmentation failed to load.</p>
-            <p className="mt-1 text-xs text-red-600">{error?.message || 'Unknown error'}</p>
+            <p className="mt-1 text-xs text-red-600">{getErrorMessage(error)}</p>
             <Button
               size="sm"
               className="mt-3 bg-red-600 hover:bg-red-700 text-white"

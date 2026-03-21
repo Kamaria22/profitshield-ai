@@ -36,21 +36,29 @@ const urgencyColors = {
   this_month: 'bg-blue-100 text-blue-700'
 };
 
+function parseError(data) {
+  if (!data?.error && !data?.message) return null;
+  return data?.detail || data?.message || data?.error;
+}
+
 export default function MarketingCampaignsPanel({ tenantId }) {
   const [launchedCampaigns, setLaunchedCampaigns] = useState(new Set());
   const queryClient = useQueryClient();
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch, isFetching, isError, error } = useQuery({
     queryKey: ['marketingCampaigns', tenantId],
     queryFn: async () => {
       const response = await base44.functions.invoke('aiMarketingCampaigns', {
         tenant_id: tenantId
       });
+      const maybeError = parseError(response.data);
+      if (maybeError) throw new Error(maybeError);
       return response.data;
     },
     enabled: !!tenantId,
     staleTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    retry: (failureCount, err) => !/rate limit/i.test(err?.message || '') && failureCount < 1
   });
 
   const launchMutation = useMutation({
@@ -108,6 +116,16 @@ export default function MarketingCampaignsPanel({ tenantId }) {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-pink-500" />
             <span className="ml-2 text-slate-500">Creating campaigns...</span>
+          </div>
+        ) : isError ? (
+          <div className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-center">
+            <Megaphone className="mx-auto mb-2 h-8 w-8 text-pink-500" />
+            <p className="text-sm font-medium text-pink-800">Marketing campaigns are temporarily unavailable.</p>
+            <p className="mt-1 text-xs text-pink-700">
+              {/rate limit/i.test(error?.message || '')
+                ? 'The AI campaign service is rate-limited right now. Retry shortly.'
+                : (error?.message || 'Unknown error')}
+            </p>
           </div>
         ) : data?.campaigns ? (
           <div className="space-y-4">
