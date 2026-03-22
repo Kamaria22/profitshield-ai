@@ -9,6 +9,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { upsertProjectedCustomer } from './helpers/customerProjection.ts';
 
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
@@ -192,10 +193,12 @@ async function processOrderJob(db, tenant, payload, job, tenantCtx) {
   };
 
   if (existing.length > 0) {
-    await db.entities.Order.update(existing[0].id, rec);
+    const updatedOrder = await db.entities.Order.update(existing[0].id, rec);
+    await upsertProjectedCustomer(db, tenant.id, { ...updatedOrder, ...rec });
     return { order_id: existing[0].id };
   } else {
     const created = await db.entities.Order.create(rec);
+    await upsertProjectedCustomer(db, tenant.id, { ...created, ...rec });
     if (riskData.risk_level === 'high') {
       await db.entities.Alert.create({
         tenant_id: tenant.id,

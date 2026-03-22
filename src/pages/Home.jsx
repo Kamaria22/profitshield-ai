@@ -435,10 +435,10 @@ export default function Home() {
   // bootstrap to register webhooks, drain queue, and sync orders without waiting
   // for the user to click Sync.
   useEffect(() => {
-    if (!authTenantId || summaryLoading || syncMutation.isPending) return;
+    if (!authTenantId || syncMutation.isPending) return;
     if (!tenant?.onboarding_completed) return;
     const totalOrders = Number(metrics?.totalOrders || 0);
-    const bootstrapRecommended = Boolean(dashboardSummary?.bootstrapRecommended);
+    const bootstrapRecommended = dashboardSummary == null ? true : Boolean(dashboardSummary?.bootstrapRecommended);
     if (!bootstrapRecommended && totalOrders > 0) return;
 
     const key = `ps:dashboard-bootstrap:${authTenantId}`;
@@ -463,7 +463,7 @@ export default function Home() {
         // Keep UI responsive; manual Sync remains available.
       }
     })();
-  }, [authTenantId, summaryLoading, syncMutation.isPending, tenant?.onboarding_completed, metrics?.totalOrders, dashboardSummary?.bootstrapRecommended, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
+  }, [authTenantId, syncMutation.isPending, tenant?.onboarding_completed, metrics?.totalOrders, dashboardSummary, isEmbedded, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Minimal blocking state
   if (tenantLoading) {

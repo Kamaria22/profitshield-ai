@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { upsertProjectedCustomer } from './helpers/customerProjection.ts';
 
 function withEndpointGuard(name, handler) {
   return async (req) => {
@@ -324,9 +325,11 @@ async function processOrder(base44, tenant, orderData, costMappings, settings) {
   };
   
   if (existingOrders.length > 0) {
-    await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
+    const updatedOrder = await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
+    await upsertProjectedCustomer(base44.asServiceRole, tenant.id, { ...updatedOrder, ...orderRecord });
   } else {
-    await base44.asServiceRole.entities.Order.create(orderRecord);
+    const createdOrder = await base44.asServiceRole.entities.Order.create(orderRecord);
+    await upsertProjectedCustomer(base44.asServiceRole, tenant.id, { ...createdOrder, ...orderRecord });
   }
 }
 

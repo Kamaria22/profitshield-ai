@@ -41,6 +41,16 @@ function persistLastBackgroundSync(tenantId, ts) {
   } catch {}
 }
 
+function hasBootstrapInFlight(tenantId) {
+  if (!tenantId || typeof window === 'undefined') return false;
+  try {
+    const raw = Number(sessionStorage.getItem(`ps:bootstrap-inflight:${tenantId}`) || 0);
+    return !!raw && (Date.now() - raw < 90_000);
+  } catch {
+    return false;
+  }
+}
+
 export function useSyncManager() {
   return useContext(SyncContext);
 }
@@ -92,6 +102,9 @@ export function SyncProvider({ children, tenantId }) {
   // Auto-sync on login/mount - with debounce to prevent excessive calls
   useEffect(() => {
     if (tenantId && isOnline) {
+      if (hasBootstrapInFlight(tenantId)) {
+        return;
+      }
       const lastSync = readLastBackgroundSync(tenantId);
       if (lastSync && Date.now() - lastSync < SYNC_THROTTLE_MS) {
         return;
@@ -105,6 +118,7 @@ export function SyncProvider({ children, tenantId }) {
   // Set up real-time subscriptions for auto-sync - with defensive error handling
   useEffect(() => {
     if (!tenantId) return;
+    if (hasBootstrapInFlight(tenantId)) return;
 
     const subscriptions = [];
 
@@ -213,6 +227,7 @@ export function SyncProvider({ children, tenantId }) {
   // Periodic sync (every 5 minutes when online)
   useEffect(() => {
     if (!tenantId || !isOnline) return;
+    if (hasBootstrapInFlight(tenantId)) return;
 
     const interval = setInterval(() => {
       triggerSync(true); // Silent sync
@@ -225,6 +240,7 @@ export function SyncProvider({ children, tenantId }) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && tenantId && isOnline) {
+        if (hasBootstrapInFlight(tenantId)) return;
         // Only sync if last sync was more than 1 minute ago
         if (!lastSyncTime || Date.now() - lastSyncTime > SYNC_THROTTLE_MS) {
           triggerSync(true);

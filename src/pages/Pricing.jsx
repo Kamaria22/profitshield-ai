@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { usePlatformResolver, requireResolved } from '@/components/usePlatformResolver';
-import { createPageUrl } from '@/components/platformContext';
+import { createPageUrl, getPersistedContext } from '@/components/platformContext';
+import { invokeWithRetry } from '@/lib/safeApi';
 import { 
   Check, 
   X, 
@@ -177,6 +178,55 @@ const FAQ = [
   }
 ];
 
+function bootstrapInFlightKey(tenantId) {
+  return `ps:bootstrap-inflight:${tenantId}`;
+}
+
+function dashboardBootstrapKey(tenantId) {
+  return `ps:dashboard-bootstrap:${tenantId}`;
+}
+
+function dashboardSummaryStorageKey(tenantId) {
+  return `ps:dashboard-summary:${tenantId}`;
+}
+
+function dashboardSummaryDurableStorageKey(tenantId) {
+  return `ps:dashboard-summary:durable:${tenantId}`;
+}
+
+function markBootstrapStart(tenantId) {
+  if (!tenantId || typeof window === 'undefined') return;
+  const startedAt = String(Date.now());
+  try { sessionStorage.setItem(bootstrapInFlightKey(tenantId), startedAt); } catch {}
+  try { sessionStorage.setItem(dashboardBootstrapKey(tenantId), '1'); } catch {}
+}
+
+function markBootstrapDone(tenantId) {
+  if (!tenantId || typeof window === 'undefined') return;
+  try { sessionStorage.removeItem(bootstrapInFlightKey(tenantId)); } catch {}
+  try {
+    const ts = String(Date.now());
+    sessionStorage.setItem(`ps:last-background-sync:${tenantId}`, ts);
+    localStorage.setItem(`ps:last-background-sync:${tenantId}`, ts);
+  } catch {}
+}
+
+function clearBootstrapMarkers(tenantId) {
+  if (!tenantId || typeof window === 'undefined') return;
+  try { sessionStorage.removeItem(bootstrapInFlightKey(tenantId)); } catch {}
+  try { sessionStorage.removeItem(dashboardBootstrapKey(tenantId)); } catch {}
+}
+
+function warmDashboardSummaryCache(tenantId, summary) {
+  if (!tenantId || !summary || typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(dashboardSummaryStorageKey(tenantId), JSON.stringify(summary));
+  } catch {}
+  try {
+    localStorage.setItem(dashboardSummaryDurableStorageKey(tenantId), JSON.stringify(summary));
+  } catch {}
+}
+
 export default function Pricing() {
   const [isYearly, setIsYearly] = useState(false);
   const [selectedTier, setSelectedTier] = useState(null);
@@ -188,6 +238,39 @@ export default function Pricing() {
   const tenant = resolver?.tenant;
   const currentTier = tenant?.subscription_tier || 'trial';
 
+  const startPostPlanBootstrap = async (tenantId) => {
+    if (!tenantId) return;
+    const persisted = getPersistedContext(true) || {};
+    const task = (async () => {
+      try {
+        await invokeWithRetry('shopifyActivationBootstrap', {
+          tenant_id: tenantId,
+          integration_id: persisted?.integrationId || undefined,
+          shop: persisted?.shop || persisted?.storeKey || undefined,
+          source: 'pricing_activation',
+          force: true,
+          days: 30
+        }, { attempts: 2, baseMs: 250 });
+
+        const { data } = await invokeWithRetry('dashboardAI', {
+          action: 'embedded_summary',
+          tenant_id: tenantId,
+        }, { attempts: 1, baseMs: 200 });
+        if (data?.success) {
+          warmDashboardSummaryCache(tenantId, data);
+        }
+        markBootstrapDone(tenantId);
+      } catch (error) {
+        clearBootstrapMarkers(tenantId);
+      }
+    })();
+
+    await Promise.race([
+      task,
+      new Promise((resolve) => setTimeout(resolve, 700))
+    ]);
+  };
+
   const handleSelectPlan = async (tier) => {
     if (tier.id === 'enterprise') {
       // Open contact form or email
@@ -197,11 +280,13 @@ export default function Pricing() {
 
     if (tier.id === 'trial') {
       if (resolverCheck.tenantId && tenant) {
+        markBootstrapStart(tenant.id);
         await base44.entities.Tenant.update(tenant.id, {
           onboarding_completed: true,
           status: 'active',
           subscription_tier: tenant.subscription_tier || 'trial'
         });
+        await startPostPlanBootstrap(tenant.id);
         toast.success('Trial activated. Starting automated protection.');
         navigate(createPageUrl('Home'));
       } else {
@@ -216,12 +301,14 @@ export default function Pricing() {
     try {
       // In production, this would integrate with Stripe
       if (resolverCheck.tenantId) {
+        markBootstrapStart(tenant.id);
         await base44.entities.Tenant.update(tenant.id, {
           subscription_tier: tier.id,
           monthly_order_limit: tier.orderLimit,
           onboarding_completed: true,
           status: 'active'
         });
+        await startPostPlanBootstrap(tenant.id);
         toast.success(`Upgraded to ${tier.name}!`);
         navigate(createPageUrl('Home'));
       } else {
@@ -229,6 +316,7 @@ export default function Pricing() {
         navigate(createPageUrl('Onboarding'));
       }
     } catch (error) {
+      if (tenant?.id) clearBootstrapMarkers(tenant.id);
       toast.error('Failed to update subscription');
     } finally {
       setLoading(false);

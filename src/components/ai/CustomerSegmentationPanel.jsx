@@ -38,7 +38,7 @@ function getErrorMessage(error) {
 
 async function invokeSegmentation(tenantId, extra = {}) {
   const payload = { tenant_id: tenantId, ...extra };
-  const functionNames = ['aiCustomerSegmentation', 'customerSegmentationRuntime'];
+  const functionNames = ['customerSegmentationRuntime'];
   let lastError = null;
 
   for (const name of functionNames) {

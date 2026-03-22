@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { upsertProjectedCustomer } from './helpers/customerProjection.ts';
 
 function withEndpointGuard(name, handler) {
   return async (req) => {
@@ -591,6 +592,12 @@ Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
         savedOrder = await base44.asServiceRole.entities.Order.create(orderRecord);
         created++;
       }
+
+      await upsertProjectedCustomer(
+        base44.asServiceRole,
+        tenant.id,
+        savedOrder?.id ? { ...savedOrder, ...orderRecord } : { id: existingOrders[0]?.id, ...orderRecord }
+      );
 
       // Send email notifications for matching risk rules (if notification enabled)
       if (riskData.risk_level === 'high' || riskData.recommended_action !== 'none') {

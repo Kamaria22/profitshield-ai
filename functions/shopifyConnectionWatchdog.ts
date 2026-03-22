@@ -12,6 +12,7 @@
  * Can also be triggered manually by admin.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { rebuildProjectedCustomersFromOrders } from './helpers/customerProjection.ts';
 
 const API_VERSION = '2024-10';
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
@@ -371,6 +372,12 @@ Deno.serve(async (req) => {
       const customerRows = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
       const hasOrders = recentOrders.length > 0;
       if (hasOrders && customerRows.length === 0) {
+        const repaired = await rebuildProjectedCustomersFromOrders(db, tenantId, 500).catch(() => ({ created: 0, updated: 0, projected: 0 }));
+        const repairedCustomers = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
+        if (repairedCustomers.length > 0) {
+          result.customer_projection_repaired = true;
+          result.customer_projection_repaired_count = repaired.projected || repaired.created || repaired.updated || repairedCustomers.length;
+        } else {
         result.health_issues.push('customer_projection_gap');
         result.customer_projection_gap = true;
         const previousGapCount = Number(integration?.metadata?.customer_projection_gap_count || 0) || 0;
@@ -399,6 +406,7 @@ Deno.serve(async (req) => {
               customer_projection_gap_count: nextGapCount
             }
           }).catch(() => {});
+        }
         }
       }
 

@@ -84,7 +84,7 @@ async function upsertFixReport(base44, report) {
 const FEATURE_PLAYBOOKS = {
   customer_segmentation: {
     requiredEntities: ["Tenant", "Order", "Customer", "CustomerSegment", "AuditLog"],
-    requiredFunctions: ["aiCustomerSegmentation"],
+    requiredFunctions: ["customerSegmentationRuntime"],
     requiredFeatureFlags: ["feature_customer_segmentation"],
 
     async smokeTest(base44, tenantId) {
@@ -133,16 +133,16 @@ const FEATURE_PLAYBOOKS = {
 
       // SAFE FIX B: Trigger segmentation run
       try {
-        await base44.functions.invoke("aiCustomerSegmentation", {
+        await base44.functions.invoke("customerSegmentationRuntime", {
           action: "run_rfm",
           tenant_id: tenantId,
           window_days: 365,
           force: true,
         });
-        results.push({ fix: "invoke_aiCustomerSegmentation_run_rfm", status: "applied" });
+        results.push({ fix: "invoke_customerSegmentationRuntime_run_rfm", status: "applied" });
       } catch (e) {
         results.push({
-          fix: "invoke_aiCustomerSegmentation_run_rfm",
+          fix: "invoke_customerSegmentationRuntime_run_rfm",
           status: "failed",
           error: e?.message || "invoke_failed",
         });
