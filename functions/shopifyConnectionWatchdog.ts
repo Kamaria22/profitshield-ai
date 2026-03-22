@@ -372,7 +372,14 @@ Deno.serve(async (req) => {
       const customerRows = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
       const hasOrders = recentOrders.length > 0;
       if (hasOrders && customerRows.length === 0) {
-        const repaired = await rebuildProjectedCustomersFromOrders(db, tenantId, 500).catch(() => ({ created: 0, updated: 0, projected: 0 }));
+        let repaired = { created: 0, updated: 0, projected: 0 };
+        let repairError = null;
+        try {
+          repaired = await rebuildProjectedCustomersFromOrders(db, tenantId, 500);
+        } catch (error) {
+          repairError = String(error?.message || error || 'customer_projection_repair_failed');
+          result.customer_projection_repair_error = repairError;
+        }
         const repairedCustomers = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
         if (repairedCustomers.length > 0) {
           result.customer_projection_repaired = true;
@@ -403,7 +410,8 @@ Deno.serve(async (req) => {
             status: 'pending',
             metadata: {
               shop_domain: shopDomain,
-              customer_projection_gap_count: nextGapCount
+              customer_projection_gap_count: nextGapCount,
+              customer_projection_repair_error: repairError
             }
           }).catch(() => {});
         }
