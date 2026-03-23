@@ -370,6 +370,9 @@ export default function PnLAnalytics() {
           {/* Key Metrics Cards */}
           <PnLMetricsCards metrics={metrics} />
 
+          {/* AI Order Analysis */}
+          <AIOrderAnalysis orders={orders} metrics={metrics} />
+
           {/* Trends Chart */}
           <PnLTrendsChart data={trendData} granularity={granularity} />
 
@@ -405,9 +408,6 @@ export default function PnLAnalytics() {
               />
             </CardContent>
           </Card>
-
-          {/* AI Order Analysis */}
-          <AIOrderAnalysis orders={orders} metrics={metrics} />
 
           {/* Drilldown Panel */}
           {drilldownOrders && (
