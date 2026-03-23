@@ -21,6 +21,9 @@ import PnLSegmentTable from '@/components/analytics/PnLSegmentTable';
 import OrderDrilldownPanel from '@/components/analytics/OrderDrilldownPanel';
 import AIOrderAnalysis from '@/components/analytics/AIOrderAnalysis';
 
+const POLL_INTERVAL_MS = 60 * 1000;
+const INVALIDATION_DEBOUNCE_MS = 2500;
+
 const DATE_PRESETS = [
   { label: 'Today', value: 'today', getDates: () => ({ from: new Date(), to: new Date() }) },
   { label: 'Last 7 Days', value: '7d', getDates: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
@@ -50,6 +53,7 @@ export default function PnLAnalytics() {
   const [segmentBy, setSegmentBy] = useState('product');
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [drilldownOrders, setDrilldownOrders] = useState(null);
+  const invalidateTimerRef = React.useRef(null);
 
   // Fetch orders for the date range
   const {
@@ -62,7 +66,7 @@ export default function PnLAnalytics() {
     queryKey: [...buildQueryKey('pnl-orders', resolverCheck), dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
       if (!queryFilter?.tenant_id) return [];
-      const allOrders = await base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id });
+      const allOrders = await base44.entities.Order.filter({ tenant_id: queryFilter.tenant_id }, '-order_date', 5000);
       return allOrders.filter(order => {
         if (!order.order_date) return false;
         const orderDate = new Date(order.order_date);
@@ -70,17 +74,26 @@ export default function PnLAnalytics() {
       });
     },
     enabled: canQuery && !tenantLoading,
-    staleTime: 0,
-    refetchInterval: 30000, // refetch every 30s
+    staleTime: 15 * 1000,
+    refetchInterval: () => (typeof document !== 'undefined' && document.visibilityState === 'visible' ? POLL_INTERVAL_MS : false),
+    refetchIntervalInBackground: false,
   });
 
   // Real-time subscription: invalidate query when orders change
   useEffect(() => {
     if (!queryFilter?.tenant_id) return;
     const unsubscribe = base44.entities.Order.subscribe(() => {
-      queryClient.invalidateQueries({ queryKey: buildQueryKey('pnl-orders', resolverCheck) });
+      if (invalidateTimerRef.current) return;
+      invalidateTimerRef.current = window.setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: buildQueryKey('pnl-orders', resolverCheck) });
+        invalidateTimerRef.current = null;
+      }, INVALIDATION_DEBOUNCE_MS);
     });
     return () => {
+      if (invalidateTimerRef.current) {
+        window.clearTimeout(invalidateTimerRef.current);
+        invalidateTimerRef.current = null;
+      }
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [queryFilter?.tenant_id, queryClient, resolverCheck]);
