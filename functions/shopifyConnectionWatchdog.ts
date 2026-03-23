@@ -380,11 +380,28 @@ Deno.serve(async (req) => {
           repairError = String(error?.message || error || 'customer_projection_repair_failed');
           result.customer_projection_repair_error = repairError;
         }
+        result.customer_projection_repair_attempted = true;
+        result.customer_projection_repair_counts = repaired;
         const repairedCustomers = await db.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 5).catch(() => []);
         if (repairedCustomers.length > 0) {
           result.customer_projection_repaired = true;
           result.customer_projection_repaired_count = repaired.projected || repaired.created || repaired.updated || repairedCustomers.length;
         } else {
+        const expectedEmails = new Set(
+          recentOrders
+            .map((order) => String(order?.customer_email || '').trim().toLowerCase())
+            .filter(Boolean)
+        );
+        const globalCustomers = await db.entities.Customer.list('-created_date', 20).catch(() => []);
+        const matchingGlobalCustomers = Array.isArray(globalCustomers)
+          ? globalCustomers.filter((customer) => expectedEmails.has(String(customer?.email || '').trim().toLowerCase()))
+          : [];
+        result.customer_projection_global_matches = matchingGlobalCustomers.length;
+        result.customer_projection_global_match_sample = matchingGlobalCustomers.slice(0, 3).map((customer) => ({
+          id: customer?.id || null,
+          email: customer?.email || null,
+          tenant_id: customer?.tenant_id || null,
+        }));
         result.health_issues.push('customer_projection_gap');
         result.customer_projection_gap = true;
         const previousGapCount = Number(integration?.metadata?.customer_projection_gap_count || 0) || 0;
@@ -411,7 +428,9 @@ Deno.serve(async (req) => {
             metadata: {
               shop_domain: shopDomain,
               customer_projection_gap_count: nextGapCount,
-              customer_projection_repair_error: repairError
+              customer_projection_repair_error: repairError,
+              customer_projection_repair_counts: repaired,
+              customer_projection_global_matches: matchingGlobalCustomers.length
             }
           }).catch(() => {});
         }
