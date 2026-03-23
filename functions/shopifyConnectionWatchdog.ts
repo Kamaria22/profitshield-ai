@@ -14,7 +14,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { rebuildProjectedCustomersFromOrders } from './helpers/customerProjection.ts';
 
-const VERSION = '2026-03-23.watchdog-customer-projection-v3';
+const VERSION = '2026-03-23.watchdog-customer-projection-v4';
 const API_VERSION = '2024-10';
 const APP_URL = (Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app').replace(/\/$/, '');
 const WEBHOOK_ENDPOINT_CANONICAL = `${APP_URL}/api/functions/shopifyWebhook`;
