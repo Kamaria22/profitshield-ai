@@ -87,10 +87,20 @@ async function loadExistingCustomer(db: any, tenantId: string, email: string) {
 
 async function writeProjectedCustomer(db: any, current: any, payload: Record<string, any>) {
   try {
-    if (current?.id) {
-      return await db.entities.Customer.update(current.id, payload);
+    const action = current?.id ? 'update' : 'create';
+    const result = current?.id
+      ? await db.entities.Customer.update(current.id, payload)
+      : await db.entities.Customer.create(payload);
+
+    if (!result || (!result?.id && action === 'create')) {
+      throw new Error(`customer_projection_${action}_returned_empty`);
     }
-    return await db.entities.Customer.create(payload);
+
+    if (current?.id && String(result?.id || current.id) !== String(current.id)) {
+      throw new Error('customer_projection_update_mismatched_id');
+    }
+
+    return result;
   } catch (error) {
     const message = String(error?.message || error || 'customer_projection_write_failed');
     console.error('[customerProjection] persistence failed', {
