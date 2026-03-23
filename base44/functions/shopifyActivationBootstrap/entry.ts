@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 import { rebuildProjectedCustomersFromOrders } from './helpers/customerProjection.ts';
 
-const VERSION = '2026-03-24.bootstrap-v2';
+const VERSION = '2026-03-24.bootstrap-v3';
 const API_VERSION = '2024-10';
 const INLINE_QUEUE_LIMIT = 20;
 
@@ -561,6 +561,7 @@ Deno.serve(withEndpointGuard('shopifyActivationBootstrap', async (req) => {
       last_sync_at: refreshed?.last_sync_at || integration?.last_sync_at || null,
       integration_status: refreshed?.status || integration?.status || null,
       webhook_count: Object.keys(refreshed?.webhook_endpoints || integration?.webhook_endpoints || {}).length
-    }
+    },
+    deployment_hint: 'inline-bootstrap-fallback'
   });
 }));
