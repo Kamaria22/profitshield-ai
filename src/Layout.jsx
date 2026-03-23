@@ -688,12 +688,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* Desktop Sidebar */}
       <aside className={`
-        hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw]
-        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-2xl border-r border-cyan-400/10 shadow-[0_0_50px_rgba(8,47,73,0.18)]
+        hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] overflow-hidden
+        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-2xl border-r border-cyan-400/10 shadow-[0_18px_48px_rgba(2,6,23,0.42)]
         transform transition-transform duration-200 ease-in-out
         translate-x-0
       `}>
-        <div className="flex flex-col h-full">
+        <div className="relative flex h-full w-full flex-col">
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-cyan-400/0 via-cyan-300/30 to-cyan-400/0" />
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-white/8">
             <Link to={createPageUrl('Home', location.search)} className="flex items-center gap-2">
@@ -883,7 +884,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64 overflow-x-hidden min-h-screen flex flex-col">
+      <div className="relative isolate min-h-screen flex flex-col overflow-x-hidden lg:ml-64">
         {/* Top bar */}
         <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.88),rgba(8,15,30,0.78))] backdrop-blur-xl border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
           <button 
