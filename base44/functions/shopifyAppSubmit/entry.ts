@@ -28,13 +28,13 @@ ENTERPRISE GRADE
 • Full audit trail and compliance logs
 • GDPR and CCPA compliant
 • Bank-level encryption (AES-256)`,
-  supportUrl: 'https://profitshield.base44.app/?page=HelpCenter',
-  privacyPolicyUrl: 'https://profitshield.base44.app/?page=PrivacyPolicy',
-  termsUrl: 'https://profitshield.base44.app/?page=TermsOfService',
+  supportUrl: 'https://profit-shield-ai.base44.app/?page=HelpCenter',
+  privacyPolicyUrl: 'https://profit-shield-ai.base44.app/?page=PrivacyPolicy',
+  termsUrl: 'https://profit-shield-ai.base44.app/?page=TermsOfService',
   webhooks: [
-    { topic: 'CUSTOMERS_REDACT', endpoint: `${Deno.env.get('APP_URL') || 'https://profitshield.base44.app'}/api/gdprCustomerRedact` },
-    { topic: 'SHOP_REDACT', endpoint: `${Deno.env.get('APP_URL') || 'https://profitshield.base44.app'}/api/gdprShopRedact` },
-    { topic: 'CUSTOMERS_DATA_REQUEST', endpoint: `${Deno.env.get('APP_URL') || 'https://profitshield.base44.app'}/api/gdprCustomerDataRequest` },
+    { topic: 'CUSTOMERS_REDACT', endpoint: `${Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app'}/api/gdprCustomerRedact` },
+    { topic: 'SHOP_REDACT', endpoint: `${Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app'}/api/gdprShopRedact` },
+    { topic: 'CUSTOMERS_DATA_REQUEST', endpoint: `${Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app'}/api/gdprCustomerDataRequest` },
   ]
 };
 

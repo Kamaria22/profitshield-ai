@@ -51,7 +51,7 @@ npm install @capacitor/push-notifications @capacitor/app @capacitor/storage @cap
   "appName": "ProfitShield AI",
   "webDir": "dist",
   "server": {
-    "url": "https://profitshield.base44.app",
+    "url": "https://profit-shield-ai.base44.app",
     "cleartext": false
   },
   "ios": {

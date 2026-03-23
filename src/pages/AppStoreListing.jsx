@@ -36,7 +36,7 @@ const CHECKLIST = [
   { id: 'icon', label: 'App icon uploaded (1024×1024px, no alpha)', docsUrl: 'https://shopify.dev/docs/apps/launch/app-requirements' },
   { id: 'screenshots', label: 'Screenshots uploaded (min 3)', docsUrl: null },
   { id: 'pricing', label: 'Pricing plans confirmed in Partner Dashboard', docsUrl: 'https://shopify.dev/docs/apps/launch/billing' },
-  { id: 'support_url', label: 'Support URL set: profitshield.base44.app/?page=HelpCenter', docsUrl: null },
+  { id: 'support_url', label: 'Support URL set: profit-shield-ai.base44.app/?page=HelpCenter', docsUrl: null },
   { id: 'privacy_url', label: 'Privacy Policy URL confirmed', docsUrl: null },
   { id: 'terms_url', label: 'Terms of Service URL confirmed', docsUrl: null },
   { id: 'scopes', label: 'Required OAuth scopes declared in Partner Dashboard', docsUrl: 'https://shopify.dev/docs/api/usage/access-scopes' },
@@ -131,10 +131,10 @@ export default function AppStoreListing() {
           {[
             { label: 'App Handle', val: 'profitshield-ai' },
             { label: 'Category', val: 'Store management' },
-            { label: 'Support URL', val: 'https://profitshield.base44.app/?page=HelpCenter' },
-            { label: 'Marketing URL', val: 'https://profitshield.base44.app' },
-            { label: 'Privacy Policy URL', val: 'https://profitshield.base44.app/?page=PrivacyPolicy' },
-            { label: 'Terms URL', val: 'https://profitshield.base44.app/?page=TermsOfService' },
+            { label: 'Support URL', val: 'https://profit-shield-ai.base44.app/?page=HelpCenter' },
+            { label: 'Marketing URL', val: 'https://profit-shield-ai.base44.app' },
+            { label: 'Privacy Policy URL', val: 'https://profit-shield-ai.base44.app/?page=PrivacyPolicy' },
+            { label: 'Terms URL', val: 'https://profit-shield-ai.base44.app/?page=TermsOfService' },
           ].map(item => (
             <div key={item.label} className="glass-card rounded-xl p-4 border-white/5">
               <p className="text-xs text-slate-500 mb-1">{item.label}</p>

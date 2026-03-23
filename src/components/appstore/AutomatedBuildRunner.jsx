@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 const APP_ID = 'com.profitshield.app';
 const APP_NAME = 'ProfitShield AI';
-const WEB_URL = 'https://profitshield.base44.app';
+const WEB_URL = 'https://profit-shield-ai.base44.app';
 const VERSION = '1.0.0';
 
 function CodeBlock({ code, label }) {

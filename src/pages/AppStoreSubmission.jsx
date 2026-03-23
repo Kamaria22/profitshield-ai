@@ -13,10 +13,10 @@ const APP_VERSION = '1.0.0';
 const BUILD_NUMBER = '100';
 
 const LEGAL_URLS = {
-  privacy: 'https://profitshield.base44.app/?page=PrivacyPolicy',
-  terms: 'https://profitshield.base44.app/?page=TermsOfService',
-  cookies: 'https://profitshield.base44.app/?page=CookiePolicy',
-  dpa: 'https://profitshield.base44.app/?page=DataProcessingAgreement',
+  privacy: 'https://profit-shield-ai.base44.app/?page=PrivacyPolicy',
+  terms: 'https://profit-shield-ai.base44.app/?page=TermsOfService',
+  cookies: 'https://profit-shield-ai.base44.app/?page=CookiePolicy',
+  dpa: 'https://profit-shield-ai.base44.app/?page=DataProcessingAgreement',
 };
 
 function Item({ label, ok, warn, detail, link }) {
@@ -162,7 +162,7 @@ export default function AppStoreSubmission() {
             <Item label="Bundle ID / App ID" ok detail="com.profitshield.app" />
             <Item label="App Version" ok detail={`${APP_VERSION} (${BUILD_NUMBER})`} />
             <Item label="Support Email" ok detail="support@profitshield.ai" />
-            <Item label="Marketing URL" ok detail="https://profitshield.base44.app" link="https://profitshield.base44.app" />
+            <Item label="Marketing URL" ok detail="https://profit-shield-ai.base44.app" link="https://profit-shield-ai.base44.app" />
             <Item label="Category" ok detail="Business / Finance" />
             <Item label="Age Rating" ok detail="4+ (iOS) · Everyone (Android)" />
           </Section>

@@ -7,7 +7,7 @@ import Stripe from 'npm:stripe@14.21.0';
  * Fails safely with 400 if any price ID is missing.
  */
 
-const APP_URL = Deno.env.get('APP_URL') || 'https://profitshield.base44.app';
+const APP_URL = Deno.env.get('APP_URL') || 'https://profit-shield-ai.base44.app';
 
 function getPriceIds() {
   return {
