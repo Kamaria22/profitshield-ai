@@ -5,6 +5,18 @@ const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, '.guard');
 const OUT_FILE = path.join(OUT_DIR, 'layer-inventory.json');
 
+function legacyToBase44(rel) {
+  if (rel === 'functions/helpers/agentRuntime.ts') return 'base44/functions/helpers/agentRuntime/entry.ts';
+  if (!rel.startsWith('functions/') || !rel.endsWith('.ts')) return rel;
+  const name = path.basename(rel, '.ts');
+  return `base44/functions/${name}/entry.ts`;
+}
+
+function resolveExistingPath(rel) {
+  const candidates = [rel, legacyToBase44(rel)];
+  return candidates.find((candidate) => fs.existsSync(path.join(ROOT, candidate))) || rel;
+}
+
 const LAYERS = {
   watchdog: [
     'functions/shopifyConnectionWatchdog.ts',
@@ -43,11 +55,12 @@ const LAYERS = {
 };
 
 function classify(rel) {
-  const abs = path.join(ROOT, rel);
-  if (!fs.existsSync(abs)) return { file: rel, status: 'missing', weak: true, note: 'file not found' };
+  const resolved = resolveExistingPath(rel);
+  const abs = path.join(ROOT, resolved);
+  if (!fs.existsSync(abs)) return { file: rel, resolved_file: resolved, status: 'missing', weak: true, note: 'file not found' };
   const content = fs.readFileSync(abs, 'utf8');
   const hasCore = /Deno\.serve\(|export default function|export class|watchdog|guardian|heal|health|incident|risk|build/i.test(content);
-  return { file: rel, status: hasCore ? 'active_or_usable' : 'partial', weak: !hasCore, note: hasCore ? '' : 'low signal in file body' };
+  return { file: rel, resolved_file: resolved, status: hasCore ? 'active_or_usable' : 'partial', weak: !hasCore, note: hasCore ? '' : 'low signal in file body' };
 }
 
 const layers = {};

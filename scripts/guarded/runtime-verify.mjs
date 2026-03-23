@@ -5,6 +5,18 @@ const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, '.guard');
 const OUT_FILE = path.join(OUT_DIR, 'incidents-runtime.json');
 
+function legacyToBase44(rel) {
+  if (rel === 'functions/helpers/agentRuntime.ts') return 'base44/functions/helpers/agentRuntime/entry.ts';
+  if (!rel.startsWith('functions/') || !rel.endsWith('.ts')) return rel;
+  const name = path.basename(rel, '.ts');
+  return `base44/functions/${name}/entry.ts`;
+}
+
+function resolveExistingPath(rel) {
+  const candidates = [rel, legacyToBase44(rel)];
+  return candidates.find((candidate) => fs.existsSync(path.join(ROOT, candidate))) || rel;
+}
+
 const checks = [
   {
     id: 'embedded_entry_has_csp_header',
@@ -42,7 +54,8 @@ const checks = [
 const incidents = [];
 
 for (const c of checks) {
-  const abs = path.join(ROOT, c.file);
+  const resolved = resolveExistingPath(c.file);
+  const abs = path.join(ROOT, resolved);
   if (!fs.existsSync(abs)) {
     incidents.push({ blocker_type: 'missing_runtime_file', severity: 'critical', owner_agent: c.owner_agent, file: c.file, message: `${c.file} missing` });
     continue;
@@ -59,6 +72,7 @@ for (const c of checks) {
       severity: 'high',
       owner_agent: c.owner_agent,
       file: c.file,
+      resolved_file: resolved,
       check_id: c.id,
       missing,
       message: `${c.id} missing required markers: ${missing.join(', ')}`,

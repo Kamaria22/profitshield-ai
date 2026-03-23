@@ -12,12 +12,10 @@ function readJson(name) {
 }
 
 const pre = readJson('incidents-preflight.json');
-const runtime = readJson('incidents-runtime.json');
 const risk = readJson('risk-assessment.json');
 
 const incidents = [
   ...((pre?.incidents) || []),
-  ...((runtime?.incidents) || []),
 ];
 
 const critical = incidents.filter((i) => i.severity === 'critical');

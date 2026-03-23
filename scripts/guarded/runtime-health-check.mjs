@@ -5,6 +5,18 @@ const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, '.guard');
 const OUT_FILE = path.join(OUT_DIR, 'runtime-health-check.json');
 
+function legacyToBase44(rel) {
+  if (rel === 'functions/helpers/agentRuntime.ts') return 'base44/functions/helpers/agentRuntime/entry.ts';
+  if (!rel.startsWith('functions/') || !rel.endsWith('.ts')) return rel;
+  const name = path.basename(rel, '.ts');
+  return `base44/functions/${name}/entry.ts`;
+}
+
+function resolveExistingPath(rel) {
+  const candidates = [rel, legacyToBase44(rel)];
+  return candidates.find((candidate) => fs.existsSync(path.join(ROOT, candidate))) || rel;
+}
+
 const checks = [
   {
     id: 'layout_mounts_frontend_guardian',
@@ -72,7 +84,8 @@ const checks = [
 
 const incidents = [];
 for (const c of checks) {
-  const abs = path.join(ROOT, c.file);
+  const resolved = resolveExistingPath(c.file);
+  const abs = path.join(ROOT, resolved);
   if (!fs.existsSync(abs)) {
     incidents.push({ severity: 'critical', blocker_type: 'missing_runtime_file', owner_agent: c.owner_agent, check: c.id, file: c.file });
     continue;
@@ -84,7 +97,7 @@ for (const c of checks) {
     missing.push(`one_of:${c.anyTokens.join('|')}`);
   }
   if (missing.length) {
-    incidents.push({ severity: 'high', blocker_type: 'runtime_guard_missing', owner_agent: c.owner_agent, check: c.id, file: c.file, missing });
+    incidents.push({ severity: 'high', blocker_type: 'runtime_guard_missing', owner_agent: c.owner_agent, check: c.id, file: c.file, resolved_file: resolved, missing });
   }
 }
 

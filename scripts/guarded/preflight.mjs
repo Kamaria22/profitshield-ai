@@ -7,12 +7,24 @@ const OUT_FILE = path.join(OUT_DIR, 'incidents-preflight.json');
 
 const incidents = [];
 
+function legacyToBase44(rel) {
+  if (rel === 'functions/helpers/agentRuntime.ts') return 'base44/functions/helpers/agentRuntime/entry.ts';
+  if (!rel.startsWith('functions/') || !rel.endsWith('.ts')) return rel;
+  const name = path.basename(rel, '.ts');
+  return `base44/functions/${name}/entry.ts`;
+}
+
+function resolveExistingPath(rel) {
+  const candidates = [rel, legacyToBase44(rel)];
+  return candidates.find((candidate) => fs.existsSync(path.join(ROOT, candidate))) || rel;
+}
+
 function fileExists(rel) {
-  return fs.existsSync(path.join(ROOT, rel));
+  return fs.existsSync(path.join(ROOT, resolveExistingPath(rel)));
 }
 
 function read(rel) {
-  return fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  return fs.readFileSync(path.join(ROOT, resolveExistingPath(rel)), 'utf8');
 }
 
 function addIncident(incident) {
@@ -86,7 +98,8 @@ function checkCriticalBase44Path() {
   ];
 
   for (const rel of required) {
-    if (!fileExists(rel)) {
+    const resolved = resolveExistingPath(rel);
+    if (!fs.existsSync(path.join(ROOT, resolved))) {
       addIncident({ blocker_type: 'missing_critical_file', severity: 'critical', owner_agent: 'stability_agent', file: rel, message: `${rel} missing`, healable: false });
     }
   }

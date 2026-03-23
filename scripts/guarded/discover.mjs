@@ -6,6 +6,18 @@ const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, '.guard');
 const OUT_FILE = path.join(OUT_DIR, 'protection-inventory.json');
 
+function legacyToBase44(rel) {
+  if (rel === 'functions/helpers/agentRuntime.ts') return 'base44/functions/helpers/agentRuntime/entry.ts';
+  if (!rel.startsWith('functions/') || !rel.endsWith('.ts')) return rel;
+  const name = path.basename(rel, '.ts');
+  return `base44/functions/${name}/entry.ts`;
+}
+
+function resolveExistingPath(rel) {
+  const candidates = [rel, legacyToBase44(rel)];
+  return candidates.find((candidate) => fs.existsSync(path.join(ROOT, candidate))) || rel;
+}
+
 const SYSTEMS = [
   { id: 'self_heal_engine', path: 'functions/selfHeal.ts', role: 'autonomous_recovery', trigger: "base44.functions.invoke('selfHeal', { action: ... })" },
   { id: 'frontend_guardian_fn', path: 'functions/frontendGuardian.ts', role: 'runtime_guardian', trigger: "base44.functions.invoke('frontendGuardian', { action: 'watchdog'|'report_incident' })" },
@@ -28,11 +40,11 @@ const SYSTEMS = [
 ];
 
 function exists(rel) {
-  return fs.existsSync(path.join(ROOT, rel));
+  return fs.existsSync(path.join(ROOT, resolveExistingPath(rel)));
 }
 
 function read(rel) {
-  return fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  return fs.readFileSync(path.join(ROOT, resolveExistingPath(rel)), 'utf8');
 }
 
 function usageCount(token) {
@@ -45,11 +57,12 @@ function usageCount(token) {
 }
 
 function classify(system) {
-  if (!exists(system.path)) {
+  const resolvedPath = resolveExistingPath(system.path);
+  if (!fs.existsSync(path.join(ROOT, resolvedPath))) {
     return { status: 'missing', implemented: false, active: false, notes: ['file not found'] };
   }
 
-  const content = read(system.path);
+  const content = read(resolvedPath);
   const hasHandler = /Deno\.serve\(/.test(content) || /export class/.test(content) || /export default function/.test(content);
   const hasSafetySignals = /allowRole|ensureTenantIsolation|startAgentExecution|run_watchdog|watchdog|heal_|Incident|AuditLog/.test(content);
 
@@ -67,7 +80,7 @@ function classify(system) {
   if (!hasSafetySignals) notes.push('limited explicit safety markers');
   if (refCount <= 1) notes.push('few runtime references; likely manual/scheduled');
 
-  return { status, implemented, active, refCount, notes };
+  return { status, implemented, active, refCount, notes, resolved_path: resolvedPath };
 }
 
 const inventory = SYSTEMS.map((s) => ({ ...s, ...classify(s) }));
