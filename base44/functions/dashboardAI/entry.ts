@@ -1,4 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { rebuildProjectedCustomersFromOrders } from '../helpers/customerProjection/entry.ts';
+
+const VERSION = '2026-03-24.dashboard-projection-v1';
 
 function withEndpointGuard(name, handler) {
   return async (req) => {
@@ -29,6 +32,57 @@ async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
   } catch {
     return fallback;
   }
+}
+
+async function repairProjectedCustomers(base44, tenantId, alerts) {
+  const [orders, customers] = await Promise.all([
+    safeFilter(() => base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId }, '-order_date', 250), [], 'dashboardAI.projection_orders'),
+    safeFilter(() => base44.asServiceRole.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 10), [], 'dashboardAI.projection_customers')
+  ]);
+
+  if (!orders.length || customers.length > 0) {
+    return { attempted: false, repaired: customers.length > 0, customerCount: customers.length };
+  }
+
+  let counts = { created: 0, updated: 0, projected: 0 };
+  try {
+    counts = await rebuildProjectedCustomersFromOrders(base44.asServiceRole, tenantId, 500);
+  } catch (error) {
+    return {
+      attempted: true,
+      repaired: false,
+      customerCount: 0,
+      repairError: String(error?.message || error || 'customer_projection_repair_failed')
+    };
+  }
+
+  const refreshedCustomers = await safeFilter(
+    () => base44.asServiceRole.entities.Customer.filter({ tenant_id: tenantId }, '-created_date', 10),
+    [],
+    'dashboardAI.projection_customers_refreshed'
+  );
+
+  if (refreshedCustomers.length > 0) {
+    const projectionAlerts = (alerts || []).filter((alert) =>
+      String(alert?.title || '').includes('Customer Data Projection Active')
+    );
+    await Promise.all(
+      projectionAlerts.map((alert) =>
+        base44.asServiceRole.entities.Alert.update(alert.id, {
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolution_notes: 'Resolved automatically by dashboardAI projection repair.'
+        }).catch(() => {})
+      )
+    );
+  }
+
+  return {
+    attempted: true,
+    repaired: refreshedCustomers.length > 0,
+    customerCount: refreshedCustomers.length,
+    ...counts
+  };
 }
 
 const handler = withEndpointGuard('dashboardAI', async (req) => {
@@ -63,6 +117,11 @@ const handler = withEndpointGuard('dashboardAI', async (req) => {
         safeFetch(() => base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id, platform: 'shopify', status: 'connected' }).then((r) => r[0] || null), null)
       ]);
 
+      const projectionRepair = await repairProjectedCustomers(base44, tenant_id, alerts);
+      const refreshedAlerts = projectionRepair.repaired
+        ? await safeFetch(() => base44.asServiceRole.entities.Alert.filter({ tenant_id, status: 'pending' }, '-created_date', 10), alerts)
+        : alerts;
+
       const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
       const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
       const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
@@ -75,16 +134,18 @@ const handler = withEndpointGuard('dashboardAI', async (req) => {
           avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
           highRiskOrders,
           totalOrders: orders.length,
-          pendingAlerts: alerts.length
+          pendingAlerts: refreshedAlerts.length
         },
         profitScore: tenant?.profit_integrity_score || 0,
-        alertsCount: alerts.length,
+        alertsCount: refreshedAlerts.length,
         isDemoMode: !integration,
         integrationStatus: integration?.status || null,
         lastSyncAt: integration?.last_sync_at || null,
         bootstrapRecommended: !integration || !integration?.last_sync_at || orders.length === 0,
+        version: VERSION,
+        projectionRepair,
         orders: orders.slice(0, 5),
-        alerts,
+        alerts: refreshedAlerts,
         profitLeaks: leaks
       });
     }

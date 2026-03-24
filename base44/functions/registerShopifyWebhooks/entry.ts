@@ -51,9 +51,6 @@ const TOPICS = [
   'refunds/create',
   'products/update',
   'app/uninstalled',
-  'customers/data_request',
-  'customers/redact',
-  'shop/redact',
   'app_subscriptions/update'
 ];
 
@@ -101,6 +98,17 @@ async function shopifyFetchWithRetry(shopDomain, accessToken, path, init = {}, m
       ...(init.headers || {})
     }
   });
+}
+
+async function loadExistingWebhookMap(shopDomain, accessToken, webhookUrl) {
+  const listRes = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json?limit=250');
+  if (!listRes.ok) return {};
+  const { webhooks = [] } = await listRes.json().catch(() => ({ webhooks: [] }));
+  return Object.fromEntries(
+    (webhooks || [])
+      .filter((webhook) => webhook?.address === webhookUrl && webhook?.topic)
+      .map((webhook) => [webhook.topic, String(webhook.id)])
+  );
 }
 
 Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
@@ -173,13 +181,16 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
       }, { status: 400 });
     }
 
-    // Delete ALL stale webhooks (including wrong-domain ones)
+    // Delete stale webhooks that point to non-canonical destinations.
     try {
       const listRes = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json?limit=250');
       if (listRes.ok) {
         const { webhooks } = await listRes.json();
         for (const wh of (webhooks || [])) {
-          if (staleEndpoints.some(ep => wh.address.includes('shopifyWebhook') || wh.address === ep)) {
+          const address = String(wh?.address || '');
+          const isShopifyWebhook = address.includes('shopifyWebhook');
+          const isCanonical = address === webhookUrl;
+          if (isShopifyWebhook && !isCanonical && staleEndpoints.includes(address)) {
             await shopifyFetchWithRetry(shopDomain, accessToken, `/webhooks/${wh.id}.json`, {
               method: 'DELETE',
             }).catch(() => {});
@@ -194,9 +205,25 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
     const registered = {};
     const errors = [];
     const registryRecords = [];
+    const existingWebhookMap = await loadExistingWebhookMap(shopDomain, accessToken, webhookUrl);
 
     for (const topic of TOPICS) {
       try {
+        if (existingWebhookMap[topic]) {
+          const webhookId = existingWebhookMap[topic];
+          registered[topicToKey(topic)] = webhookId;
+          registryRecords.push({
+            shop_domain: shopDomain,
+            tenant_id: integration.tenant_id,
+            topic,
+            address: webhookUrl,
+            webhook_id: webhookId,
+            status: 'active',
+            last_checked_at: new Date().toISOString()
+          });
+          continue;
+        }
+
         const res = await shopifyFetchWithRetry(shopDomain, accessToken, '/webhooks.json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -217,7 +244,25 @@ Deno.serve(withEndpointGuard('registerShopifyWebhooks', async (req) => {
             last_checked_at: new Date().toISOString()
           });
         } else {
-          errors.push({ topic, error: JSON.stringify(data.errors || data) });
+          const normalizedError = JSON.stringify(data.errors || data);
+          if (normalizedError.includes('already been taken')) {
+            const refreshedWebhookMap = await loadExistingWebhookMap(shopDomain, accessToken, webhookUrl);
+            if (refreshedWebhookMap[topic]) {
+              const webhookId = refreshedWebhookMap[topic];
+              registered[topicToKey(topic)] = webhookId;
+              registryRecords.push({
+                shop_domain: shopDomain,
+                tenant_id: integration.tenant_id,
+                topic,
+                address: webhookUrl,
+                webhook_id: webhookId,
+                status: 'active',
+                last_checked_at: new Date().toISOString()
+              });
+              continue;
+            }
+          }
+          errors.push({ topic, error: normalizedError });
         }
       } catch (e) {
         errors.push({ topic, error: e.message });
