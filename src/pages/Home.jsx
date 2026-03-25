@@ -10,7 +10,10 @@ import { usePermissions } from '@/components/usePermissions';
 import { 
   Sparkles,
   ArrowRight,
-  Store
+  Store,
+  Shield,
+  Brain,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -174,6 +177,10 @@ export default function Home() {
   const [showDeferredContent, setShowDeferredContent] = useState(false);
 
   useEffect(() => {
+    if (dashboardSummary) {
+      setShowDeferredContent(true);
+      return undefined;
+    }
     let timeoutId = null;
     let idleId = null;
     const enableDeferred = () => setShowDeferredContent(true);
@@ -188,7 +195,7 @@ export default function Home() {
         window.cancelIdleCallback(idleId);
       }
     };
-  }, []);
+  }, [dashboardSummary]);
 
   useEffect(() => {
     if (!isOwnerAdmin && shouldShowTutorial && authTenantId) {
@@ -625,6 +632,33 @@ export default function Home() {
             )}
           </div>
 
+          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <SignalBrief
+              icon={Brain}
+              label="AI posture"
+              value={displayProfitLeaks.length > 0 ? `${displayProfitLeaks.length} active leak signals` : 'No active leak signals'}
+              tone="text-violet-200"
+            />
+            <SignalBrief
+              icon={AlertTriangle}
+              label="Alert pressure"
+              value={(dashboardSummary?.alerts?.length || 0) > 0 ? `${dashboardSummary.alerts.length} pending alerts` : 'No pending alerts'}
+              tone={(dashboardSummary?.alerts?.length || 0) > 0 ? 'text-amber-200' : 'text-emerald-200'}
+            />
+            <SignalBrief
+              icon={Shield}
+              label="Risk field"
+              value={metrics.highRiskOrders > 0 ? `${metrics.highRiskOrders} high-risk orders` : 'Risk field stable'}
+              tone={metrics.highRiskOrders > 0 ? 'text-red-200' : 'text-cyan-200'}
+            />
+            <SignalBrief
+              icon={Sparkles}
+              label="Sync runtime"
+              value={syncMutation.isPending ? 'Actively healing store state' : dashboardSummary?.lastSyncAt ? 'Warm, recent sync available' : 'Bootstrap standing by'}
+              tone="text-emerald-200"
+            />
+          </div>
+
           {/* 1️⃣ AI Profit Operating System — instant, above-the-fold */}
           <AIProfitOperatingSystem
             metrics={metrics}
@@ -774,5 +808,21 @@ export default function Home() {
         </div>
       </div>
     </SubscriptionGate>
+  );
+}
+
+function SignalBrief({ icon: Icon, label, value, tone = 'text-cyan-200' }) {
+  return (
+    <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.04]">
+          <Icon className={`h-4 w-4 ${tone}`} />
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
+          <p className={`mt-1 text-sm font-semibold ${tone}`}>{value}</p>
+        </div>
+      </div>
+    </div>
   );
 }
