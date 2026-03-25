@@ -240,14 +240,25 @@ async function writeAudit(base44, tenantId, action, details) {
 
 async function upsertHealthSnapshot(base44, tenantId, snapshot) {
   const db = base44.asServiceRole.entities;
+  const normalized = {
+    ...snapshot,
+    tenant_id: tenantId,
+    period: snapshot?.period || currentPeriod(),
+    period_type: snapshot?.period_type || "daily",
+    detected_at: snapshot?.detected_at || snapshot?.computed_at || nowIso(),
+  };
   const existing = await db.SystemHealth
-    .filter({ tenant_id: tenantId })
+    .filter({
+      tenant_id: tenantId,
+      period: normalized.period,
+      period_type: normalized.period_type,
+    })
     .catch(() => []);
   if (existing?.[0]) {
-    await db.SystemHealth.update(existing[0].id, snapshot).catch(() => {});
-    return existing[0].id;
+    const updated = await db.SystemHealth.update(existing[0].id, normalized).catch(() => null);
+    return updated?.id || existing[0].id || null;
   }
-  const created = await db.SystemHealth.create(snapshot).catch(() => null);
+  const created = await db.SystemHealth.create(normalized).catch(() => null);
   return created?.id || null;
 }
 
@@ -471,6 +482,9 @@ Deno.serve(async (req) => {
         const snapshot = {
           tenant_id: tid,
           computed_at: nowIso(),
+          detected_at: nowIso(),
+          period: currentPeriod(),
+          period_type: "daily",
           healthy: true,
           checks: {
             ensure_defaults: defaults,
@@ -483,12 +497,25 @@ Deno.serve(async (req) => {
           const uiCheck = await evaluateUiProbe(base44, tid, uiProbe);
           snapshot.checks.ui_route_integrity = uiCheck;
           if (!uiCheck.ok) snapshot.healthy = false;
+        } else {
+          snapshot.checks.ui_route_integrity = {
+            ok: true,
+            skipped: true,
+            reason: "ui_probe_missing"
+          };
         }
 
         if (seg?.ok === false) snapshot.healthy = false;
 
-        await upsertHealthSnapshot(base44, tid, snapshot);
-        out.push({ tenant_id: tid, healthy: snapshot.healthy, checks: snapshot.checks });
+        const snapshotId = await upsertHealthSnapshot(base44, tid, snapshot);
+        const persisted = !!snapshotId;
+        out.push({
+          tenant_id: tid,
+          healthy: persisted ? snapshot.healthy : false,
+          snapshot_persisted: persisted,
+          snapshot_id: snapshotId,
+          checks: snapshot.checks
+        });
       }
 
       return ok({ action, tenants_checked: out.length, results: out, elapsed_ms: Date.now() - start }, 200);
