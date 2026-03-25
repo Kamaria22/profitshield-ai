@@ -348,7 +348,7 @@ export default function Orders() {
       )}
 
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-5 py-5">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-4 py-4">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.14),transparent_60%)] lg:block" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

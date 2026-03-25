@@ -1037,7 +1037,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         <main
           ref={mainScrollRef}
           onScroll={handleMainScroll}
-          className={`future-grid flex-1 ${device.isMobile ? 'p-3' : device.isTablet ? 'p-4' : 'p-4 lg:p-6'} ${showPhoneQuickNav ? 'pb-24' : 'pb-6'} bg-transparent overflow-x-hidden overflow-y-auto`}
+          className={`future-grid flex-1 ${device.isMobile ? 'p-2' : device.isTablet ? 'p-3' : 'p-3 lg:p-4'} ${showPhoneQuickNav ? 'pb-24' : 'pb-5'} bg-transparent overflow-x-hidden overflow-y-auto`}
           style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
           aria-label="App content"
@@ -1057,7 +1057,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.10),transparent_65%)]" />
-          <div className="page-canvas relative z-[1] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+          <div className="page-canvas relative z-[1] px-2.5 py-2.5 sm:px-3 sm:py-3 lg:px-4 lg:py-3.5">
             <div className="orbital-ring -left-16 top-8 h-40 w-40 opacity-40" />
             <div className="orbital-ring right-6 top-10 h-24 w-24 opacity-30" />
             {children}

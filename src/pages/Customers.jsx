@@ -246,7 +246,7 @@ export default function Customers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-5 py-5">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-4 py-4">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.16),transparent_60%)] lg:block" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

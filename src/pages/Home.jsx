@@ -573,7 +573,7 @@ export default function Home() {
 
         {/* Main Grid */}
           <div className="flex-1">
-          <div className="future-panel relative mb-4 overflow-hidden rounded-[1.8rem] px-5 py-4">
+          <div className="future-panel relative mb-3 overflow-hidden rounded-[1.8rem] px-4 py-3.5">
             <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
             <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
@@ -585,7 +585,7 @@ export default function Home() {
                     {metrics.totalOrders > 0 ? `${metrics.totalOrders} tracked orders` : 'Bootstrap adaptive'}
                   </span>
                 </div>
-                <h1 className="text-3xl font-semibold text-white sm:text-[2.4rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
+                <h1 className="text-[1.8rem] font-semibold text-white sm:text-[2.15rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
                   Merchant command center
                 </h1>
                 <p className="mt-1.5 max-w-2xl text-sm text-slate-400 sm:text-base">
@@ -607,24 +607,16 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Dashboard Layer</p>
-              <h2 className="text-xl font-semibold text-white">Instant operational overview</h2>
-              <p className="text-sm text-slate-400">
-                Profit telemetry, risk posture, automation status, and recovery controls arranged for immediate action.
-              </p>
-            </div>
             {resolver?.user?.id && (
-              <Suspense fallback={null}>
-                <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
-              </Suspense>
+              <div className="mt-3 flex justify-start lg:justify-end">
+                <Suspense fallback={null}>
+                  <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
+                </Suspense>
+              </div>
             )}
           </div>
 
-          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SignalBrief
               icon={Brain}
               label="AI posture"
@@ -657,7 +649,7 @@ export default function Home() {
             profitScore={profitScore}
             loading={summaryLoading}
           />
-          <div className="mt-4">
+          <div className="mt-3">
             <WelcomeChecklist />
           </div>
 

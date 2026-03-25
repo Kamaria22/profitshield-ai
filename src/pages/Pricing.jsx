@@ -363,7 +363,7 @@ export default function Pricing() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
-          className="future-panel future-grid future-scan text-center mb-8 overflow-hidden rounded-[2rem] px-6 py-8"
+          className="future-panel future-grid future-scan text-center mb-6 overflow-hidden rounded-[2rem] px-5 py-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -428,7 +428,7 @@ export default function Pricing() {
         </motion.div>
 
         {/* Pricing Cards */}
-        <div className="sticky top-3 z-20 mb-6">
+        <div className="sticky top-2 z-20 mb-5">
           <div className="mx-auto max-w-4xl rounded-2xl border border-emerald-400/20 bg-slate-950/70 backdrop-blur px-4 py-3 shadow-lg">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
