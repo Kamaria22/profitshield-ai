@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import { CheckCircle2, XCircle, AlertCircle, Loader2, ClipboardList, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +60,7 @@ export default function AppStoreSubmission() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    loadCurrentUserSafe().then(setUser).catch(() => {});
   }, []);
 
   const runChecks = async () => {

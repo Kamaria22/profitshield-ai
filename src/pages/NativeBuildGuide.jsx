@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import AutomatedBuildRunner from '@/components/appstore/AutomatedBuildRunner';
-import { base44 } from '@/api/base44Client';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 
 export default function NativeBuildGuide() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    loadCurrentUserSafe().then(setUser).catch(() => {});
   }, []);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'owner';

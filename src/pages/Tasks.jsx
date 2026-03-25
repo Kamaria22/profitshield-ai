@@ -25,6 +25,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import TasksTable from '../components/tasks/TasksTable';
 import TaskDetailPanel from '../components/tasks/TaskDetailPanel';
 import CreateTaskDialog from '../components/tasks/CreateTaskDialog';
@@ -51,8 +52,8 @@ export default function Tasks() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-  }, []);
+    loadCurrentUserSafe(resolver?.user).then(setUser).catch(() => {});
+  }, [resolver?.user]);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: tasksQueryKey,

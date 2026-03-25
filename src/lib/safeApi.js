@@ -18,6 +18,33 @@ function extractHttpStatus(error) {
   return match ? Number(match[1]) : null;
 }
 
+function shouldTryFallback(error) {
+  const status = extractHttpStatus(error);
+  const msg = String(error?.message || '').toLowerCase();
+  return (
+    status === 0 ||
+    status === 404 ||
+    status === 408 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    msg.includes('deployment does not exist') ||
+    msg.includes('not found') ||
+    msg.includes('timeout') ||
+    msg.includes('network')
+  );
+}
+
+async function invokeWithTimeout(fnName, payload, timeoutMs) {
+  return await Promise.race([
+    base44.functions.invoke(fnName, payload),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`invoke_timeout_${fnName}_${timeoutMs}ms`)), timeoutMs);
+    })
+  ]);
+}
+
 export async function retryAsync(fn, options = {}) {
   const attempts = Math.max(1, options.attempts || 3);
   const baseMs = Math.max(100, options.baseMs || 250);
@@ -41,6 +68,7 @@ export async function retryAsync(fn, options = {}) {
 export async function invokeWithRetry(name, payload = {}, options = {}) {
   const attempts = options.attempts || 3;
   const baseMs = options.baseMs || 300;
+  const timeoutMs = Math.max(2500, options.timeoutMs || 12000);
   const candidates = [name, ...(FUNCTION_FALLBACKS[name] || [])];
   let lastError = null;
 
@@ -78,13 +106,12 @@ export async function invokeWithRetry(name, payload = {}, options = {}) {
         return payload;
       })();
       return await retryAsync(
-        () => base44.functions.invoke(fnName, invokePayload),
+        () => invokeWithTimeout(fnName, invokePayload, timeoutMs),
         { attempts, baseMs }
       );
     } catch (error) {
       lastError = error;
-      const status = extractHttpStatus(error);
-      if (status !== 404) {
+      if (!shouldTryFallback(error)) {
         throw error;
       }
     }

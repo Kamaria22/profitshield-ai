@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import { Zap, Clock, Loader2, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -28,7 +29,7 @@ export default function PerformanceAudit() {
   const [results, setResults] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    loadCurrentUserSafe().then(setUser).catch(() => {});
   }, []);
 
   const runAudit = async () => {

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';
 import { invokeWithRetry } from '@/lib/safeApi';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,23 +27,22 @@ import {
 } from 'lucide-react';
 
 export default function SystemHealth() {
+  // SINGLE SOURCE OF TRUTH: Platform Resolver
+  const resolver = usePlatformResolver();
+  const resolverCheck = requireResolved(resolver);
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then((u) => {
+    loadCurrentUserSafe(resolver?.user).then((u) => {
       const role = String(u?.role || u?.app_role || '').toLowerCase();
       setUserRole(role || null);
     }).catch(() => {});
-  }, []);
+  }, [resolver?.user]);
 
   const isAdmin = userRole === 'admin';
   const isOwner = userRole === 'owner';
   const isPrivileged = isAdmin || isOwner;
 
-  // SINGLE SOURCE OF TRUTH: Platform Resolver
-  const resolver = usePlatformResolver();
-  const resolverCheck = requireResolved(resolver);
-  
   const canQuery = canQueryTenant(resolverCheck);
   const queryFilter = getTenantFilter(resolverCheck);
   const eventLogsQueryKey = buildQueryKey('eventLogs', resolverCheck);

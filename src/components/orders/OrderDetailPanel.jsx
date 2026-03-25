@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { base44 } from '@/api/base44Client';
+import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import RiskAnalysisCard from './RiskAnalysisCard';
 import RiskBreakdownCard from '../risk/RiskBreakdownCard';
 import RiskMitigationPanel from '../risk/RiskMitigationPanel';
@@ -123,7 +124,7 @@ export default function OrderDetailPanel({ order, onClose, onOrderUpdated }) {
       await base44.entities.Order.update(order.id, updateData);
       
       // Log the action
-      const user = await base44.auth.me();
+      const user = await loadCurrentUserSafe();
       await base44.entities.AuditLog.create({
         tenant_id: order.tenant_id,
         actor_email: user?.email || 'unknown',
