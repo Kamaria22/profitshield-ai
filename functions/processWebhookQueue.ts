@@ -10,7 +10,119 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { upsertProjectedCustomer } from '../base44/functions/helpers/customerProjection/entry.ts';
+
+function normalizeEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return email || null;
+}
+
+function normalizeName(value) {
+  const name = String(value || '').trim();
+  return name || null;
+}
+
+function syntheticGuestEmail(order) {
+  const name = normalizeName(order?.customer_name || order?.shipping_address?.name || order?.billing_address?.name);
+  if (name) {
+    return `guest_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}@guest.local`;
+  }
+  const platformOrderId = String(order?.platform_order_id || order?.id || crypto.randomUUID());
+  return `guest_${platformOrderId.toLowerCase()}@guest.local`;
+}
+
+function projectedCustomerIdentity(order) {
+  const email = normalizeEmail(order?.customer_email || order?.email) || syntheticGuestEmail(order);
+  const name = normalizeName(order?.customer_name) || normalizeName(order?.shipping_address?.name) || 'Guest Customer';
+  return { email, name };
+}
+
+function projectedRiskProfile(totalOrders, highRiskOrders) {
+  const highRiskRatio = totalOrders > 0 ? highRiskOrders / totalOrders : 0;
+  if (highRiskRatio >= 0.35) return 'high';
+  if (highRiskRatio >= 0.15) return 'medium';
+  return 'low';
+}
+
+function splitName(name) {
+  const normalized = normalizeName(name) || '';
+  if (!normalized) return { firstName: 'Guest', lastName: 'Customer' };
+  const [firstName, ...rest] = normalized.split(/\s+/);
+  return { firstName: firstName || 'Guest', lastName: rest.join(' ') || 'Customer' };
+}
+
+function buildCustomerPayload(tenantId, email, name, metrics) {
+  const { firstName, lastName } = splitName(name);
+  const totalOrders = Math.max(0, Number(metrics.totalOrders) || 0);
+  const totalSpent = Number(metrics.totalSpent) || 0;
+  const totalProfit = Number(metrics.totalProfit) || 0;
+  const refundCount = Math.max(0, Number(metrics.refundCount) || 0);
+  const highRiskOrders = Math.max(0, Number(metrics.highRiskOrders) || 0);
+  const avgOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+  const riskProfile = projectedRiskProfile(totalOrders, highRiskOrders);
+  const riskScore = totalOrders > 0 ? Math.min(100, Math.round((highRiskOrders / totalOrders) * 100)) : 0;
+  return {
+    tenant_id: tenantId,
+    email,
+    name,
+    first_name: firstName,
+    last_name: lastName,
+    total_orders: totalOrders,
+    orders_count: totalOrders,
+    total_spent: totalSpent,
+    total_profit: totalProfit,
+    ltv: totalSpent,
+    avg_order_value: avgOrderValue,
+    refund_count: refundCount,
+    high_risk_orders: highRiskOrders,
+    risk_profile: riskProfile,
+    risk_score: riskScore,
+    last_order_at: metrics.lastOrderAt || null,
+  };
+}
+
+async function loadExistingCustomer(db, tenantId, email) {
+  const byUpdated = await db.entities.Customer.filter({ tenant_id: tenantId, email }, '-updated_date', 1).catch(() => []);
+  if (byUpdated?.[0]) return byUpdated[0];
+  const byCreated = await db.entities.Customer.filter({ tenant_id: tenantId, email }, '-created_date', 1).catch(() => []);
+  return byCreated?.[0] || null;
+}
+
+async function writeProjectedCustomer(db, current, payload) {
+  const result = current?.id
+    ? await db.entities.Customer.update(current.id, payload)
+    : await db.entities.Customer.create(payload);
+  if (!result || (!result?.id && !current?.id)) throw new Error('customer_projection_write_failed');
+  return result;
+}
+
+async function upsertProjectedCustomer(db, tenantId, order) {
+  if (!db?.entities?.Customer || !tenantId || !order) return null;
+  const { email, name } = projectedCustomerIdentity(order);
+  const current = await loadExistingCustomer(db, tenantId, email);
+  const totalOrders = Number(current?.total_orders ?? current?.orders_count || 0) || 0;
+  const totalSpent = Number(current?.total_spent || 0) || 0;
+  const totalProfit = Number(current?.total_profit || 0) || 0;
+  const refundCount = Number(current?.refund_count || 0) || 0;
+  const highRiskOrders = Number(current?.high_risk_orders || 0) || 0;
+  const orderRevenue = Number(order?.total_revenue || 0) || 0;
+  const orderProfit = Number(order?.net_profit ?? order?.total_profit || 0) || 0;
+  const isRefunded = String(order?.status || '').toLowerCase().includes('refund');
+  const isHighRisk = String(order?.risk_level || '').toLowerCase() === 'high' || Number(order?.fraud_score || order?.risk_score || 0) >= 70;
+  const candidateOrderAt = order?.order_date || order?.created_date || current?.last_order_at || null;
+  const currentLastOrderAt = current?.last_order_at || current?.created_date || null;
+  const latestOrderAt = !currentLastOrderAt || (candidateOrderAt && new Date(candidateOrderAt).getTime() >= new Date(currentLastOrderAt).getTime())
+    ? candidateOrderAt
+    : currentLastOrderAt;
+  const payload = buildCustomerPayload(tenantId, email, name, {
+    totalOrders: totalOrders + 1,
+    totalSpent: totalSpent + orderRevenue,
+    totalProfit: totalProfit + orderProfit,
+    refundCount: refundCount + (isRefunded ? 1 : 0),
+    highRiskOrders: highRiskOrders + (isHighRisk ? 1 : 0),
+    lastOrderAt: latestOrderAt,
+  });
+  return await writeProjectedCustomer(db, current, payload);
+}
 
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 20;

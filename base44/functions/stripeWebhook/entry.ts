@@ -23,7 +23,7 @@ const TIER_ORDER_LIMITS = {
 async function triggerTenantBootstrap(base44, tenantId, source) {
   if (!tenantId) return;
   try {
-    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrapV2', {
+    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrap', {
       tenant_id: tenantId,
       source,
       force: true,
