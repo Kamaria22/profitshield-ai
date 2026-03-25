@@ -348,21 +348,44 @@ export default function Orders() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">Orders</h1>
-          <p className="text-slate-400">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-5 py-5">
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.14),transparent_60%)] lg:block" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                Order Command Layer
+              </span>
+              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
+                {stats.totalOrders} visible orders
+              </span>
+            </div>
+            <h1 className="text-3xl font-semibold text-white">Orders</h1>
+            <p className="text-slate-400 mt-2">
             View and analyze order profitability
             {tenantSettings?.demo_mode === false && (
               <Badge variant="outline" className="ml-2 text-xs">Real orders only</Badge>
             )}
-          </p>
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:items-end">
+            <OrderSyncStatus
+              tenantId={resolverCheck.tenantId}
+              integrationId={resolverCheck.integrationId}
+              onSynced={() => queryClient.invalidateQueries({ queryKey: ordersQueryKey })}
+            />
+            <div className="grid grid-cols-2 gap-3 sm:w-[280px]">
+              <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Risk exposure</p>
+                <p className={`mt-1 text-sm font-semibold ${stats.highRisk > 0 ? 'text-red-300' : 'text-emerald-200'}`}>{stats.highRisk > 0 ? `${stats.highRisk} high risk` : 'Controlled'}</p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Profit posture</p>
+                <p className={`mt-1 text-sm font-semibold ${stats.totalProfit >= 0 ? 'text-emerald-200' : 'text-red-300'}`}>{stats.totalProfit >= 0 ? 'Positive' : 'Negative'}</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <OrderSyncStatus
-          tenantId={resolverCheck.tenantId}
-          integrationId={resolverCheck.integrationId}
-          onSynced={() => queryClient.invalidateQueries({ queryKey: ordersQueryKey })}
-        />
       </div>
 
       {/* Stats Bar */}

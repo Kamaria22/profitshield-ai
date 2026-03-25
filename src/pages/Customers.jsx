@@ -246,7 +246,9 @@ export default function Customers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-5 py-5">
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.16),transparent_60%)] lg:block" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {selectedSegment && (
             <Button variant="ghost" size="icon" onClick={() => setSelectedSegment(null)}>
@@ -254,10 +256,18 @@ export default function Customers() {
             </Button>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-100">
+                Customer Intelligence Mesh
+              </span>
+              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                {summaryStats.totalCustomers} tracked customers
+              </span>
+            </div>
+            <h1 className="text-3xl font-semibold text-white">
               {selectedSegment ? selectedSegment.name : 'Customer Segments'}
             </h1>
-            <p className="text-slate-400">
+            <p className="text-slate-400 mt-2">
               {selectedSegment 
                 ? `${displayedCustomers.length} customers in this segment`
                 : 'Segment and analyze your customer base'
@@ -270,6 +280,7 @@ export default function Customers() {
             <Plus className="w-4 h-4 mr-2" /> Create Segment
           </Button>
         )}
+        </div>
       </div>
 
       {/* Summary Stats */}

@@ -359,25 +359,39 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
+    <div className="min-h-screen py-8 px-4 text-white">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
-          className="text-center mb-12"
+          className="future-panel future-grid future-scan text-center mb-8 overflow-hidden rounded-[2rem] px-6 py-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 future-badge text-emerald-100 px-4 py-2 rounded-full text-sm font-medium mb-4">
             <Shield className="w-4 h-4" />
-            Protect Your Profits
+            Revenue Protection Activation
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">
-            Simple, Transparent Pricing
+          <h1 className="text-4xl font-bold text-white mb-4 sm:text-5xl">
+            Choose the plan that activates the full operating system
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Choose the plan that fits your store. All plans include core profit protection features.
-            Scale as you grow.
+          <p className="text-lg text-slate-300 max-w-3xl mx-auto">
+            Plan selection is the unlock point for autonomous sync, instant webhook refresh, and live AI orchestration. This surface should feel like a launch decision, not a billing form.
           </p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3 text-left">
+            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Activation</p>
+              <p className="mt-1 text-sm font-semibold text-cyan-100">Webhook and sync bootstrap</p>
+            </div>
+            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Performance</p>
+              <p className="mt-1 text-sm font-semibold text-emerald-100">Instant post-plan automation</p>
+            </div>
+            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Coverage</p>
+              <p className="mt-1 text-sm font-semibold text-violet-100">AI, analytics, and protection layers</p>
+            </div>
+          </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -391,22 +405,22 @@ export default function Pricing() {
               Choose Plan Now
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <div className="text-sm text-slate-500">
+            <div className="text-sm text-slate-400">
               Pick a plan to unlock the fastest sync, webhooks, and AI automation.
             </div>
           </div>
 
           {/* Billing Toggle */}
           <div className="flex items-center justify-center gap-4 mt-8">
-            <span className={`text-sm font-medium ${!isYearly ? 'text-slate-900' : 'text-slate-500'}`}>
+            <span className={`text-sm font-medium ${!isYearly ? 'text-white' : 'text-slate-500'}`}>
               Monthly
             </span>
             <Switch checked={isYearly} onCheckedChange={setIsYearly} />
-            <span className={`text-sm font-medium ${isYearly ? 'text-slate-900' : 'text-slate-500'}`}>
+            <span className={`text-sm font-medium ${isYearly ? 'text-white' : 'text-slate-500'}`}>
               Yearly
             </span>
             {isYearly && (
-              <Badge className="bg-emerald-100 text-emerald-700 ml-2">
+              <Badge className="bg-emerald-500/15 text-emerald-200 ml-2 border border-emerald-400/20">
                 Save 17%
               </Badge>
             )}
@@ -415,11 +429,11 @@ export default function Pricing() {
 
         {/* Pricing Cards */}
         <div className="sticky top-3 z-20 mb-6">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-emerald-200 bg-white/92 backdrop-blur px-4 py-3 shadow-lg">
+          <div className="mx-auto max-w-4xl rounded-2xl border border-emerald-400/20 bg-slate-950/70 backdrop-blur px-4 py-3 shadow-lg">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-900">Plan selection activates autonomous sync</p>
-                <p className="text-xs text-slate-500">Choose a plan here to start instant webhook refresh, order sync, and AI automation.</p>
+                <p className="text-sm font-semibold text-white">Plan selection activates autonomous sync</p>
+                <p className="text-xs text-slate-400">Choose a plan here to start instant webhook refresh, order sync, and AI automation.</p>
               </div>
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700"
@@ -456,7 +470,7 @@ export default function Pricing() {
                   </div>
                 )}
                 
-                <Card className={`h-full flex flex-col ${tier.popular ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-500/10' : 'border-slate-200'} ${isCurrentPlan ? 'ring-2 ring-emerald-500' : ''}`}>
+                <Card className={`future-panel h-full flex flex-col border-white/8 bg-white/[0.03] ${tier.popular ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-500/10' : ''} ${isCurrentPlan ? 'ring-2 ring-emerald-500' : ''}`}>
                   <CardHeader className="text-center pb-4">
                     <div className={`w-12 h-12 rounded-xl ${getColorClasses(tier.color, 'icon')} flex items-center justify-center mx-auto mb-3`}>
                       <Icon className="w-6 h-6" />
@@ -469,14 +483,14 @@ export default function Pricing() {
                     <div className="text-center mb-6">
                       {price !== null ? (
                         <>
-                          <span className="text-4xl font-bold text-slate-900">${price}</span>
-                          <span className="text-slate-500">/{isYearly ? 'year' : 'month'}</span>
+                          <span className="text-4xl font-bold text-white">${price}</span>
+                          <span className="text-slate-400">/{isYearly ? 'year' : 'month'}</span>
                           {tier.duration && (
-                            <p className="text-sm text-slate-500 mt-1">{tier.duration}</p>
+                            <p className="text-sm text-slate-400 mt-1">{tier.duration}</p>
                           )}
                         </>
                       ) : (
-                        <span className="text-2xl font-bold text-slate-900">Custom</span>
+                        <span className="text-2xl font-bold text-white">Custom</span>
                       )}
                     </div>
 
@@ -488,7 +502,7 @@ export default function Pricing() {
                           ) : (
                             <X className="w-4 h-4 text-slate-300 mt-0.5 flex-shrink-0" />
                           )}
-                          <span className={`text-sm ${feature.included ? 'text-slate-700' : 'text-slate-400'}`}>
+                          <span className={`text-sm ${feature.included ? 'text-slate-200' : 'text-slate-500'}`}>
                             {feature.name}
                           </span>
                         </div>
@@ -532,24 +546,24 @@ export default function Pricing() {
           transition={{ delay: 0.5 }}
         >
           <div className="text-center p-4">
-            <Lock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-slate-700">Bank-Level Security</p>
-            <p className="text-xs text-slate-500">256-bit encryption</p>
+            <Lock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-100">Bank-Level Security</p>
+            <p className="text-xs text-slate-400">256-bit encryption</p>
           </div>
           <div className="text-center p-4">
-            <Clock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-slate-700">14-Day Free Trial</p>
-            <p className="text-xs text-slate-500">No credit card required</p>
+            <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-100">14-Day Free Trial</p>
+            <p className="text-xs text-slate-400">No credit card required</p>
           </div>
           <div className="text-center p-4">
-            <HeadphonesIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-slate-700">Expert Support</p>
-            <p className="text-xs text-slate-500">Real humans, fast response</p>
+            <HeadphonesIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-100">Expert Support</p>
+            <p className="text-xs text-slate-400">Real humans, fast response</p>
           </div>
           <div className="text-center p-4">
-            <Users className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-slate-700">1000+ Merchants</p>
-            <p className="text-xs text-slate-500">Trust ProfitShield</p>
+            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-100">1000+ Merchants</p>
+            <p className="text-xs text-slate-400">Trust ProfitShield</p>
           </div>
         </motion.div>
 
@@ -560,15 +574,15 @@ export default function Pricing() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
         >
-          <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
+          <h2 className="text-2xl font-bold text-white text-center mb-8">
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
             {FAQ.map((item, index) => (
-              <Card key={index} className="border-slate-200">
+              <Card key={index} className="future-panel border-white/8 bg-white/[0.03]">
                 <CardContent className="pt-4">
-                  <h3 className="font-semibold text-slate-900 mb-2">{item.q}</h3>
-                  <p className="text-slate-600 text-sm">{item.a}</p>
+                  <h3 className="font-semibold text-white mb-2">{item.q}</h3>
+                  <p className="text-slate-300 text-sm">{item.a}</p>
                 </CardContent>
               </Card>
             ))}

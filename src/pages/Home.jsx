@@ -610,7 +610,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Dashboard Layer</p>
+              <h2 className="text-2xl font-semibold text-white">Instant operational overview</h2>
+              <p className="text-sm text-slate-400">
+                Profit telemetry, risk posture, automation status, and recovery controls arranged for immediate action.
+              </p>
+            </div>
             {resolver?.user?.id && (
               <Suspense fallback={null}>
                 <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
