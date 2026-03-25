@@ -388,6 +388,17 @@ Deno.serve(async (req) => {
           result.customer_projection_repaired = true;
           result.customer_projection_repaired_count = repaired.projected || repaired.created || repaired.updated || repairedCustomers.length;
         } else {
+        try {
+          const bootstrapRun = await base44.functions.invoke('shopifyActivationBootstrap', {
+            tenant_id: tenantId,
+            integration_id: integration.id,
+            source: 'shopify_connection_watchdog_projection_gap',
+            force: false,
+            days: 30
+          }).catch(() => null);
+          result.customer_projection_bootstrap_attempted = true;
+          result.customer_projection_bootstrap_result = bootstrapRun?.data || null;
+        } catch {}
         const expectedEmails = new Set(
           recentOrders
             .map((order) => String(order?.customer_email || '').trim().toLowerCase())

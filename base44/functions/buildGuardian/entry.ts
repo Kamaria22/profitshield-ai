@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
 
   const findings = [];
   const fixes = [];
+  const runtimeFallbacks = [];
 
   // 1) Required env checks
   const required = ["APP_URL", "SHOPIFY_WEBHOOK_SECRET", "SHOPIFY_API_KEY"];
@@ -101,6 +102,27 @@ Deno.serve(async (req) => {
         severity: "high",
       });
     }
+
+    try {
+      const bootstrapProbe = await base44.functions.invoke("shopifyActivationBootstrap", {
+        tenant_id: tenantId,
+        source: "build_guardian_runtime_probe",
+        force: false,
+        days: 30,
+      });
+      runtimeFallbacks.push({
+        type: "shopify_bootstrap_probe",
+        ok: bootstrapProbe?.data?.ok === true,
+        version: bootstrapProbe?.data?.version || null,
+        deployment_hint: bootstrapProbe?.data?.deployment_hint || null,
+      });
+    } catch (e) {
+      findings.push({
+        type: "shopify_bootstrap_probe_failed",
+        error: e?.message || String(e),
+        severity: "critical",
+      });
+    }
   }
 
   // Persist incident log
@@ -111,11 +133,11 @@ Deno.serve(async (req) => {
       entity_type: "BuildGuardian",
       performed_by: "system",
       description: `BuildGuardian detected ${findings.length} finding(s). Expected webhook: ${expectedWebhook}`,
-      details: { findings, fixes, expectedWebhook },
+      details: { findings, fixes, runtimeFallbacks, expectedWebhook },
       category: "ai_action",
       severity: findings.some((f) => f.severity === "critical") ? "critical" : "medium",
     }).catch(() => {});
   }
 
-  return json({ ok: true, action, findings, fixes, expectedWebhook }, 200);
+  return json({ ok: true, action, findings, fixes, runtimeFallbacks, expectedWebhook }, 200);
 });

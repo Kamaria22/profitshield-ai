@@ -11,6 +11,11 @@ function normalizeName(value) {
   return name || null;
 }
 
+function normalizePhone(value) {
+  const digits = String(value || '').replace(/\D+/g, '');
+  return digits || null;
+}
+
 function syntheticGuestEmail(order) {
   const name = normalizeName(order?.customer_name || order?.shipping_address?.name || order?.billing_address?.name);
   if (name) {
@@ -23,7 +28,13 @@ function syntheticGuestEmail(order) {
 function projectedCustomerIdentity(order) {
   const email = normalizeEmail(order?.customer_email || order?.email) || syntheticGuestEmail(order);
   const name = normalizeName(order?.customer_name) || normalizeName(order?.shipping_address?.name) || 'Guest Customer';
-  return { email, name };
+  const phone = normalizePhone(
+    order?.customer_phone ||
+    order?.phone ||
+    order?.shipping_address?.phone ||
+    order?.billing_address?.phone
+  );
+  return { email, name, phone };
 }
 
 function projectedRiskProfile(totalOrders, highRiskOrders) {
@@ -53,6 +64,14 @@ function buildCustomerPayload(tenantId, email, name, metrics) {
   const avgOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
   const riskProfile = projectedRiskProfile(totalOrders, highRiskOrders);
   const riskScore = totalOrders > 0 ? Math.min(100, Math.round((highRiskOrders / totalOrders) * 100)) : 0;
+  const refundRate = totalOrders > 0 ? refundCount / totalOrders : 0;
+  const profitabilityScore = totalSpent > 0 ? Math.max(0, Math.min(100, Math.round(((totalProfit / totalSpent) + 0.5) * 100))) : 50;
+  const projectedSegment =
+    totalSpent >= 1000 ? 'vip' :
+    totalOrders >= 4 ? 'repeat' :
+    totalOrders >= 2 ? 'growing' : 'new';
+  const churnRisk = refundRate >= 0.3 ? 'high' : totalOrders <= 1 ? 'medium' : 'low';
+  const projectionConfidence = email?.endsWith('@guest.local') ? 'medium' : totalOrders >= 2 ? 'high' : 'medium';
 
   return {
     tenant_id: tenantId,
@@ -70,6 +89,11 @@ function buildCustomerPayload(tenantId, email, name, metrics) {
     high_risk_orders: highRiskOrders,
     risk_profile: riskProfile,
     risk_score: riskScore,
+    customer_tier: projectedSegment,
+    projected_segment: projectedSegment,
+    churn_risk: churnRisk,
+    projection_confidence: projectionConfidence,
+    profitability_score: profitabilityScore,
     last_order_at: metrics.lastOrderAt || null,
   };
 }
@@ -81,27 +105,81 @@ async function loadExistingCustomer(db, tenantId, email) {
   return byCreated?.[0] || null;
 }
 
-async function writeProjectedCustomer(db, current, payload) {
-  const result = current?.id
-    ? await db.entities.Customer.update(current.id, payload)
-    : await db.entities.Customer.create(payload);
-  if (!result || (!result?.id && !current?.id)) {
-    throw new Error('customer_projection_write_failed');
+function buildLookupMaps(rows = []) {
+  const byEmail = new Map();
+  const byPhone = new Map();
+  const byName = new Map();
+  for (const row of rows) {
+    const email = normalizeEmail(row?.email);
+    const phone = normalizePhone(row?.phone);
+    const name = normalizeName(row?.name);
+    if (email && !byEmail.has(email)) byEmail.set(email, row);
+    if (phone && !byPhone.has(phone)) byPhone.set(phone, row);
+    if (name && !byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), row);
   }
-  return result;
+  return { byEmail, byPhone, byName };
+}
+
+async function listExistingCustomers(db, tenantId, limit = 1000) {
+  return await db.entities.Customer.filter({ tenant_id: tenantId }, '-updated_date', limit).catch(() => []);
+}
+
+function minimalCustomerPayload(payload) {
+  return {
+    tenant_id: payload.tenant_id,
+    email: payload.email,
+    name: payload.name,
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    total_orders: payload.total_orders,
+    orders_count: payload.orders_count,
+    total_spent: payload.total_spent,
+    total_profit: payload.total_profit,
+    ltv: payload.ltv,
+    avg_order_value: payload.avg_order_value,
+    refund_count: payload.refund_count,
+    high_risk_orders: payload.high_risk_orders,
+    risk_profile: payload.risk_profile,
+    risk_score: payload.risk_score,
+    last_order_at: payload.last_order_at,
+  };
+}
+
+async function writeProjectedCustomer(db, current, payload) {
+  try {
+    const result = current?.id
+      ? await db.entities.Customer.update(current.id, payload)
+      : await db.entities.Customer.create(payload);
+    if (!result || (!result?.id && !current?.id)) {
+      throw new Error('customer_projection_write_failed');
+    }
+    return result;
+  } catch (error) {
+    const fallbackPayload = minimalCustomerPayload(payload);
+    const fallbackResult = current?.id
+      ? await db.entities.Customer.update(current.id, fallbackPayload)
+      : await db.entities.Customer.create(fallbackPayload);
+    if (!fallbackResult || (!fallbackResult?.id && !current?.id)) {
+      throw error;
+    }
+    return fallbackResult;
+  }
 }
 
 async function rebuildProjectedCustomersFromOrders(db, tenantId, limit = 500) {
   if (!db?.entities?.Customer || !db?.entities?.Order || !tenantId) return { created: 0, updated: 0, projected: 0 };
   const orders = await db.entities.Order.filter({ tenant_id: tenantId }, '-order_date', limit).catch(() => []);
   if (!Array.isArray(orders) || orders.length === 0) return { created: 0, updated: 0, projected: 0 };
+  const existingRows = await listExistingCustomers(db, tenantId, Math.min(1000, limit * 2));
+  const lookup = buildLookupMaps(existingRows);
 
   const groups = new Map();
   for (const order of orders) {
-    const { email, name } = projectedCustomerIdentity(order);
+    const { email, name, phone } = projectedCustomerIdentity(order);
     const current = groups.get(email) || {
       email,
       name,
+      phone,
       total_orders: 0,
       total_spent: 0,
       total_profit: 0,
@@ -114,6 +192,7 @@ async function rebuildProjectedCustomersFromOrders(db, tenantId, limit = 500) {
     current.total_profit += Number(order?.net_profit || 0) || 0;
     if (String(order?.status || '').toLowerCase().includes('refund')) current.refund_count += 1;
     if (String(order?.risk_level || '').toLowerCase() === 'high' || Number(order?.fraud_score || 0) >= 70) current.high_risk_orders += 1;
+    if (!current.phone && phone) current.phone = phone;
     if (!current.last_order_at || new Date(order?.order_date || 0).getTime() > new Date(current.last_order_at || 0).getTime()) {
       current.last_order_at = order?.order_date || current.last_order_at;
     }
@@ -123,15 +202,22 @@ async function rebuildProjectedCustomersFromOrders(db, tenantId, limit = 500) {
   let created = 0;
   let updated = 0;
   for (const customer of groups.values()) {
-    const existing = await loadExistingCustomer(db, tenantId, customer.email);
-    const payload = buildCustomerPayload(tenantId, customer.email, customer.name, {
+    const existing =
+      lookup.byEmail.get(customer.email) ||
+      (customer.phone ? lookup.byPhone.get(customer.phone) : null) ||
+      lookup.byName.get(String(customer.name || '').toLowerCase()) ||
+      await loadExistingCustomer(db, tenantId, customer.email);
+    const payload = {
+      ...buildCustomerPayload(tenantId, customer.email, customer.name, {
       totalOrders: customer.total_orders,
       totalSpent: customer.total_spent,
       totalProfit: customer.total_profit,
       refundCount: customer.refund_count,
       highRiskOrders: customer.high_risk_orders,
       lastOrderAt: customer.last_order_at,
-    });
+      }),
+      ...(customer.phone ? { phone: customer.phone } : {}),
+    };
     if (existing?.id) {
       await writeProjectedCustomer(db, existing, payload);
       updated++;

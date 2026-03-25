@@ -1,7 +1,7 @@
 class StabilityAgent {
   constructor() {
     this.maxAttempts = 3;
-    this.baseDelayMs = 250;
+    this.baseDelayMs = 150;
     this.lastSelfHealTriggerAt = 0;
     this.selfHealUnavailableUntil = 0;
     this.criticalFunctionFallbacks = {
@@ -93,7 +93,7 @@ class StabilityAgent {
   }
 
   async safeFetch(input, options = {}, fallback = { ok: false, fallback: true }) {
-    const maxRetries = Math.min(2, Math.max(0, options?.retries ?? 2));
+    const maxRetries = Math.min(1, Math.max(0, options?.retries ?? 1));
     let res = null;
     let lastNetworkError = null;
 
@@ -103,7 +103,7 @@ class StabilityAgent {
       } catch (error) {
         lastNetworkError = error;
         if (attempt >= maxRetries) break;
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
         continue;
       }
 
@@ -114,7 +114,7 @@ class StabilityAgent {
 
       if (res.status === 500 || res.status === 502) {
         if (attempt >= maxRetries) break;
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
         continue;
       }
 
@@ -147,7 +147,7 @@ class StabilityAgent {
   }
 
   monitorStatus(status, meta = {}) {
-    if ([401, 403, 404, 500, 502].includes(Number(status || 0))) {
+    if ([401, 403, 404, 429, 500, 502].includes(Number(status || 0))) {
       this.logError('http_status_detected', new Error(`http_${status}`), meta);
       if (Number(status) === 404 && meta?.functionName && this.criticalFunctionFallbacks[meta.functionName]) {
         this.reportMissingDeployment(meta.functionName, meta).catch(() => null);
@@ -159,7 +159,7 @@ class StabilityAgent {
   async triggerSelfHealRetry(status, meta = {}) {
     const now = Date.now();
     if (now < this.selfHealUnavailableUntil) return;
-    if (now - this.lastSelfHealTriggerAt < 30000) return;
+    if (now - this.lastSelfHealTriggerAt < 10000) return;
     this.lastSelfHealTriggerAt = now;
     const result = await this.safeFetch('/api/functions/selfHeal', {
       method: 'POST',
