@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { invokeWithRetry } from "@/lib/safeApi";
 
 export function DataSyncProvider({ tenantId, children }) {
   useEffect(() => {
@@ -16,7 +17,7 @@ export function DataSyncProvider({ tenantId, children }) {
         });
 
         // Process webhook queue
-        await base44.functions.invoke("processWebhookQueue", {
+        await invokeWithRetry("processWebhookQueue", {
           action: "process",
         });
       } catch (e) {

@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     if (action === 'fix_sync') {
       if (!tenantId) return Response.json({ error: 'No tenant' }, { status: 400 });
       const syncDays = days || 365;
-      const result = await base44.functions.invoke('syncShopifyOrders', {
+      const result = await base44.functions.invoke('syncShopifyOrdersV2', {
         tenant_id: tenantId,
         days: syncDays
       });

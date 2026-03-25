@@ -8,6 +8,7 @@ import QuantumButton from '@/components/quantum/QuantumButton';
 import { Badge } from '@/components/ui/badge';
 import { Check, Zap, Crown, Rocket, Star, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 const PLANS = [
   {
@@ -174,7 +175,7 @@ export default function Billing() {
 
     (async () => {
       try {
-        await base44.functions.invoke('shopifyActivationBootstrap', {
+        await invokeWithRetry('shopifyActivationBootstrap', {
           tenant_id: tenantId,
           source: 'billing_checkout_success',
           force: true,

@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
         } else {
           try {
             try {
-              await db.functions.invoke('syncShopifyOrders', { tenant_id: tenantId, days: 1 });
+              await db.functions.invoke('syncShopifyOrdersV2', { tenant_id: tenantId, days: 1 });
             } catch (syncOrdersErr) {
               if (!isMissingFunctionDeployment(syncOrdersErr)) throw syncOrdersErr;
               try {

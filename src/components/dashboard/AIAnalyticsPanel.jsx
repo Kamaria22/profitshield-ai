@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 const trendIcons = {
   up: TrendingUp,
@@ -50,7 +51,7 @@ export default function AIAnalyticsPanel({ tenantId, dateRange = 30 }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboardAI', tenantId, dateRange],
     queryFn: async () => {
-      const response = await base44.functions.invoke('dashboardAI', {
+      const response = await invokeWithRetry('dashboardAI', {
         tenant_id: tenantId,
         date_range: dateRange
       });
@@ -64,7 +65,7 @@ export default function AIAnalyticsPanel({ tenantId, dateRange = 30 }) {
   // Natural language query mutation
   const queryMutation = useMutation({
     mutationFn: async (query) => {
-      const response = await base44.functions.invoke('dashboardAI', {
+      const response = await invokeWithRetry('dashboardAI', {
         tenant_id: tenantId,
         action: 'natural_query',
         query,

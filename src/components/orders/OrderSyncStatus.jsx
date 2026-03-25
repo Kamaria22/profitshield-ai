@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { RefreshCw, CheckCircle, AlertTriangle, Clock, Loader2, Webhook } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
   const queryClient = useQueryClient();
@@ -47,7 +48,7 @@ export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
   // Sync Now mutation — uses syncShopifyOrders which handles OAuth token decryption
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const resp = await base44.functions.invoke('syncShopifyOrders', {
+      const resp = await invokeWithRetry('syncShopifyOrders', {
         tenant_id: tenantId,
         integration_id: integrationId || undefined,
         shop: integration?.store_key || undefined,

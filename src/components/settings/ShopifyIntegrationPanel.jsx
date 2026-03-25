@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { getFreshAppBridgeToken } from '@/components/shopify/AppBridgeAuth';
 import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 import TwoWaySyncPanel from '@/components/shopify/TwoWaySyncPanel';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 function isEmbedded() {
   if (typeof window === 'undefined') return false;
@@ -116,7 +117,7 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data } = await base44.functions.invoke('syncShopifyOrders', {
+      const { data } = await invokeWithRetry('syncShopifyOrders', {
         tenant_id: tenantId,
         integration_id: integration?.id || undefined,
         shop: integration?.store_key || shopDomain || undefined,

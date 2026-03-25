@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
 
     if (action === 'safe_heal_tick') {
       // 1) Safe queue retry/drain (bounded by processWebhookQueue internal batch size)
-      const queueRun = await invokeSafe(base44, 'processWebhookQueue', {});
+      const queueRun = await invokeSafe(base44, 'processWebhookQueueV2', {});
       calls.push(queueRun);
       actionsUsed += 1;
 

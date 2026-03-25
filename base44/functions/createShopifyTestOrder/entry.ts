@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     // Also trigger a manual sync to force the order in (in case webhooks aren't set up yet)
     let syncResult = null;
     try {
-      const { data } = await base44.functions.invoke('syncShopifyOrders', {
+      const { data } = await base44.functions.invoke('syncShopifyOrdersV2', {
         tenant_id: tenant.id,
         days: 1
       });

@@ -144,7 +144,7 @@ const handler = withEndpointGuard('shopifyActivationBootstrap', async (req) => {
     : { ok: true, skipped: true, reason: 'fresh_webhooks', fallback_used: false };
 
   results.actions.syncShopifyOrders = shouldRunFullSync
-    ? await safeInvoke(base44, 'syncShopifyOrders', {
+    ? await safeInvoke(base44, 'syncShopifyOrdersV2', {
         tenant_id: tenantId,
         integration_id: integration.id,
         shop: integration.store_key || tenant.shop_domain || undefined,
@@ -153,7 +153,7 @@ const handler = withEndpointGuard('shopifyActivationBootstrap', async (req) => {
     : { ok: true, skipped: true, reason: 'fresh_sync', fallback_used: false };
 
   results.actions.processWebhookQueue = ((pendingQueue?.length || 0) > 0 || shouldRunFullSync || force)
-    ? await safeInvoke(base44, 'processWebhookQueue', { action: 'process' })
+    ? await safeInvoke(base44, 'processWebhookQueueV2', { action: 'process' })
     : { ok: true, skipped: true, reason: 'queue_empty', fallback_used: false };
 
   results.actions.processShopifyDeferredJobs = await safeInvoke(base44, 'processShopifyDeferredJobs', { limit: 25 });

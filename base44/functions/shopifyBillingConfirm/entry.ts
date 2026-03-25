@@ -52,7 +52,7 @@ function parsePlanTier(inputPlan) {
 async function triggerTenantBootstrap(base44, tenantId, source) {
   if (!tenantId) return;
   try {
-    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrap', {
+    await base44.asServiceRole.functions.invoke('shopifyActivationBootstrapV2', {
       tenant_id: tenantId,
       source,
       force: true,

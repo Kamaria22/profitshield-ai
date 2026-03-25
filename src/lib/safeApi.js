@@ -2,7 +2,10 @@ import { base44 } from '@/api/base44Client';
 import { getPersistedContext } from '@/components/platformContext';
 
 const FUNCTION_FALLBACKS = {
-  syncShopifyOrders: ['syncShopifyData', 'shopifyConnectionWatchdog'],
+  shopifyActivationBootstrap: ['shopifyActivationBootstrapV2'],
+  syncShopifyOrders: ['syncShopifyOrdersV2', 'syncShopifyData', 'shopifyConnectionWatchdog'],
+  processWebhookQueue: ['processWebhookQueueV2'],
+  dashboardAI: ['dashboardAIV2'],
   syncShopifyData: ['shopifyConnectionWatchdog'],
   registerShopifyWebhooks: ['shopifyConnectionWatchdog'],
   profitAlertWatchdog: ['checkProfitAlerts'],

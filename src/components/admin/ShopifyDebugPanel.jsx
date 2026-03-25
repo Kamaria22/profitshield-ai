@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Play, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { invokeWithRetry } from '@/lib/safeApi';
 
 function StatusBadge({ ok, label }) {
   return ok
@@ -56,7 +57,7 @@ export default function ShopifyDebugPanel() {
     setLoading(p => ({ ...p, sync: true }));
     setSyncResult(null);
     try {
-      const { data } = await base44.functions.invoke('syncShopifyOrders', {
+      const { data } = await invokeWithRetry('syncShopifyOrders', {
         tenant_id: diagResult.tenant_id,
         days: 30
       });
