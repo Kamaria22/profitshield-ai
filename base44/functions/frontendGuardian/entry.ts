@@ -104,6 +104,39 @@ function classifyIncident(incident) {
   return "unknown";
 }
 
+function normalizeIssueCode(value) {
+  const raw = String(value || "frontend_guardian_incident")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return raw || "FRONTEND_GUARDIAN_INCIDENT";
+}
+
+function currentPeriod() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function buildSelfHealingEventPayload(tenantId, base = {}) {
+  const category = classifyIncident(base);
+  return {
+    tenant_id: tenantId || "unknown",
+    feature_key: base?.feature_key || category || "frontend_guardian",
+    issue_code: normalizeIssueCode(base?.issue_code || base?.code || category),
+    period: base?.period || currentPeriod(),
+    period_type: base?.period_type || "daily",
+    detected_at: base?.detected_at || base?.created_at || nowIso(),
+    message: base?.message || "unknown",
+    stack: base?.stack || null,
+    url: base?.url || null,
+    severity: base?.severity || "error",
+    status: base?.status || "open",
+    source: base?.source || "frontend_guardian",
+    details_json: base?.details_json || null,
+    created_at: base?.created_at || nowIso(),
+  };
+}
+
 async function createRoutingPatchBundle(db, tenantId, details) {
   await db.PatchBundle?.create({
     title: "Fix embedded routing / router navigation mismatch",
@@ -161,16 +194,16 @@ async function evaluateUiProbe(base44, tenantId, uiProbe) {
   }
 
   if (issues.length > 0) {
-    await db.SelfHealingEvent.create({
-      tenant_id: tenantId,
+    await db.SelfHealingEvent.create(buildSelfHealingEventPayload(tenantId, {
       feature_key: "ui_routing_integrity",
+      issue_code: "UI_ROUTING_INTEGRITY",
       message: "UI route integrity issue detected by frontendGuardian",
       severity: "high",
       status: "open",
       source: "frontend_guardian",
       details_json: { issues, ui_probe: uiProbe },
-      created_at: nowIso(),
-    }).catch(() => {});
+      period_type: "daily",
+    })).catch(() => {});
 
     await writeAudit(base44, tenantId, "frontend_guardian_ui_route_check_failed", {
       severity: "high",
@@ -382,17 +415,12 @@ Deno.serve(async (req) => {
       const incident = payload?.incident || payload;
       const tenantId = incident?.tenant_id || payload?.tenant_id || null;
 
-      const created = await db.SelfHealingEvent.create({
-        tenant_id: tenantId,
-        feature_key: incident?.feature_key || null,
-        message: incident?.message || "unknown",
-        stack: incident?.stack || null,
-        url: incident?.url || null,
-        severity: incident?.severity || "error",
+      const created = await db.SelfHealingEvent.create(buildSelfHealingEventPayload(tenantId, {
+        ...incident,
         status: "open",
         source: "frontend_guardian",
-        created_at: nowIso(),
-      }).catch(() => null);
+        details_json: incident?.details_json || incident?.payload || null,
+      })).catch(() => null);
 
       const heal = await resolveAndHeal(base44, { ...incident, id: created?.id, tenant_id: tenantId });
       const uiProbeResult = await evaluateUiProbe(base44, tenantId, incident?.payload?.ui_probe || payload?.ui_probe);
