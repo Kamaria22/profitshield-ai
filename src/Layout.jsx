@@ -1055,7 +1055,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             syncManager={syncManager}
           />
           {showMissingContextBanner && (
-            <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
+            <div className="mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
               <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
               <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
               <Button
@@ -1067,8 +1067,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.03),transparent_72%)]" />
-          <div className="page-canvas relative z-[1] -mt-1 px-2 py-1.5 sm:px-2.5 sm:py-2 lg:px-3 lg:py-2">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.025),transparent_72%)]" />
+          <div className="page-canvas relative z-[1] -mt-2 px-2 py-1 sm:px-2.5 sm:py-1.5 lg:px-3 lg:py-1.5">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             {children}
@@ -1258,15 +1258,15 @@ function MerchantUtilityBanner({
 
   return (
     <div className="px-0 pb-0 pt-0">
-      <div className="merchant-banner-flow command-surface relative overflow-hidden rounded-[1.15rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.97),rgba(8,18,34,0.94)_42%,rgba(6,14,27,0.97))] px-3 py-1.5">
+      <div className="merchant-banner-flow command-surface relative overflow-hidden rounded-[1.05rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.97),rgba(8,18,34,0.94)_42%,rgba(6,14,27,0.97))] px-3 py-1">
         <div className={`pointer-events-none absolute inset-y-0 left-0 w-44 bg-gradient-to-r ${statusGlow}`} />
         <div className={`pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r ${activeCard?.accent || 'from-cyan-400/16 via-indigo-400/8 to-transparent'} opacity-60`} />
         <div className="merchant-banner-orb pointer-events-none absolute inset-y-0 right-0 hidden w-64 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.16),transparent_65%)] lg:block" />
-        <div className="relative grid gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(250px,0.65fr)] lg:items-center">
-          <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-            <div className="flex min-w-0 items-center gap-3 rounded-[1rem] border border-white/8 bg-white/[0.035] px-3 py-2">
-              <div className="merchant-banner-pulse flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.32))] shadow-[0_0_24px_rgba(56,189,248,0.18)]">
-                <ActiveIcon className="h-5 w-5 text-cyan-100" />
+        <div className="relative grid gap-1.5 lg:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.55fr)] lg:items-center">
+          <div className="grid min-w-0 gap-1.5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+            <div className="flex min-w-0 items-center gap-3 rounded-[0.95rem] border border-white/8 bg-white/[0.03] px-3 py-2">
+              <div className="merchant-banner-pulse flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.32))] shadow-[0_0_24px_rgba(56,189,248,0.18)]">
+                <ActiveIcon className="h-4.5 w-4.5 text-cyan-100" />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1284,20 +1284,20 @@ function MerchantUtilityBanner({
                     </span>
                   )}
                 </div>
-                <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-100">
+                <p className="mt-0.5 line-clamp-1 text-sm font-semibold text-slate-100">
                   {activeCard?.title}
                 </p>
-                <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">
+                <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
                   {activeCard?.blurb}
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+            <div className="flex flex-wrap items-center gap-1.5 xl:justify-end">
               {(activeCard?.stats || []).map((stat) => (
                 <span
                   key={stat}
-                  className="inline-flex items-center rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-200"
+                  className="inline-flex items-center rounded-full border border-white/8 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200"
                 >
                   {stat}
                 </span>
@@ -1305,9 +1305,9 @@ function MerchantUtilityBanner({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 lg:items-end">
-            <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
-              <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 lg:w-[280px] lg:flex-none">
+          <div className="flex flex-col gap-1.5 lg:items-end">
+            <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:justify-end">
+              <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 lg:w-[240px] lg:flex-none">
                 {previewSlides.map((slide, index) => {
                   const PreviewIcon = slide.icon;
                   return (
@@ -1315,18 +1315,18 @@ function MerchantUtilityBanner({
                       key={slide.id}
                       type="button"
                       onClick={() => setActiveSlide(slides.findIndex((item) => item.id === slide.id))}
-                      className="group rounded-[0.95rem] border border-white/8 bg-white/[0.028] px-2.5 py-2 text-left transition-colors hover:bg-white/[0.055]"
+                      className="group rounded-[0.85rem] border border-white/8 bg-white/[0.028] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.055]"
                       aria-label={`Show ${slide.title}`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-slate-100">
-                          <PreviewIcon className="h-4 w-4" />
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-slate-100">
+                          <PreviewIcon className="h-3.5 w-3.5" />
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Queue {String(index + 1).padStart(2, '0')}
                           </p>
-                          <p className="truncate text-xs font-medium text-slate-200 group-hover:text-white">
+                          <p className="truncate text-[11px] font-medium text-slate-200 group-hover:text-white">
                             {slide.eyebrow}
                           </p>
                         </div>
@@ -1337,7 +1337,7 @@ function MerchantUtilityBanner({
               </div>
 
               <Link to={createPageUrl(activeCard?.ctaPage || 'Home', locationSearch)}>
-                <Button size="sm" className="h-10 min-w-[150px] rounded-xl bg-cyan-500/16 px-4 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/24">
+                <Button size="sm" className="h-9 min-w-[138px] rounded-xl bg-cyan-500/16 px-3.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/24">
                   {activeCard?.ctaLabel || 'Open'}
                 </Button>
               </Link>
@@ -1347,7 +1347,7 @@ function MerchantUtilityBanner({
                   variant="ghost"
                   onClick={() => syncManager?.triggerSync?.()}
                   disabled={syncing || syncStatus === 'offline'}
-                  className="h-10 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-200 hover:bg-white/[0.05]"
+                  className="h-9 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-200 hover:bg-white/[0.05]"
                 >
                   {syncing ? 'Syncing…' : 'Refresh'}
                 </Button>
