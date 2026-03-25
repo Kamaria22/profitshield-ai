@@ -1034,17 +1034,6 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </div>
         )}
 
-        <MerchantUtilityBanner
-          authTenantId={authTenantId}
-          currentPageName={currentPageName}
-          isEmbedded={isEmbedded}
-          locationSearch={location.search}
-          storeDisplayName={storeDisplayName}
-          platformDisplay={platformDisplay}
-          subscriptionTier={subscriptionTier}
-          syncManager={syncManager}
-        />
-
         {/* Page content */}
         <main
           ref={mainScrollRef}
@@ -1055,8 +1044,18 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           aria-label="App content"
         >
           <MobileDeepWrapper>
+          <MerchantUtilityBanner
+            authTenantId={authTenantId}
+            currentPageName={currentPageName}
+            isEmbedded={isEmbedded}
+            locationSearch={location.search}
+            storeDisplayName={storeDisplayName}
+            platformDisplay={platformDisplay}
+            subscriptionTier={subscriptionTier}
+            syncManager={syncManager}
+          />
           {showMissingContextBanner && (
-            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
+            <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
               <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
               <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
               <Button
@@ -1068,8 +1067,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.04),transparent_70%)]" />
-          <div className="page-canvas relative z-[1] -mt-px px-2 py-1.5 sm:px-2.5 sm:py-2 lg:px-3 lg:py-2">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.03),transparent_72%)]" />
+          <div className="page-canvas relative z-[1] -mt-1 px-2 py-1.5 sm:px-2.5 sm:py-2 lg:px-3 lg:py-2">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             {children}
@@ -1184,8 +1183,8 @@ function MerchantUtilityBanner({
         : 'from-emerald-400/50 via-emerald-300/20 to-transparent';
 
   return (
-    <div className="px-2 pb-1.5 pt-1 sm:px-2.5 lg:px-3">
-      <div className="merchant-banner-flow command-surface relative overflow-hidden rounded-[1.25rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.96),rgba(8,18,34,0.92)_42%,rgba(6,14,27,0.96))] px-3 py-2.5">
+    <div className="px-0 pb-0.5 pt-0">
+      <div className="merchant-banner-flow command-surface relative overflow-hidden rounded-[1.15rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.96),rgba(8,18,34,0.92)_42%,rgba(6,14,27,0.96))] px-3 py-2">
         <div className={`pointer-events-none absolute inset-y-0 left-0 w-40 bg-gradient-to-r ${statusGlow}`} />
         <div className="merchant-banner-orb pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.16),transparent_65%)] lg:block" />
         <div className="relative flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
