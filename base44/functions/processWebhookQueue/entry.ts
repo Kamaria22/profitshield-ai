@@ -1,130 +1,33 @@
-// redeploy trigger: force Base44 to republish processWebhookQueue runtime
-/**
- * WEBHOOK QUEUE PROCESSOR
- *
- * Pulls pending jobs from WebhookQueue, processes them with idempotency,
- * exponential backoff on failure, max 5 retries then dead_letter.
- *
- * Designed to run on a schedule (every 30s via automation) OR be called directly.
- * Admin-only when called directly. Automation uses service role.
- */
-
+// redeploy trigger: rewritten processWebhookQueue runtime for Base44 republish
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { upsertProjectedCustomer } from '../helpers/customerProjection/entry.ts';
 
+const VERSION = '2026-03-24.webhook-queue-rewrite-v1';
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
-const JOB_CONCURRENCY = 4;
 
-// Classify errors: transient = worth retrying, permanent = dead-letter immediately
-function classifyError(err) {
-  const msg = (err?.message || '').toLowerCase();
-  if (msg.includes('timeout') || msg.includes('network') || msg.includes('econnreset') || msg.includes('503') || msg.includes('rate limit')) {
-    return 'transient';
-  }
-  if (msg.includes('not found') || msg.includes('tenant') || msg.includes('invalid') || msg.includes('unknown topic')) {
-    return 'permanent';
-  }
-  return 'transient'; // default: retry
+function json(data, status = 200) {
+  return Response.json(data, { status });
 }
 
-// ─── Profit Calculation (mirror of shopifyWebhook) ───────────────────────────
-function calculateOrderProfit(order, costMappings, settings) {
-  const revenue = parseFloat(order.total_price) || 0;
-  const shippingCharged = order.shipping_lines?.reduce((s, l) => s + parseFloat(l.price || 0), 0) || 0;
-  const discountTotal = order.discount_codes?.reduce((s, d) => s + parseFloat(d.amount || 0), 0) || 0;
-
-  let totalCogs = 0;
-  let hasAllCosts = true;
-  for (const item of order.line_items || []) {
-    const sku = item.sku || item.variant_id?.toString();
-    const cm = costMappings instanceof Map ? costMappings.get(sku) : costMappings.find(m => m.sku === sku);
-    if (cm) totalCogs += (cm.cost_per_unit || 0) * (item.quantity || 1);
-    else hasAllCosts = false;
-  }
-
-  const paymentFee = (revenue * ((settings?.default_payment_fee_pct || 2.9) / 100)) + (settings?.default_payment_fee_fixed || 0.30);
-  const platformFee = revenue * ((settings?.default_platform_fee_pct || 0) / 100);
-  const shippingCost = shippingCharged * 0.8;
-  const netProfit = revenue - totalCogs - paymentFee - platformFee - shippingCost;
-
-  return {
-    total_revenue: revenue,
-    shipping_charged: shippingCharged,
-    discount_total: discountTotal,
-    total_cogs: totalCogs,
-    payment_fee: paymentFee,
-    platform_fee: platformFee,
-    shipping_cost: shippingCost,
-    net_profit: netProfit,
-    margin_pct: revenue > 0 ? (netProfit / revenue) * 100 : 0,
-    confidence: !hasAllCosts ? 'medium' : 'high'
-  };
-}
-
-// ─── Risk Scoring ────────────────────────────────────────────────────────────
-function calculateRiskScores(order, settings) {
-  let fraudScore = 0;
-  const riskReasons = [];
-  const orderTotal = parseFloat(order.total_price || 0);
-  const isFirst = !order.customer || order.customer.orders_count <= 1;
-
-  if (isFirst && orderTotal > 200) { fraudScore += 25; riskReasons.push('New customer, high value'); }
-  const b = order.billing_address, s = order.shipping_address;
-  if (b && s && b.country_code !== s.country_code) { fraudScore += 30; riskReasons.push('Country mismatch'); }
-  if ((order.discount_codes?.length || 0) >= 2) { fraudScore += 10; riskReasons.push('Multiple discounts'); }
-  if (isFirst && orderTotal > 500) { fraudScore += 20; riskReasons.push('First order > $500'); }
-
-  fraudScore = Math.min(fraudScore, 100);
-  const high = settings?.high_risk_threshold || 70;
-  const med = settings?.medium_risk_threshold || 40;
-  return {
-    fraud_score: fraudScore,
-    return_score: isFirst ? 20 : 0,
-    chargeback_score: Math.min(fraudScore * 0.5, 100),
-    risk_level: fraudScore >= high ? 'high' : fraudScore >= med ? 'medium' : 'low',
-    risk_reasons: riskReasons,
-    recommended_action: fraudScore >= high ? 'hold' : fraudScore >= med ? 'verify' : 'none'
-  };
-}
-
-function mapStatus(order) {
-  if (order.cancelled_at) return 'cancelled';
-  if (order.fulfillment_status === 'fulfilled') return 'fulfilled';
-  if (order.financial_status === 'paid') return 'paid';
-  return 'pending';
-}
-
-async function runInBatches(items, batchSize, worker) {
-  const size = Math.max(1, Math.trunc(batchSize || 1));
-  for (let index = 0; index < items.length; index += size) {
-    const batch = items.slice(index, index + size);
-    await Promise.all(batch.map(worker));
-  }
-}
-
-function createTenantCache() {
-  const cache = new Map();
-  return {
-    async get(db, tenantId) {
-      if (cache.has(tenantId)) return cache.get(tenantId);
-      const promise = (async () => {
-        const [costMappings, settingsData, integrations] = await Promise.all([
-          db.entities.CostMapping.filter({ tenant_id: tenantId }).catch(() => []),
-          db.entities.TenantSettings.filter({ tenant_id: tenantId }).catch(() => []),
-          db.entities.PlatformIntegration.filter({ tenant_id: tenantId, platform: 'shopify' }).catch(() => [])
-        ]);
-        return {
-          costMappings,
-          costMappingMap: new Map(
-            (costMappings || []).filter((row) => row?.sku).map((row) => [row.sku, row])
-          ),
-          settings: settingsData[0] || {},
-          integrationId: integrations[0]?.id || null
-        };
-      })();
-      cache.set(tenantId, promise);
-      return promise;
+function withEndpointGuard(name, handler) {
+  return async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      });
+    }
+    try {
+      const res = await handler(req);
+      return res instanceof Response ? res : json({ error: `${name}_invalid_response`, version: VERSION }, 500);
+    } catch (error) {
+      console.error(`[${name}] unhandled`, error);
+      return json({ error: 'internal_error', endpoint: name, message: error?.message || String(error), version: VERSION }, 500);
     }
   };
 }
@@ -132,350 +35,140 @@ function createTenantCache() {
 function normalizeQueueJob(job) {
   const topic = String(job?.event_type || job?.topic || '').trim();
   let payload = job?.payload ?? null;
-  if (typeof payload === 'string') {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      throw new Error('invalid webhook payload');
-    }
-  }
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('invalid webhook payload');
-  }
+  if (typeof payload === 'string') payload = JSON.parse(payload);
+  if (!topic || !payload || typeof payload !== 'object') throw new Error('invalid webhook payload');
   return {
     ...job,
     event_type: topic,
-    topic,
     payload,
     retry_count: Number(job?.retry_count ?? job?.attempts ?? 0) || 0,
   };
 }
 
-// ─── Process a single order job ──────────────────────────────────────────────
-async function processOrderJob(db, tenant, payload, job, tenantCtx) {
-  const settings = tenantCtx?.settings || {};
-  const profitData = calculateOrderProfit(payload, tenantCtx?.costMappingMap || tenantCtx?.costMappings || [], settings);
-  const riskData = calculateRiskScores(payload, settings);
+function mapOrderStatus(order) {
+  if (order?.cancelled_at) return 'cancelled';
+  if (order?.refunds?.length > 0) return 'refunded';
+  if (order?.fulfillment_status === 'fulfilled') return 'fulfilled';
+  if (order?.financial_status === 'paid' || order?.financial_status === 'partially_paid') return 'paid';
+  return 'pending';
+}
 
-  const existing = await db.entities.Order.filter({
-    tenant_id: tenant.id,
-    platform_order_id: payload.id.toString()
-  });
-
-  // Resolve integration_id for this job
-  let integrationId = job.integration_id || null;
-  if (!integrationId) {
-    integrationId = tenantCtx?.integrationId || null;
-  }
-
-  const rec = {
-    tenant_id: tenant.id,
-    integration_id: integrationId,
-    shop_domain: tenant.shop_domain,
-    platform_order_id: payload.id.toString(),
-    order_number: payload.order_number?.toString() || payload.name,
-    customer_email: payload.email,
-    customer_name: payload.customer?.first_name
-      ? `${payload.customer.first_name} ${payload.customer.last_name || ''}`.trim()
-      : payload.shipping_address?.name,
-    order_date: payload.created_at,
-    processed_at: payload.processed_at || payload.created_at,
-    financial_status: payload.financial_status,
-    fulfillment_status: payload.fulfillment_status || 'unfulfilled',
-    status: mapStatus(payload),
-    billing_address: payload.billing_address,
-    shipping_address: payload.shipping_address,
-    discount_codes: payload.discount_codes?.map(d => d.code) || [],
-    is_first_order: !payload.customer || payload.customer.orders_count <= 1,
+async function processOrderJob(base44, tenantId, job, payload) {
+  const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenantId, platform: 'shopify' }, '-created_date', 1).catch(() => []);
+  const integration = integrations[0] || null;
+  const shopDomain = integration?.store_key || null;
+  const platformOrderId = String(payload?.id || '').trim();
+  if (!platformOrderId) return;
+  const record = {
+    tenant_id: tenantId,
+    integration_id: job?.integration_id || integration?.id || null,
+    shop_domain: shopDomain,
+    platform_order_id: platformOrderId,
+    order_number: String(payload?.order_number || payload?.name || platformOrderId),
+    customer_email: payload?.email || payload?.customer?.email || null,
+    customer_name: payload?.customer?.first_name ? `${payload.customer.first_name} ${payload?.customer?.last_name || ''}`.trim() : payload?.shipping_address?.name || null,
+    order_date: payload?.created_at || new Date().toISOString(),
+    processed_at: payload?.processed_at || payload?.created_at || new Date().toISOString(),
+    financial_status: payload?.financial_status || null,
+    fulfillment_status: payload?.fulfillment_status || 'unfulfilled',
+    status: mapOrderStatus(payload),
+    billing_address: payload?.billing_address || null,
+    shipping_address: payload?.shipping_address || null,
+    discount_codes: Array.isArray(payload?.discount_codes) ? payload.discount_codes.map((item) => item?.code).filter(Boolean) : [],
+    is_first_order: !payload?.customer || Number(payload?.customer?.orders_count || 0) <= 1,
     is_demo: false,
-    ...profitData,
-    ...riskData,
+    total_revenue: Number(payload?.total_price || 0) || 0,
     platform_data: payload
   };
-
-  if (existing.length > 0) {
-    const updatedOrder = await db.entities.Order.update(existing[0].id, rec);
-    await upsertProjectedCustomer(db, tenant.id, { ...updatedOrder, ...rec });
-    return { order_id: existing[0].id };
+  const existing = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId, platform_order_id: platformOrderId }, '-created_date', 1).catch(() => []);
+  if (existing[0]?.id) {
+    const saved = await base44.asServiceRole.entities.Order.update(existing[0].id, record);
+    await upsertProjectedCustomer(base44.asServiceRole, tenantId, { ...saved, ...record }).catch(() => {});
   } else {
-    const created = await db.entities.Order.create(rec);
-    await upsertProjectedCustomer(db, tenant.id, { ...created, ...rec });
-    if (riskData.risk_level === 'high') {
-      await db.entities.Alert.create({
-        tenant_id: tenant.id,
-        type: 'high_risk_order',
-        severity: 'high',
-        title: `High Risk Order #${rec.order_number}`,
-        message: `Order flagged: ${riskData.risk_reasons.join(', ')}`,
-        entity_type: 'order',
-        entity_id: payload.id.toString(),
-        recommended_action: riskData.recommended_action,
-        metadata: { fraud_score: riskData.fraud_score, order_total: profitData.total_revenue }
-      }).catch(() => {});
-    }
-    if (profitData.net_profit < 0) {
-      await db.entities.Alert.create({
-        tenant_id: tenant.id,
-        type: 'negative_margin',
-        severity: 'medium',
-        title: `Negative Margin on Order #${rec.order_number}`,
-        message: `Lost $${Math.abs(profitData.net_profit).toFixed(2)}`,
-        entity_type: 'order',
-        entity_id: payload.id.toString(),
-        metadata: { net_profit: profitData.net_profit }
-      }).catch(() => {});
-    }
-    return { order_id: created.id };
-  }
-  return null;
-}
-
-// ─── Process a single refund job ─────────────────────────────────────────────
-async function processRefundJob(db, tenant, payload) {
-  const exists = await db.entities.Refund.filter({
-    tenant_id: tenant.id,
-    platform_refund_id: payload.id.toString()
-  });
-  if (exists.length > 0) return;
-
-  const total = payload.transactions?.reduce((s, t) => s + parseFloat(t.amount || 0), 0) || 0;
-  await db.entities.Refund.create({
-    tenant_id: tenant.id,
-    order_id: payload.order_id.toString(),
-    platform_refund_id: payload.id.toString(),
-    amount: total,
-    reason: payload.note || 'No reason provided',
-    refunded_at: payload.created_at
-  });
-
-  const orders = await db.entities.Order.filter({ tenant_id: tenant.id, platform_order_id: payload.order_id.toString() });
-  if (orders.length > 0) {
-    const cur = orders[0].refund_amount || 0;
-    await db.entities.Order.update(orders[0].id, {
-      refund_amount: cur + total,
-      status: (cur + total) >= orders[0].total_revenue ? 'refunded' : 'partially_refunded'
-    });
+    const saved = await base44.asServiceRole.entities.Order.create(record);
+    await upsertProjectedCustomer(base44.asServiceRole, tenantId, { ...saved, ...record }).catch(() => {});
   }
 }
 
-// ─── Process products/update ─────────────────────────────────────────────────
-async function processProductUpdateJob(db, tenant, payload) {
-  const productId = payload.id?.toString();
-  if (!productId) return;
-
-  const existing = await db.entities.Product.filter({
-    tenant_id: tenant.id,
-    platform_product_id: productId
-  });
-
-  const variants = (payload.variants || []).map(v => ({
-    variant_id: v.id?.toString(),
-    title: v.title,
-    sku: v.sku,
-    price: parseFloat(v.price || 0),
-    inventory_quantity: v.inventory_quantity ?? null,
-    compare_at_price: v.compare_at_price ? parseFloat(v.compare_at_price) : null
-  }));
-
-  const rec = {
-    tenant_id: tenant.id,
-    platform_product_id: productId,
-    title: payload.title,
-    handle: payload.handle,
-    product_type: payload.product_type,
-    vendor: payload.vendor,
-    status: payload.status || 'active',
-    tags: typeof payload.tags === 'string' ? payload.tags.split(',').map(t => t.trim()).filter(Boolean) : (payload.tags || []),
-    variants,
-    images: (payload.images || []).map(img => img.src),
-    updated_at_platform: payload.updated_at
-  };
-
-  if (existing.length > 0) {
-    console.log(`[processProductUpdateJob] Updating product ${productId} for tenant ${tenant.id}`);
-    await db.entities.Product.update(existing[0].id, rec);
-  } else {
-    console.log(`[processProductUpdateJob] Creating product ${productId} for tenant ${tenant.id}`);
-    await db.entities.Product.create(rec);
+async function processRefundJob(base44, tenantId, payload) {
+  const refundId = String(payload?.id || '').trim();
+  const platformOrderId = String(payload?.order_id || '').trim();
+  if (!refundId || !platformOrderId) return;
+  const existingRefunds = await base44.asServiceRole.entities.Refund.filter({ tenant_id: tenantId, platform_refund_id: refundId }, '-created_date', 1).catch(() => []);
+  if (!existingRefunds.length) {
+    const amount = (payload?.transactions || []).reduce((sum, txn) => sum + (parseFloat(txn?.amount || 0) || 0), 0);
+    await base44.asServiceRole.entities.Refund.create({
+      tenant_id: tenantId,
+      order_id: platformOrderId,
+      platform_refund_id: refundId,
+      amount,
+      reason: payload?.note || 'No reason provided',
+      refunded_at: payload?.created_at || new Date().toISOString()
+    }).catch(() => {});
   }
 }
 
-// ─── Process orders/cancelled ─────────────────────────────────────────────────
-async function processOrderCancelledJob(db, tenant, payload) {
-  const platformOrderId = payload.id?.toString();
-  if (!platformOrderId) return;
+const handler = withEndpointGuard('processWebhookQueue', async (req) => {
+  const base44 = createClientFromRequest(req);
 
-  const existing = await db.entities.Order.filter({
-    tenant_id: tenant.id,
-    platform_order_id: platformOrderId
-  });
-
-  if (existing.length > 0) {
-    console.log(`[processOrderCancelledJob] Marking order ${platformOrderId} cancelled for tenant ${tenant.id}`);
-    await db.entities.Order.update(existing[0].id, {
-      status: 'cancelled',
-      fulfillment_status: payload.fulfillment_status || existing[0].fulfillment_status,
-      cancelled_at: payload.cancelled_at || new Date().toISOString(),
-      cancel_reason: payload.cancel_reason || null
-    });
-  } else {
-    console.log(`[processOrderCancelledJob] Order ${platformOrderId} not found locally — skipping cancellation`);
+  let user = null;
+  try { user = await base44.auth.me(); } catch (_) {}
+  const role = String(user?.role || user?.app_role || '').toLowerCase();
+  if (user && role !== 'admin' && role !== 'owner') {
+    return json({ error: 'Admin/owner only', version: VERSION }, 403);
   }
-}
 
-// ─── Main Handler ─────────────────────────────────────────────────────────────
-Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const db = base44.asServiceRole;
-    const tenantCache = createTenantCache();
+  const pending = await base44.asServiceRole.entities.WebhookQueue.filter({ status: 'pending' }, '-created_date', BATCH_SIZE).catch(() => []);
+  const retryable = await base44.asServiceRole.entities.WebhookQueue.filter({ status: 'failed' }, 'next_attempt_at', BATCH_SIZE).catch(() => []);
+  const now = new Date();
+  const jobs = [
+    ...pending,
+    ...retryable.filter((job) => !job?.next_attempt_at || new Date(job.next_attempt_at) <= now)
+  ].slice(0, BATCH_SIZE);
 
-    // Auth check: admin user OR automated (no auth = service role caller from scheduler)
-    let isAutomated = false;
+  if (!jobs.length) return json({ processed: 0, failed: 0, dead_lettered: 0, total_jobs: 0, version: VERSION });
+
+  const stats = { processed: 0, failed: 0, dead_lettered: 0, total_jobs: jobs.length, version: VERSION };
+  for (const job of jobs) {
+    let normalized = job;
     try {
-      const user = await base44.auth.me();
-      const role = (user?.role || user?.app_role || '').toLowerCase();
-      if (user && role !== 'admin' && role !== 'owner') {
-        return Response.json({ error: 'Admin/owner only' }, { status: 403 });
-      }
-    } catch {
-      // No session = called from scheduler automation — allow
-      isAutomated = true;
-    }
+      normalized = normalizeQueueJob(job);
+      await base44.asServiceRole.entities.WebhookQueue.update(job.id, { status: 'processing', last_attempt_at: new Date().toISOString() }).catch(() => {});
 
-    const now = new Date();
-    const nowIso = now.toISOString();
-
-    // Fetch pending jobs that are ready to process (next_attempt_at <= now or null)
-    const pending = await db.entities.WebhookQueue.filter({ status: 'pending' }, '-created_date', BATCH_SIZE);
-    const retryable = await db.entities.WebhookQueue.filter({ status: 'failed' }, 'next_attempt_at', BATCH_SIZE);
-
-    const jobs = [
-      ...pending,
-      ...retryable.filter(j => !j.next_attempt_at || new Date(j.next_attempt_at) <= now)
-    ].slice(0, BATCH_SIZE);
-
-    if (jobs.length === 0) {
-      return Response.json({ processed: 0, message: 'Queue empty' });
-    }
-
-    console.log(`[processWebhookQueue] Processing ${jobs.length} jobs`);
-
-    const stats = { processed: 0, failed: 0, dead_lettered: 0 };
-
-    await runInBatches(jobs, JOB_CONCURRENCY, async (job) => {
-      let normalizedJob = {
-        ...job,
-        event_type: String(job?.event_type || job?.topic || '').trim(),
-        retry_count: Number(job?.retry_count ?? job?.attempts ?? 0) || 0,
-      };
-      const t0 = Date.now();
-
-      try {
-        normalizedJob = normalizeQueueJob(job);
-        // Mark as processing only after the payload is known-good
-        await db.entities.WebhookQueue.update(normalizedJob.id, {
-          status: 'processing',
-          last_attempt_at: nowIso
-        }).catch(() => {});
-
-        // Resolve tenant
-        const tenants = await db.entities.Tenant.filter({ id: normalizedJob.tenant_id });
-        if (!tenants[0]) throw new Error(`Tenant not found: ${normalizedJob.tenant_id}`);
-        const tenant = tenants[0];
-        const tenantCtx = await tenantCache.get(db, tenant.id);
-
-        const topic = normalizedJob.event_type;
-        const payload = normalizedJob.payload;
-
-        if (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid') {
-          const orderResult = await processOrderJob(db, tenant, payload, job, tenantCtx);
-          // Fire-and-forget async risk scoring after order is saved
-          if (orderResult?.order_id) {
-            base44.asServiceRole.functions.invoke('riskEngine', {
-              action: 'score',
-              tenant_id: tenant.id,
-              order_id: orderResult.order_id
-            }).catch(e => console.warn('[processWebhookQueue] riskEngine call failed:', e.message));
-          }
-        } else if (topic === 'refunds/create') {
-          await processRefundJob(db, tenant, payload);
-        } else if (topic === 'products/update') {
-          await processProductUpdateJob(db, tenant, payload);
-        } else if (topic === 'orders/cancelled') {
-          await processOrderCancelledJob(db, tenant, payload);
-        } else {
-          console.log(`[processWebhookQueue] Unhandled topic: ${topic} — marking complete`);
-        }
-
-        const duration = Date.now() - t0;
-        await db.entities.WebhookQueue.update(normalizedJob.id, {
-          status: 'complete',
-          processed_at: new Date().toISOString(),
-          processing_duration_ms: duration
-        });
-        stats.processed++;
-
-      } catch (err) {
-        const retries = (normalizedJob.retry_count || 0) + 1;
-        const errorClass = classifyError(err);
-        console.error(`[processWebhookQueue] Job ${normalizedJob.id} failed (attempt ${retries}, ${errorClass}):`, err.message);
-
-        const deadLetter = retries >= MAX_RETRIES || errorClass === 'permanent';
-
-        if (deadLetter) {
-          const reason = errorClass === 'permanent'
-            ? `[permanent] ${err.message}`
-            : `[max retries exhausted after ${retries} attempts] ${err.message}`;
-          await db.entities.WebhookQueue.update(normalizedJob.id, {
-            status: 'dead_letter',
-            retry_count: retries,
-            attempts: retries,
-            error_message: reason,
-            last_attempt_at: nowIso
-          });
-          stats.dead_lettered++;
-
-          // Emit an audit trail entry so dead-letters are visible without digging into queue
-          await db.entities.AuditLog.create({
-            tenant_id: normalizedJob.tenant_id,
-            action: 'webhook_dead_lettered',
-            entity_type: 'webhook_queue',
-            entity_id: normalizedJob.id,
-            performed_by: 'system',
-            description: `Webhook job dead-lettered after ${retries} attempts (topic: ${normalizedJob.event_type}): ${err.message}`,
-            severity: 'medium',
-            category: 'integration',
-            is_auto_action: true,
-            metadata: {
-              event_type: normalizedJob.event_type,
-              retry_count: retries,
-              error_class: errorClass,
-              idempotency_key: normalizedJob.idempotency_key
-            }
+      if (normalized.event_type === 'orders/create' || normalized.event_type === 'orders/updated' || normalized.event_type === 'orders/paid') {
+        await processOrderJob(base44, normalized.tenant_id, job, normalized.payload);
+      } else if (normalized.event_type === 'refunds/create') {
+        await processRefundJob(base44, normalized.tenant_id, normalized.payload);
+      } else if (normalized.event_type === 'orders/cancelled') {
+        const existing = await base44.asServiceRole.entities.Order.filter({ tenant_id: normalized.tenant_id, platform_order_id: String(normalized.payload?.id || '') }, '-created_date', 1).catch(() => []);
+        if (existing[0]?.id) {
+          await base44.asServiceRole.entities.Order.update(existing[0].id, {
+            status: 'cancelled',
+            cancelled_at: normalized.payload?.cancelled_at || new Date().toISOString(),
+            cancel_reason: normalized.payload?.cancel_reason || null
           }).catch(() => {});
-        } else {
-          // Exponential backoff: 30s, 60s, 120s, 240s, 480s
-          const backoffMs = 30000 * Math.pow(2, retries - 1);
-          const nextAttempt = new Date(Date.now() + backoffMs).toISOString();
-          await db.entities.WebhookQueue.update(normalizedJob.id, {
-            status: 'failed',
-            retry_count: retries,
-            attempts: retries,
-            error_message: err.message,
-            last_attempt_at: nowIso,
-            next_attempt_at: nextAttempt
-          });
-          stats.failed++;
         }
       }
-    });
 
-    console.log(`[processWebhookQueue] Done: processed=${stats.processed} failed=${stats.failed} dead_lettered=${stats.dead_lettered}`);
-    return Response.json({ ...stats, total_jobs: jobs.length });
-
-  } catch (error) {
-    console.error('[processWebhookQueue] Fatal:', error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+      await base44.asServiceRole.entities.WebhookQueue.update(job.id, { status: 'complete', processed_at: new Date().toISOString() }).catch(() => {});
+      stats.processed++;
+    } catch (error) {
+      const retries = (Number(normalized?.retry_count ?? normalized?.attempts ?? 0) || 0) + 1;
+      const deadLetter = retries >= MAX_RETRIES;
+      await base44.asServiceRole.entities.WebhookQueue.update(job.id, {
+        status: deadLetter ? 'dead_letter' : 'failed',
+        retry_count: retries,
+        attempts: retries,
+        error_message: String(error?.message || error || 'process_webhook_queue_failed'),
+        last_attempt_at: new Date().toISOString(),
+        next_attempt_at: deadLetter ? null : new Date(Date.now() + 30000 * Math.pow(2, retries - 1)).toISOString()
+      }).catch(() => {});
+      if (deadLetter) stats.dead_lettered++;
+      else stats.failed++;
+    }
   }
+
+  return json(stats);
 });
+
+Deno.serve(handler);
