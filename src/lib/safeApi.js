@@ -2,9 +2,10 @@ import { base44 } from '@/api/base44Client';
 import { getPersistedContext } from '@/components/platformContext';
 
 const FUNCTION_FALLBACKS = {
-  syncShopifyOrders: ['syncShopifyData', 'shopifyConnectionWatchdog'],
-  syncShopifyData: ['shopifyConnectionWatchdog'],
-  registerShopifyWebhooks: ['shopifyConnectionWatchdog'],
+  syncShopifyOrders: ['shopifyActivationBootstrap', 'syncShopifyData', 'shopifyConnectionWatchdog'],
+  processWebhookQueue: ['shopifyActivationBootstrap'],
+  syncShopifyData: ['shopifyActivationBootstrap', 'shopifyConnectionWatchdog'],
+  registerShopifyWebhooks: ['shopifyActivationBootstrap', 'shopifyConnectionWatchdog'],
   profitAlertWatchdog: ['checkProfitAlerts'],
   supportGuardian: ['supportWatchdog'],
 };
@@ -56,6 +57,8 @@ export async function invokeWithRetry(name, payload = {}, options = {}) {
 
         if (
           fnName === 'syncShopifyOrders' ||
+          fnName === 'processWebhookQueue' ||
+          fnName === 'shopifyActivationBootstrap' ||
           fnName === 'syncShopifyData' ||
           fnName === 'registerShopifyWebhooks' ||
           fnName === 'shopifyReconcileWebhooks'
@@ -65,6 +68,9 @@ export async function invokeWithRetry(name, payload = {}, options = {}) {
           if (!next.integration_id && persisted?.integrationId) next.integration_id = persisted.integrationId;
           if (!next.shop && (persisted?.shop || persisted?.storeKey)) {
             next.shop = persisted.shop || persisted.storeKey;
+          }
+          if (fnName === 'shopifyActivationBootstrap' && next.force == null) {
+            next.force = false;
           }
           return next;
         }

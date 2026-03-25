@@ -117,14 +117,18 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data } = await invokeWithRetry('syncShopifyOrders', {
+      const { data } = await invokeWithRetry('shopifyActivationBootstrap', {
         tenant_id: tenantId,
         integration_id: integration?.id || undefined,
         shop: integration?.store_key || shopDomain || undefined,
+        source: 'settings_manual_sync',
+        force: true,
         days: parseInt(syncDays)
       });
-      if (data?.success) {
-        toast.success(`Sync complete — ${data.createdCount || 0} created, ${data.updatedCount || 0} updated`);
+      if (data?.ok || data?.success) {
+        const created = Number(data?.actions?.syncShopifyOrders?.data?.createdCount || data?.createdCount || 0);
+        const updated = Number(data?.actions?.syncShopifyOrders?.data?.updatedCount || data?.updatedCount || 0);
+        toast.success(`Sync complete — ${created} created, ${updated} updated`);
         queryClient.invalidateQueries({ queryKey: ['shopifyIntegrationPanel', tenantId] });
       } else {
         toast.error(data?.error || 'Sync failed');

@@ -57,12 +57,16 @@ export default function ShopifyDebugPanel() {
     setLoading(p => ({ ...p, sync: true }));
     setSyncResult(null);
     try {
-      const { data } = await invokeWithRetry('syncShopifyOrders', {
+      const { data } = await invokeWithRetry('shopifyActivationBootstrap', {
         tenant_id: diagResult.tenant_id,
+        source: 'debug_manual_sync',
+        force: true,
         days: 30
       });
       setSyncResult(data);
-      toast.success(`Sync complete: ${data?.createdCount || 0} created, ${data?.updatedCount || 0} updated`);
+      const created = Number(data?.actions?.syncShopifyOrders?.data?.createdCount || data?.createdCount || 0);
+      const updated = Number(data?.actions?.syncShopifyOrders?.data?.updatedCount || data?.updatedCount || 0);
+      toast.success(`Sync complete: ${created} created, ${updated} updated`);
     } catch (e) {
       toast.error('Sync failed: ' + e.message);
     } finally {

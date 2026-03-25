@@ -242,6 +242,17 @@ export default function Home() {
           if (!data?.success) {
             throw new Error(data?.error || 'Failed to load embedded dashboard summary');
           }
+          if (Number(data?.metrics?.totalOrders || 0) === 0 && data?.bootstrapRecommended) {
+            try {
+              await invokeWithRetry('shopifyActivationBootstrap', {
+                tenant_id: queryFilter.tenant_id,
+                source: 'embedded_summary_recovery',
+                force: true,
+                days: 30
+              }, { attempts: 1, baseMs: 200 });
+              return await fetchEntitySummary(queryFilter.tenant_id);
+            } catch {}
+          }
           return data;
         } catch (error) {
           const msg = String(error?.message || '');
@@ -403,12 +414,19 @@ export default function Home() {
   const syncMutation = useMutation({
     mutationFn: async () => {
       if (!authTenantId) throw new Error('No store connected');
-      const response = await invokeWithRetry('syncShopifyOrders', { tenant_id: authTenantId }, { attempts: 3, baseMs: 300 });
+      const response = await invokeWithRetry('shopifyActivationBootstrap', {
+        tenant_id: authTenantId,
+        source: isEmbedded ? 'embedded_manual_sync' : 'dashboard_manual_sync',
+        force: true,
+        days: 30
+      }, { attempts: 3, baseMs: 300 });
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
     onSuccess: (data) => {
-      toast.success(`Synced: ${data.createdCount || 0} new orders`);
+      const created = Number(data?.actions?.syncShopifyOrders?.data?.createdCount || 0);
+      const updated = Number(data?.actions?.syncShopifyOrders?.data?.updatedCount || 0);
+      toast.success(`Synced: ${created} new, ${updated} updated`);
       queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
       queryClient.invalidateQueries({ queryKey: profitLeaksKey });
       queryClient.invalidateQueries({ queryKey: buildQueryKey('orders', resolverCheck) });

@@ -48,18 +48,20 @@ export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
   // Sync Now mutation — uses syncShopifyOrders which handles OAuth token decryption
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const resp = await invokeWithRetry('syncShopifyOrders', {
+      const resp = await invokeWithRetry('shopifyActivationBootstrap', {
         tenant_id: tenantId,
         integration_id: integrationId || undefined,
         shop: integration?.store_key || undefined,
+        source: 'order_status_manual_sync',
+        force: true,
         days: 30,
       });
       if (resp.data?.error) throw new Error(resp.data.error);
       return resp.data;
     },
     onSuccess: (data) => {
-      const created = data.createdCount ?? data.created ?? 0;
-      const updated = data.updatedCount ?? data.updated ?? 0;
+      const created = data?.actions?.syncShopifyOrders?.data?.createdCount ?? data.createdCount ?? data.created ?? 0;
+      const updated = data?.actions?.syncShopifyOrders?.data?.updatedCount ?? data.updatedCount ?? data.updated ?? 0;
       toast.success(`Sync complete: ${created} new, ${updated} updated`);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['integration-sync-status'] });
