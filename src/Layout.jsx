@@ -1168,62 +1168,95 @@ function MerchantUtilityBanner({
       : syncStatus === 'offline'
         ? 'Offline mode'
         : 'Instant sync ready';
+  const statusTone = syncing
+    ? 'text-cyan-100'
+    : syncStatus === 'error'
+      ? 'text-amber-100'
+      : syncStatus === 'offline'
+        ? 'text-slate-300'
+        : 'text-emerald-100';
+  const statusGlow = syncing
+    ? 'from-cyan-400/50 via-cyan-300/20 to-transparent'
+    : syncStatus === 'error'
+      ? 'from-amber-400/45 via-amber-300/20 to-transparent'
+      : syncStatus === 'offline'
+        ? 'from-slate-400/35 via-slate-300/10 to-transparent'
+        : 'from-emerald-400/50 via-emerald-300/20 to-transparent';
 
   return (
     <div className="px-2 pb-1.5 pt-1 sm:px-2.5 lg:px-3">
-      <div className="command-surface flex flex-col gap-2 rounded-[1.2rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.94),rgba(8,18,34,0.9))] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
-              Merchant lane
-            </span>
-            {platformDisplay && (
-              <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100">
-                {platformDisplay}
-              </span>
-            )}
-            {subscriptionTier && (
-              <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-100">
-                {subscriptionTier}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="truncate text-sm font-medium text-slate-100">
-              {hasStore
-                ? `${storeDisplayName || 'Connected store'} is ready for fast sync and action routing.`
-                : 'Connect a store to unlock live sync, webhooks, and merchant intelligence.'}
-            </p>
-            <span className="text-xs text-slate-400">
-              {hasStore ? syncLabel : 'Setup required'}
-            </span>
-          </div>
-        </div>
+      <div className="merchant-banner-flow command-surface relative overflow-hidden rounded-[1.25rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.96),rgba(8,18,34,0.92)_42%,rgba(6,14,27,0.96))] px-3 py-2.5">
+        <div className={`pointer-events-none absolute inset-y-0 left-0 w-40 bg-gradient-to-r ${statusGlow}`} />
+        <div className="merchant-banner-orb pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.16),transparent_65%)] lg:block" />
+        <div className="relative flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(0,1.25fr)_minmax(220px,0.75fr)]">
+            <div className="flex min-w-0 items-center gap-3 rounded-[1rem] border border-white/8 bg-white/[0.035] px-3 py-2">
+              <div className="merchant-banner-pulse flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(34,211,238,0.22),rgba(99,102,241,0.3))] shadow-[0_0_24px_rgba(56,189,248,0.18)]">
+                <Shield className="h-4.5 w-4.5 text-cyan-100" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="future-badge inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+                    Merchant lane
+                  </span>
+                  {platformDisplay && (
+                    <span className="future-badge inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100">
+                      {platformDisplay}
+                    </span>
+                  )}
+                  {subscriptionTier && (
+                    <span className="future-badge inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-100">
+                      {subscriptionTier}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-100">
+                  {hasStore ? (storeDisplayName || 'Connected store') : 'Store setup required'}
+                </p>
+              </div>
+            </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {hasStore ? (
-            <>
-              <Button
-                size="sm"
-                onClick={() => syncManager?.triggerSync?.()}
-                disabled={syncing || syncStatus === 'offline'}
-                className="h-8 rounded-xl bg-cyan-500/14 px-3 text-xs font-medium text-cyan-100 hover:bg-cyan-500/22"
-              >
-                {syncing ? 'Syncing…' : 'Sync now'}
-              </Button>
-              <Link to={createPageUrl(currentPageName === 'Orders' ? 'Integrations' : 'Orders', locationSearch)}>
-                <Button size="sm" variant="ghost" className="h-8 rounded-xl border border-white/10 px-3 text-xs text-slate-200 hover:bg-white/[0.05]">
-                  {currentPageName === 'Orders' ? 'Manage integrations' : 'Open orders'}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Status</p>
+                <p className={`mt-1 text-sm font-semibold ${statusTone}`}>{hasStore ? syncLabel : 'Setup'}</p>
+              </div>
+              <div className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Flow</p>
+                <p className="mt-1 text-sm font-semibold text-slate-100">{currentPageName === 'Orders' ? 'Orders' : 'Runtime'}</p>
+              </div>
+              <div className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Mode</p>
+                <p className="mt-1 text-sm font-semibold text-slate-100">{isEmbedded ? 'Embedded' : 'Web'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2 xl:pl-3">
+            {hasStore ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => syncManager?.triggerSync?.()}
+                  disabled={syncing || syncStatus === 'offline'}
+                  className="h-9 min-w-[110px] rounded-xl bg-cyan-500/16 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/24"
+                >
+                  {syncing ? 'Syncing…' : 'Sync now'}
+                </Button>
+                <Link to={createPageUrl(currentPageName === 'Orders' ? 'Integrations' : 'Orders', locationSearch)}>
+                  <Button size="sm" variant="ghost" className="h-9 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-200 hover:bg-white/[0.05]">
+                    {currentPageName === 'Orders' ? 'Manage' : 'Orders'}
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link to={createPageUrl('Integrations', locationSearch)}>
+                <Button size="sm" className="h-9 min-w-[132px] rounded-xl bg-emerald-600 px-3 text-xs font-semibold hover:bg-emerald-700">
+                  {isEmbedded ? 'Connect store' : 'Connect platform'}
                 </Button>
               </Link>
-            </>
-          ) : (
-            <Link to={createPageUrl('Integrations', locationSearch)}>
-              <Button size="sm" className="h-8 rounded-xl bg-emerald-600 px-3 text-xs font-medium hover:bg-emerald-700">
-                {isEmbedded ? 'Connect store' : 'Connect platform'}
-              </Button>
-            </Link>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

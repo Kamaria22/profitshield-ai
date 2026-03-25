@@ -261,6 +261,25 @@
     animation: future-scan 7s linear infinite;
     pointer-events: none;
   }
+
+  .merchant-banner-flow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 0%, rgba(56, 189, 248, 0.08) 28%, rgba(129, 140, 248, 0.12) 48%, transparent 72%);
+    transform: translateX(-65%);
+    animation: merchant-banner-flow 8.5s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  .merchant-banner-orb {
+    animation: merchant-banner-orb 7s ease-in-out infinite;
+  }
+
+  .merchant-banner-pulse {
+    animation: merchant-banner-pulse 2.8s ease-in-out infinite;
+  }
 }
 
 @keyframes shimmer {
@@ -281,6 +300,23 @@
 @keyframes future-scan {
   0% { transform: translateY(-55%); }
   100% { transform: translateY(55%); }
+}
+
+@keyframes merchant-banner-flow {
+  0% { transform: translateX(-65%); opacity: 0.25; }
+  16% { opacity: 0.65; }
+  50% { transform: translateX(10%); opacity: 0.5; }
+  100% { transform: translateX(88%); opacity: 0.18; }
+}
+
+@keyframes merchant-banner-orb {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.18; }
+  50% { transform: translate3d(-8px, 2px, 0) scale(1.05); opacity: 0.3; }
+}
+
+@keyframes merchant-banner-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.2); opacity: 0.9; }
+  50% { box-shadow: 0 0 0 7px rgba(56, 189, 248, 0); opacity: 1; }
 }
 
 /* Scrollbar — dark theme */
