@@ -1,7 +1,8 @@
+// redeploy trigger: force Base44 to republish dashboardAI runtime
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { rebuildProjectedCustomersFromOrders } from '../helpers/customerProjection/entry.ts';
 
-const VERSION = '2026-03-24.dashboard-projection-v1';
+const VERSION = '2026-03-24.dashboard-projection-v2';
 
 function withEndpointGuard(name, handler) {
   return async (req) => {
