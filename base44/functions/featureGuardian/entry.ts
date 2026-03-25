@@ -82,6 +82,80 @@ async function upsertFixReport(base44, report) {
 // FEATURE PLAYBOOKS
 // ─────────────────────────────────────────────
 const FEATURE_PLAYBOOKS = {
+  shopify_runtime: {
+    requiredEntities: ["Tenant", "PlatformIntegration", "Order", "Alert", "AuditLog"],
+    requiredFunctions: ["shopifyActivationBootstrap", "registerShopifyWebhooks"],
+    requiredFeatureFlags: [],
+
+    async smokeTest(base44, tenantId) {
+      const db = base44.asServiceRole?.entities || base44.entities;
+      const tenant = await db.Tenant.filter({ id: tenantId }).then((rows) => rows?.[0] || null).catch(() => null);
+      if (!tenant) {
+        return { ok: false, reason: "tenant_missing", diagnostics: { tenantId } };
+      }
+      const integrations = await db.PlatformIntegration.filter({ tenant_id: tenantId, platform: "shopify" }).catch(() => []);
+      const integration = integrations.find((row) => row?.status === "connected" || row?.status === "degraded") || integrations[0] || null;
+      if (!integration?.id) {
+        return { ok: false, reason: "shopify_integration_missing", diagnostics: { integrationCount: integrations.length } };
+      }
+      const orders = await db.Order.filter({ tenant_id: tenantId }, "-order_date", 3).catch(() => []);
+      return {
+        ok: orders.length > 0,
+        reason: orders.length > 0 ? "healthy" : "orders_missing",
+        diagnostics: {
+          integration_id: integration.id,
+          integration_status: integration.status,
+          last_sync_at: integration.last_sync_at || null,
+          webhook_count: Object.keys(integration.webhook_endpoints || {}).length,
+          order_count_preview: orders.length,
+        }
+      };
+    },
+
+    async safeFixes(base44, tenantId) {
+      const db = base44.asServiceRole?.entities || base44.entities;
+      const integrations = await db.PlatformIntegration.filter({ tenant_id: tenantId, platform: "shopify" }).catch(() => []);
+      const integration = integrations.find((row) => row?.status === "connected" || row?.status === "degraded") || integrations[0] || null;
+      const results = [];
+
+      if (!integration?.id) {
+        return [{ fix: "bootstrap_shopify_runtime", status: "failed", error: "shopify_integration_missing" }];
+      }
+
+      try {
+        const response = await base44.functions.invoke("shopifyActivationBootstrap", {
+          tenant_id: tenantId,
+          integration_id: integration.id,
+          source: "feature_guardian_shopify_runtime",
+          force: true,
+          days: 30,
+        });
+        results.push({
+          fix: "invoke_shopifyActivationBootstrap",
+          status: "applied",
+          response: response?.data || null,
+        });
+      } catch (e) {
+        results.push({ fix: "invoke_shopifyActivationBootstrap", status: "failed", error: e?.message || "invoke_failed" });
+      }
+
+      try {
+        const response = await base44.functions.invoke("registerShopifyWebhooks", {
+          integration_id: integration.id,
+        });
+        results.push({
+          fix: "invoke_registerShopifyWebhooks",
+          status: "applied",
+          response: response?.data || null,
+        });
+      } catch (e) {
+        results.push({ fix: "invoke_registerShopifyWebhooks", status: "failed", error: e?.message || "invoke_failed" });
+      }
+
+      return results;
+    },
+  },
+
   customer_segmentation: {
     requiredEntities: ["Tenant", "Order", "Customer", "CustomerSegment", "AuditLog"],
     requiredFunctions: ["customerSegmentationRuntime"],

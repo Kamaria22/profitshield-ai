@@ -4,6 +4,13 @@ class StabilityAgent {
     this.baseDelayMs = 250;
     this.lastSelfHealTriggerAt = 0;
     this.selfHealUnavailableUntil = 0;
+    this.criticalFunctionFallbacks = {
+      shopifyActivationBootstrap: 'inline_bootstrap_fallback',
+      syncShopifyOrders: 'shopifyActivationBootstrap',
+      processWebhookQueue: 'shopifyActivationBootstrap',
+      dashboardAI: 'entity_summary_fallback',
+      registerShopifyWebhooks: 'shopifyActivationBootstrap',
+    };
   }
 
   logError(context, error, meta = {}) {
@@ -15,7 +22,53 @@ class StabilityAgent {
       ...meta,
     };
     console.warn('[StabilityAgent]', payload);
+    try {
+      sessionStorage.setItem(`ps:stability:${context}`, JSON.stringify(payload));
+    } catch {}
     return payload;
+  }
+
+  rememberMissingFunction(name, meta = {}) {
+    const payload = {
+      name,
+      fallback: this.criticalFunctionFallbacks[name] || null,
+      detectedAt: new Date().toISOString(),
+      ...meta,
+    };
+    try {
+      localStorage.setItem(`ps:missing-function:${name}`, JSON.stringify(payload));
+    } catch {}
+    return payload;
+  }
+
+  async reportMissingDeployment(name, meta = {}) {
+    const incident = this.rememberMissingFunction(name, meta);
+    const body = {
+      action: 'report_incident',
+      tenant_id: meta?.tenant_id || null,
+      incident: {
+        code: 'missing_function_deployment',
+        message: `Missing deployment detected for ${name}`,
+        severity: 'high',
+        feature: name,
+        details: incident,
+      },
+      data: { selected: { tenant_id: meta?.tenant_id || null } },
+      ui_probe: {
+        missing_function: name,
+        recommended_fallback: incident.fallback,
+      }
+    };
+
+    for (const endpoint of ['/api/functions/frontendGuardian', '/api/functions/featureGuardian', '/api/functions/selfHeal']) {
+      const result = await this.safeFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (result?.ok) return true;
+    }
+    return false;
   }
 
   delay(ms) {
@@ -96,6 +149,9 @@ class StabilityAgent {
   monitorStatus(status, meta = {}) {
     if ([401, 403, 404, 500, 502].includes(Number(status || 0))) {
       this.logError('http_status_detected', new Error(`http_${status}`), meta);
+      if (Number(status) === 404 && meta?.functionName && this.criticalFunctionFallbacks[meta.functionName]) {
+        this.reportMissingDeployment(meta.functionName, meta).catch(() => null);
+      }
       this.triggerSelfHealRetry(status, meta).catch(() => null);
     }
   }

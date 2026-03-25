@@ -119,7 +119,8 @@ export default function Home() {
     return null;
   }, [dashboardSummaryKey, queryClient, summaryCacheKey, summaryDurableCacheKey]);
 
-  const fetchEntitySummary = useCallback(async (tenantId) => {
+  const fetchEntitySummary = useCallback(async (tenantId, options = {}) => {
+    const orderLimit = Math.max(1, Math.min(50, Number(options.orderLimit || 20) || 20));
     const safeFilter = async (entity, query, sort, limit) => {
       try {
         const rows = await entity.filter(query, sort, limit);
@@ -128,11 +129,13 @@ export default function Home() {
         return [];
       }
     };
-    const [orders, alerts, leaks] = await Promise.all([
-      safeFilter(base44.entities.Order, { tenant_id: tenantId }, '-order_date', 20),
+    const [orders, alerts, leaks, integrations] = await Promise.all([
+      safeFilter(base44.entities.Order, { tenant_id: tenantId }, '-order_date', orderLimit),
       safeFilter(base44.entities.Alert, { tenant_id: tenantId, status: 'pending' }, '-created_date', 5),
-      safeFilter(base44.entities.ProfitLeak, { tenant_id: tenantId, is_resolved: false }, '-impact_amount', 5)
+      safeFilter(base44.entities.ProfitLeak, { tenant_id: tenantId, is_resolved: false }, '-impact_amount', 5),
+      safeFilter(base44.entities.PlatformIntegration, { tenant_id: tenantId, platform: 'shopify' }, '-updated_date', 2)
     ]);
+    const integration = integrations.find((row) => row?.status === 'connected' || row?.status === 'degraded') || integrations[0] || null;
 
     const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
     const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
@@ -141,7 +144,7 @@ export default function Home() {
     return {
       success: true,
       fallback: true,
-      fallback_source: 'entities',
+      fallback_source: options.fallbackSource || 'entities',
       metrics: {
         totalRevenue,
         totalProfit,
@@ -153,6 +156,9 @@ export default function Home() {
       profitScore: resolver?.tenant?.profit_integrity_score || 0,
       alertsCount: alerts.length,
       isDemoMode: false,
+      integrationStatus: integration?.status || null,
+      lastSyncAt: integration?.last_sync_at || null,
+      bootstrapRecommended: orders.length === 0 || !integration?.last_sync_at,
       orders: orders.slice(0, 5),
       alerts,
       profitLeaks: leaks
@@ -234,26 +240,24 @@ export default function Home() {
       if (!queryFilter?.tenant_id) return null;
 
       if (isEmbedded) {
+        const entitySummary = await fetchEntitySummary(queryFilter.tenant_id, {
+          orderLimit: 8,
+          fallbackSource: 'embedded_entities'
+        });
+        if (Number(entitySummary?.metrics?.totalOrders || 0) > 0) {
+          return entitySummary;
+        }
         try {
-          const { data } = await invokeWithRetry('dashboardAI', {
-            action: 'embedded_summary',
+          await invokeWithRetry('shopifyActivationBootstrap', {
             tenant_id: queryFilter.tenant_id,
+            source: 'embedded_summary_recovery',
+            force: true,
+            days: 30
           }, { attempts: 1, baseMs: 200 });
-          if (!data?.success) {
-            throw new Error(data?.error || 'Failed to load embedded dashboard summary');
-          }
-          if (Number(data?.metrics?.totalOrders || 0) === 0 && data?.bootstrapRecommended) {
-            try {
-              await invokeWithRetry('shopifyActivationBootstrap', {
-                tenant_id: queryFilter.tenant_id,
-                source: 'embedded_summary_recovery',
-                force: true,
-                days: 30
-              }, { attempts: 1, baseMs: 200 });
-              return await fetchEntitySummary(queryFilter.tenant_id);
-            } catch {}
-          }
-          return data;
+          return await fetchEntitySummary(queryFilter.tenant_id, {
+            orderLimit: 8,
+            fallbackSource: 'embedded_bootstrap_entities'
+          });
         } catch (error) {
           const msg = String(error?.message || '');
           const isRateLimited = msg.includes('429') || msg.toLowerCase().includes('rate limit');
@@ -262,7 +266,7 @@ export default function Home() {
           if (cached && (isRateLimited || isMissingDeployment)) {
             return { ...cached, fallback: true, fallback_source: 'cached_summary' };
           }
-          return await fetchEntitySummary(queryFilter.tenant_id);
+          return entitySummary;
         }
       }
       

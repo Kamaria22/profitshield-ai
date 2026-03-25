@@ -141,10 +141,72 @@ if (typeof window !== 'undefined' && !window.__PS_FUNCTION_INVOKE_GUARD__) {
       } catch (error) {
         const status = extractStatusFromError(error);
         const isMissing = status === 404 || isDeploymentMissingError(error);
+        const persisted = getPersistedContext(true);
+        if (isMissing && stabilityAgent?.rememberMissingFunction) {
+          stabilityAgent.rememberMissingFunction(name, {
+            tenant_id: payload?.tenant_id || persisted?.tenantId || null,
+            integration_id: payload?.integration_id || persisted?.integrationId || null,
+          });
+          stabilityAgent.reportMissingDeployment?.(name, {
+            tenant_id: payload?.tenant_id || persisted?.tenantId || null,
+            integration_id: payload?.integration_id || persisted?.integrationId || null,
+          }).catch(() => null);
+        }
 
         // Keep Shopify sync operational even if syncShopifyOrders deployment is missing.
         if (name === 'syncShopifyOrders' && isMissing) {
-          return originalInvoke('syncShopifyData', payload, ...rest);
+          return originalInvoke('shopifyActivationBootstrap', {
+            ...payload,
+            tenant_id: payload?.tenant_id || persisted?.tenantId || null,
+            integration_id: payload?.integration_id || persisted?.integrationId || null,
+            source: 'missing_syncShopifyOrders_runtime',
+            force: true,
+            days: payload?.days || 30,
+          }, ...rest);
+        }
+
+        if (name === 'processWebhookQueue' && isMissing) {
+          return originalInvoke('shopifyActivationBootstrap', {
+            ...payload,
+            tenant_id: payload?.tenant_id || persisted?.tenantId || null,
+            integration_id: payload?.integration_id || persisted?.integrationId || null,
+            source: 'missing_processWebhookQueue_runtime',
+            force: false,
+            days: payload?.days || 30,
+          }, ...rest);
+        }
+
+        if (name === 'registerShopifyWebhooks' && isMissing) {
+          return originalInvoke('shopifyActivationBootstrap', {
+            ...payload,
+            tenant_id: payload?.tenant_id || persisted?.tenantId || null,
+            integration_id: payload?.integration_id || persisted?.integrationId || null,
+            source: 'missing_registerShopifyWebhooks_runtime',
+            force: false,
+            days: 30,
+          }, ...rest);
+        }
+
+        if (name === 'dashboardAI' && isMissing) {
+          return {
+            data: {
+              success: false,
+              fallback: true,
+              reason: 'dashboardAI_unavailable',
+              bootstrapRecommended: true,
+              metrics: {
+                totalRevenue: 0,
+                totalProfit: 0,
+                avgMargin: 0,
+                highRiskOrders: 0,
+                totalOrders: 0,
+                pendingAlerts: 0,
+              },
+              orders: [],
+              alerts: [],
+              profitLeaks: [],
+            },
+          };
         }
 
         // Keep guardian checks operational if supportGuardian deployment is missing.
@@ -216,7 +278,7 @@ if (typeof window !== 'undefined' && !window.__PS_EMBEDDED_USER_ME_FETCH_GUARD__
         await new Promise((resolve) => setTimeout(resolve, waitMs))
         continue
       }
-      stabilityAgent.monitorStatus(response.status, { url, method })
+      stabilityAgent.monitorStatus(response.status, { url, method, functionName: (/\/api\/functions\/([^/?]+)/.exec(url || '') || [])[1] || null })
       if (!shouldRetryApi(url, method, response.status) || i === maxAttempts - 1) {
         return response
       }
