@@ -1,6 +1,13 @@
-// redeploy trigger: force Base44 to republish syncShopifyOrders runtime
+// redeploy trigger: rewritten syncShopifyOrders runtime for Base44 republish
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { upsertProjectedCustomer } from '../base44/functions/helpers/customerProjection/entry.ts';
+import { upsertProjectedCustomer } from '../helpers/customerProjection/entry.ts';
+
+const VERSION = '2026-03-24.sync-orders-rewrite-v1';
+const API_VERSION = '2024-10';
+
+function json(data, status = 200) {
+  return Response.json(data, { status });
+}
 
 function withEndpointGuard(name, handler) {
   return async (req) => {
@@ -16,309 +23,46 @@ function withEndpointGuard(name, handler) {
     }
     try {
       const res = await handler(req);
-      return res instanceof Response ? res : Response.json({ error: `${name}_invalid_response` }, { status: 500 });
+      return res instanceof Response ? res : json({ error: `${name}_invalid_response`, version: VERSION }, 500);
     } catch (error) {
       console.error(`[${name}] unhandled`, error);
-      return Response.json({ error: 'internal_error', endpoint: name, message: error?.message || String(error) }, { status: 500 });
+      return json({ error: 'internal_error', endpoint: name, message: error?.message || String(error), version: VERSION }, 500);
     }
   };
 }
 
-async function safeFilter(filterFn, fallback = [], _context = 'safeFilter') {
+async function decryptToken(encryptedToken) {
+  const key = Deno.env.get('ENCRYPTION_KEY');
   try {
-    const rows = await filterFn();
-    return Array.isArray(rows) ? rows : fallback;
+    const combined = Uint8Array.from(atob(encryptedToken), (c) => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const encrypted = combined.slice(12);
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode((key || '').padEnd(32, '0').slice(0, 32));
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, encrypted);
+    return new TextDecoder().decode(decrypted);
   } catch {
-    return fallback;
+    try { return atob(encryptedToken); } catch { return null; }
   }
-}
-
-async function runInBatches(items, batchSize, worker) {
-  const size = Math.max(1, Math.trunc(batchSize || 1));
-  const results = [];
-  for (let index = 0; index < items.length; index += size) {
-    const batch = items.slice(index, index + size);
-    const batchResults = await Promise.all(batch.map(worker));
-    results.push(...batchResults);
-  }
-  return results;
-}
-
-function normalizeTenantId(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim();
-}
-
-function clampDays(value, fallback = 90) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(1, Math.min(365, Math.trunc(parsed)));
-}
-
-async function readJsonBody(req) {
-  try {
-    return await req.json();
-  } catch {
-    return null;
-  }
-}
-
-// Calculate profit for an order
-function calculateOrderProfit(order, costMappings, settings) {
-  const revenue = parseFloat(order.total_price) || 0;
-  const shippingCharged = order.shipping_lines?.reduce((sum, l) => sum + parseFloat(l.price || 0), 0) || 0;
-  const taxTotal = order.tax_lines?.reduce((sum, l) => sum + parseFloat(l.price || 0), 0) || 0;
-  const discountTotal = order.discount_codes?.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0) || 0;
-  
-  let totalCogs = 0;
-  let hasAllCosts = true;
-  
-  const lineItems = order.line_items || [];
-  for (const item of lineItems) {
-    const sku = item.sku || item.variant_id?.toString();
-    const costMapping = costMappings instanceof Map ? costMappings.get(sku) : costMappings.find(m => m.sku === sku);
-    if (costMapping) {
-      totalCogs += (costMapping.cost_per_unit || 0) * (item.quantity || 1);
-    } else {
-      hasAllCosts = false;
-    }
-  }
-  
-  const paymentFeePct = settings?.default_payment_fee_pct || 2.9;
-  const paymentFeeFixed = settings?.default_payment_fee_fixed || 0.30;
-  const paymentFee = (revenue * paymentFeePct / 100) + paymentFeeFixed;
-  const platformFeePct = settings?.default_platform_fee_pct || 0;
-  const platformFee = revenue * platformFeePct / 100;
-  const shippingCost = order.shipping_cost || shippingCharged * 0.8;
-  
-  const netProfit = revenue - totalCogs - paymentFee - platformFee - shippingCost;
-  const marginPct = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-  
-  let confidence = 'high';
-  if (!hasAllCosts) confidence = 'medium';
-  if (lineItems.length > 0 && costMappings.length === 0) confidence = 'low';
-  
-  return {
-    total_revenue: revenue,
-    subtotal: revenue - shippingCharged - taxTotal,
-    shipping_charged: shippingCharged,
-    tax_total: taxTotal,
-    discount_total: discountTotal,
-    total_cogs: totalCogs,
-    payment_fee: paymentFee,
-    platform_fee: platformFee,
-    shipping_cost: shippingCost,
-    net_profit: netProfit,
-    margin_pct: marginPct,
-    confidence
-  };
-}
-
-// Calculate risk scores with custom rules support
-function calculateRiskScores(order, settings, customRules = []) {
-  let fraudScore = 0;
-  let returnScore = 0;
-  let chargebackScore = 0;
-  const riskReasons = [];
-  let customRuleAction = null;
-  
-  const orderTotal = parseFloat(order.total_price || 0);
-  const isFirstOrder = !order.customer || order.customer.orders_count <= 1;
-  
-  if (isFirstOrder && orderTotal > 200) {
-    fraudScore += 25;
-    riskReasons.push('New customer with high order value');
-  }
-  
-  const billing = order.billing_address;
-  const shipping = order.shipping_address;
-  if (billing && shipping) {
-    if (billing.country_code !== shipping.country_code) {
-      fraudScore += 30;
-      riskReasons.push('Billing and shipping countries differ');
-    }
-  }
-  
-  const discountCount = order.discount_codes?.length || 0;
-  if (discountCount >= 2) {
-    fraudScore += 10;
-    chargebackScore += 15;
-    riskReasons.push('Multiple discount codes used');
-  }
-  
-  if (isFirstOrder && orderTotal > 500) {
-    fraudScore += 20;
-    chargebackScore += 10;
-    riskReasons.push('First order exceeds $500');
-  }
-  
-  if (isFirstOrder) returnScore += 20;
-
-  // Apply custom risk rules
-  for (const rule of customRules) {
-    if (evaluateCustomRule(rule, order, orderTotal, isFirstOrder, discountCount)) {
-      const adjustment = rule.risk_adjustment || 0;
-      fraudScore += adjustment;
-      riskReasons.push(`Custom rule: ${rule.name}`);
-      
-      if (rule.action && rule.action !== 'none') {
-        const actionPriority = { cancel: 4, hold: 3, verify: 2, flag: 1 };
-        if (!customRuleAction || actionPriority[rule.action] > actionPriority[customRuleAction]) {
-          customRuleAction = rule.action;
-        }
-      }
-    }
-  }
-  
-  fraudScore = Math.min(100, Math.max(0, fraudScore));
-  returnScore = Math.min(100, Math.max(0, returnScore));
-  chargebackScore = Math.min(100, Math.max(0, chargebackScore));
-  
-  const maxScore = Math.max(fraudScore, chargebackScore);
-  const highThreshold = settings?.high_risk_threshold || 70;
-  const mediumThreshold = settings?.medium_risk_threshold || 40;
-  
-  let riskLevel = 'low';
-  let recommendedAction = 'none';
-  
-  if (customRuleAction) {
-    recommendedAction = customRuleAction;
-    if (customRuleAction === 'cancel' || customRuleAction === 'hold') {
-      riskLevel = 'high';
-    } else {
-      riskLevel = 'medium';
-    }
-  } else if (maxScore >= highThreshold) {
-    riskLevel = 'high';
-    recommendedAction = 'hold';
-  } else if (maxScore >= mediumThreshold) {
-    riskLevel = 'medium';
-    recommendedAction = 'verify';
-  }
-  
-  return {
-    fraud_score: fraudScore,
-    return_score: returnScore,
-    chargeback_score: chargebackScore,
-    risk_level: riskLevel,
-    risk_reasons: riskReasons,
-    recommended_action: recommendedAction
-  };
-}
-
-// Evaluate custom rule against order data (simplified for sync)
-function evaluateCustomRule(rule, order, orderTotal, isFirstOrder, discountCount) {
-  const conditions = rule.conditions || [];
-  
-  for (const condition of conditions) {
-    const { field, operator, value } = condition;
-    let fieldValue;
-    
-    switch (field) {
-      case 'order_value':
-        fieldValue = orderTotal;
-        break;
-      case 'is_first_order':
-        fieldValue = isFirstOrder;
-        break;
-      case 'has_discount_code':
-        fieldValue = discountCount > 0;
-        break;
-      case 'discount_pct':
-        const discountTotal = order.discount_codes?.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0) || 0;
-        fieldValue = orderTotal > 0 ? (discountTotal / (orderTotal + discountTotal)) * 100 : 0;
-        break;
-      case 'shipping_country':
-        fieldValue = order.shipping_address?.country_code || order.shipping_address?.country || '';
-        break;
-      case 'item_count':
-        fieldValue = order.line_items?.length || 1;
-        break;
-      default:
-        continue;
-    }
-    
-    if (!evaluateCondition(fieldValue, operator, value, field)) {
-      return false;
-    }
-  }
-  
-  return conditions.length > 0;
-}
-
-function evaluateCondition(fieldValue, operator, compareValue, field) {
-  // Boolean fields
-  if (field === 'is_first_order' || field === 'has_discount_code') {
-    const boolValue = compareValue === 'true' || compareValue === true;
-    return operator === 'equals' ? fieldValue === boolValue : fieldValue !== boolValue;
-  }
-  
-  // Numeric fields
-  const numericFields = ['order_value', 'discount_pct', 'item_count'];
-  if (numericFields.includes(field)) {
-    const numField = parseFloat(fieldValue) || 0;
-    const numCompare = parseFloat(compareValue) || 0;
-    switch (operator) {
-      case 'greater_than': return numField > numCompare;
-      case 'less_than': return numField < numCompare;
-      case 'equals': return numField === numCompare;
-      case 'not_equals': return numField !== numCompare;
-    }
-  }
-  
-  // String fields
-  const strField = String(fieldValue).toLowerCase();
-  const strCompare = String(compareValue).toLowerCase();
-  switch (operator) {
-    case 'equals': return strField === strCompare;
-    case 'not_equals': return strField !== strCompare;
-    case 'contains': return strField.includes(strCompare);
-    case 'not_contains': return !strField.includes(strCompare);
-    default: return false;
-  }
-}
-
-function mapOrderStatus(order) {
-  if (order.cancelled_at) return 'cancelled';
-  if (order.refunds?.length > 0) {
-    const refundTotal = order.refunds.reduce((sum, r) => 
-      sum + r.transactions?.reduce((s, t) => s + parseFloat(t.amount || 0), 0) || 0, 0);
-    if (refundTotal >= parseFloat(order.total_price)) return 'refunded';
-    return 'partially_refunded';
-  }
-  if (order.fulfillment_status === 'fulfilled') return 'fulfilled';
-  if (order.financial_status === 'paid') return 'paid';
-  return 'pending';
 }
 
 async function shopifyFetchWithRetry(url, accessToken, init = {}, maxAttempts = 4) {
   let attempt = 0;
   while (attempt < maxAttempts) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    try {
-      const res = await fetch(url, {
-        ...init,
-        signal: controller.signal,
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-          ...(init.headers || {})
-        }
-      });
-      clearTimeout(timeout);
-      if (res.status !== 429 && res.status < 500) return res;
-      const retryAfter = Number(res.headers.get('Retry-After') || '0');
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 400 * Math.pow(2, attempt));
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-      attempt++;
-    } catch (error) {
-      clearTimeout(timeout);
-      if (attempt >= maxAttempts - 1) throw error;
-      const waitMs = Math.min(8000, 400 * Math.pow(2, attempt));
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-      attempt++;
-    }
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+        ...(init.headers || {})
+      }
+    });
+    if (res.status !== 429 && res.status < 500) return res;
+    const retryAfter = Number(res.headers.get('Retry-After') || '0');
+    const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 400 * Math.pow(2, attempt));
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    attempt++;
   }
   return fetch(url, {
     ...init,
@@ -330,394 +74,147 @@ async function shopifyFetchWithRetry(url, accessToken, init = {}, maxAttempts = 
   });
 }
 
-Deno.serve(withEndpointGuard('syncShopifyOrders', async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const body = await readJsonBody(req);
-    if (!body || typeof body !== 'object') {
-      return Response.json({ error: 'Invalid JSON body', error_code: 'invalid_json' }, { status: 400 });
-    }
-
-    const tenant_id = normalizeTenantId(body.tenant_id);
-    const days = clampDays(body.days, 90);
-    const reqIntegrationId = typeof body.integration_id === 'string' ? body.integration_id.trim() : '';
-    const requestedShop = typeof body.shop === 'string' ? body.shop.toLowerCase().trim() : null;
-
-    if (!tenant_id) {
-      return Response.json({ error: 'Missing tenant_id' }, { status: 400 });
-    }
-
-    // Embedded Shopify startup may invoke sync before Base44 session is established.
-    // If a user session is present, enforce tenant ownership (except owner/admin).
-    let requester = null;
-    try { requester = await base44.auth.me(); } catch (_) {}
-    const requesterRole = String(requester?.role || requester?.app_role || '').toLowerCase();
-    const requesterTenant = String(requester?.tenant_id || '').trim();
-    if (
-      requester &&
-      requesterRole !== 'owner' &&
-      requesterRole !== 'admin' &&
-      requesterTenant &&
-      requesterTenant !== tenant_id
-    ) {
-      return Response.json({ error: 'Forbidden tenant access', error_code: 'tenant_forbidden' }, { status: 403 });
-    }
-    
-    // Get tenant
-    const tenants = await safeFilter(
-      () => base44.asServiceRole.entities.Tenant.filter({ id: tenant_id }),
-      [],
-      'syncShopifyOrders.tenant_lookup'
-    );
-    if (tenants.length === 0) {
-      return Response.json({ error: 'Tenant not found' }, { status: 404 });
-    }
-    const tenant = tenants[0];
-    
-    // Get OAuth token — try is_valid=true first, fall back to any token for this tenant/platform
-    let tokens = await safeFilter(
-      () => base44.asServiceRole.entities.OAuthToken.filter({
-        tenant_id: tenant.id,
-        platform: 'shopify',
-        is_valid: true
-      }),
-      [],
-      'syncShopifyOrders.token_lookup'
-    );
-
-    if (tokens.length === 0) {
-      // Fallback: try without is_valid filter (token may exist but flag not set)
-      tokens = await safeFilter(
-        () => base44.asServiceRole.entities.OAuthToken.filter({
-          tenant_id: tenant.id,
-          platform: 'shopify'
-        }),
-        [],
-        'syncShopifyOrders.token_fallback'
-      );
-    }
-    
-    if (tokens.length === 0) {
-      return Response.json({ error: 'No Shopify token found. Please reconnect your store via OAuth.' }, { status: 400 });
-    }
-    
-    // Decrypt access token using AES-GCM (matches encryption in shopifyAuth)
-    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-    const encryptedToken = tokens[0].encrypted_access_token;
-    
-    let accessToken;
-    try {
-      const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-      const iv = combined.slice(0, 12);
-      const encrypted = combined.slice(12);
-      
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode((encryptionKey || '').padEnd(32, '0').slice(0, 32));
-      
-      const cryptoKey = await crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'AES-GCM' },
-        false,
-        ['decrypt']
-      );
-      
-      const decrypted = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        cryptoKey,
-        encrypted
-      );
-      
-      accessToken = new TextDecoder().decode(decrypted);
-    } catch (decryptErr) {
-      // Fallback: token may be stored as plain base64 (when ENCRYPTION_KEY was unset at install time)
-      console.warn('[syncShopifyOrders] AES decrypt failed, trying base64 fallback:', decryptErr.message);
-      try {
-        accessToken = atob(encryptedToken);
-      } catch (e2) {
-        console.error('[syncShopifyOrders] All decryption strategies failed:', e2.message);
-        return Response.json({ error: 'Failed to decrypt access token. Please reconnect your store.' }, { status: 500 });
-      }
-    }
-    
-    // Get integration record
-    const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({
-      tenant_id: tenant.id,
-      platform: 'shopify'
-    });
-    let integration = null;
-    if (reqIntegrationId) {
-      integration = integrations.find((row) => row.id === reqIntegrationId) || null;
-    }
-    if (!integration) {
-      integration = integrations.find((row) => row.status === 'connected' || row.status === 'degraded') || integrations[0] || null;
-    }
-    const integrationId = integration?.id || reqIntegrationId || null;
-    const shopDomain = integration?.store_key || tenant.shop_domain;
-    if (requestedShop && shopDomain && requestedShop !== shopDomain) {
-      return Response.json(
-        { error: 'Shop mismatch for tenant integration', error_code: 'shop_mismatch' },
-        { status: 403 }
-      );
-    }
-    if (!shopDomain) {
-      return Response.json({ error: 'Missing Shopify shop domain for tenant' }, { status: 400 });
-    }
-
-    console.log('[syncShopifyOrders] Fetching orders from Shopify for:', shopDomain, 'days:', days);
-    
-    // Create / update SyncJob record to track this run
-    let syncJob = null;
-    try {
-      syncJob = await base44.asServiceRole.entities.SyncJob.create({
-        tenant_id: tenant.id,
-        integration_id: integrationId,
-        platform: 'shopify',
-        job_type: `historical_${days}d`,
-        status: 'running',
-        started_at: new Date().toISOString()
-      });
-    } catch (sjErr) {
-      console.warn('[syncShopifyOrders] Could not create SyncJob:', sjErr.message);
-    }
-
-    // Paginate through orders (up to 10 pages = 250*10 = 2500 orders)
-    const sinceDate = new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
-    let allOrders = [];
-    // Pre-flight: verify token is still valid before full sync
-    const scopeCheck = await shopifyFetchWithRetry(`https://${shopDomain}/admin/oauth/access_scopes.json`, accessToken, {
-      headers: {}
-    }, 3);
-    if (!scopeCheck.ok) {
-      // Invalidate token so diagnose reflects true state
-      await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
-      if (integrationId) {
-        await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, { status: 'disconnected' }).catch(() => {});
-      } else {
-        const integrationList = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenant.id, platform: 'shopify' });
-        if (integrationList[0]) await base44.asServiceRole.entities.PlatformIntegration.update(integrationList[0].id, { status: 'disconnected' }).catch(() => {});
-      }
-      return Response.json({ error: `Shopify API returned ${scopeCheck.status} — token is invalid. Please reconnect OAuth.` }, { status: 400 });
-    }
-
-    let pageUrl = `https://${shopDomain}/admin/api/2024-10/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
-    let pageCount = 0;
-
-    while (pageUrl && pageCount < 10) {
-      const shopifyUrl = pageUrl;
-      const shopifyRes = await shopifyFetchWithRetry(shopifyUrl, accessToken, {
-        headers: {}
-      }, 4);
-      
-      if (!shopifyRes.ok) {
-        const errorText = await shopifyRes.text();
-        console.error('[syncShopifyOrders] Shopify API error:', shopifyRes.status, errorText);
-        if (pageCount === 0) {
-          return Response.json({ error: `Shopify API error: ${shopifyRes.status}: ${errorText}` }, { status: 500 });
-        }
-        break; // Partial sync OK if first page succeeded
-      }
-      
-      const pageData = await shopifyRes.json();
-      const pageOrders = pageData.orders || [];
-      allOrders = allOrders.concat(pageOrders);
-      console.log(`[syncShopifyOrders] Page ${pageCount + 1}: fetched ${pageOrders.length} orders (total: ${allOrders.length})`);
-
-      // Check for next page via Link header
-      const linkHeader = shopifyRes.headers.get('link') || '';
-      const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-      pageUrl = nextMatch ? nextMatch[1] : null;
-      pageCount++;
-    }
-
-    const shopifyOrders = allOrders;
-    console.log('[syncShopifyOrders] Total orders fetched from Shopify:', shopifyOrders.length);
-    
-    // Get cost mappings, settings, and custom risk rules
-    const [costMappings, settingsData, customRules] = await Promise.all([
-      base44.asServiceRole.entities.CostMapping.filter({ tenant_id: tenant.id }),
-      base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id }),
-      base44.asServiceRole.entities.RiskRule.filter({ tenant_id: tenant.id, is_active: true })
-    ]);
-    const settings = settingsData[0] || {};
-    const costMappingMap = new Map(
-      (costMappings || [])
-        .filter((row) => row?.sku)
-        .map((row) => [row.sku, row])
-    );
-    
-    let created = 0;
-    let updated = 0;
-    const tenantSettingsList = await base44.asServiceRole.entities.TenantSettings.filter({ tenant_id: tenant.id }).catch(() => []);
-    const notifyEmail = tenantSettingsList[0]?.notification_email || null;
-
-    await runInBatches(shopifyOrders, 8, async (orderData) => {
-      const profitData = calculateOrderProfit(orderData, costMappingMap, settings);
-      const riskData = calculateRiskScores(orderData, settings, customRules);
-      
-      const existingOrders = await base44.asServiceRole.entities.Order.filter({
-        tenant_id: tenant.id,
-        platform_order_id: orderData.id.toString()
-      });
-      
-      const orderRecord = {
-        tenant_id: tenant.id,
-        integration_id: integrationId,
-        shop_domain: shopDomain,
-        platform_order_id: orderData.id.toString(),
-        order_number: orderData.order_number?.toString() || orderData.name,
-        customer_email: orderData.email,
-        customer_name: orderData.customer?.first_name 
-          ? `${orderData.customer.first_name} ${orderData.customer.last_name || ''}`
-          : orderData.shipping_address?.name,
-        order_date: orderData.created_at,
-        processed_at: orderData.processed_at || orderData.created_at,
-        financial_status: orderData.financial_status,
-        status: mapOrderStatus(orderData),
-        fulfillment_status: orderData.fulfillment_status || 'unfulfilled',
-        billing_address: orderData.billing_address,
-        shipping_address: orderData.shipping_address,
-        discount_codes: orderData.discount_codes?.map(d => d.code) || [],
-        is_first_order: !orderData.customer || orderData.customer.orders_count <= 1,
-        is_demo: false,
-        ...profitData,
-        ...riskData,
-        platform_data: orderData
-      };
-      
-      let savedOrder;
-      if (existingOrders.length > 0) {
-        savedOrder = await base44.asServiceRole.entities.Order.update(existingOrders[0].id, orderRecord);
-        updated++;
-      } else {
-        savedOrder = await base44.asServiceRole.entities.Order.create(orderRecord);
-        created++;
-      }
-
-      await upsertProjectedCustomer(
-        base44.asServiceRole,
-        tenant.id,
-        savedOrder?.id ? { ...savedOrder, ...orderRecord } : { id: existingOrders[0]?.id, ...orderRecord }
-      );
-
-      // Send email notifications for matching risk rules (if notification enabled)
-      if (riskData.risk_level === 'high' || riskData.recommended_action !== 'none') {
-        const notifyRules = customRules.filter(r => r.notification && r.is_active);
-        for (const rule of notifyRules) {
-          if (evaluateCustomRule(rule, orderData, parseFloat(orderData.total_price || 0), !orderData.customer || orderData.customer.orders_count <= 1, orderData.discount_codes?.length || 0)) {
-            if (notifyEmail) {
-              base44.asServiceRole.functions.invoke('aiRuleAssistant', {
-                action: 'notify',
-                tenant_id: tenant.id,
-                rule_name: rule.name,
-                order_number: orderData.order_number?.toString() || orderData.name,
-                order_value: orderData.total_price,
-                risk_score: riskData.fraud_score,
-                triggered_action: riskData.recommended_action,
-                email: notifyEmail,
-                conditions_matched: riskData.risk_reasons
-              }).catch((notifyErr) => {
-                console.warn('[syncShopifyOrders] Notification failed:', notifyErr.message);
-              });
-            }
-            break; // Only one notification per order
-          }
-        }
-      }
-    });
-    
-    // Find newest order number
-    let newestOrderNumber = null;
-    if (shopifyOrders.length > 0) {
-      const sorted = [...shopifyOrders].sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-      );
-      newestOrderNumber = sorted[0]?.order_number?.toString() || sorted[0]?.name;
-    }
-    
-    const syncedAt = new Date().toISOString();
-    console.log('[syncShopifyOrders] Sync complete. Created:', created, 'Updated:', updated, 'Newest:', newestOrderNumber);
-
-    // Update integration's last_sync_at and stats
-    if (integrationId) {
-      await base44.asServiceRole.entities.PlatformIntegration.update(integrationId, {
-        status: 'connected',
-        last_sync_at: syncedAt,
-        last_sync_status: 'success',
-        last_sync_stats: {
-          orders_synced: shopifyOrders.length,
-          orders_created: created,
-          orders_updated: updated,
-          errors_count: 0
-        }
-      }).catch(() => {});
-    }
-
-    // Update SyncJob to completed
-    if (syncJob?.id) {
-      await base44.asServiceRole.entities.SyncJob.update(syncJob.id, {
-        status: 'completed',
-        completed_at: syncedAt,
-        orders_synced: created + updated,
-        orders_fetched: shopifyOrders.length,
-        orders_created: created,
-        orders_updated: updated
-      }).catch(() => {});
-    }
-
-    // Trigger profit alert checks for new/updated orders
-    try {
-      await base44.asServiceRole.functions.invoke('checkProfitAlerts', { tenant_id: tenant.id });
-    } catch (alertError) {
-      console.log('[syncShopifyOrders] Alert check skipped:', alertError.message);
-    }
-    
-    return Response.json({ 
-      success: true,
-      shopDomain,
-      tenantId: tenant.id,
-      integrationId,
-      fetchedCount: shopifyOrders.length,
-      createdCount: created,
-      updatedCount: updated,
-      newestOrderNumber,
-      syncedAt,
-      anyErrors: [],
-      // Legacy fields for backward compatibility
-      created, 
-      updated, 
-      total: shopifyOrders.length 
-    });
-    
-  } catch (error) {
-    console.error('[syncShopifyOrders] Error:', error);
-    const message = String(error?.message || 'Unknown error');
-    const lower = message.toLowerCase();
-    if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('429')) {
-      return Response.json(
-        { error: 'Shopify rate limit exceeded. Retry shortly.', error_code: 'shopify_rate_limited' },
-        { status: 429, headers: { 'Retry-After': '2' } }
-      );
-    }
-    return Response.json(
-      { error: message, error_code: 'sync_shopify_orders_failed' },
-      { status: 500 }
-    );
-  }
-}));
-
-async function decryptAccessToken(encryptedToken) {
-  const key = Deno.env.get('ENCRYPTION_KEY');
-  try {
-    const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-    const iv = combined.slice(0, 12);
-    const enc = combined.slice(12);
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode((key || '').padEnd(32, '0').slice(0, 32));
-    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['decrypt']);
-    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
-    return new TextDecoder().decode(decrypted);
-  } catch {
-    return atob(encryptedToken); // fallback
-  }
+function mapOrderStatus(order) {
+  if (order?.cancelled_at) return 'cancelled';
+  if (order?.refunds?.length > 0) return 'refunded';
+  if (order?.fulfillment_status === 'fulfilled') return 'fulfilled';
+  if (order?.financial_status === 'paid' || order?.financial_status === 'partially_paid') return 'paid';
+  return 'pending';
 }
+
+const handler = withEndpointGuard('syncShopifyOrders', async (req) => {
+  const base44 = createClientFromRequest(req);
+  const body = await req.json().catch(() => ({}));
+  const tenantId = String(body?.tenant_id || '').trim();
+  const integrationId = String(body?.integration_id || '').trim();
+  const requestedShop = String(body?.shop || '').trim().toLowerCase();
+  const days = Math.max(1, Math.min(365, Number(body?.days || 30) || 30));
+
+  if (!tenantId) return json({ error: 'Missing tenant_id', version: VERSION }, 400);
+
+  let requester = null;
+  try { requester = await base44.auth.me(); } catch (_) {}
+  const requesterRole = String(requester?.role || requester?.app_role || '').toLowerCase();
+  const requesterTenant = String(requester?.tenant_id || '').trim();
+  if (requester && requesterRole !== 'owner' && requesterRole !== 'admin' && requesterTenant && requesterTenant !== tenantId) {
+    return json({ error: 'Forbidden tenant access', version: VERSION }, 403);
+  }
+
+  const tenant = await base44.asServiceRole.entities.Tenant.filter({ id: tenantId }).then((rows) => rows?.[0] || null).catch(() => null);
+  if (!tenant) return json({ error: 'Tenant not found', version: VERSION }, 404);
+
+  const integrations = await base44.asServiceRole.entities.PlatformIntegration.filter({ tenant_id: tenantId, platform: 'shopify' }).catch(() => []);
+  const integration = integrations.find((row) => row.id === integrationId) || integrations[0] || null;
+  if (!integration) return json({ error: 'Shopify integration not found', version: VERSION }, 404);
+
+  const shopDomain = integration.store_key || tenant.shop_domain || null;
+  if (!shopDomain) return json({ error: 'Missing Shopify shop domain', version: VERSION }, 400);
+  if (requestedShop && requestedShop !== shopDomain.toLowerCase()) {
+    return json({ error: 'Shop mismatch for tenant integration', version: VERSION }, 403);
+  }
+
+  let tokens = await base44.asServiceRole.entities.OAuthToken.filter({ tenant_id: tenantId, platform: 'shopify', is_valid: true }).catch(() => []);
+  if (!tokens.length) {
+    tokens = await base44.asServiceRole.entities.OAuthToken.filter({ tenant_id: tenantId, platform: 'shopify' }).catch(() => []);
+  }
+  if (!tokens.length) return json({ error: 'No Shopify token found. Please reconnect your store.', version: VERSION }, 400);
+
+  const accessToken = await decryptToken(tokens[0]?.encrypted_access_token);
+  if (!accessToken) return json({ error: 'Failed to decrypt access token. Please reconnect your store.', version: VERSION }, 500);
+
+  const scopeCheck = await shopifyFetchWithRetry(`https://${shopDomain}/admin/oauth/access_scopes.json`, accessToken, {}, 3);
+  if (!scopeCheck.ok) {
+    await base44.asServiceRole.entities.OAuthToken.update(tokens[0].id, { is_valid: false }).catch(() => {});
+    await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, { status: 'disconnected' }).catch(() => {});
+    return json({ error: `Shopify API returned ${scopeCheck.status}. Please reconnect OAuth.`, version: VERSION }, 400);
+  }
+
+  const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  let pageUrl = `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250&created_at_min=${sinceDate}&order=created_at+desc`;
+  let pageCount = 0;
+  let allOrders = [];
+
+  while (pageUrl && pageCount < 10) {
+    const response = await shopifyFetchWithRetry(pageUrl, accessToken, {}, 4);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      return json({ error: `Shopify API error ${response.status}${text ? `: ${text}` : ''}`, version: VERSION }, response.status === 429 ? 429 : 500);
+    }
+    const payload = await response.json().catch(() => ({}));
+    const pageOrders = Array.isArray(payload?.orders) ? payload.orders : [];
+    allOrders = allOrders.concat(pageOrders);
+    const linkHeader = response.headers.get('link') || '';
+    const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+    pageUrl = nextMatch ? nextMatch[1] : null;
+    pageCount++;
+  }
+
+  let created = 0;
+  let updated = 0;
+  for (const order of allOrders) {
+    const platformOrderId = String(order?.id || '').trim();
+    if (!platformOrderId) continue;
+    const record = {
+      tenant_id: tenantId,
+      integration_id: integration.id,
+      shop_domain: shopDomain,
+      platform_order_id: platformOrderId,
+      order_number: String(order?.order_number || order?.name || platformOrderId),
+      customer_email: order?.email || order?.customer?.email || null,
+      customer_name: order?.customer?.first_name ? `${order.customer.first_name} ${order?.customer?.last_name || ''}`.trim() : order?.shipping_address?.name || null,
+      order_date: order?.created_at || new Date().toISOString(),
+      processed_at: order?.processed_at || order?.created_at || new Date().toISOString(),
+      financial_status: order?.financial_status || null,
+      fulfillment_status: order?.fulfillment_status || 'unfulfilled',
+      status: mapOrderStatus(order),
+      billing_address: order?.billing_address || null,
+      shipping_address: order?.shipping_address || null,
+      discount_codes: Array.isArray(order?.discount_codes) ? order.discount_codes.map((item) => item?.code).filter(Boolean) : [],
+      is_first_order: !order?.customer || Number(order?.customer?.orders_count || 0) <= 1,
+      is_demo: false,
+      total_revenue: Number(order?.total_price || 0) || 0,
+      platform_data: order
+    };
+    const existing = await base44.asServiceRole.entities.Order.filter({ tenant_id: tenantId, platform_order_id: platformOrderId }, '-created_date', 1).catch(() => []);
+    if (existing[0]?.id) {
+      const saved = await base44.asServiceRole.entities.Order.update(existing[0].id, record);
+      await upsertProjectedCustomer(base44.asServiceRole, tenantId, { ...saved, ...record }).catch(() => {});
+      updated++;
+    } else {
+      const saved = await base44.asServiceRole.entities.Order.create(record);
+      await upsertProjectedCustomer(base44.asServiceRole, tenantId, { ...saved, ...record }).catch(() => {});
+      created++;
+    }
+  }
+
+  const syncedAt = new Date().toISOString();
+  await base44.asServiceRole.entities.PlatformIntegration.update(integration.id, {
+    status: 'connected',
+    last_sync_at: syncedAt,
+    last_sync_status: 'success',
+    last_sync_stats: {
+      orders_synced: allOrders.length,
+      orders_created: created,
+      orders_updated: updated,
+      errors_count: 0,
+      version: VERSION
+    }
+  }).catch(() => {});
+
+  return json({
+    success: true,
+    version: VERSION,
+    tenantId,
+    integrationId: integration.id,
+    shopDomain,
+    fetchedCount: allOrders.length,
+    createdCount: created,
+    updatedCount: updated,
+    syncedAt,
+    created,
+    updated,
+    total: allOrders.length
+  });
+});
+
+Deno.serve(handler);
