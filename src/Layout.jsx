@@ -688,8 +688,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* Desktop Sidebar */}
       <aside className={`
-        hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] overflow-hidden
-        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] backdrop-blur-2xl border-r border-cyan-400/10 shadow-[0_18px_48px_rgba(2,6,23,0.42)]
+        command-surface hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] overflow-hidden
+        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] border-r border-cyan-400/10 shadow-[0_18px_48px_rgba(2,6,23,0.42)]
         transform transition-transform duration-200 ease-in-out
         translate-x-0
       `}>
@@ -886,7 +886,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="relative isolate min-h-screen flex flex-col overflow-x-hidden lg:ml-64">
         {/* Top bar */}
-        <header className={`sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.88),rgba(8,15,30,0.78))] backdrop-blur-xl border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
+        <header className={`topbar-glow command-surface sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.88),rgba(8,15,30,0.78))] border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-6`}>
           <button 
             onClick={handleSidebarOpen}
             className={`lg:hidden relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
@@ -1057,7 +1057,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.10),transparent_65%)]" />
-          <div className="relative z-[1]">
+          <div className="page-canvas relative z-[1] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+            <div className="orbital-ring -left-16 top-8 h-40 w-40 opacity-40" />
+            <div className="orbital-ring right-6 top-10 h-24 w-24 opacity-30" />
             {children}
           </div>
           </MobileDeepWrapper>

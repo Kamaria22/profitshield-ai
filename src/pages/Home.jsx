@@ -574,11 +574,43 @@ export default function Home() {
           <div className="flex-1">
           <WelcomeChecklist />
 
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="text-sm text-slate-500">Autonomous profit intelligence · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+          <div className="future-panel relative mb-5 overflow-hidden rounded-[1.8rem] px-5 py-5">
+            <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                    Real-Time Operating Layer
+                  </span>
+                  <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
+                    {metrics.totalOrders > 0 ? `${metrics.totalOrders} tracked orders` : 'Bootstrap adaptive'}
+                  </span>
+                </div>
+                <h1 className="text-3xl font-semibold text-white sm:text-4xl" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
+                  Merchant command center
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
+                  Instant telemetry, autonomous recovery, and profit-grade operating context arranged for action instead of browsing.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
+                <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Runtime date</p>
+                  <p className="mt-1 text-sm font-semibold text-cyan-100">
+                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+                <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sync posture</p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-100">
+                    {syncMutation.isPending ? 'Actively syncing' : dashboardSummary?.lastSyncAt ? 'Live and warm' : 'Self-healing'}
+                  </p>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div className="mb-4 flex items-center justify-between">
             {resolver?.user?.id && (
               <Suspense fallback={null}>
                 <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />

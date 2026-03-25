@@ -44,6 +44,7 @@ export default function ExecutiveSummaryBar({
                     riskLevel === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500';
   const systemPulse = totalProfit >= 0 ? 'Positive velocity' : 'Negative drag';
   const systemTone = totalProfit >= 0 ? '#34d399' : '#f87171';
+  const commandState = syncing ? 'Synchronizing live store state' : 'Instant command channel ready';
 
   return (
     <div className="sticky top-0 z-20 px-2 py-2 sm:px-4">
@@ -68,6 +69,10 @@ export default function ExecutiveSummaryBar({
                   Demo
                 </span>
               )}
+            </div>
+            <div className="mb-3 rounded-2xl border border-cyan-400/12 bg-cyan-400/5 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Command State</p>
+              <p className="mt-1 text-sm font-medium text-cyan-100">{commandState}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
