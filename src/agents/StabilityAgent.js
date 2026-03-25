@@ -11,6 +11,10 @@ class StabilityAgent {
       dashboardAI: 'entity_summary_fallback',
       registerShopifyWebhooks: 'shopifyActivationBootstrap',
     };
+    this.knownUiAnomalies = {
+      dashboard_render_gap: 'force_immediate_dashboard_modules',
+      dashboard_sparse_top: 'inject_signal_briefs',
+    };
   }
 
   logError(context, error, meta = {}) {
@@ -37,6 +41,19 @@ class StabilityAgent {
     };
     try {
       localStorage.setItem(`ps:missing-function:${name}`, JSON.stringify(payload));
+    } catch {}
+    return payload;
+  }
+
+  rememberUiAnomaly(name, meta = {}) {
+    const payload = {
+      name,
+      fallback: this.knownUiAnomalies[name] || null,
+      detectedAt: new Date().toISOString(),
+      ...meta,
+    };
+    try {
+      localStorage.setItem(`ps:ui-anomaly:${name}`, JSON.stringify(payload));
     } catch {}
     return payload;
   }

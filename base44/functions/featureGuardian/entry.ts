@@ -82,6 +82,52 @@ async function upsertFixReport(base44, report) {
 // FEATURE PLAYBOOKS
 // ─────────────────────────────────────────────
 const FEATURE_PLAYBOOKS = {
+  dashboard_runtime: {
+    requiredEntities: ["Tenant", "Order", "Alert", "ProfitLeak", "PlatformIntegration", "AuditLog"],
+    requiredFunctions: ["shopifyActivationBootstrap"],
+    requiredFeatureFlags: [],
+
+    async smokeTest(base44, tenantId) {
+      const db = base44.asServiceRole?.entities || base44.entities;
+      const [orders, alerts, leaks] = await Promise.all([
+        db.Order.filter({ tenant_id: tenantId }, "-order_date", 5).catch(() => []),
+        db.Alert.filter({ tenant_id: tenantId, status: "pending" }, "-created_date", 5).catch(() => []),
+        db.ProfitLeak.filter({ tenant_id: tenantId, is_resolved: false }, "-impact_amount", 5).catch(() => []),
+      ]);
+
+      const signalCount = orders.length + alerts.length + leaks.length;
+      return {
+        ok: signalCount > 0,
+        reason: signalCount > 0 ? "healthy" : "dashboard_sparse",
+        diagnostics: {
+          orders: orders.length,
+          alerts: alerts.length,
+          leaks: leaks.length,
+        }
+      };
+    },
+
+    async safeFixes(base44, tenantId) {
+      const results = [];
+      try {
+        const response = await base44.functions.invoke("shopifyActivationBootstrap", {
+          tenant_id: tenantId,
+          source: "feature_guardian_dashboard_runtime",
+          force: true,
+          days: 30,
+        });
+        results.push({
+          fix: "invoke_shopifyActivationBootstrap_for_dashboard",
+          status: "applied",
+          response: response?.data || null,
+        });
+      } catch (e) {
+        results.push({ fix: "invoke_shopifyActivationBootstrap_for_dashboard", status: "failed", error: e?.message || "invoke_failed" });
+      }
+      return results;
+    },
+  },
+
   shopify_runtime: {
     requiredEntities: ["Tenant", "PlatformIntegration", "Order", "Alert", "AuditLog"],
     requiredFunctions: ["shopifyActivationBootstrap", "registerShopifyWebhooks"],
