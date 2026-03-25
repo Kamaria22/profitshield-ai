@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-import { rebuildProjectedCustomersFromOrders } from './helpers/customerProjection.ts';
+import { rebuildProjectedCustomersFromOrders } from '../helpers/customerProjection/entry.ts';
 
 const VERSION = '2026-03-24.bootstrap-v3';
 const API_VERSION = '2024-10';

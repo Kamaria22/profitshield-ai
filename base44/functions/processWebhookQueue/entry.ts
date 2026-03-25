@@ -9,7 +9,7 @@
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { upsertProjectedCustomer } from './helpers/customerProjection.ts';
+import { upsertProjectedCustomer } from '../helpers/customerProjection/entry.ts';
 
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 20;

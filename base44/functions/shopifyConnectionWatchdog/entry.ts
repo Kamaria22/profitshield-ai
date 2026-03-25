@@ -12,7 +12,7 @@
  * Can also be triggered manually by admin.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { rebuildProjectedCustomersFromOrders } from './helpers/customerProjection.ts';
+import { rebuildProjectedCustomersFromOrders } from '../helpers/customerProjection/entry.ts';
 
 const VERSION = '2026-03-23.watchdog-customer-projection-v4';
 const API_VERSION = '2024-10';
