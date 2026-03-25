@@ -246,9 +246,9 @@ export default function Customers() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.6rem] px-4 py-3.5">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.45rem] px-4 py-3">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.16),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           {selectedSegment && (
             <Button variant="ghost" size="icon" onClick={() => setSelectedSegment(null)}>
@@ -256,7 +256,7 @@ export default function Customers() {
             </Button>
           )}
           <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-100">
                 Customer Intelligence Mesh
               </span>
@@ -264,10 +264,10 @@ export default function Customers() {
                 {summaryStats.totalCustomers} tracked customers
               </span>
             </div>
-            <h1 className="text-3xl font-semibold text-white">
+            <h1 className="text-[1.85rem] font-semibold text-white">
               {selectedSegment ? selectedSegment.name : 'Customer Segments'}
             </h1>
-            <p className="text-slate-400 mt-2">
+            <p className="mt-1.5 text-slate-400">
               {selectedSegment 
                 ? `${displayedCustomers.length} customers in this segment`
                 : 'Segment and analyze your customer base'

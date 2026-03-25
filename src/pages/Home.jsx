@@ -573,11 +573,11 @@ export default function Home() {
 
         {/* Main Grid */}
           <div className="flex-1">
-          <div className="future-panel relative mb-2 overflow-hidden rounded-[1.6rem] px-4 py-3">
+          <div className="future-panel relative mb-2 overflow-hidden rounded-[1.45rem] px-4 py-2.5">
             <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
-            <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
                     Real-Time Operating Layer
                   </span>
@@ -585,21 +585,21 @@ export default function Home() {
                     {metrics.totalOrders > 0 ? `${metrics.totalOrders} tracked orders` : 'Bootstrap adaptive'}
                   </span>
                 </div>
-                <h1 className="text-[1.8rem] font-semibold text-white sm:text-[2.15rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
+                <h1 className="text-[1.55rem] font-semibold text-white sm:text-[1.95rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
                   Merchant command center
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-slate-400 sm:text-base">
+                <p className="mt-0.5 max-w-2xl text-sm text-slate-400 sm:text-[0.95rem]">
                   Instant telemetry, autonomous recovery, and profit-grade operating context arranged for action instead of browsing.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
-                <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="grid grid-cols-2 gap-2.5 lg:w-[340px]">
+                <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
                   <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Runtime date</p>
                   <p className="mt-1 text-sm font-semibold text-cyan-100">
                     {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
-                <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3">
+                <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
                   <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sync posture</p>
                   <p className="mt-1 text-sm font-semibold text-emerald-100">
                     {syncMutation.isPending ? 'Actively syncing' : dashboardSummary?.lastSyncAt ? 'Live and warm' : 'Self-healing'}
@@ -608,7 +608,7 @@ export default function Home() {
               </div>
             </div>
             {resolver?.user?.id && (
-              <div className="mt-2 flex justify-start lg:justify-end">
+              <div className="mt-1.5 flex justify-start lg:justify-end">
                 <Suspense fallback={null}>
                   <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
                 </Suspense>
@@ -616,7 +616,7 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mb-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-2.5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <SignalBrief
               icon={Brain}
               label="AI posture"
@@ -649,7 +649,7 @@ export default function Home() {
             profitScore={profitScore}
             loading={summaryLoading}
           />
-          <div className="mt-3">
+          <div className="mt-2.5">
             <WelcomeChecklist />
           </div>
 
@@ -677,10 +677,10 @@ export default function Home() {
             <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
           </Suspense>
 
-          <div className="flex gap-6 h-full">
+          <div className="flex h-full gap-4 lg:gap-5">
             <div className="flex-1 min-w-0">
               {/* Row 1: Core profit metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <ProfitHealthPanel metrics={metrics} loading={false} />
                 </Suspense>
@@ -693,7 +693,7 @@ export default function Home() {
               </div>
 
               {/* Row 2: AI Alerts + Opportunities + Forecast */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
                 </Suspense>
@@ -706,7 +706,7 @@ export default function Home() {
               </div>
 
               {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
                 </Suspense>
@@ -719,7 +719,7 @@ export default function Home() {
               </div>
 
               {/* Row 4: Fraud + AI Automations + Integrations + Reports */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <SecurityPanel loading={false} />
                 </Suspense>

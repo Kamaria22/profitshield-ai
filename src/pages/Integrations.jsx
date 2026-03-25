@@ -549,11 +549,11 @@ export default function Integrations() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.6rem] px-4 py-3.5">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.45rem] px-4 py-3">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
               Integration Control Plane
             </span>
@@ -561,8 +561,8 @@ export default function Integrations() {
               {integrations.length} connected runtime{integrations.length === 1 ? '' : 's'}
             </span>
           </div>
-          <h1 className="text-3xl font-semibold text-white">Platform Integrations</h1>
-          <p className="text-slate-400 mt-2">Connect e-commerce platforms for two-way order sync, webhook registration, and risk scoring</p>
+          <h1 className="text-[1.85rem] font-semibold text-white">Platform Integrations</h1>
+          <p className="mt-1.5 text-slate-400">Connect e-commerce platforms for two-way order sync, webhook registration, and risk scoring</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (

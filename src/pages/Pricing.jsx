@@ -363,37 +363,37 @@ export default function Pricing() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
-          className="future-panel future-grid future-scan text-center mb-4 overflow-hidden rounded-[1.75rem] px-5 py-5"
+          className="future-panel future-grid future-scan mb-4 overflow-hidden rounded-[1.6rem] px-5 py-4.5 text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="inline-flex items-center gap-2 future-badge text-emerald-100 px-4 py-2 rounded-full text-sm font-medium mb-4">
+          <div className="future-badge mb-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium text-emerald-100">
             <Shield className="w-4 h-4" />
             Revenue Protection Activation
           </div>
-          <h1 className="text-4xl font-bold text-white mb-4 sm:text-5xl">
+          <h1 className="mb-3 text-4xl font-bold text-white sm:text-[3.2rem]">
             Choose the plan that activates the full operating system
           </h1>
-          <p className="text-lg text-slate-300 max-w-3xl mx-auto">
+          <p className="mx-auto max-w-3xl text-base text-slate-300 sm:text-lg">
             Plan selection is the unlock point for autonomous sync, instant webhook refresh, and live AI orchestration. This surface should feel like a launch decision, not a billing form.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 text-left">
-            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+          <div className="mt-3.5 grid gap-2.5 text-left sm:grid-cols-3">
+            <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Activation</p>
               <p className="mt-1 text-sm font-semibold text-cyan-100">Webhook and sync bootstrap</p>
             </div>
-            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Performance</p>
               <p className="mt-1 text-sm font-semibold text-emerald-100">Instant post-plan automation</p>
             </div>
-            <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3">
               <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Coverage</p>
               <p className="mt-1 text-sm font-semibold text-violet-100">AI, analytics, and protection layers</p>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-3.5 flex flex-wrap items-center justify-center gap-3">
             <Button
               size="lg"
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -411,7 +411,7 @@ export default function Pricing() {
           </div>
 
           {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-4 mt-5">
+          <div className="mt-4 flex items-center justify-center gap-4">
             <span className={`text-sm font-medium ${!isYearly ? 'text-white' : 'text-slate-500'}`}>
               Monthly
             </span>

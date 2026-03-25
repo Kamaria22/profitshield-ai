@@ -110,17 +110,24 @@ class StabilityAgent {
   }
 
   async safeFetch(input, options = {}, fallback = { ok: false, fallback: true }) {
-    const maxRetries = Math.min(1, Math.max(0, options?.retries ?? 1));
+    const {
+      retries,
+      attempts,
+      baseDelayMs,
+      ...fetchOptions
+    } = options || {};
+    const maxRetries = Math.max(0, (attempts ? attempts - 1 : retries) ?? 1);
+    const retryBaseMs = Math.max(150, baseDelayMs || this.baseDelayMs);
     let res = null;
     let lastNetworkError = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        res = await fetch(input, options);
+        res = await fetch(input, fetchOptions);
       } catch (error) {
         lastNetworkError = error;
         if (attempt >= maxRetries) break;
-        await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, Math.min(2500, retryBaseMs * (attempt + 1))));
         continue;
       }
 
@@ -131,7 +138,7 @@ class StabilityAgent {
 
       if (res.status === 500 || res.status === 502) {
         if (attempt >= maxRetries) break;
-        await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, Math.min(2500, retryBaseMs * (attempt + 1))));
         continue;
       }
 
