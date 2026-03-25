@@ -175,20 +175,6 @@ export default function Home() {
   const tutorialTenantId = isEmbedded || isOwnerAdmin ? null : authTenantId;
   const shouldShowTutorial = useShouldShowTutorial(tutorialTenantId);
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  useEffect(() => {
-    if (!authTenantId || !dashboardSummary) return;
-    const visibleSignals =
-      Number(metrics?.totalOrders || 0) +
-      Number(dashboardSummary?.alerts?.length || 0) +
-      Number(displayProfitLeaks?.length || 0);
-    if (visibleSignals === 0 && !summaryLoading) {
-      stabilityAgent.rememberUiAnomaly('dashboard_render_gap', {
-        tenant_id: authTenantId,
-        route: 'Home',
-        reason: 'summary_loaded_but_sparse',
-      });
-    }
-  }, [authTenantId, dashboardSummary, metrics?.totalOrders, displayProfitLeaks?.length, summaryLoading]);
 
   useEffect(() => {
     if (!isOwnerAdmin && shouldShowTutorial && authTenantId) {
@@ -413,6 +399,21 @@ export default function Home() {
     pendingAlerts: 0
   };
   const profitScore = dashboardSummary?.profitScore || 0;
+
+  useEffect(() => {
+    if (!authTenantId || !dashboardSummary) return;
+    const visibleSignals =
+      Number(metrics?.totalOrders || 0) +
+      Number(dashboardSummary?.alerts?.length || 0) +
+      Number(displayProfitLeaks?.length || 0);
+    if (visibleSignals === 0 && !summaryLoading) {
+      stabilityAgent.rememberUiAnomaly('dashboard_render_gap', {
+        tenant_id: authTenantId,
+        route: 'Home',
+        reason: 'summary_loaded_but_sparse',
+      });
+    }
+  }, [authTenantId, dashboardSummary, metrics?.totalOrders, displayProfitLeaks?.length, summaryLoading]);
 
   // Sync mutation
   const syncMutation = useMutation({
