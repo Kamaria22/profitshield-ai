@@ -886,7 +886,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="relative isolate min-h-screen flex flex-col overflow-x-hidden lg:ml-64">
         {/* Top bar */}
-        <header className={`topbar-glow command-surface sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.88),rgba(8,15,30,0.78))] border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-5`}>
+        <header className={`topbar-glow command-surface sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.92),rgba(8,15,30,0.84))] border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-5`}>
           <button 
             onClick={handleSidebarOpen}
             className={`lg:hidden relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
@@ -1037,7 +1037,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         <main
           ref={mainScrollRef}
           onScroll={handleMainScroll}
-          className={`future-grid flex-1 ${device.isMobile ? 'px-2 pt-0' : device.isTablet ? 'px-2.5 pt-0.5' : 'px-2.5 pt-0.5 lg:px-3 lg:pt-0.5'} ${showPhoneQuickNav ? 'pb-24' : 'pb-4'} bg-transparent overflow-x-hidden overflow-y-auto`}
+          className={`future-grid flex-1 ${device.isMobile ? 'px-2 pt-0' : device.isTablet ? 'px-2.5 pt-0' : 'px-2.5 pt-0 lg:px-3 lg:pt-0'} ${showPhoneQuickNav ? 'pb-24' : 'pb-4'} bg-transparent overflow-x-hidden overflow-y-auto`}
           style={{ height: 'calc(100dvh - var(--ps-topbar-h, 4rem))' }}
           role="main"
           aria-label="App content"
@@ -1056,10 +1056,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.05),transparent_65%)]" />
-          <div className="page-canvas relative z-[1] px-2 py-1.5 sm:px-2.5 sm:py-2 lg:px-3 lg:py-2.5">
-            <div className="orbital-ring -left-16 top-4 hidden h-28 w-28 opacity-20 lg:block" />
-            <div className="orbital-ring right-6 top-6 hidden h-16 w-16 opacity-15 xl:block" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.04),transparent_70%)]" />
+          <div className="page-canvas relative z-[1] -mt-px px-2 py-1.5 sm:px-2.5 sm:py-2 lg:px-3 lg:py-2">
+            <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
+            <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             {children}
           </div>
           </MobileDeepWrapper>
