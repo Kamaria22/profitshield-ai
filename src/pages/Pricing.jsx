@@ -359,11 +359,11 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 text-white">
+    <div className="min-h-screen py-4 px-4 text-white">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div 
-          className="future-panel future-grid future-scan text-center mb-6 overflow-hidden rounded-[2rem] px-5 py-6"
+          className="future-panel future-grid future-scan text-center mb-4 overflow-hidden rounded-[1.75rem] px-5 py-5"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -378,7 +378,7 @@ export default function Pricing() {
             Plan selection is the unlock point for autonomous sync, instant webhook refresh, and live AI orchestration. This surface should feel like a launch decision, not a billing form.
           </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3 text-left">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3 text-left">
             <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.03] px-4 py-4">
               <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Activation</p>
               <p className="mt-1 text-sm font-semibold text-cyan-100">Webhook and sync bootstrap</p>
@@ -393,7 +393,7 @@ export default function Pricing() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <Button
               size="lg"
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -411,7 +411,7 @@ export default function Pricing() {
           </div>
 
           {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-4 mt-8">
+          <div className="flex items-center justify-center gap-4 mt-5">
             <span className={`text-sm font-medium ${!isYearly ? 'text-white' : 'text-slate-500'}`}>
               Monthly
             </span>
@@ -428,7 +428,7 @@ export default function Pricing() {
         </motion.div>
 
         {/* Pricing Cards */}
-        <div className="sticky top-2 z-20 mb-5">
+        <div className="sticky top-2 z-20 mb-4">
           <div className="mx-auto max-w-4xl rounded-2xl border border-emerald-400/20 bg-slate-950/70 backdrop-blur px-4 py-3 shadow-lg">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>

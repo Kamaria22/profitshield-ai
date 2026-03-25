@@ -1056,10 +1056,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.10),transparent_65%)]" />
-          <div className="page-canvas relative z-[1] px-2.5 py-2.5 sm:px-3 sm:py-3 lg:px-4 lg:py-3.5">
-            <div className="orbital-ring -left-16 top-8 h-40 w-40 opacity-40" />
-            <div className="orbital-ring right-6 top-10 h-24 w-24 opacity-30" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_65%)]" />
+          <div className="page-canvas relative z-[1] px-2 py-2 sm:px-2.5 sm:py-2.5 lg:px-3 lg:py-3">
+            <div className="orbital-ring -left-16 top-6 h-32 w-32 opacity-30" />
+            <div className="orbital-ring right-6 top-8 h-20 w-20 opacity-20" />
             {children}
           </div>
           </MobileDeepWrapper>

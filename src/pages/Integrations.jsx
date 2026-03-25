@@ -547,9 +547,9 @@ export default function Integrations() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.8rem] px-4 py-4">
+      <div className="future-panel future-grid relative overflow-hidden rounded-[1.6rem] px-4 py-3.5">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

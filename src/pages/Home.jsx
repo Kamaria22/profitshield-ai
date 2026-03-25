@@ -573,11 +573,11 @@ export default function Home() {
 
         {/* Main Grid */}
           <div className="flex-1">
-          <div className="future-panel relative mb-3 overflow-hidden rounded-[1.8rem] px-4 py-3.5">
+          <div className="future-panel relative mb-2 overflow-hidden rounded-[1.6rem] px-4 py-3">
             <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
                   <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
                     Real-Time Operating Layer
                   </span>
@@ -588,7 +588,7 @@ export default function Home() {
                 <h1 className="text-[1.8rem] font-semibold text-white sm:text-[2.15rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
                   Merchant command center
                 </h1>
-                <p className="mt-1.5 max-w-2xl text-sm text-slate-400 sm:text-base">
+                <p className="mt-1 max-w-2xl text-sm text-slate-400 sm:text-base">
                   Instant telemetry, autonomous recovery, and profit-grade operating context arranged for action instead of browsing.
                 </p>
               </div>
@@ -608,7 +608,7 @@ export default function Home() {
               </div>
             </div>
             {resolver?.user?.id && (
-              <div className="mt-3 flex justify-start lg:justify-end">
+              <div className="mt-2 flex justify-start lg:justify-end">
                 <Suspense fallback={null}>
                   <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
                 </Suspense>
@@ -616,7 +616,7 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
             <SignalBrief
               icon={Brain}
               label="AI posture"
