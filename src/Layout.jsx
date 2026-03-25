@@ -14,7 +14,7 @@ import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import MobileAppBanner from '@/components/mobile/MobileAppBanner';
 import { maskEmail } from '@/components/utils/safeLog';
 import { NotificationProvider, NotificationSettingsButton } from '@/components/pwa/NotificationManager';
-import { SyncProvider, SyncStatusIndicator } from '@/components/pwa/SyncManager';
+import { SyncProvider, SyncStatusIndicator, useSyncManager } from '@/components/pwa/SyncManager';
 import { InstallAppBanner, UpdateAvailableBanner } from '@/components/pwa/ServiceWorkerRegistration';
 import { healthAgent } from '@/components/health/HealthAgent';
 import FrontendGuardian from '@/components/FrontendGuardian';
@@ -398,6 +398,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const alertsLoadTimerRef = useRef(null);
   const supportLoadTimerRef = useRef(null);
   const topBarHeight = device.isMobile ? '3.5rem' : '4rem';
+  const syncManager = useSyncManager();
   
   // Safe permissions
   const permissionsData = usePermissions() || {};
@@ -1033,6 +1034,17 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           </div>
         )}
 
+        <MerchantUtilityBanner
+          authTenantId={authTenantId}
+          currentPageName={currentPageName}
+          isEmbedded={isEmbedded}
+          locationSearch={location.search}
+          storeDisplayName={storeDisplayName}
+          platformDisplay={platformDisplay}
+          subscriptionTier={subscriptionTier}
+          syncManager={syncManager}
+        />
+
         {/* Page content */}
         <main
           ref={mainScrollRef}
@@ -1132,6 +1144,88 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
       {/* GDPR Cookie Consent */}
       <CookieConsent />
+    </div>
+  );
+}
+
+function MerchantUtilityBanner({
+  authTenantId,
+  currentPageName,
+  isEmbedded,
+  locationSearch,
+  storeDisplayName,
+  platformDisplay,
+  subscriptionTier,
+  syncManager,
+}) {
+  const hasStore = !!authTenantId;
+  const syncStatus = syncManager?.syncStatus || 'idle';
+  const syncing = syncStatus === 'syncing';
+  const syncLabel = syncing
+    ? 'Syncing now'
+    : syncStatus === 'error'
+      ? 'Recovery available'
+      : syncStatus === 'offline'
+        ? 'Offline mode'
+        : 'Instant sync ready';
+
+  return (
+    <div className="px-2 pb-1.5 pt-1 sm:px-2.5 lg:px-3">
+      <div className="command-surface flex flex-col gap-2 rounded-[1.2rem] border-cyan-400/10 bg-[linear-gradient(90deg,rgba(4,10,24,0.94),rgba(8,18,34,0.9))] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+              Merchant lane
+            </span>
+            {platformDisplay && (
+              <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100">
+                {platformDisplay}
+              </span>
+            )}
+            {subscriptionTier && (
+              <span className="future-badge inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-100">
+                {subscriptionTier}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="truncate text-sm font-medium text-slate-100">
+              {hasStore
+                ? `${storeDisplayName || 'Connected store'} is ready for fast sync and action routing.`
+                : 'Connect a store to unlock live sync, webhooks, and merchant intelligence.'}
+            </p>
+            <span className="text-xs text-slate-400">
+              {hasStore ? syncLabel : 'Setup required'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {hasStore ? (
+            <>
+              <Button
+                size="sm"
+                onClick={() => syncManager?.triggerSync?.()}
+                disabled={syncing || syncStatus === 'offline'}
+                className="h-8 rounded-xl bg-cyan-500/14 px-3 text-xs font-medium text-cyan-100 hover:bg-cyan-500/22"
+              >
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </Button>
+              <Link to={createPageUrl(currentPageName === 'Orders' ? 'Integrations' : 'Orders', locationSearch)}>
+                <Button size="sm" variant="ghost" className="h-8 rounded-xl border border-white/10 px-3 text-xs text-slate-200 hover:bg-white/[0.05]">
+                  {currentPageName === 'Orders' ? 'Manage integrations' : 'Open orders'}
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <Link to={createPageUrl('Integrations', locationSearch)}>
+              <Button size="sm" className="h-8 rounded-xl bg-emerald-600 px-3 text-xs font-medium hover:bg-emerald-700">
+                {isEmbedded ? 'Connect store' : 'Connect platform'}
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
