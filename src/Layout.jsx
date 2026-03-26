@@ -1044,21 +1044,22 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           aria-label="App content"
         >
           <MobileDeepWrapper>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.015),transparent_72%)]" />
-          <div className="page-canvas relative z-[1] -mt-4 px-2 pb-0.5 pt-0 sm:px-2.5 sm:pb-1 sm:pt-0 lg:px-3 lg:pb-1 lg:pt-0">
+          <div className="page-canvas relative z-[1] -mt-5 px-2 pb-0.5 pt-0 sm:px-2.5 sm:pb-1 sm:pt-0 lg:px-3 lg:pb-1 lg:pt-0">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
-            <div className="space-y-2">
-              <MerchantUtilityBanner
-                authTenantId={authTenantId}
-                currentPageName={currentPageName}
-                isEmbedded={isEmbedded}
-                locationSearch={location.search}
-                storeDisplayName={storeDisplayName}
-                platformDisplay={platformDisplay}
-                subscriptionTier={subscriptionTier}
-                syncManager={syncManager}
-              />
+            <div className="space-y-1.5">
+              <div className="-mx-2 -mt-px sm:-mx-2.5 lg:-mx-3">
+                <MerchantUtilityBanner
+                  authTenantId={authTenantId}
+                  currentPageName={currentPageName}
+                  isEmbedded={isEmbedded}
+                  locationSearch={location.search}
+                  storeDisplayName={storeDisplayName}
+                  platformDisplay={platformDisplay}
+                  subscriptionTier={subscriptionTier}
+                  syncManager={syncManager}
+                />
+              </div>
               {showMissingContextBanner && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
                   <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
@@ -1073,7 +1074,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                 </div>
               )}
             </div>
-            <div className="mt-2">
+            <div className="mt-1.5">
               {children}
             </div>
           </div>
