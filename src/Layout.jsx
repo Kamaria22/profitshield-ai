@@ -1045,7 +1045,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         >
           <MobileDeepWrapper>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.015),transparent_72%)]" />
-          <div className="page-canvas relative z-[1] -mt-4 px-2 py-0.5 sm:px-2.5 sm:py-1 lg:px-3 lg:py-1">
+          <div className="page-canvas relative z-[1] -mt-4 px-2 pb-0.5 pt-0 sm:px-2.5 sm:pb-1 sm:pt-0 lg:px-3 lg:pb-1 lg:pt-0">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             <div className="space-y-2">
