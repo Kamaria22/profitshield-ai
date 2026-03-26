@@ -567,7 +567,7 @@ export default function Home() {
         />
 
         {/* Main Grid */}
-        <div className="flex-1">
+        <div className="flex-1 space-y-3.5">
 
           {/* 1️⃣ AI Profit Operating System — instant, above-the-fold */}
           <AIProfitOperatingSystem
@@ -575,7 +575,7 @@ export default function Home() {
             profitScore={profitScore}
             loading={summaryLoading}
           />
-          <div className="mt-2.5">
+          <div>
             <WelcomeChecklist />
           </div>
 
@@ -603,10 +603,10 @@ export default function Home() {
             <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
           </Suspense>
 
-          <div className="flex h-full gap-4 lg:gap-5">
+          <div className="flex h-full gap-3.5 lg:gap-4">
             <div className="flex-1 min-w-0">
               {/* Row 1: Core profit metrics */}
-              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <ProfitHealthPanel metrics={metrics} loading={false} />
                 </Suspense>
@@ -619,7 +619,7 @@ export default function Home() {
               </div>
 
               {/* Row 2: AI Alerts + Opportunities + Forecast */}
-              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
                 </Suspense>
@@ -632,7 +632,7 @@ export default function Home() {
               </div>
 
               {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
-              <div className="mb-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
                 </Suspense>
@@ -645,7 +645,7 @@ export default function Home() {
               </div>
 
               {/* Row 4: Fraud + AI Automations + Integrations + Reports */}
-              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3.5 grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:grid-cols-3">
                 <Suspense fallback={<PanelSkeleton />}>
                   <SecurityPanel loading={false} />
                 </Suspense>
@@ -668,7 +668,7 @@ export default function Home() {
 
               {/* Connect Store CTA */}
               {isDemoMode && (
-                <div className="mt-4 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-sm">
+                <div className="mt-3.5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
                       <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -689,8 +689,8 @@ export default function Home() {
             </div>
 
             {/* Side Rail - Lazy loaded */}
-            <div className="hidden xl:block w-80 flex-shrink-0 space-y-4">
-              <div className="sticky top-0 space-y-4">
+            <div className="hidden xl:block w-80 flex-shrink-0 space-y-3.5">
+              <div className="sticky top-0 space-y-3.5">
                 {/* Autonomous Insight Engine - always visible */}
                 <Suspense fallback={<PanelSkeleton />}>
                   <AutonomousInsightEngine
