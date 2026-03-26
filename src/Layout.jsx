@@ -1055,7 +1055,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             syncManager={syncManager}
           />
           {showMissingContextBanner && (
-            <div className="mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
+            <div className="mb-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
               <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
               <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
               <Button
@@ -1067,8 +1067,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.02),transparent_72%)]" />
-          <div className="page-canvas relative z-[1] -mt-3 px-2 py-1 sm:px-2.5 sm:py-1.5 lg:px-3 lg:py-1.5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.015),transparent_72%)]" />
+          <div className="page-canvas relative z-[1] -mt-4 px-2 py-0.5 sm:px-2.5 sm:py-1 lg:px-3 lg:py-1">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             {children}
