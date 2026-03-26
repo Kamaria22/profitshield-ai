@@ -12,9 +12,6 @@ import {
   Sparkles,
   ArrowRight,
   Store,
-  Shield,
-  Brain,
-  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,8 +49,6 @@ const RiskMitigationPanel = lazy(() => import('../components/dashboard/panels/Ri
 const FinancialReportingPanel = lazy(() => import('../components/dashboard/panels/FinancialReportingPanel'));
 const CustomizeLayoutPanel = lazy(() => import('../components/dashboard/panels/CustomizeLayoutPanel'));
 
-// Dashboard personalization
-const DashboardCustomizer = lazy(() => import('../components/dashboard/DashboardCustomizer'));
 const CustomAlerts = lazy(() => import('../components/dashboard/CustomAlerts'));
 
 export default function Home() {
@@ -572,76 +567,7 @@ export default function Home() {
         />
 
         {/* Main Grid */}
-          <div className="flex-1">
-          <div className="future-panel relative mb-2 overflow-hidden rounded-[1.45rem] px-4 py-2.5">
-            <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
-            <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                    Real-Time Operating Layer
-                  </span>
-                  <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-                    {metrics.totalOrders > 0 ? `${metrics.totalOrders} tracked orders` : 'Bootstrap adaptive'}
-                  </span>
-                </div>
-                <h1 className="text-[1.55rem] font-semibold text-white sm:text-[1.95rem]" style={{ textShadow: '0 0 24px rgba(56,189,248,0.16)' }}>
-                  Merchant command center
-                </h1>
-                <p className="mt-0.5 max-w-2xl text-sm text-slate-400 sm:text-[0.95rem]">
-                  Instant telemetry, autonomous recovery, and profit-grade operating context arranged for action instead of browsing.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 lg:w-[340px]">
-                <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Runtime date</p>
-                  <p className="mt-1 text-sm font-semibold text-cyan-100">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Sync posture</p>
-                  <p className="mt-1 text-sm font-semibold text-emerald-100">
-                    {syncMutation.isPending ? 'Actively syncing' : dashboardSummary?.lastSyncAt ? 'Live and warm' : 'Self-healing'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {resolver?.user?.id && (
-              <div className="mt-1.5 flex justify-start lg:justify-end">
-                <Suspense fallback={null}>
-                  <DashboardCustomizer userId={resolver.user.id} onLayoutChange={() => queryClient.invalidateQueries(['dashboard'])} />
-                </Suspense>
-              </div>
-            )}
-          </div>
-
-          <div className="mb-2.5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            <SignalBrief
-              icon={Brain}
-              label="AI posture"
-              value={displayProfitLeaks.length > 0 ? `${displayProfitLeaks.length} active leak signals` : 'No active leak signals'}
-              tone="text-violet-200"
-            />
-            <SignalBrief
-              icon={AlertTriangle}
-              label="Alert pressure"
-              value={(dashboardSummary?.alerts?.length || 0) > 0 ? `${dashboardSummary.alerts.length} pending alerts` : 'No pending alerts'}
-              tone={(dashboardSummary?.alerts?.length || 0) > 0 ? 'text-amber-200' : 'text-emerald-200'}
-            />
-            <SignalBrief
-              icon={Shield}
-              label="Risk field"
-              value={metrics.highRiskOrders > 0 ? `${metrics.highRiskOrders} high-risk orders` : 'Risk field stable'}
-              tone={metrics.highRiskOrders > 0 ? 'text-red-200' : 'text-cyan-200'}
-            />
-            <SignalBrief
-              icon={Sparkles}
-              label="Sync runtime"
-              value={syncMutation.isPending ? 'Actively healing store state' : dashboardSummary?.lastSyncAt ? 'Warm, recent sync available' : 'Bootstrap standing by'}
-              tone="text-emerald-200"
-            />
-          </div>
+        <div className="flex-1">
 
           {/* 1️⃣ AI Profit Operating System — instant, above-the-fold */}
           <AIProfitOperatingSystem
@@ -787,21 +713,5 @@ export default function Home() {
         </div>
       </div>
     </SubscriptionGate>
-  );
-}
-
-function SignalBrief({ icon: Icon, label, value, tone = 'text-cyan-200' }) {
-  return (
-    <div className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.04]">
-          <Icon className={`h-4 w-4 ${tone}`} />
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">{label}</p>
-          <p className={`mt-1 text-sm font-semibold ${tone}`}>{value}</p>
-        </div>
-      </div>
-    </div>
   );
 }
