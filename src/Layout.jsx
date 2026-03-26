@@ -1067,8 +1067,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </Button>
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.025),transparent_72%)]" />
-          <div className="page-canvas relative z-[1] -mt-2 px-2 py-1 sm:px-2.5 sm:py-1.5 lg:px-3 lg:py-1.5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.02),transparent_72%)]" />
+          <div className="page-canvas relative z-[1] -mt-3 px-2 py-1 sm:px-2.5 sm:py-1.5 lg:px-3 lg:py-1.5">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
             {children}
