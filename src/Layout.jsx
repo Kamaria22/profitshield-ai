@@ -1044,34 +1044,38 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           aria-label="App content"
         >
           <MobileDeepWrapper>
-          <MerchantUtilityBanner
-            authTenantId={authTenantId}
-            currentPageName={currentPageName}
-            isEmbedded={isEmbedded}
-            locationSearch={location.search}
-            storeDisplayName={storeDisplayName}
-            platformDisplay={platformDisplay}
-            subscriptionTier={subscriptionTier}
-            syncManager={syncManager}
-          />
-          {showMissingContextBanner && (
-            <div className="mb-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
-              <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
-              <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
-              <Button
-                size="sm"
-                className="mt-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30"
-                onClick={() => navigate(createPageUrl('Integrations', location.search))}
-              >
-                Connect Store
-              </Button>
-            </div>
-          )}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.015),transparent_72%)]" />
           <div className="page-canvas relative z-[1] -mt-4 px-2 py-0.5 sm:px-2.5 sm:py-1 lg:px-3 lg:py-1">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
-            {children}
+            <div className="space-y-2">
+              <MerchantUtilityBanner
+                authTenantId={authTenantId}
+                currentPageName={currentPageName}
+                isEmbedded={isEmbedded}
+                locationSearch={location.search}
+                storeDisplayName={storeDisplayName}
+                platformDisplay={platformDisplay}
+                subscriptionTier={subscriptionTier}
+                syncManager={syncManager}
+              />
+              {showMissingContextBanner && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-sm p-4 text-sm text-amber-300" role="alert">
+                  <p className="font-medium mb-1 text-amber-200">No Store Connected</p>
+                  <p className="text-amber-400/80">Connect a store to unlock intelligent profit analytics.</p>
+                  <Button
+                    size="sm"
+                    className="mt-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30"
+                    onClick={() => navigate(createPageUrl('Integrations', location.search))}
+                  >
+                    Connect Store
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="mt-2">
+              {children}
+            </div>
           </div>
           </MobileDeepWrapper>
         </main>
