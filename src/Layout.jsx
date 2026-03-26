@@ -1074,7 +1074,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                 </div>
               )}
             </div>
-            <div className="mt-1.5">
+            <div className="mt-0.5">
               {children}
             </div>
           </div>
