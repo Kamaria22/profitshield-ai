@@ -47,7 +47,7 @@ export default function ExecutiveSummaryBar({
   const commandState = syncing ? 'Synchronizing live store state' : 'Instant command channel ready';
 
   return (
-    <div className="px-2 pb-1.5 sm:px-3">
+    <div className="px-2 pb-0 sm:px-3">
       <div className="future-panel future-scan rounded-[1.45rem] px-4 py-2.5 sm:px-4.5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
