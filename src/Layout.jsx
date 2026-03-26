@@ -1044,11 +1044,11 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           aria-label="App content"
         >
           <MobileDeepWrapper>
-          <div className="page-canvas relative z-[1] -mt-6 px-2 pb-0.5 pt-0 sm:px-2.5 sm:pb-1 sm:pt-0 lg:px-3 lg:pb-1 lg:pt-0">
+          <div className="page-canvas relative z-[1] -mt-7 px-2 pb-0.5 pt-0 sm:px-2.5 sm:pb-1 sm:pt-0 lg:px-3 lg:pb-1 lg:pt-0">
             <div className="orbital-ring -left-16 top-3 hidden h-24 w-24 opacity-15 lg:block" />
             <div className="orbital-ring right-6 top-4 hidden h-14 w-14 opacity-10 xl:block" />
-            <div className="space-y-1.5">
-              <div className="-mx-2 -mt-px sm:-mx-2.5 lg:-mx-3">
+            <div className="space-y-1">
+              <div className="-mx-2 -mt-1 sm:-mx-2.5 lg:-mx-3">
                 <MerchantUtilityBanner
                   authTenantId={authTenantId}
                   currentPageName={currentPageName}
