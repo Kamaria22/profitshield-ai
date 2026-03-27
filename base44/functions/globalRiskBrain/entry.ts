@@ -32,6 +32,9 @@ Deno.serve(async (req) => {
       
       case 'aggregate_patterns':
         return Response.json(await aggregatePatterns(base44, params));
+
+      case 'generate_signal_datasets':
+        return Response.json(await generateSignalDatasets(base44, params));
       
       default:
         return Response.json({ error: 'Unknown action' }, { status: 400 });
@@ -515,4 +518,214 @@ async function aggregatePatterns(base44, { industry, region, days = 30 }) {
     occurrence_count: data.count,
     merchant_count: data.merchant_count.size
   }));
+}
+
+async function generateSignalDatasets(base44, { tenant_id, days = 90 }) {
+  const since = new Date(Date.now() - (Math.max(7, Math.min(365, Number(days) || 90)) * 24 * 60 * 60 * 1000));
+  const allAudits = await base44.asServiceRole.entities.RiskScoreAudit.filter({}).catch(() => []);
+  const audits = allAudits.filter((audit) => {
+    const ts = new Date(audit?.score_timestamp || audit?.created_date || 0);
+    return ts >= since && (!tenant_id || audit?.tenant_id === tenant_id);
+  });
+  const allOrders = await base44.asServiceRole.entities.Order.filter({}).catch(() => []);
+  const orders = allOrders.filter((order) => {
+    const ts = new Date(order?.order_date || order?.created_date || 0);
+    return ts >= since && (!tenant_id || order?.tenant_id === tenant_id);
+  });
+  const allOutcomes = await base44.asServiceRole.entities.OrderOutcome.filter({}).catch(() => []);
+  const outcomes = allOutcomes.filter((outcome) => {
+    const ts = new Date(outcome?.outcome_date || outcome?.created_date || 0);
+    return ts >= since && (!tenant_id || outcome?.tenant_id === tenant_id);
+  });
+
+  const signalMap = new Map();
+  const patternMap = new Map();
+
+  const registerSignal = (signal_type, signal_key, meta = {}) => {
+    const key = `${signal_type}:${signal_key}`;
+    const entry = signalMap.get(key) || {
+      signal_type,
+      signal_key,
+      occurrence_count: 0,
+      true_positive_count: 0,
+      false_positive_count: 0,
+      tenant_ids: new Set(),
+      confidence_score: 55,
+      impact_weight: 8,
+      last_observed_at: new Date().toISOString(),
+      ...meta,
+    };
+    entry.occurrence_count += 1;
+    if (meta.tenant_id) entry.tenant_ids.add(meta.tenant_id);
+    entry.last_observed_at = new Date().toISOString();
+    signalMap.set(key, entry);
+    return entry;
+  };
+
+  const registerPattern = (pattern_type, meta = {}) => {
+    const entry = patternMap.get(pattern_type) || {
+      pattern_type,
+      occurrence_count: 0,
+      severity: 'medium',
+      risk_multiplier: 1.2,
+      statistical_profile: {},
+      is_active: true,
+      last_detected_at: new Date().toISOString(),
+      ...meta,
+    };
+    entry.occurrence_count += 1;
+    entry.last_detected_at = new Date().toISOString();
+    patternMap.set(pattern_type, entry);
+    return entry;
+  };
+
+  for (const audit of audits) {
+    const outcome = String(audit?.outcome || '').toLowerCase();
+    const badOutcome = ['fraud_confirmed', 'chargeback', 'chargeback_fraud', 'return_abuse'].includes(outcome);
+    const goodOutcome = outcome === 'fulfilled_ok';
+    for (const contribution of (audit?.feature_contributions || [])) {
+      const feature = String(contribution?.feature || '').toLowerCase();
+      let signalType = null;
+      if (feature.includes('velocity')) signalType = 'velocity_anomaly';
+      else if (feature.includes('address mismatch')) signalType = 'address_mismatch';
+      else if (feature.includes('heavy discount')) signalType = 'heavy_discount';
+      else if (feature.includes('new customer')) signalType = 'new_customer';
+      else if (feature.startsWith('signal:')) signalType = String(contribution?.feature || '').replace(/^signal:\s*/i, '').trim().toLowerCase().replace(/\s+/g, '_');
+      if (!signalType) continue;
+      const signal = registerSignal(signalType, signalType, {
+        tenant_id: audit?.tenant_id,
+        impact_weight: Math.max(6, Math.min(30, Math.round(Math.abs(Number(contribution?.contribution || 0)) || 8))),
+      });
+      if (badOutcome) signal.true_positive_count += 1;
+      if (goodOutcome) signal.false_positive_count += 1;
+    }
+  }
+
+  if (orders.length >= 5) {
+    const revenues = orders.map((order) => Number(order?.total_revenue || 0)).filter((value) => Number.isFinite(value));
+    if (revenues.length >= 5) {
+      const mean = revenues.reduce((sum, value) => sum + value, 0) / revenues.length;
+      const variance = revenues.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / revenues.length;
+      const stdDev = Math.sqrt(variance || 0);
+      const threshold = stdDev > 0 ? 2 : 9999;
+      let outlierCount = 0;
+      for (const order of orders) {
+        const revenue = Number(order?.total_revenue || 0);
+        if (!Number.isFinite(revenue) || stdDev === 0) continue;
+        const zScore = Math.abs((revenue - mean) / stdDev);
+        if (zScore > threshold) outlierCount += 1;
+      }
+      if (outlierCount > 0) {
+        patternMap.set('amount_outlier', {
+          pattern_type: 'amount_outlier',
+          occurrence_count: outlierCount,
+          severity: outlierCount >= 5 ? 'high' : 'medium',
+          risk_multiplier: outlierCount >= 5 ? 1.5 : 1.25,
+          is_active: true,
+          last_detected_at: new Date().toISOString(),
+          statistical_profile: {
+            mean,
+            std_dev: stdDev,
+            z_score_threshold: threshold,
+          }
+        });
+      }
+    }
+  }
+
+  const negativeOutcomes = outcomes.filter((outcome) => {
+    const type = String(outcome?.outcome_type || '').toLowerCase();
+    return type.includes('chargeback') || type.includes('fraud') || type.includes('abuse') || type.includes('refund');
+  });
+  if (negativeOutcomes.length >= 3) {
+    patternMap.set('negative_outcome_cluster', {
+      pattern_type: 'negative_outcome_cluster',
+      occurrence_count: negativeOutcomes.length,
+      severity: negativeOutcomes.length >= 8 ? 'critical' : negativeOutcomes.length >= 5 ? 'high' : 'medium',
+      risk_multiplier: negativeOutcomes.length >= 8 ? 1.8 : negativeOutcomes.length >= 5 ? 1.5 : 1.25,
+      is_active: true,
+      last_detected_at: new Date().toISOString(),
+      statistical_profile: {
+        negative_outcome_count: negativeOutcomes.length,
+        sample_size: outcomes.length,
+        negative_rate: outcomes.length ? negativeOutcomes.length / outcomes.length : 0,
+      }
+    });
+  }
+
+  const existingSignals = await base44.asServiceRole.entities.GlobalRiskSignal.filter({}).catch(() => []);
+  let signals_created = 0;
+  let signals_updated = 0;
+  for (const signal of signalMap.values()) {
+    const precision = signal.true_positive_count + signal.false_positive_count > 0
+      ? signal.true_positive_count / (signal.true_positive_count + signal.false_positive_count)
+      : 0.5;
+    const payload = {
+      signal_type: signal.signal_type,
+      signal_key: signal.signal_key,
+      is_active: true,
+      occurrence_count: signal.occurrence_count,
+      true_positive_count: signal.true_positive_count,
+      false_positive_count: signal.false_positive_count,
+      precision,
+      confidence_score: Math.max(35, Math.min(95, Math.round(precision * 100))),
+      impact_weight: signal.impact_weight,
+      merchant_count: signal.tenant_ids.size || (tenant_id ? 1 : 0),
+      last_observed_at: signal.last_observed_at,
+      detected_at: signal.last_observed_at,
+      period: new Date().toISOString().slice(0, 10),
+      period_type: 'daily',
+      tenant_id: tenant_id || undefined,
+      source: 'globalRiskBrain.generate_signal_datasets',
+    };
+    const existing = existingSignals.find((row) => row.signal_type === signal.signal_type && row.signal_key === signal.signal_key);
+    if (existing?.id) {
+      await base44.asServiceRole.entities.GlobalRiskSignal.update(existing.id, payload).catch(() => {});
+      signals_updated += 1;
+    } else {
+      await base44.asServiceRole.entities.GlobalRiskSignal.create(payload).catch(() => {});
+      signals_created += 1;
+    }
+  }
+
+  const existingPatterns = await base44.asServiceRole.entities.AnomalyPattern.filter({}).catch(() => []);
+  let patterns_created = 0;
+  let patterns_updated = 0;
+  for (const pattern of patternMap.values()) {
+    const payload = {
+      pattern_type: pattern.pattern_type,
+      is_active: true,
+      severity: pattern.severity,
+      occurrence_count: pattern.occurrence_count,
+      risk_multiplier: pattern.risk_multiplier,
+      statistical_profile: pattern.statistical_profile,
+      last_detected_at: pattern.last_detected_at,
+      detected_at: pattern.last_detected_at,
+      period: new Date().toISOString().slice(0, 10),
+      period_type: 'daily',
+      tenant_id: tenant_id || undefined,
+      source: 'globalRiskBrain.generate_signal_datasets',
+    };
+    const existing = existingPatterns.find((row) => row.pattern_type === pattern.pattern_type);
+    if (existing?.id) {
+      await base44.asServiceRole.entities.AnomalyPattern.update(existing.id, payload).catch(() => {});
+      patterns_updated += 1;
+    } else {
+      await base44.asServiceRole.entities.AnomalyPattern.create(payload).catch(() => {});
+      patterns_created += 1;
+    }
+  }
+
+  return {
+    success: true,
+    audits_scanned: audits.length,
+    orders_scanned: orders.length,
+    outcomes_scanned: outcomes.length,
+    signals_created,
+    signals_updated,
+    patterns_created,
+    patterns_updated,
+    signal_candidates: signalMap.size,
+    pattern_candidates: patternMap.size,
+  };
 }

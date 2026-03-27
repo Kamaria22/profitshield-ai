@@ -126,6 +126,28 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
     }
   };
 
+  const handleGenerateDatasets = async () => {
+    if (!tenantId) {
+      toast.error('Store context is not ready yet');
+      return;
+    }
+    try {
+      const result = await base44.functions.invoke('globalRiskBrain', {
+        action: 'generate_signal_datasets',
+        tenant_id: tenantId,
+        days: 90
+      });
+      if (result.data?.success) {
+        toast.success(`Signals updated: ${result.data.signals_created + result.data.signals_updated}, patterns updated: ${result.data.patterns_created + result.data.patterns_updated}`);
+        retryAll();
+      } else {
+        toast.warning(result.data?.reason || 'Dataset generation did not complete');
+      }
+    } catch (e) {
+      toast.error('Dataset generation failed');
+    }
+  };
+
   if (!tenantId) {
     return (
       <Card>
@@ -178,6 +200,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
               <Activity className="w-4 h-4 mr-2" />
               Check Drift
             </Button>
+            <Button variant="outline" size="sm" onClick={handleGenerateDatasets}>
+              <Globe className="w-4 h-4 mr-2" />
+              Generate Signals
+            </Button>
             <Button size="sm" onClick={handleRetrain} className="bg-purple-600 hover:bg-purple-700">
               <Zap className="w-4 h-4 mr-2" />
               Trigger Retrain
@@ -203,6 +229,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
           <Button variant="outline" size="sm" onClick={handleCheckDrift} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading}>
             <Activity className="w-4 h-4 mr-2" />
             Check Drift
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleGenerateDatasets} disabled={!tenantId || signalsLoading || patternsLoading}>
+            <Globe className="w-4 h-4 mr-2" />
+            Generate Signals
           </Button>
           <Button size="sm" onClick={handleRetrain} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading} className="bg-purple-600 hover:bg-purple-700">
             <Zap className="w-4 h-4 mr-2" />
@@ -284,7 +314,13 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             {signalsLoading ? (
               <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
             ) : signals.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No signals detected yet</p>
+              <div className="space-y-3 py-4 text-center">
+                <p className="text-slate-500">No signals detected yet</p>
+                <Button variant="outline" size="sm" onClick={handleGenerateDatasets}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  Generate Signals
+                </Button>
+              </div>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {signals.slice(0, 10).map((signal) => (
@@ -328,7 +364,13 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             {patternsLoading ? (
               <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
             ) : patterns.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No patterns detected yet</p>
+              <div className="space-y-3 py-4 text-center">
+                <p className="text-slate-500">No patterns detected yet</p>
+                <Button variant="outline" size="sm" onClick={handleGenerateDatasets}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  Generate Patterns
+                </Button>
+              </div>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {patterns.slice(0, 10).map((pattern) => (
