@@ -30,7 +30,26 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
         model_type: 'fraud_detection', 
         status: 'active' 
       });
-      return models[0] || null;
+      if (models[0]) return models[0];
+
+      const deployedAiModels = await base44.entities.AIModelVersion
+        .filter({ model_type: 'fraud_detection', is_deployed: true })
+        .catch(() => []);
+      const aiModel = deployedAiModels[0] || null;
+      if (!aiModel) return null;
+
+      return {
+        id: aiModel.id,
+        version: aiModel.version,
+        performance_metrics: {
+          accuracy: aiModel.evaluation_score ? aiModel.evaluation_score / 100 : aiModel.precision || 0,
+          f1_score: aiModel.f1_score || 0,
+        },
+        drift_metrics: {
+          drift_alert_triggered: (aiModel.drift_score || 0) >= 50,
+        },
+        source_registry: 'AIModelVersion',
+      };
     }
   });
 
@@ -53,6 +72,7 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
   });
 
   const loadError = modelError || signalsError || patternsError || benchmarksError;
+  const noDataset = !modelLoading && !signalsLoading && !patternsLoading && !modelData && signals.length === 0 && patterns.length === 0;
   const retryAll = () => {
     refetchModel();
     refetchSignals();
@@ -76,6 +96,8 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
         toast.success('Model performance is stable');
       }
       refetchModel();
+      refetchSignals();
+      refetchPatterns();
     } catch (e) {
       toast.error('Drift check failed');
     }
@@ -95,7 +117,7 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
       });
       if (result.data?.success) {
         toast.success(`New model version ${result.data.new_version} created`);
-        refetchModel();
+        retryAll();
       } else {
         toast.warning(result.data?.reason || 'Retraining not triggered');
       }
@@ -126,6 +148,39 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             <Button variant="outline" size="sm" onClick={retryAll}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (noDataset) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-600" />
+            AI Model &amp; Signals
+          </CardTitle>
+          <CardDescription>No live model or signal data is available yet for this store.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Use the controls below to check the model registry, refresh global signals, or attempt a retrain once enough scored outcomes exist.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={retryAll}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh Data
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCheckDrift}>
+              <Activity className="w-4 h-4 mr-2" />
+              Check Drift
+            </Button>
+            <Button size="sm" onClick={handleRetrain} className="bg-purple-600 hover:bg-purple-700">
+              <Zap className="w-4 h-4 mr-2" />
+              Trigger Retrain
             </Button>
           </div>
         </CardContent>
@@ -172,6 +227,9 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
               <div className="p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-500">Version</p>
                 <p className="text-xl font-bold">{modelData.version}</p>
+                {modelData.source_registry && (
+                  <p className="mt-1 text-xs text-slate-400">{modelData.source_registry}</p>
+                )}
               </div>
               <div className="p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-500">Accuracy</p>
