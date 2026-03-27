@@ -20,8 +20,11 @@ import {
 import { toast } from 'sonner';
 
 export default function GlobalIntelligenceDashboard({ tenantId }) {
-  const { data: modelData, isLoading: modelLoading, refetch: refetchModel } = useQuery({
-    queryKey: ['activeModel'],
+  const queriesEnabled = !!tenantId;
+
+  const { data: modelData, isLoading: modelLoading, error: modelError, refetch: refetchModel } = useQuery({
+    queryKey: ['activeModel', tenantId || 'unresolved'],
+    enabled: queriesEnabled,
     queryFn: async () => {
       const models = await base44.entities.ModelVersion.filter({ 
         model_type: 'fraud_detection', 
@@ -31,25 +34,41 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
     }
   });
 
-  const { data: signals = [], isLoading: signalsLoading } = useQuery({
-    queryKey: ['globalSignals'],
+  const { data: signals = [], isLoading: signalsLoading, error: signalsError, refetch: refetchSignals } = useQuery({
+    queryKey: ['globalSignals', tenantId || 'unresolved'],
+    enabled: queriesEnabled,
     queryFn: () => base44.entities.GlobalRiskSignal.filter({ is_active: true })
   });
 
-  const { data: patterns = [], isLoading: patternsLoading } = useQuery({
-    queryKey: ['anomalyPatterns'],
+  const { data: patterns = [], isLoading: patternsLoading, error: patternsError, refetch: refetchPatterns } = useQuery({
+    queryKey: ['anomalyPatterns', tenantId || 'unresolved'],
+    enabled: queriesEnabled,
     queryFn: () => base44.entities.AnomalyPattern.filter({ is_active: true })
   });
 
-  const { data: benchmarks = [] } = useQuery({
-    queryKey: ['industryBenchmarks'],
+  const { data: benchmarks = [], error: benchmarksError, refetch: refetchBenchmarks } = useQuery({
+    queryKey: ['industryBenchmarks', tenantId || 'unresolved'],
+    enabled: queriesEnabled,
     queryFn: () => base44.entities.IndustryBenchmark.filter({})
   });
 
+  const loadError = modelError || signalsError || patternsError || benchmarksError;
+  const retryAll = () => {
+    refetchModel();
+    refetchSignals();
+    refetchPatterns();
+    refetchBenchmarks();
+  };
+
   const handleCheckDrift = async () => {
+    if (!tenantId) {
+      toast.error('Store context is not ready yet');
+      return;
+    }
     try {
       const result = await base44.functions.invoke('globalRiskBrain', {
-        action: 'check_drift'
+        action: 'check_drift',
+        tenant_id: tenantId
       });
       if (result.data?.drift_detected) {
         toast.warning(`Model drift detected! F1 dropped from ${result.data.baseline_f1?.toFixed(2)} to ${result.data.current_f1?.toFixed(2)}`);
@@ -63,6 +82,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
   };
 
   const handleRetrain = async () => {
+    if (!tenantId) {
+      toast.error('Store context is not ready yet');
+      return;
+    }
     try {
       const result = await base44.functions.invoke('globalRiskBrain', {
         action: 'retrain_model',
@@ -81,6 +104,35 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
     }
   };
 
+  if (!tenantId) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <p className="text-sm text-slate-500">Risk model context is still resolving. Retry once your store is connected.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-red-600">AI Model &amp; Signals failed to load.</p>
+            <p className="text-sm text-slate-500">
+              {loadError?.message || 'The risk intelligence queries did not complete successfully.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={retryAll}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -93,11 +145,11 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
           <p className="text-slate-500">Self-improving AI risk detection system</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleCheckDrift}>
+          <Button variant="outline" size="sm" onClick={handleCheckDrift} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading}>
             <Activity className="w-4 h-4 mr-2" />
             Check Drift
           </Button>
-          <Button size="sm" onClick={handleRetrain} className="bg-purple-600 hover:bg-purple-700">
+          <Button size="sm" onClick={handleRetrain} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading} className="bg-purple-600 hover:bg-purple-700">
             <Zap className="w-4 h-4 mr-2" />
             Trigger Retrain
           </Button>
