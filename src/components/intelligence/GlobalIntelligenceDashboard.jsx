@@ -19,6 +19,19 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+function InlineActionButton({ onClick, disabled, children, className = '' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function buildLocalSignalDatasets(audits = [], orders = [], outcomes = [], tenantId) {
   const signalMap = new Map();
   const patternMap = new Map();
@@ -300,10 +313,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             <p className="text-sm text-slate-500">
               {loadError?.message || 'The risk intelligence queries did not complete successfully.'}
             </p>
-            <Button variant="outline" size="sm" onClick={retryAll}>
+            <InlineActionButton onClick={retryAll}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry
-            </Button>
+            </InlineActionButton>
           </div>
         </CardContent>
       </Card>
@@ -325,18 +338,18 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             Use the controls below to check the model registry, refresh global signals, or attempt a retrain once enough scored outcomes exist.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={retryAll}>
+            <InlineActionButton onClick={retryAll}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh Data
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleCheckDrift}>
+            </InlineActionButton>
+            <InlineActionButton onClick={handleCheckDrift}>
               <Activity className="w-4 h-4 mr-2" />
               Check Drift
-            </Button>
-          <Button variant="outline" size="sm" onClick={handleGenerateDatasets} disabled={generatorState.busy}>
+            </InlineActionButton>
+          <InlineActionButton onClick={handleGenerateDatasets} disabled={generatorState.busy}>
             <Globe className="w-4 h-4 mr-2" />
             {generatorState.busy ? 'Generating…' : 'Generate Signals'}
-          </Button>
+          </InlineActionButton>
             <Button size="sm" onClick={handleRetrain} className="bg-purple-600 hover:bg-purple-700">
               <Zap className="w-4 h-4 mr-2" />
               Trigger Retrain
@@ -359,14 +372,14 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
           <p className="text-slate-500">Self-improving AI risk detection system</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleCheckDrift} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading}>
+          <InlineActionButton onClick={handleCheckDrift} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading}>
             <Activity className="w-4 h-4 mr-2" />
             Check Drift
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleGenerateDatasets} disabled={!tenantId || signalsLoading || patternsLoading || generatorState.busy}>
+          </InlineActionButton>
+          <InlineActionButton onClick={handleGenerateDatasets} disabled={!tenantId || signalsLoading || patternsLoading || generatorState.busy}>
             <Globe className="w-4 h-4 mr-2" />
             {generatorState.busy ? 'Generating…' : 'Generate Signals'}
-          </Button>
+          </InlineActionButton>
           <Button size="sm" onClick={handleRetrain} disabled={!tenantId || modelLoading || signalsLoading || patternsLoading} className="bg-purple-600 hover:bg-purple-700">
             <Zap className="w-4 h-4 mr-2" />
             Trigger Retrain
@@ -449,10 +462,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             ) : visibleSignals.length === 0 ? (
               <div className="space-y-3 py-4 text-center">
                 <p className="text-slate-500">No signals detected yet</p>
-                <Button variant="outline" size="sm" onClick={handleGenerateDatasets} disabled={generatorState.busy}>
+                <InlineActionButton onClick={handleGenerateDatasets} disabled={generatorState.busy}>
                   <Globe className="w-4 h-4 mr-2" />
                   {generatorState.busy ? 'Generating…' : 'Generate Signals'}
-                </Button>
+                </InlineActionButton>
               </div>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -499,10 +512,10 @@ export default function GlobalIntelligenceDashboard({ tenantId }) {
             ) : visiblePatterns.length === 0 ? (
               <div className="space-y-3 py-4 text-center">
                 <p className="text-slate-500">No patterns detected yet</p>
-                <Button variant="outline" size="sm" onClick={handleGenerateDatasets} disabled={generatorState.busy}>
+                <InlineActionButton onClick={handleGenerateDatasets} disabled={generatorState.busy}>
                   <Globe className="w-4 h-4 mr-2" />
                   {generatorState.busy ? 'Generating…' : 'Generate Patterns'}
-                </Button>
+                </InlineActionButton>
               </div>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
