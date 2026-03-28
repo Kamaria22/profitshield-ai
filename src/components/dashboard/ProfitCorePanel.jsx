@@ -32,6 +32,18 @@ function getTrendMeta(orders = []) {
   return `${sign}${pct.toFixed(1)}% recent trend`;
 }
 
+function estimateDailyRunRate(orders = [], totalProfit = 0) {
+  if (!orders.length) return 0;
+  const timestamps = orders
+    .map((order) => new Date(order?.order_date || order?.processed_at || 0).getTime())
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!timestamps.length) return totalProfit / 30;
+  const minTs = Math.min(...timestamps);
+  const maxTs = Math.max(...timestamps);
+  const spanDays = Math.max(1, Math.ceil((maxTs - minTs) / (1000 * 60 * 60 * 24)) + 1);
+  return totalProfit / spanDays;
+}
+
 function ForecastMetric({ label, value }) {
   return (
     <div className="dashboard-subpanel">
@@ -43,10 +55,13 @@ function ForecastMetric({ label, value }) {
 
 export default function ProfitCorePanel({ metrics, orders = [] }) {
   const totalProfit = Number(metrics?.totalProfit || 0);
+  const totalRevenue = Number(metrics?.totalRevenue || 0);
   const margin = Number(metrics?.avgMargin || 0);
-  const monthlyRunRate = totalProfit || 0;
+  const dailyRunRate = estimateDailyRunRate(orders, totalProfit);
+  const monthlyRunRate = dailyRunRate * 30;
   const trendPoints = buildTrendPoints(orders);
   const trendMeta = getTrendMeta(orders);
+  const revenueMeta = totalRevenue > 0 ? `${formatCurrency(totalRevenue)} revenue` : 'No revenue captured yet';
 
   return (
     <div className="dashboard-panel p-4 md:p-5">
@@ -54,6 +69,7 @@ export default function ProfitCorePanel({ metrics, orders = [] }) {
         <section className="dashboard-subpanel">
           <p className="dashboard-label">Profit Overview</p>
           <p className="dashboard-metric mt-3">{formatCurrency(totalProfit)}</p>
+          <p className="mt-2 text-sm text-slate-400">{revenueMeta}</p>
           <div className="mt-3 flex items-center justify-between gap-4">
             <div>
               <p className="dashboard-label">Margin</p>
@@ -77,6 +93,7 @@ export default function ProfitCorePanel({ metrics, orders = [] }) {
 
         <section className="dashboard-subpanel">
           <p className="dashboard-label">Forecast</p>
+          <p className="mt-2 text-sm text-slate-400">Projected from current profit run rate</p>
           <div className="mt-3 grid gap-3">
             <ForecastMetric label="30 days" value={monthlyRunRate} />
             <ForecastMetric label="60 days" value={monthlyRunRate * 2} />

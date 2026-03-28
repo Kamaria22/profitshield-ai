@@ -371,6 +371,10 @@ export default function Home() {
   const profitScore = dashboardSummary?.profitScore || 0;
   const visibleAlerts = (dashboardSummary?.alerts || []).slice(0, 3);
   const aiStatus = dashboardSummary?.lastSyncAt ? 'Active' : 'Idle';
+  const dashboardHasData =
+    Number(metrics?.totalOrders || 0) > 0 ||
+    Number(visibleAlerts.length || 0) > 0 ||
+    Number(displayProfitLeaks?.length || 0) > 0;
 
   useEffect(() => {
     if (!authTenantId || !dashboardSummary) return;
@@ -554,6 +558,26 @@ export default function Home() {
               </Suspense>
             )}
           />
+          {!dashboardHasData && (
+            <div className="dashboard-panel mt-3">
+              <p className="dashboard-label">Startup State</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="dashboard-title">No live telemetry yet</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    ProfitShield is connected, but the dashboard is still waiting for synced merchant data.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending || !authTenantId}
+                  className="border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                >
+                  {syncMutation.isPending ? 'Syncing...' : 'Run Initial Sync'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </SubscriptionGate>
