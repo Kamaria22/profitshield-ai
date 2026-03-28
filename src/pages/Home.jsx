@@ -5,12 +5,11 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { invokeWithRetry, withUiGuard } from '@/lib/safeApi';
+import { invokeWithRetry } from '@/lib/safeApi';
 import { stabilityAgent } from '@/agents/StabilityAgent';
 import { usePermissions } from '@/components/usePermissions';
 import { 
   Sparkles,
-  ArrowRight,
   Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,37 +18,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
-import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
 
-// Critical above-the-fold components - loaded immediately
-import AIProfitOperatingSystem from '../components/dashboard/AIProfitOperatingSystem';
-import ExecutiveSummaryBar from '../components/dashboard/ExecutiveSummaryBar';
-import { PanelSkeleton } from '../components/dashboard/LazyPanel';
-
-// Heavy panels - lazy loaded with IntersectionObserver
-const AutonomousProfitGuard = lazy(() => import('../components/dashboard/AutonomousProfitGuard'));
-const AIProfitIntelligenceSummary = lazy(() => import('../components/dashboard/AIProfitIntelligenceSummary'));
-const AIAlerts = lazy(() => import('../components/dashboard/AIAlerts'));
-const AIOpportunities = lazy(() => import('../components/dashboard/AIOpportunities'));
-const ProfitForecast = lazy(() => import('../components/dashboard/ProfitForecast'));
-const ProfitHealthPanel = lazy(() => import('../components/dashboard/panels/ProfitHealthPanel'));
-const PredictiveOverviewBar = lazy(() => import('../components/dashboard/PredictiveOverviewBar'));
-const AutonomousInsightEngine = lazy(() => import('../components/dashboard/AutonomousInsightEngine'));
-const RiskCommandPanel = lazy(() => import('../components/dashboard/panels/RiskCommandPanel'));
-const AlertsPanel = lazy(() => import('../components/dashboard/panels/AlertsPanel'));
-const MarginLeakPanel = lazy(() => import('../components/dashboard/panels/MarginLeakPanel'));
-const CashflowPanel = lazy(() => import('../components/dashboard/panels/CashflowPanel'));
-const SecurityPanel = lazy(() => import('../components/dashboard/panels/SecurityPanel'));
-const CEOInsightsPanel = lazy(() => import('../components/dashboard/panels/CEOInsightsPanel'));
-const AIAutomationsPanel = lazy(() => import('../components/dashboard/panels/AIAutomationsPanel'));
-const AdvancedAnalyticsPanel = lazy(() => import('../components/dashboard/panels/AdvancedAnalyticsPanel'));
-const IntegrationsPanel = lazy(() => import('../components/dashboard/panels/IntegrationsPanel'));
-const RiskMitigationPanel = lazy(() => import('../components/dashboard/panels/RiskMitigationPanel'));
-const FinancialReportingPanel = lazy(() => import('../components/dashboard/panels/FinancialReportingPanel'));
-const CustomizeLayoutPanel = lazy(() => import('../components/dashboard/panels/CustomizeLayoutPanel'));
-
-const CustomAlerts = lazy(() => import('../components/dashboard/CustomAlerts'));
+import TopCommandBar from '../components/dashboard/TopCommandBar';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
+import ProfitCorePanel from '../components/dashboard/ProfitCorePanel';
+import RiskActionPanel from '../components/dashboard/RiskActionPanel';
+import ControlPanel from '../components/dashboard/ControlPanel';
+const ExpandablePanel = lazy(() => import('../components/dashboard/ExpandablePanel'));
 
 export default function Home() {
   const resolver = usePlatformResolver();
@@ -383,7 +359,6 @@ export default function Home() {
   }, [authTenantId, queryClient, dashboardSummaryKey, profitLeaksKey]);
 
   // Extract from summary for immediate display
-  const isDemoMode = dashboardSummary?.isDemoMode ?? true;
   const displayProfitLeaks = isEmbedded ? (dashboardSummary?.profitLeaks || []) : profitLeaks;
   const metrics = dashboardSummary?.metrics || {
     totalRevenue: 0,
@@ -394,6 +369,8 @@ export default function Home() {
     pendingAlerts: 0
   };
   const profitScore = dashboardSummary?.profitScore || 0;
+  const visibleAlerts = (dashboardSummary?.alerts || []).slice(0, 3);
+  const aiStatus = dashboardSummary?.lastSyncAt ? 'Active' : 'Idle';
 
   useEffect(() => {
     if (!authTenantId || !dashboardSummary) return;
@@ -435,19 +412,6 @@ export default function Home() {
       toast.error(error.message || 'Sync failed');
     }
   });
-
-  const handleSync = useCallback(withUiGuard(() => syncMutation.mutate(), () => toast.error('Sync failed')), [syncMutation]);
-  const handleScan = useCallback(() => {
-    if (!syncMutation.isPending) {
-      syncMutation.mutate();
-    }
-  }, [syncMutation]);
-  const handleExport = useCallback(withUiGuard(() => {
-    navigate(createPageUrl('PnLAnalytics', location.search));
-  }, () => toast.error('Could not open analytics')), [navigate, location.search]);
-  const handleSecurity = useCallback(withUiGuard(() => {
-    navigate(createPageUrl('Intelligence', location.search));
-  }, () => toast.error('Could not open risk page')), [navigate, location.search]);
 
   // Autonomous recovery path: as soon as a store is available, run one bounded
   // bootstrap to register webhooks, drain queue, and sync orders without waiting
@@ -554,160 +518,42 @@ export default function Home() {
       )}
 
       <div className="min-h-full flex flex-col">
-        {/* Executive Summary Bar - Critical above-the-fold */}
-        <ExecutiveSummaryBar 
-          tenant={displayTenant}
+        <TopCommandBar
+          profitScore={profitScore}
           metrics={metrics}
-          onSync={handleSync}
-          onScan={handleScan}
-          onExport={handleExport}
-          onSecurity={handleSecurity}
-          syncing={syncMutation.isPending}
-          isDemo={isDemoMode}
+          alerts={visibleAlerts}
+          aiStatus={aiStatus}
+          lastActionAt={dashboardSummary?.lastSyncAt}
         />
 
-        {/* Main Grid */}
-        <div className="flex-1 space-y-3">
-
-          {/* 1️⃣ AI Profit Operating System — instant, above-the-fold */}
-          <AIProfitOperatingSystem
-            metrics={metrics}
-            profitScore={profitScore}
-            loading={summaryLoading}
+        <div className="mt-3 flex-1">
+          <DashboardLayout
+            left={(
+              <ControlPanel
+                integrationStatus={dashboardSummary?.integrationStatus}
+                aiStatus={aiStatus}
+              />
+            )}
+            center={(
+              <ProfitCorePanel
+                metrics={metrics}
+                orders={dashboardSummary?.orders || []}
+              />
+            )}
+            right={(
+              <RiskActionPanel
+                alerts={visibleAlerts}
+                profitLeaks={displayProfitLeaks}
+                metrics={metrics}
+                integrationStatus={dashboardSummary?.integrationStatus}
+              />
+            )}
+            bottom={(
+              <Suspense fallback={null}>
+                <ExpandablePanel tenantId={authTenantId} />
+              </Suspense>
+            )}
           />
-          <WelcomeChecklist />
-
-          {/* 2️⃣ Autonomous Profit Guard */}
-          <Suspense fallback={<PanelSkeleton />}>
-            <AutonomousProfitGuard
-              metrics={metrics}
-              profitLeaks={displayProfitLeaks}
-              alerts={dashboardSummary?.alerts || []}
-              loading={summaryLoading}
-            />
-          </Suspense>
-
-          {/* 3️⃣ AI Profit Intelligence Summary */}
-          <Suspense fallback={<PanelSkeleton />}>
-            <AIProfitIntelligenceSummary
-              metrics={metrics}
-              profitLeaks={displayProfitLeaks}
-              loading={summaryLoading}
-            />
-          </Suspense>
-
-          {/* Predictive Intelligence Overview */}
-          <Suspense fallback={<PanelSkeleton />}>
-            <PredictiveOverviewBar tenant={tenant} metrics={metrics} />
-          </Suspense>
-
-          <div className="flex h-full gap-3 lg:gap-4">
-            <div className="flex-1 min-w-0">
-              {/* Row 1: Core profit metrics */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <ProfitHealthPanel metrics={metrics} loading={false} />
-                </Suspense>
-                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
-                  <RiskCommandPanel metrics={metrics} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <MarginLeakPanel leaks={displayProfitLeaks} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-              </div>
-
-              {/* Row 2: AI Alerts + Opportunities + Forecast */}
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AIAlerts alerts={dashboardSummary?.alerts || []} loading={summaryLoading} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AIOpportunities metrics={metrics} profitLeaks={displayProfitLeaks} loading={summaryLoading} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <ProfitForecast metrics={metrics} loading={summaryLoading} />
-                </Suspense>
-              </div>
-
-              {/* Row 3: Advanced Analytics + Alerts & Tasks + Cashflow */}
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AdvancedAnalyticsPanel metrics={metrics} loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<div className="h-48 bg-slate-800/40 rounded-lg animate-pulse" />}>
-                  <AlertsPanel alerts={dashboardSummary?.alerts || []} loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CashflowPanel metrics={metrics} loading={false} />
-                </Suspense>
-              </div>
-
-              {/* Row 4: Fraud + AI Automations + Integrations + Reports */}
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <Suspense fallback={<PanelSkeleton />}>
-                  <SecurityPanel loading={false} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AIAutomationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <IntegrationsPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <RiskMitigationPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <FinancialReportingPanel loading={false} isDemo={isDemoMode} />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CustomizeLayoutPanel loading={false} />
-                </Suspense>
-              </div>
-
-              {/* Connect Store CTA */}
-              {isDemoMode && (
-                <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 backdrop-blur-sm">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <Sparkles className="w-5 h-5 text-indigo-400" />
-                      <div>
-                        <p className="font-medium text-indigo-300">Demo Mode Active</p>
-                        <p className="text-sm text-slate-500">Connect your store for live AI intelligence</p>
-                      </div>
-                    </div>
-                    <Link to={createPageUrl('Integrations', location.search)}>
-                      <Button className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30">
-                        Connect Store
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Side Rail - Lazy loaded */}
-            <div className="hidden xl:block w-80 flex-shrink-0 space-y-3">
-              <div className="sticky top-0 space-y-3">
-                {/* Autonomous Insight Engine - always visible */}
-                <Suspense fallback={<PanelSkeleton />}>
-                  <AutonomousInsightEngine
-                    metrics={metrics}
-                    alerts={dashboardSummary?.alerts || []}
-                    profitLeaks={displayProfitLeaks}
-                  />
-                </Suspense>
-                <Suspense fallback={<PanelSkeleton />}>
-                  <CEOInsightsPanel tenantId={authTenantId} metrics={metrics} />
-                </Suspense>
-                {resolver?.user?.id && (
-                  <Suspense fallback={<PanelSkeleton />}>
-                    <CustomAlerts tenantId={authTenantId} userId={resolver.user.id} />
-                  </Suspense>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </SubscriptionGate>

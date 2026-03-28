@@ -6,9 +6,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Mail, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 
 const riskColors = {
-  low: 'bg-emerald-100 text-emerald-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-red-100 text-red-700'
+  low: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300',
+  medium: 'border-amber-500/20 bg-amber-500/10 text-amber-300',
+  high: 'border-red-500/20 bg-red-500/10 text-red-300'
 };
 
 export default function CustomerTable({ customers, loading, onCustomerClick, onAction }) {
@@ -33,26 +33,26 @@ export default function CustomerTable({ customers, loading, onCustomerClick, onA
   return (
     <Table>
       <TableHeader>
-        <TableRow>
-          <TableHead>Customer</TableHead>
-          <TableHead className="text-right">Orders</TableHead>
-          <TableHead className="text-right">Total Spent</TableHead>
-          <TableHead className="text-right">Profit</TableHead>
-          <TableHead className="text-center">Risk</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+        <TableRow className="border-white/8 hover:bg-transparent">
+          <TableHead className="text-slate-300">Customer</TableHead>
+          <TableHead className="text-right text-slate-300">Orders</TableHead>
+          <TableHead className="text-right text-slate-300">Total Spent</TableHead>
+          <TableHead className="text-right text-slate-300">Profit</TableHead>
+          <TableHead className="text-center text-slate-300">Risk</TableHead>
+          <TableHead className="text-right text-slate-300">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {customers.map((customer) => (
           <TableRow 
             key={customer.id} 
-            className="cursor-pointer hover:bg-slate-50"
+            className="cursor-pointer border-white/8 hover:bg-white/[0.03]"
             onClick={() => onCustomerClick?.(customer)}
           >
             <TableCell>
               <div>
-                <p className="font-medium text-slate-900">{customer.name || 'Unknown'}</p>
-                <p className="text-sm text-slate-500">{customer.email}</p>
+                <p className="font-medium text-slate-100">{customer.name || 'Unknown'}</p>
+                <p className="text-sm text-slate-400">{customer.email}</p>
               </div>
             </TableCell>
             <TableCell className="text-right font-medium">{customer.total_orders}</TableCell>
@@ -63,7 +63,7 @@ export default function CustomerTable({ customers, loading, onCustomerClick, onA
               </span>
             </TableCell>
             <TableCell className="text-center">
-              <Badge className={riskColors[customer.risk_profile || 'low']}>
+              <Badge className={`border ${riskColors[customer.risk_profile || 'low']}`}>
                 {customer.risk_profile === 'high' && <AlertTriangle className="w-3 h-3 mr-1" />}
                 {customer.risk_profile || 'low'}
               </Badge>

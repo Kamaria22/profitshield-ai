@@ -1,7 +1,7 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, Gift, Mail } from 'lucide-react';
+import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, Gift } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 export default function SegmentInsightsCard({ segment, customers }) {
   if (!customers?.length) return null;
@@ -74,28 +74,28 @@ export default function SegmentInsightsCard({ segment, customers }) {
   }
 
   const typeColors = {
-    positive: 'border-emerald-200 bg-emerald-50',
-    negative: 'border-red-200 bg-red-50',
-    warning: 'border-amber-200 bg-amber-50',
-    neutral: 'border-slate-200 bg-slate-50'
+    positive: 'border-emerald-500/20 bg-emerald-500/10',
+    negative: 'border-red-500/20 bg-red-500/10',
+    warning: 'border-amber-500/20 bg-amber-500/10',
+    neutral: 'border-white/10 bg-white/[0.03]'
   };
 
   const iconColors = {
-    positive: 'text-emerald-600',
-    negative: 'text-red-600',
-    warning: 'text-amber-600',
-    neutral: 'text-slate-600'
+    positive: 'text-emerald-300',
+    negative: 'text-red-300',
+    warning: 'text-amber-300',
+    neutral: 'text-slate-300'
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Lightbulb className="w-5 h-5 text-amber-500" />
+    <CommandCard>
+      <CommandCardHeader className="pb-3">
+        <CommandCardTitle className="text-base flex items-center gap-2">
+          <Lightbulb className="w-5 h-5 text-amber-300" />
           Segment Insights
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        </CommandCardTitle>
+      </CommandCardHeader>
+      <CommandCardContent className="space-y-3">
         {insights.map((insight, idx) => {
           const Icon = insight.icon;
           return (
@@ -103,9 +103,9 @@ export default function SegmentInsightsCard({ segment, customers }) {
               <div className="flex items-start gap-3">
                 <Icon className={`w-5 h-5 mt-0.5 ${iconColors[insight.type]}`} />
                 <div className="flex-1">
-                  <p className="font-medium text-slate-900">{insight.title}</p>
-                  <p className="text-sm text-slate-600 mt-0.5">{insight.description}</p>
-                  <Badge variant="outline" className="mt-2 text-xs">
+                  <p className="font-medium text-slate-100">{insight.title}</p>
+                  <p className="mt-0.5 text-sm text-slate-300">{insight.description}</p>
+                  <Badge variant="outline" className="mt-2 border-white/10 text-xs text-slate-300">
                     Suggested: {insight.action}
                   </Badge>
                 </div>
@@ -113,7 +113,7 @@ export default function SegmentInsightsCard({ segment, customers }) {
             </div>
           );
         })}
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

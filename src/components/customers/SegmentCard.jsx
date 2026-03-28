@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Users, DollarSign, TrendingUp, MoreVertical, Mail, Tag, Trash2 } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,15 +14,15 @@ export default function SegmentCard({ segment, onView, onAction, onDelete }) {
   const formatCurrency = (val) => `$${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView(segment)}>
-      <CardHeader className="pb-2">
+    <CommandCard className="cursor-pointer" onClick={() => onView(segment)}>
+      <CommandCardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <div 
               className="w-3 h-3 rounded-full" 
               style={{ backgroundColor: segment.color || '#6366f1' }}
             />
-            <CardTitle className="text-base">{segment.name}</CardTitle>
+            <CommandCardTitle className="text-base">{segment.name}</CommandCardTitle>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -49,23 +49,23 @@ export default function SegmentCard({ segment, onView, onAction, onDelete }) {
           </DropdownMenu>
         </div>
         {segment.description && (
-          <p className="text-sm text-slate-500 mt-1">{segment.description}</p>
+          <p className="mt-1 text-sm text-slate-400">{segment.description}</p>
         )}
-      </CardHeader>
-      <CardContent>
+      </CommandCardHeader>
+      <CommandCardContent>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 text-slate-500 mb-1">
               <Users className="w-4 h-4" />
             </div>
-            <p className="text-xl font-bold text-slate-900">{segment.customer_count || 0}</p>
+            <p className="text-xl font-bold text-slate-100">{segment.customer_count || 0}</p>
             <p className="text-xs text-slate-500">Customers</p>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 text-slate-500 mb-1">
               <DollarSign className="w-4 h-4" />
             </div>
-            <p className="text-xl font-bold text-slate-900">{formatCurrency(segment.total_revenue)}</p>
+            <p className="text-xl font-bold text-slate-100">{formatCurrency(segment.total_revenue)}</p>
             <p className="text-xs text-slate-500">Revenue</p>
           </div>
           <div className="text-center">
@@ -77,9 +77,9 @@ export default function SegmentCard({ segment, onView, onAction, onDelete }) {
           </div>
         </div>
         {segment.is_system && (
-          <Badge variant="outline" className="mt-3 text-xs">System Segment</Badge>
+          <Badge variant="outline" className="mt-3 border-white/10 text-xs text-slate-300">System Segment</Badge>
         )}
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

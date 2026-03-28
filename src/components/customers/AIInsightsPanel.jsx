@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,11 +7,12 @@ import {
   Loader2, RefreshCw, Target, Shield, Copy, Check
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 const churnColors = {
-  low: 'bg-emerald-100 text-emerald-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-red-100 text-red-700'
+  low: 'bg-emerald-500/10 text-emerald-300',
+  medium: 'bg-amber-500/10 text-amber-300',
+  high: 'bg-red-500/10 text-red-300'
 };
 
 export default function AIInsightsPanel({ segment, customers }) {
@@ -77,18 +77,19 @@ export default function AIInsightsPanel({ segment, customers }) {
   }
 
   return (
-    <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50">
-      <CardHeader className="pb-3">
+    <CommandCard>
+      <CommandCardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-500" />
+          <CommandCardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[#00E5FF]" />
             AI-Powered Insights
-          </CardTitle>
+          </CommandCardTitle>
           <Button 
             size="sm" 
             onClick={generateAnalysis} 
             disabled={loading}
-            variant={analysis ? "outline" : "default"}
+            variant="outline"
+            className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -100,17 +101,17 @@ export default function AIInsightsPanel({ segment, customers }) {
             {loading ? 'Analyzing...' : analysis ? 'Refresh' : 'Generate Insights'}
           </Button>
         </div>
-      </CardHeader>
+      </CommandCardHeader>
       
-      <CardContent>
+      <CommandCardContent>
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
         {!analysis && !loading && !error && (
-          <p className="text-sm text-slate-500 text-center py-4">
+          <p className="py-4 text-center text-sm text-slate-400">
             Click "Generate Insights" to get AI-powered marketing recommendations, 
             churn predictions, and upsell opportunities for this segment.
           </p>
@@ -135,12 +136,12 @@ export default function AIInsightsPanel({ segment, customers }) {
 
             {/* Email Campaigns Tab */}
             <TabsContent value="campaigns" className="space-y-3 mt-3">
-              <div className="p-3 bg-white rounded-lg border">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <Tag className="w-4 h-4 text-indigo-500" />
                   <span className="font-medium text-sm">Recommended Offer</span>
                 </div>
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-slate-100">
                   {analysis.discount_strategy?.offer_type}: {analysis.discount_strategy?.discount_amount}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">{analysis.discount_strategy?.conditions}</p>
@@ -148,11 +149,11 @@ export default function AIInsightsPanel({ segment, customers }) {
               </div>
 
               {analysis.email_campaigns?.map((campaign, idx) => (
-                <div key={idx} className="p-3 bg-white rounded-lg border">
+                <div key={idx} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">"{campaign.subject_line}"</p>
-                      <p className="text-xs text-slate-600 mt-1">{campaign.description}</p>
+                      <p className="text-sm font-medium text-slate-100">"{campaign.subject_line}"</p>
+                      <p className="mt-1 text-xs text-slate-300">{campaign.description}</p>
                       <div className="flex gap-3 mt-2">
                         <span className="text-xs text-slate-500">
                           Best time: {campaign.best_send_time}
@@ -181,9 +182,9 @@ export default function AIInsightsPanel({ segment, customers }) {
 
             {/* Churn Analysis Tab */}
             <TabsContent value="churn" className="mt-3">
-              <div className="p-4 bg-white rounded-lg border">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="font-medium">Churn Risk Level</span>
+                  <span className="font-medium text-slate-100">Churn Risk Level</span>
                   <Badge className={churnColors[analysis.churn_analysis?.risk_level?.toLowerCase()] || churnColors.medium}>
                     {analysis.churn_analysis?.risk_level}
                   </Badge>
@@ -194,7 +195,7 @@ export default function AIInsightsPanel({ segment, customers }) {
                     <span className="text-slate-500">Risk Score</span>
                     <span className="font-medium">{analysis.churn_analysis?.risk_score}/10</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div 
                       className={`h-full rounded-full ${
                         analysis.churn_analysis?.risk_score <= 3 ? 'bg-emerald-500' :
@@ -205,7 +206,7 @@ export default function AIInsightsPanel({ segment, customers }) {
                   </div>
                 </div>
 
-                <p className="text-sm text-slate-600 mb-3">{analysis.churn_analysis?.reasoning}</p>
+                <p className="mb-3 text-sm text-slate-300">{analysis.churn_analysis?.reasoning}</p>
 
                 <div>
                   <p className="text-xs font-medium text-slate-500 mb-2">Key Indicators:</p>
@@ -223,10 +224,10 @@ export default function AIInsightsPanel({ segment, customers }) {
             {/* Retention Strategies Tab */}
             <TabsContent value="retention" className="space-y-3 mt-3">
               {analysis.retention_strategies?.map((strategy, idx) => (
-                <div key={idx} className="p-3 bg-white rounded-lg border">
-                  <p className="text-sm font-medium text-slate-900">{strategy.strategy}</p>
-                  <p className="text-xs text-slate-600 mt-1">{strategy.implementation}</p>
-                  <Badge variant="outline" className="mt-2 text-xs text-emerald-600">
+                        <div key={idx} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-sm font-medium text-slate-100">{strategy.strategy}</p>
+                  <p className="mt-1 text-xs text-slate-300">{strategy.implementation}</p>
+                  <Badge variant="outline" className="mt-2 border-white/10 text-xs text-emerald-300">
                     Impact: {strategy.expected_impact}
                   </Badge>
                 </div>
@@ -236,13 +237,13 @@ export default function AIInsightsPanel({ segment, customers }) {
             {/* Upsell Opportunities Tab */}
             <TabsContent value="upsell" className="space-y-3 mt-3">
               {analysis.upsell_opportunities?.map((opp, idx) => (
-                <div key={idx} className="p-3 bg-white rounded-lg border">
+                <div key={idx} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                   <div className="flex items-start gap-2">
                     <Target className="w-4 h-4 text-indigo-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{opp.opportunity}</p>
-                      <p className="text-xs text-slate-600 mt-1">{opp.approach}</p>
-                      <p className="text-xs text-emerald-600 mt-1 font-medium">
+                      <p className="text-sm font-medium text-slate-100">{opp.opportunity}</p>
+                      <p className="mt-1 text-xs text-slate-300">{opp.approach}</p>
+                      <p className="mt-1 text-xs font-medium text-emerald-300">
                         Potential: {opp.potential_revenue_increase}
                       </p>
                     </div>
@@ -274,7 +275,7 @@ export default function AIInsightsPanel({ segment, customers }) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

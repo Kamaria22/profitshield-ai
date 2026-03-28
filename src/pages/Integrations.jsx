@@ -31,6 +31,7 @@ import { parseQuery, getPersistedContext, hardResetAllContexts, createPageUrl } 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { invokeWithRetry } from '@/lib/safeApi';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -522,26 +523,26 @@ export default function Integrations() {
 
   if (status === RESOLVER_STATUS.RESOLVING) {
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="pt-6 text-center">
+      <div className="space-y-4">
+        <CommandCard>
+          <CommandCardContent className="pt-6 text-center">
             <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-400 mb-4" />
-            <p className="text-slate-600">Loading...</p>
-          </CardContent>
-        </Card>
+            <p className="text-slate-400">Loading...</p>
+          </CommandCardContent>
+        </CommandCard>
       </div>
     );
   }
 
   if (!tenantId && status !== RESOLVER_STATUS.RESOLVING) {
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="pt-6 text-center">
+      <div className="space-y-4">
+        <CommandCard>
+          <CommandCardContent className="pt-6 text-center">
             <AlertTriangle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
-            <p className="text-slate-600">No store connected. Please connect a platform first.</p>
-          </CardContent>
-        </Card>
+            <p className="text-slate-400">No store connected. Please connect a platform first.</p>
+          </CommandCardContent>
+        </CommandCard>
       </div>
     );
   }
@@ -549,20 +550,11 @@ export default function Integrations() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.45rem] px-4 py-3">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.16),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CommandCard className="px-4 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-              Integration Control Plane
-            </span>
-            <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
-              {integrations.length} connected runtime{integrations.length === 1 ? '' : 's'}
-            </span>
-          </div>
           <h1 className="text-[1.85rem] font-semibold text-white">Platform Integrations</h1>
-          <p className="mt-1.5 text-slate-400">Connect e-commerce platforms for two-way order sync, webhook registration, and risk scoring</p>
+          <p className="mt-1 text-slate-400">Connect e-commerce platforms for order sync, webhook registration, and risk scoring.</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
@@ -787,76 +779,76 @@ export default function Integrations() {
         </Dialog>
         </div>
         </div>
-      </div>
+      </CommandCard>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
+        <CommandCard>
+          <CommandCardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-100">
-                <Link2 className="w-5 h-5 text-emerald-600" />
+              <div className="rounded-lg bg-emerald-500/10 p-2">
+                <Link2 className="w-5 h-5 text-emerald-300" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Connected</p>
-                <p className="text-2xl font-bold">{integrations.filter(i => isSyncRecoverable(i)).length}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Connected</p>
+                <p className="text-2xl font-bold text-slate-100">{integrations.filter(i => isSyncRecoverable(i)).length}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
+          </CommandCardContent>
+        </CommandCard>
+        <CommandCard>
+          <CommandCardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <RefreshCw className="w-5 h-5 text-blue-600" />
+              <div className="rounded-lg bg-blue-500/10 p-2">
+                <RefreshCw className="w-5 h-5 text-blue-300" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Syncs Today</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Syncs Today</p>
+                <p className="text-2xl font-bold text-slate-100">
                   {syncJobs.filter(j => new Date(j.created_date).toDateString() === new Date().toDateString()).length}
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
+          </CommandCardContent>
+        </CommandCard>
+        <CommandCard>
+          <CommandCardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <Webhook className="w-5 h-5 text-purple-600" />
+              <div className="rounded-lg bg-purple-500/10 p-2">
+                <Webhook className="w-5 h-5 text-purple-300" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Active Webhooks</p>
-                <p className="text-2xl font-bold">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Active Webhooks</p>
+                <p className="text-2xl font-bold text-slate-100">
                   {integrations.reduce((sum, i) => sum + Object.keys(i.webhook_endpoints || {}).length, 0)}
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
+          </CommandCardContent>
+        </CommandCard>
+        <CommandCard>
+          <CommandCardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-100">
-                <Shield className="w-5 h-5 text-amber-600" />
+              <div className="rounded-lg bg-amber-500/10 p-2">
+                <Shield className="w-5 h-5 text-amber-300" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Two-Way Sync</p>
-                <p className="text-2xl font-bold">{integrations.filter(i => i.two_way_sync?.enabled).length}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Two-Way Sync</p>
+                <p className="text-2xl font-bold text-slate-100">{integrations.filter(i => i.two_way_sync?.enabled).length}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </CommandCardContent>
+        </CommandCard>
       </div>
 
       {/* Sync Status Overview */}
       {integrations.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
+        <CommandCard>
+          <CommandCardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Sync Status Overview</CardTitle>
-                <CardDescription>Quick view of all platform sync statuses</CardDescription>
+                <CommandCardTitle className="text-lg">Sync Status Overview</CommandCardTitle>
+                <CommandCardDescription>Quick view of all platform sync statuses</CommandCardDescription>
               </div>
               <Button
                 variant="outline"
@@ -876,8 +868,8 @@ export default function Integrations() {
                 Sync All
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
+          </CommandCardHeader>
+          <CommandCardContent>
             <div className="grid gap-3">
               {integrations.map((integration) => {
                 const platformInfo = PLATFORM_INFO[integration.platform] || {};
@@ -888,7 +880,7 @@ export default function Integrations() {
                 return (
                   <div 
                     key={integration.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-slate-50/50"
+                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-4"
                   >
                     <div className="flex items-center gap-4">
                       <div className={`p-2 rounded-lg ${platformInfo.color || 'bg-gray-500'}`}>
@@ -899,7 +891,7 @@ export default function Integrations() {
                           <p className="font-medium">{integration.store_name || integration.store_key}</p>
                           {getStatusBadge(integration.status)}
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+                        <div className="mt-1 flex items-center gap-3 text-sm text-slate-500">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {lastSync ? (
@@ -912,8 +904,8 @@ export default function Integrations() {
                           </span>
                           {syncStatus && (
                             <span className={`flex items-center gap-1 ${
-                              syncStatus === 'success' ? 'text-green-600' :
-                              syncStatus === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                              syncStatus === 'success' ? 'text-emerald-300' :
+                              syncStatus === 'failed' ? 'text-red-300' : 'text-amber-300'
                             }`}>
                               {syncStatus === 'success' ? <CheckCircle className="w-3 h-3" /> :
                                syncStatus === 'failed' ? <XCircle className="w-3 h-3" /> :
@@ -989,8 +981,8 @@ export default function Integrations() {
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </CommandCardContent>
+        </CommandCard>
       )}
 
       {/* Main Tabs */}
@@ -1401,36 +1393,36 @@ export default function Integrations() {
                   </div>
                   
                   {selfTestResult.error ? (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
                       {selfTestResult.error}
                     </div>
                   ) : (
                     <>
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="p-3 bg-slate-50 rounded-lg">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                           <p className="text-slate-500 text-xs">Priority</p>
-                          <p className="font-medium">{selfTestResult.chosenPriority || 'None'}</p>
+                          <p className="font-medium text-slate-100">{selfTestResult.chosenPriority || 'None'}</p>
                         </div>
-                        <div className="p-3 bg-slate-50 rounded-lg">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                           <p className="text-slate-500 text-xs">Reason</p>
-                          <p className="font-medium">{selfTestResult.reason || 'None'}</p>
+                          <p className="font-medium text-slate-100">{selfTestResult.reason || 'None'}</p>
                         </div>
-                        <div className="p-3 bg-slate-50 rounded-lg">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                           <p className="text-slate-500 text-xs">Platform</p>
-                          <p className="font-medium">{selfTestResult.resolvedPlatform || 'None'}</p>
+                          <p className="font-medium text-slate-100">{selfTestResult.resolvedPlatform || 'None'}</p>
                         </div>
-                        <div className="p-3 bg-slate-50 rounded-lg">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                           <p className="text-slate-500 text-xs">Store Key</p>
-                          <p className="font-medium truncate">{selfTestResult.resolvedStoreKey || 'None'}</p>
+                          <p className="truncate font-medium text-slate-100">{selfTestResult.resolvedStoreKey || 'None'}</p>
                         </div>
                       </div>
                       
                       {selfTestResult.flags && Object.values(selfTestResult.flags).some(Boolean) && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-sm font-medium text-amber-800 mb-2">Flags Detected:</p>
+                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                          <p className="mb-2 text-sm font-medium text-amber-300">Flags Detected:</p>
                           <div className="flex flex-wrap gap-2">
                             {Object.entries(selfTestResult.flags).filter(([_, v]) => v).map(([key]) => (
-                              <Badge key={key} variant="outline" className="text-amber-700 border-amber-300">
+                              <Badge key={key} variant="outline" className="border-amber-500/20 text-amber-200">
                                 {key.replace(/_/g, ' ')}
                               </Badge>
                             ))}
@@ -1474,14 +1466,14 @@ export default function Integrations() {
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="p-3 bg-slate-50 rounded-lg text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
                 <p className="font-medium mb-2">Current State:</p>
                 <p>Tenant ID: {tenantId ? `${tenantId.slice(0, 8)}...` : 'None'}</p>
                 <p>Integrations: {integrations.length}</p>
                 <p>Connected: {integrations.filter(i => isSyncRecoverable(i)).length}</p>
               </div>
               
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300">
                 <p className="font-medium">Warning:</p>
                 <p>Only use this if you're experiencing resolver issues. This will create missing records.</p>
               </div>

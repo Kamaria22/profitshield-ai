@@ -27,6 +27,7 @@ import CreateSegmentDialog from '@/components/customers/CreateSegmentDialog';
 import SegmentInsightsCard from '@/components/customers/SegmentInsightsCard';
 import AIInsightsPanel from '@/components/customers/AIInsightsPanel';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
+import { CommandCard } from '@/components/ui/command-card';
 
 export default function Customers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -246,9 +247,8 @@ export default function Customers() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.45rem] px-4 py-3">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.16),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <CommandCard className="px-4 py-4">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           {selectedSegment && (
             <Button variant="ghost" size="icon" onClick={() => setSelectedSegment(null)}>
@@ -256,14 +256,6 @@ export default function Customers() {
             </Button>
           )}
           <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-100">
-                Customer Intelligence Mesh
-              </span>
-              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                {summaryStats.totalCustomers} tracked customers
-              </span>
-            </div>
             <h1 className="text-[1.85rem] font-semibold text-white">
               {selectedSegment ? selectedSegment.name : 'Customer Segments'}
             </h1>
@@ -281,7 +273,7 @@ export default function Customers() {
           </Button>
         )}
         </div>
-      </div>
+      </CommandCard>
 
       {/* Summary Stats */}
       {!selectedSegment && (
@@ -294,7 +286,7 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-100">{summaryStats.totalCustomers}</p>
-                  <p className="text-sm text-slate-400">Total Customers</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Total Customers</p>
                 </div>
               </div>
             </CardContent>
@@ -307,7 +299,7 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-100">{formatCurrency(summaryStats.totalRevenue)}</p>
-                  <p className="text-sm text-slate-400">Total Revenue</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Total Revenue</p>
                 </div>
               </div>
             </CardContent>
@@ -320,7 +312,7 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-100">{formatCurrency(summaryStats.totalProfit)}</p>
-                  <p className="text-sm text-slate-400">Total Profit</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Total Profit</p>
                 </div>
               </div>
             </CardContent>
@@ -333,7 +325,7 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-100">{summaryStats.highRiskCount}</p>
-                  <p className="text-sm text-slate-400">High Risk</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">High Risk</p>
                 </div>
               </div>
             </CardContent>
@@ -343,8 +335,8 @@ export default function Customers() {
 
       {/* Main Content */}
       {selectedSegment ? (
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -362,7 +354,7 @@ export default function Customers() {
                 <Tag className="w-4 h-4 mr-2" /> Create Discount
               </Button>
             </div>
-            <Card>
+            <CommandCard>
               <CardContent className="p-0">
                 <CustomerTable 
                   customers={displayedCustomers}
@@ -370,7 +362,7 @@ export default function Customers() {
                   onAction={handleCustomerAction}
                 />
               </CardContent>
-            </Card>
+            </CommandCard>
           </div>
           <div className="space-y-4">
             <AIInsightsPanel segment={selectedSegment} customers={displayedCustomers} />
@@ -390,13 +382,13 @@ export default function Customers() {
                 {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48" />)}
               </div>
             ) : segmentsWithStats.length === 0 ? (
-              <Card className="py-12 text-center">
+              <CommandCard className="py-12 text-center">
                 <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                 <p className="text-slate-500">No segments created yet</p>
                 <Button className="mt-4" onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" /> Create Your First Segment
                 </Button>
-              </Card>
+              </CommandCard>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {segmentsWithStats.map(segment => (
@@ -423,7 +415,7 @@ export default function Customers() {
                   className="pl-10"
                 />
               </div>
-              <Card>
+              <CommandCard>
                 <CardContent className="p-0">
                   <CustomerTable 
                     customers={displayedCustomers}
@@ -431,7 +423,7 @@ export default function Customers() {
                     onAction={handleCustomerAction}
                   />
                 </CardContent>
-              </Card>
+              </CommandCard>
             </div>
           </TabsContent>
         </Tabs>

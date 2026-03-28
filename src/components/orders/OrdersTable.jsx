@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import AIOrderInsightsBadge from './AIOrderInsightsBadge';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 const riskBadgeConfig = {
   low: { variant: 'outline', className: 'border-emerald-200 text-emerald-700 bg-emerald-50' },
@@ -58,44 +59,44 @@ const statusBadgeConfig = {
 export default function OrdersTable({ orders, loading, onOrderClick }) {
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-slate-200">
-        <div className="animate-pulse p-4">
+      <CommandCard>
+        <CommandCardContent className="animate-pulse pt-4">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex gap-4 py-4 border-b border-slate-100 last:border-0">
-              <div className="h-4 bg-slate-200 rounded w-24" />
-              <div className="h-4 bg-slate-200 rounded w-32" />
-              <div className="h-4 bg-slate-200 rounded w-20" />
-              <div className="h-4 bg-slate-200 rounded w-16" />
-              <div className="h-4 bg-slate-200 rounded w-20" />
+            <div key={i} className="flex gap-4 border-b border-white/8 py-4 last:border-0">
+              <div className="h-4 w-24 rounded bg-white/10" />
+              <div className="h-4 w-32 rounded bg-white/10" />
+              <div className="h-4 w-20 rounded bg-white/10" />
+              <div className="h-4 w-16 rounded bg-white/10" />
+              <div className="h-4 w-20 rounded bg-white/10" />
             </div>
           ))}
-        </div>
-      </div>
+        </CommandCardContent>
+      </CommandCard>
     );
   }
 
   if (!orders || orders.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-        <p className="text-slate-500">No orders found</p>
-      </div>
+      <CommandCard className="p-12 text-center">
+        <p className="text-slate-400">No orders found</p>
+      </CommandCard>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <CommandCard className="overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-slate-50">
-            <TableHead className="font-semibold">Order</TableHead>
-            <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="font-semibold">Customer</TableHead>
-            <TableHead className="font-semibold text-right">Revenue</TableHead>
-            <TableHead className="font-semibold text-right">Net Profit</TableHead>
-            <TableHead className="font-semibold text-right">Margin</TableHead>
-            <TableHead className="font-semibold">Risk</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">AI</TableHead>
+          <TableRow className="border-white/8 bg-white/[0.03] hover:bg-white/[0.03]">
+            <TableHead className="font-semibold text-slate-300">Order</TableHead>
+            <TableHead className="font-semibold text-slate-300">Date</TableHead>
+            <TableHead className="font-semibold text-slate-300">Customer</TableHead>
+            <TableHead className="text-right font-semibold text-slate-300">Revenue</TableHead>
+            <TableHead className="text-right font-semibold text-slate-300">Net Profit</TableHead>
+            <TableHead className="text-right font-semibold text-slate-300">Margin</TableHead>
+            <TableHead className="font-semibold text-slate-300">Risk</TableHead>
+            <TableHead className="font-semibold text-slate-300">Status</TableHead>
+            <TableHead className="font-semibold text-slate-300">AI</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -108,7 +109,7 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
             return (
               <TableRow 
                 key={order.id} 
-                className="cursor-pointer hover:bg-slate-50 transition-colors"
+                className="cursor-pointer border-white/8 transition-colors hover:bg-white/[0.03]"
                 onClick={() => onOrderClick?.(order)}
               >
                 <TableCell className="font-medium">
@@ -119,13 +120,13 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-slate-500">
+                <TableCell className="text-slate-400">
                   {order.order_date ? format(new Date(order.order_date), 'MMM d, yyyy') : '-'}
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="font-medium text-slate-900">{order.customer_name || 'Guest'}</p>
-                    <p className="text-sm text-slate-500">{order.customer_email}</p>
+                    <p className="font-medium text-slate-100">{order.customer_name || 'Guest'}</p>
+                    <p className="text-sm text-slate-400">{order.customer_email}</p>
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-medium">
@@ -159,7 +160,7 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                               {order.fraud_score}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center justify-center w-10 h-6 rounded text-xs text-slate-400 bg-slate-100">
+                            <span className="inline-flex items-center justify-center w-10 h-6 rounded bg-white/[0.06] text-xs text-slate-400">
                               --
                             </span>
                           )}
@@ -213,6 +214,6 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
           })}
         </TableBody>
       </Table>
-    </div>
+    </CommandCard>
   );
 }

@@ -43,6 +43,7 @@ import OrderDetailPanel from '../components/orders/OrderDetailPanel';
 import OrderSearchBox from '../components/orders/OrderSearchBox';
 import OrderSyncStatus from '../components/orders/OrderSyncStatus';
 import DebugBanner from '../components/DebugBanner';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 export default function Orders() {
   const location = useLocation();
@@ -287,9 +288,9 @@ export default function Orders() {
   // No valid context - show Connect Store banner
   if (!canQuery || hasInvariantViolation || status === RESOLVER_STATUS.ERROR) {
     return (
-      <div className="space-y-6">
-        <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardContent className="py-8">
+      <div className="space-y-4">
+        <CommandCard className="border-amber-500/20 bg-amber-500/10">
+          <CommandCardContent className="py-8">
             <div className="flex flex-col items-center text-center">
               <div className="p-3 bg-amber-500/15 rounded-full mb-4">
                 <AlertTriangle className="w-8 h-8 text-amber-400" />
@@ -312,8 +313,8 @@ export default function Orders() {
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </CommandCardContent>
+        </CommandCard>
       </div>
     );
   }
@@ -333,7 +334,7 @@ export default function Orders() {
 
       {/* Test Order Indicator Banner */}
       {hasTestOrders && (
-        <div className="rounded-lg p-3 flex items-center justify-between" style={{background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.25)'}}>
+        <CommandCard className="p-3">
           <div className="flex items-center gap-2 text-sm text-indigo-300">
             <span className="text-lg">🧪</span>
             <span>{showTestOrders ? 'Showing test orders (Shopify reviewer mode)' : 'Test orders hidden'}</span>
@@ -344,27 +345,18 @@ export default function Orders() {
           >
             {showTestOrders ? 'Hide Test Orders' : 'Show Test Orders'}
           </button>
-        </div>
+        </CommandCard>
       )}
 
       {/* Header */}
-      <div className="future-panel future-grid relative overflow-hidden rounded-[1.45rem] px-4 py-3">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-56 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.14),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <CommandCard className="px-4 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                Order Command Layer
-              </span>
-              <span className="future-badge inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-                {stats.totalOrders} visible orders
-              </span>
-            </div>
             <h1 className="text-[1.85rem] font-semibold text-white">Orders</h1>
-            <p className="mt-1.5 text-slate-400">
+            <p className="mt-1 text-slate-400">
             View and analyze order profitability
             {tenantSettings?.demo_mode === false && (
-              <Badge variant="outline" className="ml-2 text-xs">Real orders only</Badge>
+              <Badge variant="outline" className="ml-2 border-white/10 text-xs text-slate-300">Real orders only</Badge>
             )}
             </p>
           </div>
@@ -375,21 +367,21 @@ export default function Orders() {
               onSynced={() => queryClient.invalidateQueries({ queryKey: ordersQueryKey })}
             />
             <div className="grid grid-cols-2 gap-2.5 sm:w-[272px]">
-              <div className="rounded-[1.1rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
+              <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
                 <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Risk exposure</p>
                 <p className={`mt-1 text-sm font-semibold ${stats.highRisk > 0 ? 'text-red-300' : 'text-emerald-200'}`}>{stats.highRisk > 0 ? `${stats.highRisk} high risk` : 'Controlled'}</p>
               </div>
-              <div className="rounded-[1.1rem] border border-white/8 bg-white/[0.03] px-3.5 py-2.5">
+              <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
                 <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Profit posture</p>
                 <p className={`mt-1 text-sm font-semibold ${stats.totalProfit >= 0 ? 'text-emerald-200' : 'text-red-300'}`}>{stats.totalProfit >= 0 ? 'Positive' : 'Negative'}</p>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </CommandCard>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="glass-card rounded-lg p-4">
           <p className="text-sm text-slate-400">Orders</p>
           <p className="text-2xl font-bold text-slate-100">{stats.totalOrders}</p>
@@ -408,20 +400,12 @@ export default function Orders() {
           <p className="text-sm text-slate-400">High Risk</p>
           <p className={`text-2xl font-bold ${stats.highRisk > 0 ? 'text-red-400' : 'text-slate-100'}`}>{stats.highRisk}</p>
         </div>
-        <div className="glass-card rounded-lg p-4">
-          <p className="text-sm text-slate-400">Avg Risk Score</p>
-          <div className="flex items-center gap-2">
-            <p className={`text-2xl font-bold ${stats.avgRiskScore >= 70 ? 'text-red-400' : stats.avgRiskScore >= 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {stats.avgRiskScore}
-            </p>
-            <span className="text-xs text-slate-500">/100</span>
-          </div>
-        </div>
       </div>
 
       {/* Risk Analysis Banner */}
       {stats.unscored > 0 && (
-        <div className="rounded-lg p-4 flex items-center justify-between" style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)'}}>
+        <CommandCard className="border-amber-500/20 bg-amber-500/10 p-4">
+          <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-5 h-5 text-amber-400" />
             <div>
@@ -440,7 +424,8 @@ export default function Orders() {
               <><Sparkles className="w-4 h-4 mr-2" /> Analyze Risk</>
             )}
           </Button>
-        </div>
+          </div>
+        </CommandCard>
       )}
 
       {/* Filters */}

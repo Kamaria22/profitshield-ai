@@ -80,10 +80,11 @@
 @layer utilities {
   /* 2080 Neural-glass card */
   .glass-card {
-    background: rgba(15, 20, 40, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
   }
 
   /* Neon edge glow variants */
@@ -145,32 +146,17 @@
 
   .future-panel {
     position: relative;
-    background:
-      linear-gradient(145deg, rgba(7, 14, 27, 0.92), rgba(14, 26, 45, 0.84)),
-      radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 30%);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    box-shadow:
-      0 20px 60px rgba(2, 6, 23, 0.48),
-      inset 0 1px 0 rgba(255,255,255,0.06),
-      0 0 0 1px rgba(14, 165, 233, 0.04);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-  }
-
-  .future-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent 28%, transparent 72%, rgba(56,189,248,0.04));
-    mix-blend-mode: screen;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .future-badge {
-    background: rgba(15, 23, 42, 0.72);
-    border: 1px solid rgba(125, 211, 252, 0.22);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: none;
   }
 
   .command-surface {
@@ -238,6 +224,47 @@
     background-size: 30px 30px;
     mask-image: radial-gradient(circle at top, black 24%, transparent 88%);
     opacity: 0.3;
+  }
+
+  .dashboard-panel {
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color 180ms ease, background-color 180ms ease;
+  }
+
+  .dashboard-panel:hover {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+  }
+
+  .dashboard-subpanel {
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .dashboard-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .dashboard-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f8fafc;
+  }
+
+  .dashboard-metric {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #f8fafc;
   }
 
   .orbital-ring {

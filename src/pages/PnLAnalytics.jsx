@@ -20,6 +20,7 @@ import PnLBreakdownChart from '@/components/analytics/PnLBreakdownChart';
 import PnLSegmentTable from '@/components/analytics/PnLSegmentTable';
 import OrderDrilldownPanel from '@/components/analytics/OrderDrilldownPanel';
 import AIOrderAnalysis from '@/components/analytics/AIOrderAnalysis';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 const POLL_INTERVAL_MS = 60 * 1000;
 const INVALIDATION_DEBOUNCE_MS = 2500;
@@ -276,7 +277,7 @@ export default function PnLAnalytics() {
   const isLoading = tenantLoading || ordersLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -359,25 +360,25 @@ export default function PnLAnalytics() {
           <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
         </div>
       ) : ordersError ? (
-        <Card className="border-red-300 bg-red-50/80">
-          <CardContent className="py-10 text-center">
+        <CommandCard className="border-red-500/20 bg-red-500/10">
+          <CommandCardContent className="py-10 text-center">
             <BarChart3 className="w-10 h-10 text-red-500 mx-auto mb-3" />
-            <p className="text-red-900 font-medium">Unable to load P&L data</p>
-            <p className="text-sm text-red-700 mt-1">
+            <p className="font-medium text-red-300">Unable to load P&L data</p>
+            <p className="mt-1 text-sm text-red-200">
               {ordersErrorValue?.message || 'Order analytics request failed.'}
             </p>
             <Button variant="outline" className="mt-4" onClick={() => refetchOrders()}>
               Retry
             </Button>
-          </CardContent>
-        </Card>
+          </CommandCardContent>
+        </CommandCard>
       ) : !metrics ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
+        <CommandCard className="border-dashed border-white/10">
+          <CommandCardContent className="py-12 text-center">
             <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500">No order data for this period</p>
-          </CardContent>
-        </Card>
+          </CommandCardContent>
+        </CommandCard>
       ) : (
         <>
           {/* Key Metrics Cards */}
@@ -393,12 +394,12 @@ export default function PnLAnalytics() {
           <PnLBreakdownChart metrics={metrics} />
 
           {/* Segmentation Section */}
-          <Card>
-            <CardHeader>
+          <CommandCard>
+            <CommandCardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>P&L by Segment</CardTitle>
-                  <CardDescription>Drill down into specific segments</CardDescription>
+                  <CommandCardTitle>P&L by Segment</CommandCardTitle>
+                  <CommandCardDescription>Drill down into specific segments</CommandCardDescription>
                 </div>
                 <Select value={segmentBy} onValueChange={setSegmentBy}>
                   <SelectTrigger className="w-40">
@@ -412,15 +413,15 @@ export default function PnLAnalytics() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardHeader>
-            <CardContent>
+            </CommandCardHeader>
+            <CommandCardContent>
               <PnLSegmentTable 
                 data={segmentData} 
                 segmentBy={segmentBy}
                 onDrilldown={handleSegmentDrilldown}
               />
-            </CardContent>
-          </Card>
+            </CommandCardContent>
+          </CommandCard>
 
           {/* Drilldown Panel */}
           {drilldownOrders && (

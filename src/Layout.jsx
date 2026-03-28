@@ -690,7 +690,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Desktop Sidebar */}
       <aside className={`
         command-surface hidden lg:flex fixed top-0 left-0 z-50 h-full w-64 max-w-[85vw] overflow-hidden
-        bg-[linear-gradient(180deg,rgba(4,10,24,0.96),rgba(10,18,34,0.94))] border-r border-cyan-400/10 shadow-[0_18px_48px_rgba(2,6,23,0.42)]
+        bg-[rgba(4,10,24,0.96)] border-r border-white/8 shadow-none
         transform transition-transform duration-200 ease-in-out
         translate-x-0
       `}>
@@ -788,7 +788,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
                     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                     transition-all duration-150
                     ${isActive
-                      ? 'bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(129,140,248,0.14))] text-cyan-100 border border-cyan-400/20 shadow-[0_0_18px_rgba(56,189,248,0.10)]'
+                      ? 'bg-white/[0.06] text-slate-100 border border-white/10'
                       : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 border border-transparent'
                     }
                   `}
@@ -887,7 +887,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
       {/* Main content */}
       <div className="relative isolate min-h-screen flex flex-col overflow-x-hidden lg:ml-64">
         {/* Top bar */}
-        <header className={`topbar-glow command-surface sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[linear-gradient(180deg,rgba(4,10,24,0.92),rgba(8,15,30,0.84))] border-b border-cyan-400/10 flex items-center justify-between px-3 sm:px-4 lg:px-5`}>
+        <header className={`topbar-glow command-surface sticky top-0 z-30 ${device.isMobile ? 'h-14' : 'h-16'} bg-[rgba(4,10,24,0.92)] border-b border-white/8 flex items-center justify-between px-3 sm:px-4 lg:px-5`}>
           <button 
             onClick={handleSidebarOpen}
             className={`lg:hidden relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${

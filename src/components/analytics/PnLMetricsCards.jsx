@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 import { 
   DollarSign, TrendingUp, TrendingDown, ShoppingCart, 
-  Users, Package, CreditCard, Truck, ArrowUpRight, ArrowDownRight
+  Users, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 
 const formatCurrency = (value) => {
@@ -55,39 +55,17 @@ export default function PnLMetricsCards({ metrics }) {
       icon: Users,
       color: 'amber',
       subtitle: `${metrics.uniqueCustomers} customers`
-    },
-    {
-      title: 'COGS',
-      value: formatCurrency(metrics.totalCogs),
-      icon: Package,
-      color: 'slate',
-      subtitle: `${formatPercent(metrics.totalRevenue > 0 ? (metrics.totalCogs / metrics.totalRevenue) * 100 : 0)} of revenue`
-    },
-    {
-      title: 'Payment Fees',
-      value: formatCurrency(metrics.totalPaymentFees),
-      icon: CreditCard,
-      color: 'orange',
-      subtitle: `${formatPercent(metrics.totalRevenue > 0 ? (metrics.totalPaymentFees / metrics.totalRevenue) * 100 : 0)} of revenue`
-    },
-    {
-      title: 'Shipping P&L',
-      value: formatCurrency(metrics.shippingProfit),
-      icon: Truck,
-      color: metrics.shippingProfit >= 0 ? 'emerald' : 'red',
-      subtitle: `Charged: ${formatCurrency(metrics.totalShippingCharged)}`,
-      trend: metrics.shippingProfit >= 0 ? 'up' : 'down'
     }
   ];
 
   const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600',
-    purple: 'bg-purple-100 text-purple-600',
-    amber: 'bg-amber-100 text-amber-600',
-    slate: 'bg-slate-100 text-slate-600',
-    orange: 'bg-orange-100 text-orange-600'
+    blue: 'bg-blue-500/10 text-blue-300',
+    emerald: 'bg-emerald-500/10 text-emerald-300',
+    red: 'bg-red-500/10 text-red-300',
+    purple: 'bg-purple-500/10 text-purple-300',
+    amber: 'bg-amber-500/10 text-amber-300',
+    slate: 'bg-slate-500/10 text-slate-300',
+    orange: 'bg-orange-500/10 text-orange-300'
   };
 
   return (
@@ -95,8 +73,8 @@ export default function PnLMetricsCards({ metrics }) {
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
-          <Card key={idx} className="hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
+          <CommandCard key={idx}>
+            <CommandCardContent className="pt-4">
               <div className="flex items-start justify-between">
                 <div className={`p-2 rounded-lg ${colorClasses[card.color]}`}>
                   <Icon className="w-4 h-4" />
@@ -112,12 +90,12 @@ export default function PnLMetricsCards({ metrics }) {
                 )}
               </div>
               <div className="mt-3">
-                <p className="text-2xl font-bold text-slate-900">{card.value}</p>
-                <p className="text-xs text-slate-500 mt-1">{card.title}</p>
+                <p className="text-2xl font-bold text-slate-100">{card.value}</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{card.title}</p>
                 <p className="text-xs text-slate-400">{card.subtitle}</p>
               </div>
-            </CardContent>
-          </Card>
+            </CommandCardContent>
+          </CommandCard>
         );
       })}
     </div>
