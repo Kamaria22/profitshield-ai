@@ -131,6 +131,7 @@ export default function Home() {
       profitScore: resolver?.tenant?.profit_integrity_score || 0,
       alertsCount: alerts.length,
       isDemoMode: false,
+      integrationId: integration?.id || null,
       integrationStatus: integration?.status || null,
       lastSyncAt: integration?.last_sync_at || null,
       bootstrapRecommended: orders.length === 0 || !integration?.last_sync_at,
@@ -255,6 +256,7 @@ export default function Home() {
         profitScore: resolver?.tenant?.profit_integrity_score || 0,
         alertsCount: alerts.length,
         isDemoMode: false,
+        integrationId: resolverCheck?.integrationId || persistedContext?.integrationId || null,
         orders: orders.slice(0, 5),
         alerts
       };
@@ -534,8 +536,14 @@ export default function Home() {
           <DashboardLayout
             left={(
               <ControlPanel
+                tenantId={authTenantId}
+                integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
                 integrationStatus={dashboardSummary?.integrationStatus}
                 aiStatus={aiStatus}
+                onSync={() => {
+                  queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+                  queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+                }}
               />
             )}
             center={(
