@@ -19,6 +19,7 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, 
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
+import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 
 import TopCommandBar from '../components/dashboard/TopCommandBar';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
@@ -561,9 +562,12 @@ export default function Home() {
               />
             )}
             bottom={(
-              <Suspense fallback={null}>
-                <ExpandablePanel tenantId={authTenantId} />
-              </Suspense>
+              <div className="space-y-3">
+                <WelcomeChecklist />
+                <Suspense fallback={null}>
+                  <ExpandablePanel tenantId={authTenantId} />
+                </Suspense>
+              </div>
             )}
           />
           {!dashboardHasData && (

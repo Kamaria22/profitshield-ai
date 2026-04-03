@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/components/platformContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 function SectionPreview({ title, rows = [], emptyLabel, valueKey }) {
   return (
@@ -22,6 +24,8 @@ function SectionPreview({ title, rows = [], emptyLabel, valueKey }) {
 }
 
 export default function ExpandablePanel({ tenantId }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-expandable', tenantId || 'unresolved'],
@@ -44,7 +48,7 @@ export default function ExpandablePanel({ tenantId }) {
         className="flex w-full items-center justify-between text-left"
       >
         <div>
-          <p className="dashboard-label">Expandables</p>
+          <p className="dashboard-label">Workspace</p>
           <p className="mt-2 dashboard-title">Orders, Customers, Products</p>
         </div>
         {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
@@ -82,6 +86,29 @@ export default function ExpandablePanel({ tenantId }) {
             valueKey="subtitle"
             emptyLabel={isLoading ? 'Loading products…' : 'No recent products'}
           />
+          <div className="lg:col-span-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(createPageUrl('Orders', location.search))}
+              className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-200 transition-colors duration-150 hover:border-white/16 hover:bg-white/[0.05]"
+            >
+              Open Orders
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(createPageUrl('Customers', location.search))}
+              className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-200 transition-colors duration-150 hover:border-white/16 hover:bg-white/[0.05]"
+            >
+              Open Customers
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(createPageUrl('Products', location.search))}
+              className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-200 transition-colors duration-150 hover:border-white/16 hover:bg-white/[0.05]"
+            >
+              Open Products
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

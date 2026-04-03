@@ -3,8 +3,8 @@
  * Guides users through first week in the app
  */
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
+import { Link, useLocation } from 'react-router-dom';
+import { createPageUrl } from '@/components/platformContext';
 import { CheckCircle2, Circle, X, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -20,6 +20,7 @@ const CHECKLIST = [
 ];
 
 export default function WelcomeChecklist() {
+  const location = useLocation();
   const [dismissed, setDismissed] = useState(false);
   const [completed, setCompleted] = useState({});
 
@@ -77,7 +78,7 @@ export default function WelcomeChecklist() {
               }
             </button>
             <Link
-              to={createPageUrl(item.page)}
+              to={createPageUrl(item.page, location.search)}
               className={`text-sm flex-1 leading-5 transition-colors ${completed[item.id] ? 'line-through text-slate-500' : 'text-slate-200 hover:text-emerald-300'}`}
             >
               {item.label}
