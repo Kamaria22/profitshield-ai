@@ -25,7 +25,7 @@
     "guard:run": "node scripts/guarded/guarded-workflow.mjs"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.23",
+    "@base44/sdk": "^0.8.24",
     "@base44/vite-plugin": "^1.0.6",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
