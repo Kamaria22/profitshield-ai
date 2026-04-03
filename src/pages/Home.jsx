@@ -526,11 +526,17 @@ export default function Home() {
 
       <div className="min-h-full flex flex-col">
         <TopCommandBar
+          tenant={displayTenant}
           profitScore={profitScore}
           metrics={metrics}
           alerts={visibleAlerts}
           aiStatus={aiStatus}
           lastActionAt={dashboardSummary?.lastSyncAt}
+          syncing={syncMutation.isPending}
+          onSync={() => syncMutation.mutate()}
+          onOpenInsights={() => navigate(createPageUrl('AIInsights', location.search))}
+          onOpenReport={() => navigate(createPageUrl('PnLAnalytics', location.search))}
+          onOpenSecurity={() => navigate(createPageUrl('SystemHealth', location.search))}
         />
 
         <div className="mt-3 flex-1">
