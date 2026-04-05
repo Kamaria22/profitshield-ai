@@ -26,6 +26,8 @@ import DashboardLayout from '../components/dashboard/DashboardLayout';
 import ProfitCorePanel from '../components/dashboard/ProfitCorePanel';
 import RiskActionPanel from '../components/dashboard/RiskActionPanel';
 import ControlPanel from '../components/dashboard/ControlPanel';
+import CommerceScopePanel from '../components/dashboard/CommerceScopePanel';
+import MerchantIntelligencePanel from '../components/dashboard/MerchantIntelligencePanel';
 const ExpandablePanel = lazy(() => import('../components/dashboard/ExpandablePanel'));
 
 export default function Home() {
@@ -569,6 +571,16 @@ export default function Home() {
             )}
             bottom={(
               <div className="space-y-3">
+                <MerchantIntelligencePanel
+                  metrics={metrics}
+                  alerts={visibleAlerts}
+                  profitLeaks={displayProfitLeaks}
+                  orders={dashboardSummary?.orders || []}
+                />
+                <CommerceScopePanel
+                  tenantId={authTenantId}
+                  integrationStatus={dashboardSummary?.integrationStatus}
+                />
                 <WelcomeChecklist />
                 <Suspense fallback={null}>
                   <ExpandablePanel tenantId={authTenantId} />
