@@ -544,43 +544,69 @@ export default function Home() {
         <div className="mt-3 flex-1">
           <DashboardLayout
             left={(
-              <ControlPanel
-                tenantId={authTenantId}
-                integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
-                integrationStatus={dashboardSummary?.integrationStatus}
-                aiStatus={aiStatus}
-                onSync={() => {
-                  queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
-                  queryClient.invalidateQueries({ queryKey: profitLeaksKey });
-                }}
-              />
+              <div className="space-y-3">
+                <ControlPanel
+                  tenantId={authTenantId}
+                  integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
+                  integrationStatus={dashboardSummary?.integrationStatus}
+                  aiStatus={aiStatus}
+                  onSync={() => {
+                    queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+                    queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+                  }}
+                />
+                <CommerceScopePanel
+                  tenantId={authTenantId}
+                  integrationStatus={dashboardSummary?.integrationStatus}
+                />
+              </div>
             )}
             center={(
-              <ProfitCorePanel
-                metrics={metrics}
-                orders={dashboardSummary?.orders || []}
-              />
-            )}
-            right={(
-              <RiskActionPanel
-                alerts={visibleAlerts}
-                profitLeaks={displayProfitLeaks}
-                metrics={metrics}
-                integrationStatus={dashboardSummary?.integrationStatus}
-              />
-            )}
-            bottom={(
               <div className="space-y-3">
+                <ProfitCorePanel
+                  metrics={metrics}
+                  orders={dashboardSummary?.orders || []}
+                />
                 <MerchantIntelligencePanel
                   metrics={metrics}
                   alerts={visibleAlerts}
                   profitLeaks={displayProfitLeaks}
                   orders={dashboardSummary?.orders || []}
                 />
-                <CommerceScopePanel
-                  tenantId={authTenantId}
+              </div>
+            )}
+            right={(
+              <div className="space-y-3">
+                <RiskActionPanel
+                  alerts={visibleAlerts}
+                  profitLeaks={displayProfitLeaks}
+                  metrics={metrics}
                   integrationStatus={dashboardSummary?.integrationStatus}
                 />
+                {!dashboardHasData && (
+                  <div className="dashboard-panel">
+                    <p className="dashboard-label">Startup State</p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <p className="dashboard-title">No live telemetry yet</p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          ProfitShield is connected, but the dashboard is still waiting for synced merchant data.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending || !authTenantId}
+                        className="w-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                      >
+                        {syncMutation.isPending ? 'Syncing...' : 'Run Initial Sync'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            bottom={(
+              <div className="space-y-3">
                 <WelcomeChecklist />
                 <Suspense fallback={null}>
                   <ExpandablePanel tenantId={authTenantId} />
@@ -588,26 +614,6 @@ export default function Home() {
               </div>
             )}
           />
-          {!dashboardHasData && (
-            <div className="dashboard-panel mt-3">
-              <p className="dashboard-label">Startup State</p>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="dashboard-title">No live telemetry yet</p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    ProfitShield is connected, but the dashboard is still waiting for synced merchant data.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending || !authTenantId}
-                  className="border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-                >
-                  {syncMutation.isPending ? 'Syncing...' : 'Run Initial Sync'}
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </SubscriptionGate>
