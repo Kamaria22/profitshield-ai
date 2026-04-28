@@ -25,6 +25,51 @@ function AlertItem({ title, impact, action, onOpen }) {
   );
 }
 
+function buildPriorityQueue({ alerts = [], profitLeaks = [], integrationStatus, highRiskOrders = 0 }) {
+  const queue = [];
+  if (highRiskOrders > 0) {
+    queue.push({
+      title: 'Risk queue',
+      impact: `${highRiskOrders} flagged orders`,
+      action: 'Open Risk Intelligence',
+      hrefKey: 'Intelligence',
+    });
+  }
+  if (alerts.length > 0) {
+    queue.push({
+      title: 'Alert queue',
+      impact: `${alerts.length} pending alerts`,
+      action: 'Review alerts',
+      hrefKey: 'Alerts',
+    });
+  }
+  if (profitLeaks.length > 0) {
+    queue.push({
+      title: 'Leak queue',
+      impact: `${profitLeaks.length} active leak signals`,
+      action: 'Inspect AI Insights',
+      hrefKey: 'AIInsights',
+    });
+  }
+  if (integrationStatus && integrationStatus !== 'connected') {
+    queue.push({
+      title: 'Runtime queue',
+      impact: `Integration is ${integrationStatus}`,
+      action: 'Open integrations',
+      hrefKey: 'Integrations',
+    });
+  }
+  if (!queue.length) {
+    queue.push({
+      title: 'Operator queue',
+      impact: 'No urgent interventions',
+      action: 'Stay monitoring',
+      hrefKey: 'Home',
+    });
+  }
+  return queue.slice(0, 3);
+}
+
 function buildTasks({ alerts = [], profitLeaks = [], integrationStatus, highRiskOrders = 0 }) {
   const tasks = [];
   if (highRiskOrders > 0) {
@@ -68,6 +113,15 @@ function buildTasks({ alerts = [], profitLeaks = [], integrationStatus, highRisk
 export default function RiskActionPanel({ alerts = [], profitLeaks = [], metrics, integrationStatus }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const priorityQueue = buildPriorityQueue({
+    alerts,
+    profitLeaks,
+    integrationStatus,
+    highRiskOrders: Number(metrics?.highRiskOrders || 0),
+  }).map((item) => ({
+    ...item,
+    href: createPageUrl(item.hrefKey, location.search),
+  }));
   const visibleAlerts = alerts.slice(0, 3).map((alert) => ({
     title: alert?.title || 'Alert',
     impact: alert?.impact_amount ? formatCurrency(alert.impact_amount) : alert?.message || 'Review recommended',
@@ -104,6 +158,15 @@ export default function RiskActionPanel({ alerts = [], profitLeaks = [], metrics
   return (
     <div className="space-y-3">
       <section className="dashboard-panel">
+        <p className="dashboard-label">Priority Queue</p>
+        <div className="mt-3 space-y-3">
+          {priorityQueue.map((item) => (
+            <AlertItem key={`${item.title}-${item.action}`} title={item.title} impact={item.impact} action={item.action} onOpen={() => navigate(item.href)} />
+          ))}
+        </div>
+      </section>
+
+      <section className="dashboard-panel">
         <p className="dashboard-label">Active Risks</p>
         <div className="mt-3 space-y-3">
           {visibleRisks.length ? visibleRisks.map((risk) => (
@@ -122,15 +185,6 @@ export default function RiskActionPanel({ alerts = [], profitLeaks = [], metrics
           )) : (
             <div className="dashboard-subpanel text-sm text-slate-400">No active alerts</div>
           )}
-        </div>
-      </section>
-
-      <section className="dashboard-panel">
-        <p className="dashboard-label">Tasks</p>
-        <div className="mt-3 space-y-3">
-          {tasks.map((task) => (
-            <AlertItem key={`${task.title}-${task.action}`} {...task} onOpen={() => navigate(task.href)} />
-          ))}
         </div>
       </section>
     </div>

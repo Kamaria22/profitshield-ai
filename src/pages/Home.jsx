@@ -560,6 +560,7 @@ export default function Home() {
                 <CommerceScopePanel
                   tenantId={authTenantId}
                   integrationStatus={dashboardSummary?.integrationStatus}
+                  subscriptionTier={tenant?.subscription_tier || 'trial'}
                 />
               </div>
             )}
@@ -585,6 +586,8 @@ export default function Home() {
             right={(
               <div className="space-y-3">
                 <RuntimeMeshPanel
+                  tenantId={authTenantId}
+                  integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
                   integrationStatus={dashboardSummary?.integrationStatus}
                   lastSyncAt={dashboardSummary?.lastSyncAt}
                   alertsCount={visibleAlerts.length}

@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
-import { Boxes, Link2, Users } from 'lucide-react';
+import { Boxes, CreditCard, Link2, Users } from 'lucide-react';
 
-function SurfaceButton({ icon: Icon, title, meta, actionLabel, onClick }) {
+function SurfaceButton({ icon: Icon, title, value, meta, actionLabel, onClick, tone = 'text-[#00E5FF]' }) {
   return (
     <button
       type="button"
@@ -19,6 +19,7 @@ function SurfaceButton({ icon: Icon, title, meta, actionLabel, onClick }) {
           </div>
           <div>
             <p className="dashboard-title">{title}</p>
+            <p className={`mt-1 text-sm font-semibold ${tone}`}>{value}</p>
             <p className="mt-1 text-sm text-slate-400">{meta}</p>
           </div>
         </div>
@@ -30,7 +31,12 @@ function SurfaceButton({ icon: Icon, title, meta, actionLabel, onClick }) {
   );
 }
 
-export default function CommerceScopePanel({ tenantId, integrationStatus }) {
+function formatPlanLabel(tier) {
+  const normalized = String(tier || 'trial').replace(/_/g, ' ');
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+export default function CommerceScopePanel({ tenantId, integrationStatus, subscriptionTier = 'trial' }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,8 +54,8 @@ export default function CommerceScopePanel({ tenantId, integrationStatus }) {
       };
 
       const [customers, products, integrations] = await Promise.all([
-        safeFilter(base44.entities.Customer, { tenant_id: tenantId }, '-created_date', 5),
-        safeFilter(base44.entities.Product, { tenant_id: tenantId }, '-updated_date', 5),
+        safeFilter(base44.entities.Customer, { tenant_id: tenantId }, '-created_date', 8),
+        safeFilter(base44.entities.Product, { tenant_id: tenantId }, '-updated_date', 8),
         safeFilter(base44.entities.PlatformIntegration, { tenant_id: tenantId }, '-updated_date', 3),
       ]);
 
@@ -62,7 +68,15 @@ export default function CommerceScopePanel({ tenantId, integrationStatus }) {
 
   const customerCount = data?.customers?.length || 0;
   const productCount = data?.products?.length || 0;
-  const activeIntegrationCount = (data?.integrations || []).filter((item) => item?.status === 'connected' || item?.status === 'degraded').length;
+  const activeIntegrations = (data?.integrations || []).filter((item) => item?.status === 'connected' || item?.status === 'degraded');
+  const activeIntegrationCount = activeIntegrations.length;
+  const recentValueCustomers = (data?.customers || []).filter((item) => Number(item?.total_spent || 0) > 0).length;
+  const activeProducts = (data?.products || []).filter((item) => String(item?.status || '').toLowerCase() === 'active').length;
+  const webhookCount = activeIntegrations.reduce((sum, item) => sum + Object.keys(item?.webhook_endpoints || {}).length, 0);
+  const billingTone =
+    subscriptionTier === 'trial' ? 'text-amber-300' :
+    subscriptionTier === 'enterprise' ? 'text-emerald-300' :
+    'text-cyan-300';
 
   return (
     <div className="dashboard-panel">
@@ -73,27 +87,39 @@ export default function CommerceScopePanel({ tenantId, integrationStatus }) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SurfaceButton
           icon={Users}
-          title="Customers"
-          meta={customerCount > 0 ? `${customerCount} recent customer records ready` : 'Customer intelligence will appear after sync'}
+          title="Customer Signal"
+          value={customerCount > 0 ? `${recentValueCustomers}/${customerCount} monetized` : 'No signal'}
+          meta={customerCount > 0 ? 'Recent customer flow is live' : 'Customer intelligence appears after sync'}
           actionLabel="Open"
           onClick={() => navigate(createPageUrl('Customers', location.search))}
         />
         <SurfaceButton
           icon={Boxes}
-          title="Products"
-          meta={productCount > 0 ? `${productCount} recent product records visible` : 'Product catalog data is still warming up'}
+          title="Product Signal"
+          value={productCount > 0 ? `${activeProducts || productCount} active` : 'No signal'}
+          meta={productCount > 0 ? 'Catalog telemetry is online' : 'Catalog data is still warming up'}
           actionLabel="Open"
           onClick={() => navigate(createPageUrl('Products', location.search))}
         />
         <SurfaceButton
           icon={Link2}
-          title="Integrations"
+          title="Integration Pulse"
+          value={activeIntegrationCount > 0 ? `${webhookCount} webhooks live` : 'Standby'}
           meta={activeIntegrationCount > 0 ? `${activeIntegrationCount} active connection${activeIntegrationCount > 1 ? 's' : ''} • ${integrationStatus || 'connected'}` : `Status: ${integrationStatus || 'pending'}`}
           actionLabel="Manage"
           onClick={() => navigate(createPageUrl('Integrations', location.search))}
+        />
+        <SurfaceButton
+          icon={CreditCard}
+          title="Billing Posture"
+          value={formatPlanLabel(subscriptionTier)}
+          meta={subscriptionTier === 'trial' ? 'Upgrade unlocks full operating system' : 'Plan is active and available'}
+          actionLabel="Review"
+          tone={billingTone}
+          onClick={() => navigate(createPageUrl('Billing', location.search))}
         />
       </div>
     </div>

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { Activity, Link2, RefreshCw, Shield } from 'lucide-react';
@@ -25,6 +27,8 @@ function Metric({ label, value, tone = 'text-slate-100' }) {
 }
 
 export default function RuntimeMeshPanel({
+  tenantId,
+  integrationId,
   integrationStatus,
   lastSyncAt,
   alertsCount = 0,
@@ -34,6 +38,27 @@ export default function RuntimeMeshPanel({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: runtimeDetail } = useQuery({
+    queryKey: ['dashboard-runtime-mesh', tenantId || 'unresolved', integrationId || 'none'],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const [pendingQueue, integrationRows] = await Promise.all([
+        base44.entities.WebhookQueue.filter({ tenant_id: tenantId, status: 'pending' }, '-created_date', 30).catch(() => []),
+        integrationId
+          ? base44.entities.PlatformIntegration.filter({ id: integrationId }).catch(() => [])
+          : base44.entities.PlatformIntegration.filter({ tenant_id: tenantId }, '-updated_date', 2).catch(() => []),
+      ]);
+      const integration = Array.isArray(integrationRows) ? integrationRows[0] || null : null;
+      return {
+        queueDepth: Array.isArray(pendingQueue) ? pendingQueue.length : 0,
+        webhookCount: Object.keys(integration?.webhook_endpoints || {}).length,
+        lastSyncStatus: integration?.last_sync_status || null,
+      };
+    },
+    staleTime: 30000,
+    gcTime: 120000,
+    refetchOnWindowFocus: false,
+  });
 
   const runtimeStatus = syncing
     ? 'Synchronizing'
@@ -78,6 +103,18 @@ export default function RuntimeMeshPanel({
           value={`${highRiskOrders} flagged • ${alertsCount} alerts`}
           tone={highRiskOrders > 0 || alertsCount > 0 ? 'text-amber-300' : 'text-slate-100'}
         />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Metric
+            label="Webhook mesh"
+            value={runtimeDetail?.webhookCount ? `${runtimeDetail.webhookCount} active` : 'Not registered'}
+            tone={runtimeDetail?.webhookCount ? 'text-emerald-300' : 'text-amber-300'}
+          />
+          <Metric
+            label="Queue lane"
+            value={runtimeDetail?.queueDepth ? `${runtimeDetail.queueDepth} pending` : (runtimeDetail?.lastSyncStatus || 'Clear')}
+            tone={runtimeDetail?.queueDepth ? 'text-amber-300' : 'text-slate-100'}
+          />
+        </div>
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -95,7 +132,7 @@ export default function RuntimeMeshPanel({
           className="dashboard-subpanel flex items-center gap-2 text-left transition-colors duration-150 hover:border-white/16 hover:bg-white/[0.05]"
         >
           <Shield className="h-4 w-4 text-[#5B6CFF]" />
-          <span className="text-sm text-slate-200">Security</span>
+          <span className="text-sm text-slate-200">Health</span>
         </button>
         <button
           type="button"
