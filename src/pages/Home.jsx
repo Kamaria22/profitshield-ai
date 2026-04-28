@@ -28,6 +28,8 @@ import RiskActionPanel from '../components/dashboard/RiskActionPanel';
 import ControlPanel from '../components/dashboard/ControlPanel';
 import CommerceScopePanel from '../components/dashboard/CommerceScopePanel';
 import MerchantIntelligencePanel from '../components/dashboard/MerchantIntelligencePanel';
+import NeuralOpsPanel from '../components/dashboard/NeuralOpsPanel';
+import RuntimeMeshPanel from '../components/dashboard/RuntimeMeshPanel';
 const ExpandablePanel = lazy(() => import('../components/dashboard/ExpandablePanel'));
 
 export default function Home() {
@@ -563,6 +565,11 @@ export default function Home() {
             )}
             center={(
               <div className="space-y-3">
+                <NeuralOpsPanel
+                  metrics={metrics}
+                  profitScore={profitScore}
+                  alerts={visibleAlerts}
+                />
                 <ProfitCorePanel
                   metrics={metrics}
                   orders={dashboardSummary?.orders || []}
@@ -577,6 +584,14 @@ export default function Home() {
             )}
             right={(
               <div className="space-y-3">
+                <RuntimeMeshPanel
+                  integrationStatus={dashboardSummary?.integrationStatus}
+                  lastSyncAt={dashboardSummary?.lastSyncAt}
+                  alertsCount={visibleAlerts.length}
+                  highRiskOrders={Number(metrics?.highRiskOrders || 0)}
+                  syncing={syncMutation.isPending}
+                  onSync={() => syncMutation.mutate()}
+                />
                 <RiskActionPanel
                   alerts={visibleAlerts}
                   profitLeaks={displayProfitLeaks}
