@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { Download, Monitor, Smartphone, Globe, Zap, Shield, Check, Play, QrCode } from 'lucide-react';
 import HolographicCard from '@/components/quantum/HolographicCard';

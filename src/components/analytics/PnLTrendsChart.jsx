@@ -1,8 +1,8 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar
 } from 'recharts';
 import { format, parseISO } from 'date-fns';

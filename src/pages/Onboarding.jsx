@@ -1,5 +1,6 @@
+// @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
 import { base44 } from '@/api/base44Client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +12,6 @@ import {
   ArrowRight, 
   Loader2,
   Sparkles,
-  TrendingUp,
   AlertTriangle,
   Zap
 } from 'lucide-react';

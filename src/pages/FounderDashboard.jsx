@@ -13,11 +13,9 @@ import {
   TrendingDown,
   Users,
   DollarSign,
-  AlertTriangle,
   Shield,
   Sparkles,
   Send,
-  RefreshCw,
   Target,
   Loader2,
   ChevronRight,
@@ -28,13 +26,11 @@ import {
   BarChart3,
   Activity,
   CheckCircle2,
-  XCircle,
   Percent,
   Star,
   Gift,
   Rocket,
   FlaskConical,
-  Settings,
   ShieldCheck
 } from 'lucide-react';
 

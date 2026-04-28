@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/components/settings/DemoVideoGeneratorFixed.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";

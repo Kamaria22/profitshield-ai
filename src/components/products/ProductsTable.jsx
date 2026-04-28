@@ -7,7 +7,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle, Package, Edit2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect, Suspense } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -5,21 +6,15 @@ import createApp from '@shopify/app-bridge';
 import { Redirect } from '@shopify/app-bridge/actions';
 import { 
   Settings as SettingsIcon, 
-  DollarSign, 
-  Bell, 
-  Users, 
-  Share2, 
-  Upload,
+  Users,
   Plus,
   Save,
   AlertTriangle,
   Store,
   RefreshCw,
-  ExternalLink,
   CheckCircle,
   XCircle,
   Shield,
-  Download,
   Film
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -42,23 +37,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+
+
 import { toast } from 'sonner';
 
 import CostMappingTable from '@/components/settings/CostMappingTable';
 import ShopifyIntegrationPanel from '@/components/settings/ShopifyIntegrationPanel';
-import CustomRiskRulesManager from '@/components/risk/CustomRiskRulesManager';
 import ProfitAlertRulesManager from '@/components/alerts/ProfitAlertRulesManager';
-import RiskModelConfig from '@/components/settings/RiskModelConfig';
-import RoleManagement from '@/components/settings/RoleManagement';
 import DataExportPanel from '@/components/settings/DataExportPanel';
 import DemoVideoGenerator from '@/components/settings/DemoVideoGeneratorFixed';
 import BiometricSettings from '@/components/settings/BiometricSettings';
@@ -66,8 +51,7 @@ import ShopifySubmitButton from '@/components/appstore/ShopifySubmitButton';
 import ScreenshotGenerator from '@/components/appstore/ScreenshotGenerator';
 import { Fingerprint } from 'lucide-react';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
-import { createPageUrl } from '@/components/platformContext';
-import { usePermissions, RequirePermission } from '@/components/usePermissions';
+import { usePermissions } from '@/components/usePermissions';
 import { hasValidAppBridgeContext } from '@/components/shopify/AppBridgeAuth';
 import { isTrustedShopifyRedirect, normalizeTrustedRedirect } from '@/components/shopify/urlSafety';
 

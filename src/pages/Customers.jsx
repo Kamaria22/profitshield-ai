@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';

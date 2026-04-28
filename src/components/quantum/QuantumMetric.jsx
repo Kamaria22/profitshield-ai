@@ -85,7 +85,7 @@ export default function QuantumMetric({
       </div>
       
       {glitch && (
-        <style jsx>{`
+        <style>{`
           @keyframes glitch {
             0%, 100% { transform: translate(0); }
             20% { transform: translate(-2px, 2px); }

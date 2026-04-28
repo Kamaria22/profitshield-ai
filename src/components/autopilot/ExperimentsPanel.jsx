@@ -10,9 +10,7 @@ import {
   CheckCircle2,
   Clock,
   TrendingUp,
-  TrendingDown,
-  RefreshCw,
-  Rocket
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 

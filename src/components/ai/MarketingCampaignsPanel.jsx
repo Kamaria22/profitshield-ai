@@ -9,7 +9,6 @@ import {
   Play, 
   RefreshCw,
   Target,
-  Clock,
   DollarSign,
   Loader2,
   Rocket,

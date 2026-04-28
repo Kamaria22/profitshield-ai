@@ -36,7 +36,9 @@ function readFallback(method) {
 const entityProxyCache = new Map();
 const safeEntities = new Proxy(rawClient.entities, {
   get(target, entityName) {
-    const entity = target?.[entityName];
+    const entityMap = /** @type {any} */ (target);
+    if (typeof entityName === 'symbol') return entityMap?.[entityName];
+    const entity = entityMap?.[entityName];
     if (!entity || typeof entity !== 'object') return entity;
     if (entityProxyCache.has(entityName)) return entityProxyCache.get(entityName);
 
@@ -78,6 +80,7 @@ const safeFunctions = new Proxy(rawClient.functions, {
 // Create a guarded client that applies safe retries/fallbacks globally.
 export const base44 = new Proxy(rawClient, {
   get(target, key) {
+    if (typeof key === 'symbol') return target[key];
     if (key === 'entities') return safeEntities;
     if (key === 'functions') return safeFunctions;
     const value = target?.[key];

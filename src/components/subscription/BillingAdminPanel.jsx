@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { RefreshCw, RotateCcw, Eye, CreditCard, Search, Shield, Clock } from 'lucide-react';
+import { RefreshCw, RotateCcw, Eye, CreditCard, Search, Clock } from 'lucide-react';
 
 export default function BillingAdminPanel() {
   const [searchDomain, setSearchDomain] = useState('');

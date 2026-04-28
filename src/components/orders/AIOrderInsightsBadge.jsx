@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Brain, Loader2, ShieldAlert, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Brain, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export default function AIOrderInsightsBadge({ order }) {
   const [insights, setInsights] = useState(null);

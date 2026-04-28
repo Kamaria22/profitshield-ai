@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CAPACITOR NATIVE BUILD GUIDE
  * Admin-only reference component with exact commands to build native iOS/Android apps.

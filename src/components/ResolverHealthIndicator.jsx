@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import {
   Tooltip,

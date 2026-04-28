@@ -9,7 +9,6 @@ import {
   TrendingDown, 
   AlertTriangle,
   DollarSign,
-  Package,
   Loader2
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';

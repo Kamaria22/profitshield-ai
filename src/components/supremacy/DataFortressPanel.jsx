@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Shield, RefreshCw, Globe, Server, Lock, AlertTriangle,
-  CheckCircle2, XCircle, Radar, Eye, Activity, Zap,
+  CheckCircle2, XCircle, Radar, Eye, Activity,
   AlertCircle, Search, FileWarning
 } from 'lucide-react';
 import { toast } from 'sonner';

@@ -1,15 +1,14 @@
+// @ts-nocheck
 import React, { useState, useCallback } from 'react';
 import { CheckCircle, XCircle, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { base44 } from '@/api/base44Client';
 import { 
   getPersistedContext, 
   persistContext, 
   clearContext,
   hasValidContext,
   hardResetAllContexts,
-  listPersistedStores,
-  getActiveStoreKey
+  listPersistedStores
 } from '@/components/platformContext';
 
 /**

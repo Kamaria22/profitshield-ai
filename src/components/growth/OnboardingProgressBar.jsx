@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { 
   CheckCircle2, 
-  Circle, 
   Store, 
   RefreshCw, 
   Shield, 
@@ -22,7 +21,7 @@ import {
   ArrowRight,
   Rocket
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const STEPS = [
   { key: 'store_connected', label: 'Connect Store', icon: Store },

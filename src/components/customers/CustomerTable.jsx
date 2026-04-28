@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Mail, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Mail, AlertTriangle } from 'lucide-react';
 
 const riskColors = {
   low: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300',

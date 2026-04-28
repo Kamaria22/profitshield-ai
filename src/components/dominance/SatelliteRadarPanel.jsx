@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Globe, Satellite, RefreshCw, AlertTriangle, TrendingUp, MapPin } from 'lucide-react';
+import { Globe, Satellite, RefreshCw, AlertTriangle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 const readinessColors = {

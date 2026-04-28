@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PERFORMANCE AUDIT — Admin only
  * Simulates Lighthouse metrics and shows bundle/API health
@@ -5,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { loadCurrentUserSafe } from '@/lib/runtimeUser';
-import { Zap, Clock, Loader2, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Zap, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';

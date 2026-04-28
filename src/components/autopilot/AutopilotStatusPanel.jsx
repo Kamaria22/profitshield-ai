@@ -14,17 +14,11 @@ import {
 } from '@/components/ui/select';
 import {
   Brain,
-  Zap,
   Shield,
   Rocket,
-  FlaskConical,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   RefreshCw,
   Settings,
-  TrendingUp,
-  Activity
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 

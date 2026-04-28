@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Brain, Sparkles, Send, ChevronRight, Check, RefreshCw,
-  MessageSquare, Lightbulb, Loader2, X, ArrowRight, Shield
+  MessageSquare, Loader2, X, ArrowRight, Shield
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 

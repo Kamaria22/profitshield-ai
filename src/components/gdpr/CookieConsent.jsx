@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Shield, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Shield, ChevronDown, ChevronUp } from 'lucide-react';
 
 const CONSENT_KEY = 'ps_cookie_consent_v1';
 

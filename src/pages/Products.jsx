@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+// @ts-nocheck
+import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';

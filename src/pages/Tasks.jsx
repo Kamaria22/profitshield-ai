@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryDefaults } from '@/components/utils/queryDefaults';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -17,14 +16,12 @@ import {
   ClipboardList,
   Plus,
   Search,
-  Filter,
   Clock,
   CheckCircle2,
   AlertCircle,
-  XCircle,
   Loader2
 } from 'lucide-react';
-import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
+import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';
 import { loadCurrentUserSafe } from '@/lib/runtimeUser';
 import TasksTable from '../components/tasks/TasksTable';
 import TaskDetailPanel from '../components/tasks/TaskDetailPanel';

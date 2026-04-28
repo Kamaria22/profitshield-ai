@@ -1,6 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from '../../utils';
 import { format } from 'date-fns';
 import {
   Table,
@@ -17,8 +15,7 @@ import {
   AlertTriangle, 
   CheckCircle, 
   AlertCircle,
-  HelpCircle,
-  ExternalLink
+  HelpCircle
 } from 'lucide-react';
 import {
   Tooltip,

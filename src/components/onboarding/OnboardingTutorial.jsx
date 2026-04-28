@@ -5,24 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
 import {
   Shield,
   TrendingUp,
   AlertTriangle,
   Brain,
-  Zap,
-  Crown,
   Rocket,
   ArrowRight,
   Check,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  X
+  ChevronLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

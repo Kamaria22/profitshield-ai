@@ -16,7 +16,6 @@ import {
   TrendingUp, 
   TrendingDown, 
   AlertTriangle, 
-  CheckCircle, 
   Info,
   ChevronDown,
   ChevronUp,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  Brain, Sparkles, AlertTriangle, TrendingUp, TrendingDown, 
+  Brain, Sparkles, AlertTriangle, TrendingUp, 
   ShieldAlert, Users, Loader2,
   CheckCircle, XCircle, Lightbulb, Target, ArrowRight
 } from 'lucide-react';

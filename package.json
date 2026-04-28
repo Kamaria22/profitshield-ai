@@ -10,6 +10,7 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
+    "smoke:merchant": "node scripts/guarded/merchant-smoke.mjs",
     "preview": "vite preview",
     "guard:discover": "node scripts/guarded/discover.mjs",
     "guard:layers": "node scripts/guarded/layer-inventory.mjs",

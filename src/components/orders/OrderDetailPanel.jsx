@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { X, AlertTriangle, CheckCircle, Package, Truck, CreditCard, RotateCcw, Percent, MapPin, RefreshCw, Loader2, Ban, Eye, FileSignature, Pause, Play } from 'lucide-react';
+import { X, Percent, RefreshCw, Loader2, Ban, Eye, FileSignature, Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -8,7 +8,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { base44 } from '@/api/base44Client';
 import { loadCurrentUserSafe } from '@/lib/runtimeUser';
-import RiskAnalysisCard from './RiskAnalysisCard';
 import RiskBreakdownCard from '../risk/RiskBreakdownCard';
 import RiskMitigationPanel from '../risk/RiskMitigationPanel';
 import {

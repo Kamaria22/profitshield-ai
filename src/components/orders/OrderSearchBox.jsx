@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';

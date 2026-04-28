@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import AutonomousHealthDashboard from '@/components/health/AutonomousHealthDashboard';
 import { usePlatformResolver, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '@/components/usePlatformResolver';

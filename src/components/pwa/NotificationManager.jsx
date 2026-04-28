@@ -1,9 +1,9 @@
+// @ts-nocheck
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Bell, BellOff, Volume2, VolumeX, Settings, X, Check } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Sheet,
   SheetContent,

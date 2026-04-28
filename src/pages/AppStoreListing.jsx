@@ -3,8 +3,7 @@
  * Protected by RouteGuard (admin + internal context required)
  */
 import React, { useState } from 'react';
-import { Copy, Check, Store, Star, Rocket, CheckCircle2, XCircle, AlertTriangle, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Copy, Check, Store, Rocket, CheckCircle2, XCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RouteGuard from '@/components/RouteGuard';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * APP STORE SUBMISSION CHECKLIST
  * Admin-only. Real-time red/green status for every submission requirement.

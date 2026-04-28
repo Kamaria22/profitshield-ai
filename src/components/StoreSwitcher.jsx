@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { usePlatformResolver, RESOLVER_STATUS } from '@/components/usePlatformResolver';
 import { createPageUrl } from '@/components/platformContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -73,7 +73,7 @@ export default function QuantumButton({
       {/* Glow effect */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 blur-xl bg-cyan-400/20 transition-opacity duration-300 -z-10" />
       
-      <style jsx>{`
+      <style>{`
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }

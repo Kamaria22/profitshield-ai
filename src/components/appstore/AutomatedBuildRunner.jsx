@@ -3,9 +3,8 @@
  * Admin-only. Generates platform-specific build scripts and validates config.
  */
 import React, { useState } from 'react';
-import { Copy, Check, Terminal, Apple, Smartphone, Package, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Copy, Check, Terminal, Apple, Smartphone, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 

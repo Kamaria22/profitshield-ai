@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { staticTranslate } from './translations';

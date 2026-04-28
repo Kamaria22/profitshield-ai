@@ -13,9 +13,7 @@ import {
   Shield,
   DollarSign,
   FlaskConical,
-  RefreshCw,
-  ChevronRight,
-  AlertTriangle
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 

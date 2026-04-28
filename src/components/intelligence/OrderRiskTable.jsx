@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Shield, AlertTriangle, RefreshCw, Loader2, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Shield, RefreshCw, Loader2, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 

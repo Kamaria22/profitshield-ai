@@ -4,18 +4,20 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "allowJs": true,
     "jsx": "react-jsx",
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["esnext", "dom"],
     "target": "esnext",
     "checkJs": true,
+    "maxNodeModuleJsDepth": 0,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": []
+    "types": ["node"]
   },
-  "include": ["src/components/**/*.js", "src/pages/**/*.jsx", "src/Layout.jsx"],
+  "include": ["src/components/**/*.js", "src/components/**/*.jsx", "src/pages/**/*.jsx", "src/Layout.jsx", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "src/vite-plugins", "src/components/ui", "src/api", "src/lib"]
 } 

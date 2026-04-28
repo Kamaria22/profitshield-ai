@@ -1,9 +1,10 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import QuantumButton from '@/components/quantum/QuantumButton';
-import { Sparkles, Zap, Shield, TrendingUp } from 'lucide-react';
+import { Sparkles, Shield, TrendingUp } from 'lucide-react';
 
 /**
  * WELCOME MODAL

@@ -13,8 +13,7 @@ import {
   Users, 
   Trophy,
   Loader2,
-  Share2,
-  Mail
+  Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 

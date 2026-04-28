@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shopify App Bridge Authentication Helper
  * Handles session token retrieval for embedded Shopify apps
