@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, RefreshCw, Shield, Sparkles } from 'lucide-react';
+import { Activity, BarChart3, RefreshCw, Shield, Sparkles, TriangleAlert } from 'lucide-react';
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -25,6 +25,10 @@ function getRiskLevel(highRiskOrders) {
   return 'Low';
 }
 
+function pluralize(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 const toneMap = {
   primary: '#00E5FF',
   secondary: '#5B6CFF',
@@ -33,14 +37,38 @@ const toneMap = {
   warning: '#F59E0B',
 };
 
+const iconMap = {
+  'Profit Integrity': Activity,
+  'Net Profit (30d)': BarChart3,
+  'Risk Level': Shield,
+  'Alerts Count': TriangleAlert,
+  'AI Status': Sparkles,
+};
+
 function StatCell({ label, value, meta, tone = 'primary' }) {
+  const Icon = iconMap[label] || Activity;
   return (
-    <div className="dashboard-panel">
-      <p className="dashboard-label">{label}</p>
-      <p className="dashboard-metric mt-2" style={{ color: toneMap[tone] || '#FFFFFF' }}>
+    <div
+      className="dashboard-panel"
+      style={{
+        background:
+          'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.028))',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="dashboard-label">{label}</p>
+        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
+          <Icon className="h-4 w-4 text-slate-300" />
+        </div>
+      </div>
+      <p className="dashboard-metric mt-3" style={{ color: toneMap[tone] || '#FFFFFF' }}>
         {value}
       </p>
-      {meta ? <p className="mt-2 text-xs text-slate-400">{meta}</p> : null}
+      {meta ? (
+        <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-300">
+          {meta}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -75,6 +103,9 @@ export default function TopCommandBar({
   const riskLevel = getRiskLevel(metrics?.highRiskOrders || 0);
   const alertsCount = Array.isArray(alerts) ? alerts.length : 0;
   const storeName = tenant?.shop_name || 'Merchant Runtime';
+  const riskMeta = `${pluralize(Number(metrics?.highRiskOrders || 0), 'flagged order')}`;
+  const alertMeta = alertsCount ? 'Needs review' : 'All clear';
+  const integrityMeta = `${Math.round(Number(profitScore || 0)) >= 70 ? 'Strong operating posture' : 'Signal still developing'}`;
 
   return (
     <div className="space-y-3">
@@ -119,7 +150,7 @@ export default function TopCommandBar({
         <StatCell
           label="Profit Integrity"
           value={`${Math.round(Number(profitScore || 0))}`}
-          meta="/100"
+          meta={`${integrityMeta} · /100`}
           tone="primary"
         />
         <StatCell
@@ -131,13 +162,13 @@ export default function TopCommandBar({
         <StatCell
           label="Risk Level"
           value={riskLevel}
-          meta={`${Number(metrics?.highRiskOrders || 0)} flagged orders`}
+          meta={riskMeta}
           tone={riskLevel === 'High' ? 'warning' : riskLevel === 'Medium' ? 'accent' : 'success'}
         />
         <StatCell
           label="Alerts Count"
           value={String(alertsCount)}
-          meta={alertsCount ? 'Needs review' : 'All clear'}
+          meta={alertMeta}
           tone={alertsCount ? 'warning' : 'success'}
         />
         <StatCell

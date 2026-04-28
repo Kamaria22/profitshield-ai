@@ -49,8 +49,8 @@ export default function ControlPanel({ tenantId, integrationId, integrationStatu
   return (
     <div className="dashboard-panel space-y-3">
       <div>
-        <p className="dashboard-label">Control Panel</p>
-        <p className="mt-2 text-sm text-slate-400">Core merchant controls, sync health, and direct access.</p>
+        <p className="dashboard-label">Command Controls</p>
+        <p className="mt-2 text-sm text-slate-400">Core controls, sync runtime, and direct operator access.</p>
       </div>
       <ControlRow
         icon={Zap}
