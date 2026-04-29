@@ -139,20 +139,17 @@ const PRIMARY_NAV_PAGES = new Set([
   'Intelligence',
   'Alerts',
   'Integrations',
+  'Billing',
+  'HelpCenter',
 ]);
 
-const OPERATIONS_NAV_PAGES = new Set([
+const UTILITY_NAV_PAGES = new Set([
   'Products',
   'Shipping',
   'Tasks',
-]);
-
-const ACCOUNT_NAV_PAGES = new Set([
-  'Billing',
-  'HelpCenter',
-  'Settings',
   'Referrals',
   'Download',
+  'Settings',
 ]);
 
 const SYSTEM_NAV_PAGES = new Set([
@@ -190,8 +187,7 @@ function getMobileNavLabel(item) {
 function groupNavItems(items) {
   const groups = {
     primary: [],
-    operations: [],
-    account: [],
+    utility: [],
     system: [],
     admin: [],
   };
@@ -199,10 +195,9 @@ function groupNavItems(items) {
   for (const item of items) {
     if (ADMIN_NAV_PAGES.has(item.page)) groups.admin.push(item);
     else if (SYSTEM_NAV_PAGES.has(item.page)) groups.system.push(item);
-    else if (ACCOUNT_NAV_PAGES.has(item.page)) groups.account.push(item);
-    else if (OPERATIONS_NAV_PAGES.has(item.page)) groups.operations.push(item);
+    else if (UTILITY_NAV_PAGES.has(item.page)) groups.utility.push(item);
     else if (PRIMARY_NAV_PAGES.has(item.page)) groups.primary.push(item);
-    else groups.account.push(item);
+    else groups.utility.push(item);
   }
 
   return groups;
@@ -452,14 +447,12 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSectionsOpen, setDesktopSectionsOpen] = useState({
-    operations: false,
-    account: false,
+    utility: false,
     system: false,
     admin: false,
   });
   const [mobileSectionsOpen, setMobileSectionsOpen] = useState({
-    operations: false,
-    account: false,
+    utility: false,
     system: false,
     admin: false,
   });
@@ -543,8 +536,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     const currentGroup =
       ADMIN_NAV_PAGES.has(currentPageName) ? 'admin' :
       SYSTEM_NAV_PAGES.has(currentPageName) ? 'system' :
-      ACCOUNT_NAV_PAGES.has(currentPageName) ? 'account' :
-      OPERATIONS_NAV_PAGES.has(currentPageName) ? 'operations' :
+      UTILITY_NAV_PAGES.has(currentPageName) ? 'utility' :
       null;
     if (!currentGroup) return;
     setDesktopSectionsOpen((prev) => ({ ...prev, [currentGroup]: true }));
@@ -560,7 +552,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
         to={item.path || createPageUrl(item.page, location.search)}
         onClick={handleSidebarClose}
         className={`
-          flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
           transition-all duration-150
           ${isActive
             ? compact
@@ -940,8 +932,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Core</p>
             </div>
             {groupedNavItems.primary.map((item) => renderNavItem(item))}
-            {renderNavSection('Operations', groupedNavItems.operations, desktopSectionsOpen.operations, () => toggleDesktopSection('operations'))}
-            {renderNavSection('Account & Support', groupedNavItems.account, desktopSectionsOpen.account, () => toggleDesktopSection('account'))}
+              {renderNavSection('Utilities', groupedNavItems.utility, desktopSectionsOpen.utility, () => toggleDesktopSection('utility'))}
           </nav>
 
           {/* User Menu */}
@@ -1135,8 +1126,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
             <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
               {mobileMenuItems.primary.map((item) => renderNavItem(item, true))}
-              {renderNavSection('Operations', mobileMenuItems.operations, mobileSectionsOpen.operations, () => toggleMobileSection('operations'), true)}
-              {renderNavSection('Account & Support', mobileMenuItems.account, mobileSectionsOpen.account, () => toggleMobileSection('account'), true)}
+              {renderNavSection('Utilities', mobileMenuItems.utility, mobileSectionsOpen.utility, () => toggleMobileSection('utility'), true)}
               {renderNavSection('System & Debug', mobileMenuItems.system, mobileSectionsOpen.system, () => toggleMobileSection('system'), true)}
               {isAdmin ? renderNavSection('Admin Tools', mobileMenuItems.admin, mobileSectionsOpen.admin, () => toggleMobileSection('admin'), true) : null}
             </nav>
