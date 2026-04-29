@@ -139,17 +139,20 @@ const PRIMARY_NAV_PAGES = new Set([
   'Intelligence',
   'Alerts',
   'Integrations',
-  'Billing',
-  'HelpCenter',
 ]);
 
-const SECONDARY_NAV_PAGES = new Set([
+const OPERATIONS_NAV_PAGES = new Set([
   'Products',
   'Shipping',
   'Tasks',
+]);
+
+const ACCOUNT_NAV_PAGES = new Set([
+  'Billing',
+  'HelpCenter',
+  'Settings',
   'Referrals',
   'Download',
-  'Settings',
 ]);
 
 const SYSTEM_NAV_PAGES = new Set([
@@ -187,7 +190,8 @@ function getMobileNavLabel(item) {
 function groupNavItems(items) {
   const groups = {
     primary: [],
-    secondary: [],
+    operations: [],
+    account: [],
     system: [],
     admin: [],
   };
@@ -195,9 +199,10 @@ function groupNavItems(items) {
   for (const item of items) {
     if (ADMIN_NAV_PAGES.has(item.page)) groups.admin.push(item);
     else if (SYSTEM_NAV_PAGES.has(item.page)) groups.system.push(item);
-    else if (SECONDARY_NAV_PAGES.has(item.page)) groups.secondary.push(item);
+    else if (ACCOUNT_NAV_PAGES.has(item.page)) groups.account.push(item);
+    else if (OPERATIONS_NAV_PAGES.has(item.page)) groups.operations.push(item);
     else if (PRIMARY_NAV_PAGES.has(item.page)) groups.primary.push(item);
-    else groups.secondary.push(item);
+    else groups.account.push(item);
   }
 
   return groups;
@@ -447,12 +452,14 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSectionsOpen, setDesktopSectionsOpen] = useState({
-    secondary: false,
+    operations: false,
+    account: false,
     system: false,
     admin: false,
   });
   const [mobileSectionsOpen, setMobileSectionsOpen] = useState({
-    secondary: false,
+    operations: false,
+    account: false,
     system: false,
     admin: false,
   });
@@ -536,7 +543,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
     const currentGroup =
       ADMIN_NAV_PAGES.has(currentPageName) ? 'admin' :
       SYSTEM_NAV_PAGES.has(currentPageName) ? 'system' :
-      SECONDARY_NAV_PAGES.has(currentPageName) ? 'secondary' :
+      ACCOUNT_NAV_PAGES.has(currentPageName) ? 'account' :
+      OPERATIONS_NAV_PAGES.has(currentPageName) ? 'operations' :
       null;
     if (!currentGroup) return;
     setDesktopSectionsOpen((prev) => ({ ...prev, [currentGroup]: true }));
@@ -932,20 +940,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Core</p>
             </div>
             {groupedNavItems.primary.map((item) => renderNavItem(item))}
-            {renderNavSection('More', groupedNavItems.secondary, desktopSectionsOpen.secondary, () => toggleDesktopSection('secondary'))}
-            {renderNavSection('System & Debug', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
-            {isAdmin ? renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin')) : null}
+            {renderNavSection('Operations', groupedNavItems.operations, desktopSectionsOpen.operations, () => toggleDesktopSection('operations'))}
+            {renderNavSection('Account & Support', groupedNavItems.account, desktopSectionsOpen.account, () => toggleDesktopSection('account'))}
           </nav>
-
-          {/* Legal Footer Links */}
-          <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-white/8">
-            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
-            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
-            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
-            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
-            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
-            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
-          </div>
 
           {/* User Menu */}
           {activeUser && (
@@ -1001,6 +998,23 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               </DropdownMenu>
             </div>
           )}
+
+          {(groupedNavItems.system.length > 0 || (isAdmin && groupedNavItems.admin.length > 0)) && (
+            <div className="border-t border-white/8 px-3 py-3">
+              {renderNavSection('System & Debug', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
+              {isAdmin ? renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin')) : null}
+            </div>
+          )}
+
+          {/* Legal Footer Links */}
+          <div className="border-t border-white/8 px-4 py-3 flex flex-wrap gap-x-3 gap-y-1">
+            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
+            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
+            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
+            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
+            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
+            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
+          </div>
         </div>
       </aside>
 
@@ -1121,7 +1135,8 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
             <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
               {mobileMenuItems.primary.map((item) => renderNavItem(item, true))}
-              {renderNavSection('More', mobileMenuItems.secondary, mobileSectionsOpen.secondary, () => toggleMobileSection('secondary'), true)}
+              {renderNavSection('Operations', mobileMenuItems.operations, mobileSectionsOpen.operations, () => toggleMobileSection('operations'), true)}
+              {renderNavSection('Account & Support', mobileMenuItems.account, mobileSectionsOpen.account, () => toggleMobileSection('account'), true)}
               {renderNavSection('System & Debug', mobileMenuItems.system, mobileSectionsOpen.system, () => toggleMobileSection('system'), true)}
               {isAdmin ? renderNavSection('Admin Tools', mobileMenuItems.admin, mobileSectionsOpen.admin, () => toggleMobileSection('admin'), true) : null}
             </nav>
