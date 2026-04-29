@@ -534,8 +534,10 @@ export default function Home() {
           profitScore={profitScore}
           metrics={metrics}
           alerts={visibleAlerts}
+          orders={dashboardSummary?.orders || []}
           aiStatus={aiStatus}
           lastActionAt={dashboardSummary?.lastSyncAt}
+          integrationStatus={dashboardSummary?.integrationStatus}
           syncing={syncMutation.isPending}
           onSync={() => syncMutation.mutate()}
           onOpenInsights={() => navigate(createPageUrl('AIInsights', location.search))}

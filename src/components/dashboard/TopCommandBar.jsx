@@ -25,6 +25,71 @@ function getRiskLevel(highRiskOrders) {
   return 'Low';
 }
 
+function deriveProfitTrend(orders = []) {
+  const source = Array.isArray(orders) ? orders.slice(0, 8) : [];
+  if (source.length < 4) {
+    return { direction: 'flat', label: 'Stable vs prior period', delta: 0 };
+  }
+
+  const midpoint = Math.ceil(source.length / 2);
+  const latest = source.slice(0, midpoint);
+  const prior = source.slice(midpoint);
+
+  const latestProfit = latest.reduce((sum, order) => sum + Number(order?.net_profit || order?.total_revenue || 0), 0);
+  const priorProfit = prior.reduce((sum, order) => sum + Number(order?.net_profit || order?.total_revenue || 0), 0);
+
+  if (!priorProfit) {
+    return { direction: latestProfit > 0 ? 'up' : 'flat', label: 'Fresh signal', delta: 0 };
+  }
+
+  const delta = ((latestProfit - priorProfit) / Math.abs(priorProfit)) * 100;
+  if (delta > 5) return { direction: 'up', label: `Up ${delta.toFixed(1)}% vs prior period`, delta };
+  if (delta < -5) return { direction: 'down', label: `Down ${Math.abs(delta).toFixed(1)}% vs prior period`, delta };
+  return { direction: 'flat', label: 'Flat vs prior period', delta };
+}
+
+function deriveInterpretation({ metrics, alertsCount, profitScore }) {
+  const margin = Number(metrics?.avgMargin || 0);
+  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
+  if (highRiskOrders > 0) return 'Risk pressure detected';
+  if (alertsCount > 0) return 'Operational pressure detected';
+  if (margin < 20) return 'Margin pressure detected';
+  if (profitScore >= 70) return 'Operating posture is healthy';
+  return 'Signal is still developing';
+}
+
+function derivePrimaryRisk({ metrics, alertsCount, integrationStatus }) {
+  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
+  if (highRiskOrders > 0) return `${pluralize(highRiskOrders, 'flagged order')} require review`;
+  if (alertsCount > 0) return `${pluralize(alertsCount, 'alert')} are waiting in queue`;
+  if (integrationStatus && integrationStatus !== 'connected') return `Runtime is ${integrationStatus}`;
+  return 'No immediate fraud or sync threats';
+}
+
+function deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable }) {
+  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
+  if (highRiskOrders > 0) return 'Open Risk Intelligence';
+  if (alertsCount > 0) return 'Review alerts';
+  if (integrationStatus && integrationStatus !== 'connected') return 'Stabilize integrations';
+  if (onSyncAvailable) return 'Run sync to refresh telemetry';
+  return 'Continue monitoring';
+}
+
+function deriveAiStatusMessage({ syncing, aiStatus, lastActionAt, integrationStatus, alertsCount, highRiskOrders }) {
+  if (syncing) return { last: 'Syncing merchant telemetry now', next: 'Next: refresh dashboard and queue state' };
+  const last = aiStatus === 'Active'
+    ? `Last action: telemetry refresh at ${formatTimestamp(lastActionAt)}`
+    : 'Last action: awaiting first live telemetry cycle';
+
+  let next = 'Next: continue monitoring';
+  if (highRiskOrders > 0) next = 'Next: prioritize flagged order review';
+  else if (alertsCount > 0) next = 'Next: surface pending alert actions';
+  else if (integrationStatus && integrationStatus !== 'connected') next = 'Next: repair runtime connection';
+  else if (aiStatus === 'Active') next = 'Next: watch for profit, risk, and webhook changes';
+
+  return { last, next };
+}
+
 function pluralize(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -87,13 +152,24 @@ function ActionButton({ icon: Icon, label, onClick, disabled = false, spinning =
   );
 }
 
+function DecisionCell({ label, value, tone = 'text-slate-100' }) {
+  return (
+    <div className="dashboard-subpanel">
+      <p className="dashboard-label">{label}</p>
+      <p className={`mt-3 text-sm font-semibold ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
 export default function TopCommandBar({
   tenant,
   profitScore,
   metrics,
   alerts,
+  orders = [],
   aiStatus,
   lastActionAt,
+  integrationStatus,
   syncing = false,
   onSync,
   onOpenReport,
@@ -106,6 +182,18 @@ export default function TopCommandBar({
   const riskMeta = `${pluralize(Number(metrics?.highRiskOrders || 0), 'flagged order')}`;
   const alertMeta = alertsCount ? 'Needs review' : 'All clear';
   const integrityMeta = `${Math.round(Number(profitScore || 0)) >= 70 ? 'Strong operating posture' : 'Signal still developing'}`;
+  const trend = deriveProfitTrend(orders);
+  const interpretation = deriveInterpretation({ metrics, alertsCount, profitScore });
+  const primaryRisk = derivePrimaryRisk({ metrics, alertsCount, integrationStatus });
+  const nextAction = deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable: !!onSync });
+  const aiMessage = deriveAiStatusMessage({
+    syncing,
+    aiStatus,
+    lastActionAt,
+    integrationStatus,
+    alertsCount,
+    highRiskOrders: Number(metrics?.highRiskOrders || 0),
+  });
 
   return (
     <div className="space-y-3">
@@ -156,7 +244,7 @@ export default function TopCommandBar({
         <StatCell
           label="Net Profit (30d)"
           value={formatCurrency(metrics?.totalProfit)}
-          meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin`}
+          meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin · ${trend.label}`}
           tone={Number(metrics?.totalProfit || 0) >= 0 ? 'success' : 'warning'}
         />
         <StatCell
@@ -174,8 +262,31 @@ export default function TopCommandBar({
         <StatCell
           label="AI Status"
           value={aiStatus}
-          meta={formatTimestamp(lastActionAt)}
+          meta={aiMessage.last.replace('Last action: ', '')}
           tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
+        />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DecisionCell
+          label="Interpretation"
+          value={interpretation}
+          tone={interpretation.includes('pressure') ? 'text-amber-300' : 'text-emerald-300'}
+        />
+        <DecisionCell
+          label="Trend"
+          value={trend.label}
+          tone={trend.direction === 'up' ? 'text-emerald-300' : trend.direction === 'down' ? 'text-rose-300' : 'text-slate-100'}
+        />
+        <DecisionCell
+          label="Primary Risk"
+          value={primaryRisk}
+          tone={primaryRisk.includes('No immediate') ? 'text-slate-100' : 'text-amber-300'}
+        />
+        <DecisionCell
+          label="Next Action"
+          value={`${nextAction} · ${aiMessage.next.replace('Next: ', '')}`}
+          tone="text-cyan-300"
         />
       </div>
     </div>
