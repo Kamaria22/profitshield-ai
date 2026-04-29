@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
-  Store, ShoppingCart, Link2, RefreshCw, Settings, CheckCircle, XCircle,
+  Store, Link2, RefreshCw, Settings, CheckCircle, XCircle,
   AlertTriangle, Clock, ArrowUpDown, Webhook, MoreVertical,
   Shield, Activity, Loader2, Unplug
 } from 'lucide-react';
@@ -31,7 +31,7 @@ import { parseQuery, getPersistedContext, hardResetAllContexts, createPageUrl } 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { invokeWithRetry } from '@/lib/safeApi';
-import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 const PLATFORM_INFO = {
   shopify: {
@@ -557,6 +557,24 @@ export default function Integrations() {
           <p className="mt-1 text-slate-400">Connect e-commerce platforms for order sync, webhook registration, and risk scoring.</p>
         </div>
         <div className="flex gap-2">
+          {integrations.filter(i => isSyncRecoverable(i)).length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                integrations
+                  .filter(i => isSyncRecoverable(i))
+                  .forEach(i => syncMutation.mutate({ integration_id: i.id, job_type: 'incremental_sync' }));
+              }}
+              disabled={syncMutation.isPending}
+            >
+              {syncMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sync All
+            </Button>
+          )}
           {isAdmin && (
             <>
               <Button variant="outline" onClick={() => setRepairDialogOpen(true)}>
@@ -840,150 +858,6 @@ export default function Integrations() {
           </CommandCardContent>
         </CommandCard>
       </div>
-
-      {/* Sync Status Overview */}
-      {integrations.length > 0 && (
-        <CommandCard>
-          <CommandCardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CommandCardTitle className="text-lg">Sync Status Overview</CommandCardTitle>
-                <CommandCardDescription>Quick view of all platform sync statuses</CommandCardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  integrations
-                    .filter(i => isSyncRecoverable(i))
-                    .forEach(i => syncMutation.mutate({ integration_id: i.id, job_type: 'incremental_sync' }));
-                }}
-                disabled={syncMutation.isPending || integrations.filter(i => isSyncRecoverable(i)).length === 0}
-              >
-                {syncMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                )}
-                Sync All
-              </Button>
-            </div>
-          </CommandCardHeader>
-          <CommandCardContent>
-            <div className="grid gap-3">
-              {integrations.map((integration) => {
-                const platformInfo = PLATFORM_INFO[integration.platform] || {};
-                const lastSync = integration.last_sync_at ? new Date(integration.last_sync_at) : null;
-                const timeSinceSync = lastSync ? Math.round((Date.now() - lastSync.getTime()) / 60000) : null;
-                const syncStatus = integration.last_sync_status;
-                
-                return (
-                  <div 
-                    key={integration.id}
-                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-lg ${platformInfo.color || 'bg-gray-500'}`}>
-                        <span className="text-xl">{platformInfo.icon || '🔗'}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{integration.store_name || integration.store_key}</p>
-                          {getStatusBadge(integration.status)}
-                        </div>
-                        <div className="mt-1 flex items-center gap-3 text-sm text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {lastSync ? (
-                              timeSinceSync < 60 
-                                ? `${timeSinceSync}m ago`
-                                : timeSinceSync < 1440
-                                ? `${Math.round(timeSinceSync / 60)}h ago`
-                                : `${Math.round(timeSinceSync / 1440)}d ago`
-                            ) : 'Never synced'}
-                          </span>
-                          {syncStatus && (
-                            <span className={`flex items-center gap-1 ${
-                              syncStatus === 'success' ? 'text-emerald-300' :
-                              syncStatus === 'failed' ? 'text-red-300' : 'text-amber-300'
-                            }`}>
-                              {syncStatus === 'success' ? <CheckCircle className="w-3 h-3" /> :
-                               syncStatus === 'failed' ? <XCircle className="w-3 h-3" /> :
-                               <AlertTriangle className="w-3 h-3" />}
-                              {syncStatus}
-                            </span>
-                          )}
-                          {integration.last_sync_stats?.orders_synced > 0 && (
-                            <span>{integration.last_sync_stats.orders_synced} orders</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isSyncRecoverable(integration) && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => syncMutation.mutate({ integration_id: integration.id, job_type: 'incremental_sync' })}
-                            disabled={syncMutation.isPending}
-                          >
-                            {syncMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <><RefreshCw className="w-4 h-4 mr-1" /> Sync</>
-                            )}
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => syncMutation.mutate({ integration_id: integration.id, job_type: 'full_sync' })}>
-                                <RefreshCw className="w-4 h-4 mr-2" /> Full Sync
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => syncMutation.mutate({ integration_id: integration.id, job_type: 'orders_only' })}>
-                                <ShoppingCart className="w-4 h-4 mr-2" /> Orders Only
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => syncMutation.mutate({ integration_id: integration.id, job_type: 'products_only' })}>
-                                <Store className="w-4 h-4 mr-2" /> Products Only
-                              </DropdownMenuItem>
-                              {integration.two_way_sync?.enabled && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => pushRiskMutation.mutate(integration.id)}>
-                                    <ArrowUpDown className="w-4 h-4 mr-2" /> Push Risk Scores
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </>
-                      )}
-                      {integration.status === 'disconnected' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedIntegration(integration);
-                            setSelectedPlatform(integration.platform);
-                            setCredentials({ store_url: integration.store_url });
-                            setConnectDialogOpen(true);
-                          }}
-                        >
-                          <Link2 className="w-4 h-4 mr-1" /> Reconnect
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CommandCardContent>
-        </CommandCard>
-      )}
 
       {/* Main Tabs */}
       <Tabs defaultValue="integrations" className="space-y-4">
