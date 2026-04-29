@@ -507,6 +507,9 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   const mobileMenuItems = groupedNavItems;
   const showPhoneQuickNav = device.isMobile && mobileQuickNav.length > 0;
   const menuAttentionCount = pendingAlerts + (isAdmin ? supportUnread : 0);
+  const showDesktopUtilitySection = isAdmin;
+  const showDesktopSystemSections = isAdmin && (groupedNavItems.system.length > 0 || groupedNavItems.admin.length > 0);
+  const showDesktopLegalFooter = isAdmin;
 
   
   // Memoized handlers
@@ -932,7 +935,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Core</p>
             </div>
             {groupedNavItems.primary.map((item) => renderNavItem(item))}
-              {renderNavSection('Utilities', groupedNavItems.utility, desktopSectionsOpen.utility, () => toggleDesktopSection('utility'))}
+            {showDesktopUtilitySection ? renderNavSection('Utilities', groupedNavItems.utility, desktopSectionsOpen.utility, () => toggleDesktopSection('utility')) : null}
           </nav>
 
           {/* User Menu */}
@@ -990,7 +993,7 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
 
-          {(groupedNavItems.system.length > 0 || (isAdmin && groupedNavItems.admin.length > 0)) && (
+          {showDesktopSystemSections && (
             <div className="border-t border-white/8 px-3 py-3">
               {renderNavSection('System & Debug', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
               {isAdmin ? renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin')) : null}
@@ -998,14 +1001,16 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
           )}
 
           {/* Legal Footer Links */}
-          <div className="border-t border-white/8 px-4 py-3 flex flex-wrap gap-x-3 gap-y-1">
-            <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
-            <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
-            <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
-            <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
-            <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
-            <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
-          </div>
+          {showDesktopLegalFooter ? (
+            <div className="border-t border-white/8 px-4 py-3 flex flex-wrap gap-x-3 gap-y-1">
+              <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
+              <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
+              <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
+              <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
+              <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
+              <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
+            </div>
+          ) : null}
         </div>
       </aside>
 
