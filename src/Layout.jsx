@@ -130,6 +130,46 @@ const navItems = [
   { name: 'Settings', page: 'Settings', icon: Settings, permission: 'settings_view' },
 ];
 
+const PRIMARY_NAV_PAGES = new Set([
+  'Home',
+  'AIInsights',
+  'Orders',
+  'Customers',
+  'PnLAnalytics',
+  'Intelligence',
+  'Alerts',
+  'Integrations',
+  'Billing',
+  'HelpCenter',
+]);
+
+const SECONDARY_NAV_PAGES = new Set([
+  'Products',
+  'Shipping',
+  'Tasks',
+  'Referrals',
+  'Download',
+  'Settings',
+]);
+
+const SYSTEM_NAV_PAGES = new Set([
+  'SystemHealth',
+  'AuditLogs',
+]);
+
+const ADMIN_NAV_PAGES = new Set([
+  'AdminEmailCenter',
+  'SupportInbox',
+  'SelfHealingCenter',
+  'PatchReview',
+  'FounderDashboard',
+  'VideoJobs',
+  'AppStoreListing',
+  'ReviewerProof',
+  'GitHubPullRequests',
+  'NativeBuildGuide',
+]);
+
 const MOBILE_NAV_LABELS = {
   Home: 'Home',
   Orders: 'Orders',
@@ -142,6 +182,25 @@ const MOBILE_NAV_LABELS = {
 function getMobileNavLabel(item) {
   if (!item?.page) return item?.name || '';
   return MOBILE_NAV_LABELS[item.page] || item.name?.split(' ')[0] || item.name || '';
+}
+
+function groupNavItems(items) {
+  const groups = {
+    primary: [],
+    secondary: [],
+    system: [],
+    admin: [],
+  };
+
+  for (const item of items) {
+    if (ADMIN_NAV_PAGES.has(item.page)) groups.admin.push(item);
+    else if (SYSTEM_NAV_PAGES.has(item.page)) groups.system.push(item);
+    else if (SECONDARY_NAV_PAGES.has(item.page)) groups.secondary.push(item);
+    else if (PRIMARY_NAV_PAGES.has(item.page)) groups.primary.push(item);
+    else groups.secondary.push(item);
+  }
+
+  return groups;
 }
 
 // Shopify App Store-facing sidebar should stay focused on merchant runtime actions.
@@ -387,6 +446,16 @@ const useFilteredNavItems = (hasPermission, isAdmin, userRole) => {
 
 function LayoutContent({ children, currentPageName, resolver = {} }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSectionsOpen, setDesktopSectionsOpen] = useState({
+    secondary: false,
+    system: false,
+    admin: false,
+  });
+  const [mobileSectionsOpen, setMobileSectionsOpen] = useState({
+    secondary: false,
+    system: false,
+    admin: false,
+  });
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const [supportUnread, setSupportUnread] = useState(0);
   const [isBottomNavHidden, setIsBottomNavHidden] = useState(false);
@@ -430,11 +499,12 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   // Memoized nav items
   const userRole = activeUser?.role || activeUser?.app_role || permissionRole || 'user';
   const filteredNavItems = useFilteredNavItems(hasPermission, isAdmin, userRole);
+  const groupedNavItems = useMemo(() => groupNavItems(filteredNavItems), [filteredNavItems]);
   const mobileQuickNav = useMemo(() => {
     const allowed = new Set(['Home', 'Orders', 'Alerts', 'Integrations']);
     return filteredNavItems.filter((item) => allowed.has(item.page)).slice(0, 4);
   }, [filteredNavItems]);
-  const mobileMenuItems = filteredNavItems;
+  const mobileMenuItems = groupedNavItems;
   const showPhoneQuickNav = device.isMobile && mobileQuickNav.length > 0;
   const menuAttentionCount = pendingAlerts + (isAdmin ? supportUnread : 0);
 
@@ -451,10 +521,92 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
   
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
   const handleSidebarOpen = useCallback(() => setSidebarOpen((prev) => !prev), []);
+  const toggleDesktopSection = useCallback((key) => {
+    setDesktopSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+  const toggleMobileSection = useCallback((key) => {
+    setMobileSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const currentGroup =
+      ADMIN_NAV_PAGES.has(currentPageName) ? 'admin' :
+      SYSTEM_NAV_PAGES.has(currentPageName) ? 'system' :
+      SECONDARY_NAV_PAGES.has(currentPageName) ? 'secondary' :
+      null;
+    if (!currentGroup) return;
+    setDesktopSectionsOpen((prev) => ({ ...prev, [currentGroup]: true }));
+    setMobileSectionsOpen((prev) => ({ ...prev, [currentGroup]: true }));
+  }, [currentPageName]);
+
+  const renderNavItem = useCallback((item, compact = false) => {
+    const isActive = currentPageName === item.page;
+    const Icon = item.icon;
+    return (
+      <Link
+        key={compact ? `mobile-${item.page}` : item.page}
+        to={item.path || createPageUrl(item.page, location.search)}
+        onClick={handleSidebarClose}
+        className={`
+          flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+          transition-all duration-150
+          ${isActive
+            ? compact
+              ? 'bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(129,140,248,0.14))] text-cyan-100 border border-cyan-400/20'
+              : 'bg-white/[0.06] text-slate-100 border border-white/10'
+            : compact
+              ? 'text-slate-300 hover:bg-white/[0.04] border border-transparent'
+              : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 border border-transparent'
+          }
+        `}
+        aria-current={isActive ? 'page' : undefined}
+      >
+        <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} aria-hidden="true" />
+        {item.name}
+        {item.adminBadge && (
+          <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(129,140,248,0.35)', color: '#a5b4fc' }}>
+            ADMIN
+          </span>
+        )}
+        {item.page === 'Alerts' && pendingAlerts > 0 && (
+          <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
+            {pendingAlerts}
+          </Badge>
+        )}
+        {item.page === 'AdminEmailCenter' && supportUnread > 0 && (
+          <Badge className="ml-auto bg-indigo-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${supportUnread} unread support messages`}>
+            {supportUnread}
+          </Badge>
+        )}
+      </Link>
+    );
+  }, [currentPageName, handleSidebarClose, location.search, pendingAlerts, supportUnread]);
+
+  const renderNavSection = useCallback((label, items, open, onToggle, compact = false) => {
+    if (!items.length) return null;
+    return (
+      <div className={compact ? 'pt-2' : 'pt-3'}>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`flex w-full items-center justify-between px-3 ${compact ? 'py-2' : 'py-1.5'} text-[10px] uppercase tracking-[0.16em] text-slate-500`}
+        >
+          <span>{label}</span>
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open ? (
+          <div className="space-y-1">
+            {items.map((item) => renderNavItem(item, compact))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }, [renderNavItem]);
 
   useEffect(() => {
     if (!showPhoneQuickNav) {
@@ -776,45 +928,13 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
-            {filteredNavItems.map((item) => {
-              const isActive = currentPageName === item.page;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.page}
-                  to={item.path || createPageUrl(item.page, location.search)}
-                  onClick={handleSidebarClose}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                    transition-all duration-150
-                    ${isActive
-                      ? 'bg-white/[0.06] text-slate-100 border border-white/10'
-                      : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 border border-transparent'
-                    }
-                  `}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} aria-hidden="true" />
-                  {item.name}
-                  {item.adminBadge && (
-                    <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
-                      style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(129,140,248,0.35)', color: '#a5b4fc' }}>
-                      ADMIN
-                    </span>
-                  )}
-                  {item.page === 'Alerts' && pendingAlerts > 0 && (
-                    <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${pendingAlerts} pending alerts`}>
-                      {pendingAlerts}
-                    </Badge>
-                  )}
-                  {item.page === 'AdminEmailCenter' && supportUnread > 0 && (
-                    <Badge className="ml-auto bg-indigo-500/90 text-white text-xs px-1.5 py-0.5" aria-label={`${supportUnread} unread support messages`}>
-                      {supportUnread}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
+            <div className="px-3 pb-1">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Core</p>
+            </div>
+            {groupedNavItems.primary.map((item) => renderNavItem(item))}
+            {renderNavSection('More', groupedNavItems.secondary, desktopSectionsOpen.secondary, () => toggleDesktopSection('secondary'))}
+            {renderNavSection('System & Debug', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
+            {isAdmin ? renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin')) : null}
           </nav>
 
           {/* Legal Footer Links */}
@@ -1000,36 +1120,10 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 mb-1">Core</p>
             </div>
             <nav className="p-2 space-y-1" role="navigation" aria-label="Mobile tab navigation">
-              {mobileMenuItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentPageName === item.page;
-                return (
-                  <Link
-                    key={`dropdown-${item.page}`}
-                    to={item.path || createPageUrl(item.page, location.search)}
-                    onClick={handleSidebarClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${
-                      isActive
-                        ? 'bg-[linear-gradient(135deg,rgba(56,189,248,0.14),rgba(129,140,248,0.14))] text-cyan-100 border border-cyan-400/20'
-                        : 'text-slate-300 hover:bg-white/[0.04] border border-transparent'
-                    }`}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} aria-hidden="true" />
-                    {item.name}
-                    {item.page === 'Alerts' && pendingAlerts > 0 && (
-                      <Badge className="ml-auto bg-red-500/90 text-white text-xs px-1.5 py-0.5">
-                        {pendingAlerts}
-                      </Badge>
-                    )}
-                    {item.page === 'AdminEmailCenter' && supportUnread > 0 && (
-                      <Badge className="ml-auto bg-indigo-500/90 text-white text-xs px-1.5 py-0.5">
-                        {supportUnread}
-                      </Badge>
-                    )}
-                  </Link>
-                );
-              })}
+              {mobileMenuItems.primary.map((item) => renderNavItem(item, true))}
+              {renderNavSection('More', mobileMenuItems.secondary, mobileSectionsOpen.secondary, () => toggleMobileSection('secondary'), true)}
+              {renderNavSection('System & Debug', mobileMenuItems.system, mobileSectionsOpen.system, () => toggleMobileSection('system'), true)}
+              {isAdmin ? renderNavSection('Admin Tools', mobileMenuItems.admin, mobileSectionsOpen.admin, () => toggleMobileSection('admin'), true) : null}
             </nav>
           </div>
         )}
