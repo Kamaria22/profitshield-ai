@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useCallback, lazy, Suspense, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl, getPersistedContext } from '@/components/platformContext';
@@ -19,18 +19,14 @@ import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, 
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
 import { useShouldShowTutorial, markTutorialCompleted } from '../components/onboarding/GamifiedOnboarding';
-import WelcomeChecklist from '../components/onboarding/WelcomeChecklist';
 
 import TopCommandBar from '../components/dashboard/TopCommandBar';
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 import ProfitCorePanel from '../components/dashboard/ProfitCorePanel';
-import RiskActionPanel from '../components/dashboard/RiskActionPanel';
 import ControlPanel from '../components/dashboard/ControlPanel';
-import CommerceScopePanel from '../components/dashboard/CommerceScopePanel';
-import MerchantIntelligencePanel from '../components/dashboard/MerchantIntelligencePanel';
-import NeuralOpsPanel from '../components/dashboard/NeuralOpsPanel';
-import RuntimeMeshPanel from '../components/dashboard/RuntimeMeshPanel';
-const ExpandablePanel = lazy(() => import('../components/dashboard/ExpandablePanel'));
+import ActionCenterPanel from '../components/dashboard/ActionCenterPanel';
+import SystemStatusPanel from '../components/dashboard/SystemStatusPanel';
+import RecentActivityPanel from '../components/dashboard/RecentActivityPanel';
 
 export default function Home() {
   const resolver = usePlatformResolver();
@@ -548,60 +544,31 @@ export default function Home() {
         <div className="mt-3 flex-1">
           <DashboardLayout
             left={(
-              <div className="space-y-3">
-                <ControlPanel
-                  tenantId={authTenantId}
-                  integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
-                  integrationStatus={dashboardSummary?.integrationStatus}
-                  aiStatus={aiStatus}
-                  onSync={() => {
-                    queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
-                    queryClient.invalidateQueries({ queryKey: profitLeaksKey });
-                  }}
-                />
-                <CommerceScopePanel
-                  tenantId={authTenantId}
-                  integrationStatus={dashboardSummary?.integrationStatus}
-                  subscriptionTier={tenant?.subscription_tier || 'trial'}
-                />
-              </div>
+              <ControlPanel
+                tenantId={authTenantId}
+                integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
+                integrationStatus={dashboardSummary?.integrationStatus}
+                aiStatus={aiStatus}
+                onSync={() => {
+                  queryClient.invalidateQueries({ queryKey: dashboardSummaryKey });
+                  queryClient.invalidateQueries({ queryKey: profitLeaksKey });
+                }}
+              />
             )}
             center={(
-              <div className="space-y-3">
-                <NeuralOpsPanel
-                  metrics={metrics}
-                  profitScore={profitScore}
-                  alerts={visibleAlerts}
-                />
-                <ProfitCorePanel
-                  metrics={metrics}
-                  orders={dashboardSummary?.orders || []}
-                />
-                <MerchantIntelligencePanel
-                  metrics={metrics}
-                  alerts={visibleAlerts}
-                  profitLeaks={displayProfitLeaks}
-                  orders={dashboardSummary?.orders || []}
-                />
-              </div>
+              <ProfitCorePanel
+                metrics={metrics}
+                orders={dashboardSummary?.orders || []}
+              />
             )}
             right={(
               <div className="space-y-3">
-                <RuntimeMeshPanel
-                  tenantId={authTenantId}
-                  integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
-                  integrationStatus={dashboardSummary?.integrationStatus}
-                  lastSyncAt={dashboardSummary?.lastSyncAt}
-                  alertsCount={visibleAlerts.length}
-                  highRiskOrders={Number(metrics?.highRiskOrders || 0)}
-                  syncing={syncMutation.isPending}
-                  onSync={() => syncMutation.mutate()}
-                />
-                <RiskActionPanel
+                <ActionCenterPanel
+                  metrics={metrics}
                   alerts={visibleAlerts}
                   profitLeaks={displayProfitLeaks}
-                  metrics={metrics}
                   integrationStatus={dashboardSummary?.integrationStatus}
+                  profitScore={profitScore}
                 />
                 {!dashboardHasData && (
                   <div className="dashboard-panel">
@@ -627,10 +594,17 @@ export default function Home() {
             )}
             bottom={(
               <div className="space-y-3">
-                <WelcomeChecklist />
-                <Suspense fallback={null}>
-                  <ExpandablePanel tenantId={authTenantId} />
-                </Suspense>
+                <SystemStatusPanel
+                  tenantId={authTenantId}
+                  integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
+                  integrationStatus={dashboardSummary?.integrationStatus}
+                  lastSyncAt={dashboardSummary?.lastSyncAt}
+                  syncing={syncMutation.isPending}
+                  onSync={() => syncMutation.mutate()}
+                />
+                <RecentActivityPanel
+                  orders={dashboardSummary?.orders || []}
+                />
               </div>
             )}
           />
