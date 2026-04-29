@@ -10,7 +10,7 @@ import {
   ShieldAlert, Users, Loader2,
   CheckCircle, XCircle, Lightbulb, Target, ArrowRight
 } from 'lucide-react';
-import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
+import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle, CommandCardDescription } from '@/components/ui/command-card';
 
 export default function AIOrderAnalysis({ orders, metrics, onHighlightOrders }) {
   const [analysis, setAnalysis] = useState(null);

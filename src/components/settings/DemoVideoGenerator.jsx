@@ -96,6 +96,9 @@ export default function DemoVideoGenerator({ resolver = {} }) {
   // Shopify App Bridge authentication
   const { token: shopifyToken, loading: tokenLoading, error: tokenError } = useAppBridgeToken();
 
+  const isEmbedded = () => !!(shopifyToken || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('embedded') === '1'));
+  const getShopifySessionToken = async () => shopifyToken || null;
+
   // Load recent job on mount
   useEffect(() => {
     const loadRecent = async () => {

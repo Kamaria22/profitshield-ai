@@ -42,7 +42,7 @@ export class AppErrorBoundary extends React.Component {
                   <p className="text-sm text-red-700 mb-4">
                     We're recovering automatically. Refresh the page if the problem persists.
                   </p>
-                  {process.env.NODE_ENV === "development" && this.state.error && (
+                  {import.meta.env.DEV && this.state.error && (
                     <details className="text-xs text-red-600 mt-2 p-2 bg-red-100 rounded cursor-pointer">
                       <summary className="font-mono">Error details</summary>
                       <pre className="mt-2 overflow-auto">{this.state.error.toString()}</pre>

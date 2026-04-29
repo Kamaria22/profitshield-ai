@@ -415,7 +415,7 @@ export default function Integrations() {
         });
         
         toast.success('Integration repaired successfully');
-        refetchIntegrations();
+        queryClient.invalidateQueries(['integrations']);
       } else if (existingIntegrations.length > 0) {
         // Check for disconnected integrations and offer to reconnect
         const disconnected = existingIntegrations.filter(i => i.status !== 'connected');
@@ -906,7 +906,7 @@ export default function Integrations() {
                           tenantId={integration.tenant_id}
                           integrationId={integration.id}
                           shopDomain={integration.store_key}
-                          onFixed={() => refetchIntegrations()}
+                          onFixed={() => queryClient.invalidateQueries(['integrations'])}
                         />
                       )}
                       {isSyncRecoverable(integration) && (
