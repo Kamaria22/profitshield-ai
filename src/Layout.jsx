@@ -929,88 +929,92 @@ function LayoutContent({ children, currentPageName, resolver = {} }) {
             </div>
           )}
 
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Main navigation">
+          {/* Navigation — scrollable, takes all available space */}
+          <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto" role="navigation" aria-label="Main navigation">
+            {/* Primary merchant nav - always visible flat */}
             <div className="px-3 pb-1">
               <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Core</p>
             </div>
             {groupedNavItems.primary.map((item) => renderNavItem(item))}
-            {showDesktopUtilitySection ? renderNavSection('Utilities', groupedNavItems.utility, desktopSectionsOpen.utility, () => toggleDesktopSection('utility')) : null}
+
+            {/* Utility nav - flat for merchants, collapsible for admins */}
+            {groupedNavItems.utility.length > 0 && (
+              isAdmin
+                ? renderNavSection('More', groupedNavItems.utility, desktopSectionsOpen.utility, () => toggleDesktopSection('utility'))
+                : (
+                  <div className="pt-2">
+                    <div className="px-3 pb-1">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">More</p>
+                    </div>
+                    {groupedNavItems.utility.map((item) => renderNavItem(item))}
+                  </div>
+                )
+            )}
+
+            {/* Admin-only sections at the bottom of nav, collapsed by default */}
+            {showDesktopSystemSections && (
+              <div className="pt-2 border-t border-white/8 mt-2">
+                {renderNavSection('System', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
+                {renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin'))}
+              </div>
+            )}
           </nav>
 
-          {/* User Menu */}
+          {/* User Menu — compact, pinned to bottom */}
           {activeUser && (
-            <div className="p-4 border-t border-white/8">
+            <div className="px-3 py-2 border-t border-white/8 flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full px-3 py-2 rounded-xl border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)', boxShadow:'0 0 12px rgba(99,102,241,0.35)'}}>
-                      <span className="text-sm font-semibold text-white">
+                  <button className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)', boxShadow:'0 0 10px rgba(99,102,241,0.35)'}}>
+                      <span className="text-xs font-semibold text-white">
                         {(activeUser.full_name || activeUser.email || 'U').charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div className="flex-1 text-left min-w-0">
-                      <p className="text-sm font-semibold text-slate-100 truncate">
+                      <p className="text-xs font-semibold text-slate-100 truncate">
                         {activeUser.full_name || 'User'}
                       </p>
-                      <p className="text-xs text-slate-500 truncate">{activeUser.email || ''}</p>
                       {roleLabel && (
-                        <span className="inline-block text-xs font-medium px-1.5 py-0 rounded mt-0.5 capitalize"
-                          style={{
-                            background:'rgba(99,102,241,0.18)',
-                            border:'1px solid rgba(129,140,248,0.35)',
-                            color:'#a5b4fc',
-                            textShadow:'0 0 8px rgba(129,140,248,0.5)'
-                          }}>
-                          {roleLabel}
-                        </span>
+                        <p className="text-[10px] text-slate-500 truncate capitalize">{roleLabel}</p>
                       )}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem asChild>
-                            <Link to={createPageUrl('Settings', location.search)}>
-                              <Settings className="w-4 h-4 mr-2" />
-                              Settings
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={createPageUrl('Pricing', location.search)}>
-                              <CreditCard className="w-4 h-4 mr-2" />
-                              Upgrade Plan
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
+                    <Link to={createPageUrl('Settings', location.search)}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={createPageUrl('Pricing', location.search)}>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Upgrade Plan
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogoutMemo} className="text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Legal links — ultra compact, only for admins */}
+              {isAdmin && (
+                <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 px-1">
+                  <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-[10px] text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
+                  <Link to={createPageUrl('TermsOfService', location.search)} className="text-[10px] text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
+                  <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-[10px] text-slate-600 hover:text-cyan-300 transition-colors">GDPR</Link>
+                  <Link to={createPageUrl('RefundPolicy', location.search)} className="text-[10px] text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
+                </div>
+              )}
             </div>
           )}
-
-          {showDesktopSystemSections && (
-            <div className="border-t border-white/8 px-3 py-3">
-              {renderNavSection('System & Debug', groupedNavItems.system, desktopSectionsOpen.system, () => toggleDesktopSection('system'))}
-              {isAdmin ? renderNavSection('Admin Tools', groupedNavItems.admin, desktopSectionsOpen.admin, () => toggleDesktopSection('admin')) : null}
-            </div>
-          )}
-
-          {/* Legal Footer Links */}
-          {showDesktopLegalFooter ? (
-            <div className="border-t border-white/8 px-4 py-3 flex flex-wrap gap-x-3 gap-y-1">
-              <Link to={createPageUrl('PrivacyPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Privacy</Link>
-              <Link to={createPageUrl('TermsOfService', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Terms</Link>
-              <Link to={createPageUrl('EndUserLicenseAgreement', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">EULA</Link>
-              <Link to={createPageUrl('CookiePolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Cookies</Link>
-              <Link to={createPageUrl('ComplianceNotice', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">GDPR/CCPA</Link>
-              <Link to={createPageUrl('RefundPolicy', location.search)} className="text-xs text-slate-600 hover:text-cyan-300 transition-colors">Refunds</Link>
-            </div>
-          ) : null}
         </div>
       </aside>
 
