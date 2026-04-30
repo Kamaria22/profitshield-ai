@@ -5,6 +5,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { createPageUrl } from '@/components/platformContext';
 
+function isShopifyEmbeddedContext() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return !!(p.get('shop') && (p.get('host') || p.get('embedded') === '1'));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * SUBSCRIPTION GUARD
  * Enforces authentication and trial initialization
@@ -12,6 +22,7 @@ import { createPageUrl } from '@/components/platformContext';
 export function SubscriptionGuard({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isEmbedded = isShopifyEmbeddedContext();
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['auth-user'],
@@ -22,6 +33,7 @@ export function SubscriptionGuard({ children }) {
         return null;
       }
     },
+    enabled: !isEmbedded,
     staleTime: 300000,
     retry: false
   });
@@ -57,6 +69,7 @@ export function SubscriptionGuard({ children }) {
   });
 
   useEffect(() => {
+    if (isEmbedded) return;
     // Redirect to login if not authenticated (except login/signup pages)
     const publicRoutes = ['/login', '/signup', '/download'];
     const isPublicRoute = publicRoutes.some(route => location.pathname.includes(route));
@@ -64,7 +77,11 @@ export function SubscriptionGuard({ children }) {
     if (!userLoading && !user && !isPublicRoute) {
       navigate(createPageUrl('Home', location.search), { replace: true });
     }
-  }, [user, userLoading, navigate, location]);
+  }, [isEmbedded, user, userLoading, navigate, location]);
+
+  if (isEmbedded) {
+    return <>{children}</>;
+  }
 
   if (userLoading || trialLoading) {
     return (
