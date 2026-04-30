@@ -74,7 +74,7 @@ export default function SystemStatusPanel({
       >
         <div>
           <p className="dashboard-label">System Status</p>
-          <p className="mt-2 text-sm text-slate-400">Collapsed technical detail for sync, webhooks, and runtime.</p>
+          <p className="mt-2 text-sm text-slate-400">Connection and sync details for your store.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-300">
@@ -87,15 +87,15 @@ export default function SystemStatusPanel({
       {open ? (
         <div className="mt-3 space-y-3">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <StatusCell label="Connection" value={integrationStatus || 'Standby'} tone={connectionTone} />
-            <StatusCell label="Last sync" value={formatTimestamp(lastSyncAt)} tone="text-[#00E5FF]" />
+            <StatusCell label="Store connection" value={integrationStatus || 'Standby'} tone={connectionTone} />
+            <StatusCell label="Last refresh" value={formatTimestamp(lastSyncAt)} tone="text-[#00E5FF]" />
             <StatusCell
-              label="Webhook mesh"
+              label="Connected services"
               value={detail?.webhookCount ? `${detail.webhookCount} active` : 'Not registered'}
               tone={detail?.webhookCount ? 'text-emerald-300' : 'text-amber-300'}
             />
             <StatusCell
-              label="Queue lane"
+              label="Pending updates"
               value={detail?.queueDepth ? `${detail.queueDepth} pending` : (detail?.lastSyncStatus || 'Clear')}
               tone={detail?.queueDepth ? 'text-amber-300' : 'text-slate-100'}
             />

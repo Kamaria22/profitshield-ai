@@ -73,16 +73,16 @@ function deriveInterpretation({ metrics, alertsCount, profitScore }) {
 }
 
 function deriveAiStatusMessage({ syncing, aiStatus, lastActionAt, integrationStatus, alertsCount, highRiskOrders }) {
-  if (syncing) return { last: 'Syncing merchant telemetry now', next: 'Next: refresh dashboard and queue state' };
+  if (syncing) return { last: 'Refreshing store data now', next: 'Next: update profit, risk, and alerts' };
   const last = aiStatus === 'Active'
-    ? `Last action: telemetry refresh at ${formatTimestamp(lastActionAt)}`
-    : 'Last action: awaiting first live telemetry cycle';
+    ? `Last action: store analysis refreshed at ${formatTimestamp(lastActionAt)}`
+    : 'Last action: awaiting first live store analysis';
 
   let next = 'Next: continue monitoring';
   if (highRiskOrders > 0) next = 'Next: prioritize flagged order review';
   else if (alertsCount > 0) next = 'Next: surface pending alert actions';
-  else if (integrationStatus && integrationStatus !== 'connected') next = 'Next: repair runtime connection';
-  else if (aiStatus === 'Active') next = 'Next: watch for profit, risk, and webhook changes';
+  else if (integrationStatus && integrationStatus !== 'connected') next = 'Next: restore store connection';
+  else if (aiStatus === 'Active') next = 'Next: watch for profit, risk, and order changes';
 
   return { last, next };
 }
@@ -191,10 +191,10 @@ export default function TopCommandBar({
     <div className="space-y-3">
       <div className="dashboard-panel flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="dashboard-label">Command Surface</p>
+          <p className="dashboard-label">Merchant Overview</p>
           <p className="mt-2 truncate text-base font-semibold text-white">{storeName}</p>
           <p className="mt-1 text-sm text-slate-400">
-            {syncing ? 'Synchronizing merchant telemetry' : 'Operational dashboard online'}
+            {syncing ? 'Refreshing store data' : 'Your store health at a glance'}
           </p>
         </div>
         <div className="flex shrink-0">

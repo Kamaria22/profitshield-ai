@@ -630,6 +630,10 @@ export default function Home() {
             orders={dashboardSummary?.orders || []}
           />
 
+          <RecentActivityPanel
+            orders={dashboardSummary?.orders || []}
+          />
+
           <SystemStatusPanel
             tenantId={authTenantId}
             integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
@@ -637,10 +641,6 @@ export default function Home() {
             lastSyncAt={dashboardSummary?.lastSyncAt}
             syncing={syncMutation.isPending}
             onSync={() => syncMutation.mutate()}
-          />
-
-          <RecentActivityPanel
-            orders={dashboardSummary?.orders || []}
           />
         </div>
       </div>

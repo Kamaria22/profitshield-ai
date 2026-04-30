@@ -21,8 +21,8 @@ function buildPriorities({ metrics, alerts, profitLeaks, integrationStatus, prof
   if (highRiskOrders > 0) {
     items.push({
       title: 'High-risk orders require review',
-      reason: `${highRiskOrders} flagged ${highRiskOrders === 1 ? 'order is' : 'orders are'} waiting in the fraud queue`,
-      action: 'Open risk intelligence',
+      reason: `${highRiskOrders} flagged ${highRiskOrders === 1 ? 'order is' : 'orders are'} waiting for review`,
+      action: 'Review orders',
       page: 'Intelligence',
       icon: ShieldAlert,
       accent: 'text-amber-300',
@@ -31,7 +31,7 @@ function buildPriorities({ metrics, alerts, profitLeaks, integrationStatus, prof
 
   if ((alerts || []).length > 0) {
     items.push({
-      title: 'Alert queue needs attention',
+      title: 'Store alerts need attention',
       reason: `${alerts.length} active ${alerts.length === 1 ? 'alert' : 'alerts'} need operator review`,
       action: 'Review alerts',
       page: 'Alerts',
@@ -53,9 +53,9 @@ function buildPriorities({ metrics, alerts, profitLeaks, integrationStatus, prof
 
   if (integrationStatus && integrationStatus !== 'connected') {
     items.push({
-      title: 'Runtime needs stabilization',
-      reason: `Integration is ${integrationStatus}, which can delay sync and alert freshness`,
-      action: 'Open integrations',
+      title: 'Store connection needs attention',
+      reason: `Connection is ${integrationStatus}, which can delay fresh store data`,
+      action: 'Check integrations',
       page: 'Integrations',
       icon: Sparkles,
       accent: 'text-amber-300',
@@ -102,13 +102,13 @@ export default function ActionCenterPanel({
   );
 
   return (
-    <section className="dashboard-panel">
+    <section className="dashboard-panel border-white/12 bg-white/[0.05]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="dashboard-label">Action Center</p>
-          <p className="mt-2 dashboard-title">Top priorities only</p>
+          <p className="mt-2 dashboard-title">What needs attention now</p>
         </div>
-        <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-300">
+        <div className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-cyan-200">
           {priorities.length} active
         </div>
       </div>
