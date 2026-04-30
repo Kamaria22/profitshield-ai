@@ -56,20 +56,22 @@ function deriveProfitTrend(orders = []) {
     return { direction: latestProfit > 0 ? 'up' : 'flat', label: 'Fresh signal', delta: 0 };
   }
 
-  const delta = ((latestProfit - priorProfit) / Math.abs(priorProfit)) * 100;
+  const rawDelta = ((latestProfit - priorProfit) / Math.abs(priorProfit)) * 100;
+  const delta = Math.max(-200, Math.min(200, rawDelta));
   if (delta > 5) return { direction: 'up', label: `Up ${delta.toFixed(1)}% vs prior period`, delta };
   if (delta < -5) return { direction: 'down', label: `Down ${Math.abs(delta).toFixed(1)}% vs prior period`, delta };
   return { direction: 'flat', label: 'Flat vs prior period', delta };
 }
 
-function deriveInterpretation({ metrics, alertsCount, profitScore }) {
-  const margin = Number(metrics?.avgMargin || 0);
+function deriveTodaysPriority({ metrics, alertsCount, integrationStatus, profitScore }) {
   const highRiskOrders = Number(metrics?.highRiskOrders || 0);
-  if (highRiskOrders > 0) return 'Risk pressure detected';
-  if (alertsCount > 0) return 'Operational pressure detected';
-  if (margin < 20) return 'Margin pressure detected';
-  if (profitScore >= 70) return 'Operating posture is healthy';
-  return 'Signal is still developing';
+  const margin = Number(metrics?.avgMargin || 0);
+  if (highRiskOrders > 0) return 'Review flagged orders now';
+  if (alertsCount > 0) return 'Resolve active alerts';
+  if (integrationStatus && integrationStatus !== 'connected') return 'Restore store connection';
+  if (margin < 20) return 'Investigate margin pressure';
+  if (profitScore >= 70) return 'Protect current momentum';
+  return 'Complete the next sync cycle';
 }
 
 function deriveAiStatusMessage({ syncing, aiStatus, lastActionAt, integrationStatus, alertsCount, highRiskOrders }) {
@@ -172,6 +174,7 @@ export default function TopCommandBar({
   const integrityProvenance = profitScoreSource === 'derived_runtime'
     ? `Derived from live store data · ${syncAge}`
     : 'Tenant score';
+  const priority = deriveTodaysPriority({ metrics, alertsCount, integrationStatus, profitScore });
   const aiMessage = deriveAiStatusMessage({
     syncing,
     aiStatus,
@@ -182,7 +185,14 @@ export default function TopCommandBar({
   });
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="dashboard-priority-bar">
+        <p className="dashboard-label">Today's Priority</p>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-white">{priority}</p>
+          <p className="text-xs text-slate-400">{syncing ? 'Refreshing now' : aiMessage.next.replace('Next: ', '')}</p>
+        </div>
+      </div>
       <div className="dashboard-panel flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="dashboard-label">Merchant Overview</p>
@@ -191,7 +201,8 @@ export default function TopCommandBar({
             {syncing ? 'Refreshing store data' : 'Your store health at a glance'}
           </p>
         </div>
-        <div className="flex shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${syncing ? 'dashboard-live-dot' : 'bg-emerald-400/80'}`} />
           <ActionButton
             icon={RefreshCw}
             label={syncing ? 'Syncing' : 'Sync Now'}
