@@ -72,23 +72,6 @@ function deriveInterpretation({ metrics, alertsCount, profitScore }) {
   return 'Signal is still developing';
 }
 
-function derivePrimaryRisk({ metrics, alertsCount, integrationStatus }) {
-  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
-  if (highRiskOrders > 0) return `${pluralize(highRiskOrders, 'flagged order')} require review`;
-  if (alertsCount > 0) return `${pluralize(alertsCount, 'alert')} are waiting in queue`;
-  if (integrationStatus && integrationStatus !== 'connected') return `Runtime is ${integrationStatus}`;
-  return 'No immediate fraud or sync threats';
-}
-
-function deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable }) {
-  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
-  if (highRiskOrders > 0) return 'Open Risk Intelligence';
-  if (alertsCount > 0) return 'Review alerts';
-  if (integrationStatus && integrationStatus !== 'connected') return 'Stabilize integrations';
-  if (onSyncAvailable) return 'Run sync to refresh telemetry';
-  return 'Continue monitoring';
-}
-
 function deriveAiStatusMessage({ syncing, aiStatus, lastActionAt, integrationStatus, alertsCount, highRiskOrders }) {
   if (syncing) return { last: 'Syncing merchant telemetry now', next: 'Next: refresh dashboard and queue state' };
   const last = aiStatus === 'Active'
@@ -171,15 +154,6 @@ function ActionButton({ icon: Icon, label, onClick, disabled = false, spinning =
   );
 }
 
-function DecisionCell({ label, value, tone = 'text-slate-100' }) {
-  return (
-    <div className="dashboard-subpanel">
-      <p className="dashboard-label">{label}</p>
-      <p className={`mt-3 text-sm font-semibold ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
 export default function TopCommandBar({
   tenant,
   profitScore,
@@ -192,9 +166,6 @@ export default function TopCommandBar({
   integrationStatus,
   syncing = false,
   onSync,
-  onOpenReport,
-  onOpenSecurity,
-  onOpenInsights,
 }) {
   const riskLevel = getRiskLevel(metrics?.highRiskOrders || 0);
   const alertsCount = Array.isArray(alerts) ? alerts.length : 0;
@@ -203,9 +174,6 @@ export default function TopCommandBar({
   const alertMeta = alertsCount ? 'Needs review' : 'All clear';
   const integrityMeta = `${Math.round(Number(profitScore || 0)) >= 70 ? 'Strong operating posture' : 'Signal still developing'}`;
   const trend = deriveProfitTrend(orders);
-  const interpretation = deriveInterpretation({ metrics, alertsCount, profitScore });
-  const primaryRisk = derivePrimaryRisk({ metrics, alertsCount, integrationStatus });
-  const nextAction = deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable: !!onSync });
   const syncAge = formatRelativeSyncAge(lastActionAt);
   const integrityProvenance = profitScoreSource === 'derived_runtime'
     ? `Source: derived runtime signal · ${syncAge}`
@@ -221,7 +189,7 @@ export default function TopCommandBar({
 
   return (
     <div className="space-y-3">
-      <div className="dashboard-panel flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="dashboard-panel flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="dashboard-label">Command Surface</p>
           <p className="mt-2 truncate text-base font-semibold text-white">{storeName}</p>
@@ -229,31 +197,13 @@ export default function TopCommandBar({
             {syncing ? 'Synchronizing merchant telemetry' : 'Operational dashboard online'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0">
           <ActionButton
             icon={RefreshCw}
             label={syncing ? 'Syncing' : 'Sync Now'}
             onClick={onSync}
             disabled={!onSync || syncing}
             spinning={syncing}
-          />
-          <ActionButton
-            icon={Sparkles}
-            label="AI Insights"
-            onClick={onOpenInsights}
-            disabled={!onOpenInsights}
-          />
-          <ActionButton
-            icon={BarChart3}
-            label="P&L"
-            onClick={onOpenReport}
-            disabled={!onOpenReport}
-          />
-          <ActionButton
-            icon={Shield}
-            label="Security"
-            onClick={onOpenSecurity}
-            disabled={!onOpenSecurity}
           />
         </div>
       </div>
@@ -293,29 +243,6 @@ export default function TopCommandBar({
           meta={aiMessage.last.replace('Last action: ', '')}
           provenance={`Source: sync runtime · ${syncAge}`}
           tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
-        />
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <DecisionCell
-          label="Interpretation"
-          value={interpretation}
-          tone={interpretation.includes('pressure') ? 'text-amber-300' : 'text-emerald-300'}
-        />
-        <DecisionCell
-          label="Trend"
-          value={trend.label}
-          tone={trend.direction === 'up' ? 'text-emerald-300' : trend.direction === 'down' ? 'text-rose-300' : 'text-slate-100'}
-        />
-        <DecisionCell
-          label="Primary Risk"
-          value={primaryRisk}
-          tone={primaryRisk.includes('No immediate') ? 'text-slate-100' : 'text-amber-300'}
-        />
-        <DecisionCell
-          label="Next Action"
-          value={`${nextAction} · ${aiMessage.next.replace('Next: ', '')}`}
-          tone="text-cyan-300"
         />
       </div>
     </div>

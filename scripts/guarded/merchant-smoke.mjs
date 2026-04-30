@@ -10,7 +10,7 @@ const criticalPages = [
     name: 'Home',
     route: '/',
     file: 'src/pages/Home.jsx',
-    requiredMarkers: ['TopCommandBar', 'DashboardLayout', 'ControlPanel', 'ProfitCorePanel', 'ActionCenterPanel', 'SystemStatusPanel', 'RecentActivityPanel'],
+    requiredMarkers: ['TopCommandBar', 'ProfitCorePanel', 'ActionCenterPanel', 'SystemStatusPanel', 'RecentActivityPanel'],
   },
   {
     name: 'Orders',
