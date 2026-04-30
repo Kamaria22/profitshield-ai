@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 import { usePlatformResolver, RESOLVER_STATUS, requireResolved, canQueryTenant, getTenantFilter, buildQueryKey } from '../components/usePlatformResolver';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
@@ -582,76 +583,74 @@ export default function Home() {
 
       <div className="min-h-full flex flex-col">
         <div className="mt-4 flex-1 space-y-4">
-          <section className="dashboard-zone">
-            <TopCommandBar
-              tenant={displayTenant}
-              profitScore={profitScore}
-              profitScoreSource={profitScoreSource}
-              metrics={metrics}
-              alerts={visibleAlerts}
-              orders={dashboardSummary?.orders || []}
-              aiStatus={aiStatus}
-              lastActionAt={dashboardSummary?.lastSyncAt}
-              integrationStatus={dashboardSummary?.integrationStatus}
-              syncing={syncMutation.isPending}
-              onSync={() => syncMutation.mutate()}
-            />
-          </section>
+          <TopCommandBar
+            tenant={displayTenant}
+            profitScore={profitScore}
+            profitScoreSource={profitScoreSource}
+            metrics={metrics}
+            alerts={visibleAlerts}
+            orders={dashboardSummary?.orders || []}
+            aiStatus={aiStatus}
+            lastActionAt={dashboardSummary?.lastSyncAt}
+            integrationStatus={dashboardSummary?.integrationStatus}
+            syncing={syncMutation.isPending}
+            onSync={() => syncMutation.mutate()}
+          />
 
-          <section className="dashboard-zone dashboard-zone-primary">
-            <ActionCenterPanel
-              metrics={metrics}
-              alerts={visibleAlerts}
-              profitLeaks={displayProfitLeaks}
-              integrationStatus={dashboardSummary?.integrationStatus}
-              profitScore={profitScore}
-            />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-4">
+              <ActionCenterPanel
+                metrics={metrics}
+                alerts={visibleAlerts}
+                profitLeaks={displayProfitLeaks}
+                integrationStatus={dashboardSummary?.integrationStatus}
+                profitScore={profitScore}
+              />
 
-            {!dashboardHasData && (
-              <div className="dashboard-panel mt-4">
-                <p className="dashboard-label">Startup State</p>
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <p className="dashboard-title">No live telemetry yet</p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      ProfitShield is connected, but the dashboard is still waiting for synced merchant data.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending || !authTenantId}
-                    className="w-full border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-                  >
-                    {syncMutation.isPending ? 'Syncing...' : 'Run Initial Sync'}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </section>
+              {!dashboardHasData && (
+                <CommandCard className="border-amber-500/20 bg-amber-500/10">
+                  <CommandCardContent className="py-5">
+                    <p className="dashboard-label">Startup State</p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <p className="dashboard-title">No live telemetry yet</p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          ProfitShield is connected, but the dashboard is still waiting for synced merchant data.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending || !authTenantId}
+                        className="w-full"
+                      >
+                        {syncMutation.isPending ? 'Syncing...' : 'Run Initial Sync'}
+                      </Button>
+                    </div>
+                  </CommandCardContent>
+                </CommandCard>
+              )}
+            </div>
 
-          <section className="dashboard-zone">
-            <ProfitCorePanel
-              metrics={metrics}
-              orders={dashboardSummary?.orders || []}
-            />
-          </section>
+            <div className="space-y-4">
+              <ProfitCorePanel
+                metrics={metrics}
+                orders={dashboardSummary?.orders || []}
+              />
+            </div>
+          </div>
 
-          <section className="dashboard-zone dashboard-zone-muted">
-            <RecentActivityPanel
-              orders={dashboardSummary?.orders || []}
-            />
-          </section>
+          <RecentActivityPanel
+            orders={dashboardSummary?.orders || []}
+          />
 
-          <section className="dashboard-zone dashboard-zone-muted">
-            <SystemStatusPanel
-              tenantId={authTenantId}
-              integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
-              integrationStatus={dashboardSummary?.integrationStatus}
-              lastSyncAt={dashboardSummary?.lastSyncAt}
-              syncing={syncMutation.isPending}
-              onSync={() => syncMutation.mutate()}
-            />
-          </section>
+          <SystemStatusPanel
+            tenantId={authTenantId}
+            integrationId={dashboardSummary?.integrationId || resolverCheck?.integrationId || persistedContext?.integrationId || null}
+            integrationStatus={dashboardSummary?.integrationStatus}
+            lastSyncAt={dashboardSummary?.lastSyncAt}
+            syncing={syncMutation.isPending}
+            onSync={() => syncMutation.mutate()}
+          />
         </div>
       </div>
     </SubscriptionGate>
