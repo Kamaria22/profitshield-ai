@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -45,9 +45,18 @@ import OrderSyncStatus from '../components/orders/OrderSyncStatus';
 import DebugBanner from '../components/DebugBanner';
 import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
+function isTestOrderRecord(order) {
+  const gateway = String(order?.platform_data?.gateway || '').toLowerCase();
+  const tags = Array.isArray(order?.tags)
+    ? order.tags.join(',').toLowerCase()
+    : String(order?.platform_data?.tags || '').toLowerCase();
+  return gateway === 'bogus' || gateway === 'manual' || tags.includes('test') || order?.is_demo === true;
+}
+
 export default function Orders() {
   const location = useLocation();
   const queryClient = useQueryClient();
+  const invalidateTimerRef = useRef(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showTestOrders, setShowTestOrders] = useState(false);
@@ -134,26 +143,16 @@ export default function Orders() {
 
   // Apply filters - MUST be before any early returns (React hooks rules)
   // Detect if store has any test orders (for banner)
-  const hasTestOrders = useMemo(() => orders.some(o => {
-    const gateway = (o.platform_data?.gateway || '').toLowerCase();
-    const tags = Array.isArray(o.tags) ? o.tags.join(',').toLowerCase() : (o.platform_data?.tags || '').toLowerCase();
-    return gateway === 'bogus' || tags.includes('test') || o.is_demo === true;
-  }), [orders]);
+  const hasTestOrders = useMemo(() => orders.some((o) => isTestOrderRecord(o)), [orders]);
+  const hasNonTestOrders = useMemo(() => orders.some((o) => !isTestOrderRecord(o)), [orders]);
 
   const filteredOrders = useMemo(() => {
     if (!canQuery) return [];
     
     let result = [...orders];
 
-    // Test order detection: Shopify test orders have gateway="bogus" or tags containing "test"
-    const isTestOrder = (o) => {
-      const gateway = (o.platform_data?.gateway || '').toLowerCase();
-      const tags = Array.isArray(o.tags) ? o.tags.join(',').toLowerCase() : (o.platform_data?.tags || '').toLowerCase();
-      return gateway === 'bogus' || gateway === 'manual' || tags.includes('test') || o.is_demo === true;
-    };
-
     if (!showTestOrders) {
-      result = result.filter(o => !isTestOrder(o) || o.is_demo !== true);
+      result = result.filter((o) => !isTestOrderRecord(o));
     }
 
     // Date range filter — use a large window to ensure real orders show
@@ -211,6 +210,48 @@ export default function Orders() {
 
     return result;
   }, [orders, filters, searchTerm, tenantSettings]);
+
+  useEffect(() => {
+    if (hasTestOrders && !hasNonTestOrders && !showTestOrders) {
+      setShowTestOrders(true);
+    }
+  }, [hasTestOrders, hasNonTestOrders, showTestOrders]);
+
+  useEffect(() => {
+    if (!resolverCheck?.tenantId) return;
+
+    const invalidateOrders = () => {
+      if (invalidateTimerRef.current) clearTimeout(invalidateTimerRef.current);
+      invalidateTimerRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ordersQueryKey });
+        invalidateTimerRef.current = null;
+      }, 300);
+    };
+
+    const unsubscribers = [];
+    try {
+      const unsubOrders = base44.entities.Order.subscribe((event) => {
+        const eventTenantId = event?.data?.tenant_id;
+        if (!eventTenantId || eventTenantId === resolverCheck.tenantId) invalidateOrders();
+      });
+      if (typeof unsubOrders === 'function') unsubscribers.push(unsubOrders);
+    } catch {}
+
+    try {
+      const unsubQueue = base44.entities.WebhookQueue.subscribe((event) => {
+        const eventTenantId = event?.data?.tenant_id;
+        if (!eventTenantId || eventTenantId === resolverCheck.tenantId) invalidateOrders();
+      });
+      if (typeof unsubQueue === 'function') unsubscribers.push(unsubQueue);
+    } catch {}
+
+    return () => {
+      if (invalidateTimerRef.current) clearTimeout(invalidateTimerRef.current);
+      unsubscribers.forEach((fn) => {
+        try { fn(); } catch {}
+      });
+    };
+  }, [resolverCheck?.tenantId, queryClient, ordersQueryKey]);
 
   // Calculate summary stats
   const stats = useMemo(() => ({
