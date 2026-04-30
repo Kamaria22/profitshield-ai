@@ -110,13 +110,7 @@ const iconMap = {
 function StatCell({ label, value, meta, provenance, tone = 'primary' }) {
   const Icon = iconMap[label] || Activity;
   return (
-    <div
-      className="dashboard-panel"
-      style={{
-        background:
-          'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.028))',
-      }}
-    >
+    <div className="dashboard-panel">
       <div className="flex items-center justify-between gap-3">
         <p className="dashboard-label">{label}</p>
         <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
@@ -132,7 +126,7 @@ function StatCell({ label, value, meta, provenance, tone = 'primary' }) {
         </div>
       ) : null}
       {provenance ? (
-        <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+        <p className="mt-2 text-[11px] text-slate-500">
           {provenance}
         </p>
       ) : null}
@@ -176,8 +170,8 @@ export default function TopCommandBar({
   const trend = deriveProfitTrend(orders);
   const syncAge = formatRelativeSyncAge(lastActionAt);
   const integrityProvenance = profitScoreSource === 'derived_runtime'
-    ? `Source: derived runtime signal · ${syncAge}`
-    : 'Source: tenant signal';
+    ? `Derived from live store data · ${syncAge}`
+    : 'Tenant score';
   const aiMessage = deriveAiStatusMessage({
     syncing,
     aiStatus,
@@ -220,28 +214,28 @@ export default function TopCommandBar({
           label="Net Profit (30d)"
           value={formatCurrency(metrics?.totalProfit)}
           meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin · ${trend.label}`}
-          provenance={`Source: order summary · ${syncAge}`}
+          provenance={`Order summary · ${syncAge}`}
           tone={Number(metrics?.totalProfit || 0) >= 0 ? 'success' : 'warning'}
         />
         <StatCell
           label="Risk Level"
           value={riskLevel}
           meta={riskMeta}
-          provenance={`Source: flagged orders · ${syncAge}`}
+          provenance={`Flagged orders · ${syncAge}`}
           tone={riskLevel === 'High' ? 'warning' : riskLevel === 'Medium' ? 'accent' : 'success'}
         />
         <StatCell
           label="Alerts Count"
           value={String(alertsCount)}
           meta={alertMeta}
-          provenance="Source: alert queue"
+          provenance="Pending alerts"
           tone={alertsCount ? 'warning' : 'success'}
         />
         <StatCell
           label="AI Status"
           value={aiStatus}
           meta={aiMessage.last.replace('Last action: ', '')}
-          provenance={`Source: sync runtime · ${syncAge}`}
+          provenance={`Store analysis · ${syncAge}`}
           tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
         />
       </div>

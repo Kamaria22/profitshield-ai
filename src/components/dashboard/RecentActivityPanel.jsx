@@ -20,6 +20,7 @@ export default function RecentActivityPanel({ orders = [] }) {
         <div>
           <p className="dashboard-label">Recent Activity</p>
           <p className="mt-2 dashboard-title">Latest orders</p>
+          <p className="mt-1 text-sm text-slate-400">A quick view of recent order movement.</p>
         </div>
         <button
           type="button"
@@ -31,7 +32,7 @@ export default function RecentActivityPanel({ orders = [] }) {
         </button>
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {visibleOrders.length ? visibleOrders.map((order) => (
           <div
             key={order?.id || order?.platform_order_id || order?.order_number}

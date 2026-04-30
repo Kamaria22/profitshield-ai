@@ -107,6 +107,7 @@ export default function ActionCenterPanel({
         <div>
           <p className="dashboard-label">Action Center</p>
           <p className="mt-2 dashboard-title">What needs attention now</p>
+          <p className="mt-1 text-sm text-slate-400">Focus on the few actions that move profit and reduce risk.</p>
         </div>
         <div className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-cyan-200">
           {priorities.length} active

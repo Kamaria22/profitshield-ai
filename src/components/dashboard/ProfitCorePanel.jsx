@@ -65,6 +65,10 @@ export default function ProfitCorePanel({ metrics, orders = [] }) {
 
   return (
     <div className="dashboard-panel p-4 md:p-5">
+      <div className="mb-4">
+        <p className="dashboard-label">Performance</p>
+        <p className="mt-2 dashboard-title">Profit and forecast</p>
+      </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(240px,0.9fr)]">
         <section className="dashboard-subpanel">
           <p className="dashboard-label">Profit Overview</p>
