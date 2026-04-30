@@ -284,7 +284,7 @@ export default function TopCommandBar({
           label="Alerts Count"
           value={String(alertsCount)}
           meta={alertMeta}
-          provenance={`Source: alert queue · ${syncAge}`}
+          provenance="Source: alert queue"
           tone={alertsCount ? 'warning' : 'success'}
         />
         <StatCell
