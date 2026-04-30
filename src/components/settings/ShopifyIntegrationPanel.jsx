@@ -55,6 +55,24 @@ async function callSettingsApi(payload) {
 export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver }) {
   const queryClient = useQueryClient();
 
+  const invalidateMerchantSyncViews = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = Array.isArray(query.queryKey) ? query.queryKey : [];
+        return key.some((part) => {
+          if (typeof part !== 'string') return false;
+          return (
+            part.includes('orders') ||
+            part.includes('dashboard-summary') ||
+            part.includes('profitLeaks') ||
+            part.includes('shopifyIntegrationPanel') ||
+            part.includes('integrations')
+          );
+        });
+      }
+    });
+  };
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['shopifyIntegrationPanel', tenantId],
     queryFn: () => callSettingsApi({ action: 'get', tenant_id: tenantId }),
@@ -130,7 +148,7 @@ export default function ShopifyIntegrationPanel({ tenantId, shopDomain, resolver
         const created = Number(data?.actions?.syncShopifyOrders?.data?.createdCount || data?.createdCount || 0);
         const updated = Number(data?.actions?.syncShopifyOrders?.data?.updatedCount || data?.updatedCount || 0);
         toast.success(`Sync complete — ${created} created, ${updated} updated`);
-        queryClient.invalidateQueries({ queryKey: ['shopifyIntegrationPanel', tenantId] });
+        invalidateMerchantSyncViews();
       } else {
         toast.error(data?.error || 'Sync failed');
       }

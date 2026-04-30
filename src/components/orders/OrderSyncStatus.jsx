@@ -17,6 +17,24 @@ import { invokeWithRetry } from '@/lib/safeApi';
 export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
   const queryClient = useQueryClient();
 
+  const invalidateMerchantViews = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = Array.isArray(query.queryKey) ? query.queryKey : [];
+        return key.some((part) => {
+          if (typeof part !== 'string') return false;
+          return (
+            part.includes('orders') ||
+            part.includes('dashboard-summary') ||
+            part.includes('profitLeaks') ||
+            part.includes('integration-sync-status') ||
+            part.includes('shopifyIntegrationPanel')
+          );
+        });
+      }
+    });
+  };
+
   // Load integration for sync health
   const { data: integration } = useQuery({
     queryKey: ['integration-sync-status', integrationId],
@@ -63,8 +81,7 @@ export default function OrderSyncStatus({ tenantId, integrationId, onSynced }) {
       const created = data?.actions?.syncShopifyOrders?.data?.createdCount ?? data.createdCount ?? data.created ?? 0;
       const updated = data?.actions?.syncShopifyOrders?.data?.updatedCount ?? data.updatedCount ?? data.updated ?? 0;
       toast.success(`Sync complete: ${created} new, ${updated} updated`);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['integration-sync-status'] });
+      invalidateMerchantViews();
       onSynced?.();
     },
     onError: (err) => {

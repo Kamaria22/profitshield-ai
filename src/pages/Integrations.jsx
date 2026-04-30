@@ -109,6 +109,25 @@ export default function Integrations() {
 
   const queryClient = useQueryClient();
 
+  const invalidateMerchantSyncViews = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = Array.isArray(query.queryKey) ? query.queryKey : [];
+        return key.some((part) => {
+          if (typeof part !== 'string') return false;
+          return (
+            part.includes('orders') ||
+            part.includes('dashboard-summary') ||
+            part.includes('profitLeaks') ||
+            part.includes('shopifyIntegrationPanel') ||
+            part.includes('integrations') ||
+            part.includes('syncJobs')
+          );
+        });
+      }
+    });
+  };
+
   const { data: integrations = [], isLoading: integrationsLoading } = useQuery({
     queryKey: ['integrations', tenantId],
     queryFn: () => base44.entities.PlatformIntegration.filter({ tenant_id: tenantId }),
@@ -256,8 +275,7 @@ export default function Integrations() {
       return result.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries(['syncJobs']);
-      queryClient.invalidateQueries(['integrations']);
+      invalidateMerchantSyncViews();
       toast.success(`Sync completed: ${data.results?.orders_created || 0} new, ${data.results?.orders_updated || 0} updated`);
     },
     onError: (error) => {
