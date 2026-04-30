@@ -28,6 +28,43 @@ import ActionCenterPanel from '../components/dashboard/ActionCenterPanel';
 import SystemStatusPanel from '../components/dashboard/SystemStatusPanel';
 import RecentActivityPanel from '../components/dashboard/RecentActivityPanel';
 
+function deriveProfitIntegrityScore({ tenantScore, totalOrders, avgMargin, highRiskOrders, alertsCount, integrationStatus }) {
+  const explicitScore = Number(tenantScore);
+  if (Number.isFinite(explicitScore) && explicitScore > 0) {
+    return {
+      score: Math.max(0, Math.min(100, Math.round(explicitScore))),
+      source: 'tenant_signal'
+    };
+  }
+
+  const ordersCount = Number(totalOrders || 0);
+  const margin = Number(avgMargin || 0);
+  const riskOrders = Number(highRiskOrders || 0);
+  const pendingAlerts = Number(alertsCount || 0);
+  const connected = integrationStatus === 'connected';
+
+  if (ordersCount === 0 && pendingAlerts === 0 && !connected) {
+    return { score: 0, source: 'tenant_signal' };
+  }
+
+  let score = 58;
+  if (margin >= 60) score += 18;
+  else if (margin >= 35) score += 10;
+  else if (margin >= 20) score += 4;
+  else score -= 12;
+
+  score -= Math.min(24, riskOrders * 12);
+  score -= Math.min(18, pendingAlerts * 6);
+  if (connected) score += 8;
+  if (ordersCount >= 5) score += 6;
+  else if (ordersCount > 0) score += 2;
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    source: 'derived_runtime'
+  };
+}
+
 export default function Home() {
   const resolver = usePlatformResolver();
   const { role: permissionRole } = usePermissions();
@@ -116,6 +153,15 @@ export default function Home() {
     const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
     const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
     const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    const profitSignal = deriveProfitIntegrityScore({
+      tenantScore: resolver?.tenant?.profit_integrity_score,
+      totalOrders: orders.length,
+      avgMargin,
+      highRiskOrders,
+      alertsCount: alerts.length,
+      integrationStatus: integration?.status || null
+    });
 
     return {
       success: true,
@@ -124,12 +170,13 @@ export default function Home() {
       metrics: {
         totalRevenue,
         totalProfit,
-        avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+        avgMargin,
         highRiskOrders,
         totalOrders: orders.length,
         pendingAlerts: alerts.length
       },
-      profitScore: resolver?.tenant?.profit_integrity_score || 0,
+      profitScore: profitSignal.score,
+      profitScoreSource: profitSignal.source,
       alertsCount: alerts.length,
       isDemoMode: false,
       integrationId: integration?.id || null,
@@ -244,17 +291,27 @@ export default function Home() {
       const totalRevenue = orders.reduce((sum, o) => sum + (o.total_revenue || o.total_price || 0), 0);
       const totalProfit = orders.reduce((sum, o) => sum + (o.net_profit || 0), 0);
       const highRiskOrders = orders.filter((o) => (o.risk_score || o.fraud_score || 0) > 70).length;
+      const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+      const profitSignal = deriveProfitIntegrityScore({
+        tenantScore: resolver?.tenant?.profit_integrity_score,
+        totalOrders: orders.length,
+        avgMargin,
+        highRiskOrders,
+        alertsCount: alerts.length,
+        integrationStatus: resolverCheck?.integrationStatus || null
+      });
 
       return {
         metrics: {
           totalRevenue,
           totalProfit,
-          avgMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+          avgMargin,
           highRiskOrders,
           totalOrders: orders.length,
           pendingAlerts: alerts.length
         },
-        profitScore: resolver?.tenant?.profit_integrity_score || 0,
+        profitScore: profitSignal.score,
+        profitScoreSource: profitSignal.source,
         alertsCount: alerts.length,
         isDemoMode: false,
         integrationId: resolverCheck?.integrationId || persistedContext?.integrationId || null,
@@ -372,6 +429,7 @@ export default function Home() {
     pendingAlerts: 0
   };
   const profitScore = dashboardSummary?.profitScore || 0;
+  const profitScoreSource = dashboardSummary?.profitScoreSource || 'tenant_signal';
   const visibleAlerts = (dashboardSummary?.alerts || []).slice(0, 3);
   const aiStatus = dashboardSummary?.lastSyncAt ? 'Active' : 'Idle';
   const dashboardHasData =
@@ -528,6 +586,7 @@ export default function Home() {
         <TopCommandBar
           tenant={displayTenant}
           profitScore={profitScore}
+          profitScoreSource={profitScoreSource}
           metrics={metrics}
           alerts={visibleAlerts}
           orders={dashboardSummary?.orders || []}

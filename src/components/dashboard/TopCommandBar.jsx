@@ -183,6 +183,7 @@ function DecisionCell({ label, value, tone = 'text-slate-100' }) {
 export default function TopCommandBar({
   tenant,
   profitScore,
+  profitScoreSource = 'tenant_signal',
   metrics,
   alerts,
   orders = [],
@@ -206,6 +207,9 @@ export default function TopCommandBar({
   const primaryRisk = derivePrimaryRisk({ metrics, alertsCount, integrationStatus });
   const nextAction = deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable: !!onSync });
   const syncAge = formatRelativeSyncAge(lastActionAt);
+  const integrityProvenance = profitScoreSource === 'derived_runtime'
+    ? `Source: derived runtime signal · ${syncAge}`
+    : 'Source: tenant signal';
   const aiMessage = deriveAiStatusMessage({
     syncing,
     aiStatus,
@@ -259,7 +263,7 @@ export default function TopCommandBar({
           label="Profit Integrity"
           value={`${Math.round(Number(profitScore || 0))}`}
           meta={`${integrityMeta} · /100`}
-          provenance="Source: tenant signal"
+          provenance={integrityProvenance}
           tone="primary"
         />
         <StatCell
