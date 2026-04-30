@@ -102,7 +102,7 @@ export default function ActionCenterPanel({
   );
 
   return (
-    <section className="dashboard-panel border-white/12 bg-white/[0.05]">
+    <section className="dashboard-panel dashboard-action-panel">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="dashboard-label">Action Center</p>
