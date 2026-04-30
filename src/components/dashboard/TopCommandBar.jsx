@@ -19,6 +19,20 @@ function formatTimestamp(value) {
   });
 }
 
+function formatRelativeSyncAge(value) {
+  if (!value) return 'Awaiting first sync';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Awaiting first sync';
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60 * 1000) return 'Synced just now';
+  const diffMinutes = Math.round(diffMs / (60 * 1000));
+  if (diffMinutes < 60) return `Synced ${diffMinutes}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `Synced ${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `Synced ${diffDays}d ago`;
+}
+
 function getRiskLevel(highRiskOrders) {
   if (highRiskOrders >= 5) return 'High';
   if (highRiskOrders > 0) return 'Medium';
@@ -110,7 +124,7 @@ const iconMap = {
   'AI Status': Sparkles,
 };
 
-function StatCell({ label, value, meta, tone = 'primary' }) {
+function StatCell({ label, value, meta, provenance, tone = 'primary' }) {
   const Icon = iconMap[label] || Activity;
   return (
     <div
@@ -133,6 +147,11 @@ function StatCell({ label, value, meta, tone = 'primary' }) {
         <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-300">
           {meta}
         </div>
+      ) : null}
+      {provenance ? (
+        <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+          {provenance}
+        </p>
       ) : null}
     </div>
   );
@@ -186,6 +205,7 @@ export default function TopCommandBar({
   const interpretation = deriveInterpretation({ metrics, alertsCount, profitScore });
   const primaryRisk = derivePrimaryRisk({ metrics, alertsCount, integrationStatus });
   const nextAction = deriveNextAction({ metrics, alertsCount, integrationStatus, onSyncAvailable: !!onSync });
+  const syncAge = formatRelativeSyncAge(lastActionAt);
   const aiMessage = deriveAiStatusMessage({
     syncing,
     aiStatus,
@@ -239,30 +259,35 @@ export default function TopCommandBar({
           label="Profit Integrity"
           value={`${Math.round(Number(profitScore || 0))}`}
           meta={`${integrityMeta} · /100`}
+          provenance="Source: tenant signal"
           tone="primary"
         />
         <StatCell
           label="Net Profit (30d)"
           value={formatCurrency(metrics?.totalProfit)}
           meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin · ${trend.label}`}
+          provenance={`Source: order summary · ${syncAge}`}
           tone={Number(metrics?.totalProfit || 0) >= 0 ? 'success' : 'warning'}
         />
         <StatCell
           label="Risk Level"
           value={riskLevel}
           meta={riskMeta}
+          provenance={`Source: flagged orders · ${syncAge}`}
           tone={riskLevel === 'High' ? 'warning' : riskLevel === 'Medium' ? 'accent' : 'success'}
         />
         <StatCell
           label="Alerts Count"
           value={String(alertsCount)}
           meta={alertMeta}
+          provenance={`Source: alert queue · ${syncAge}`}
           tone={alertsCount ? 'warning' : 'success'}
         />
         <StatCell
           label="AI Status"
           value={aiStatus}
           meta={aiMessage.last.replace('Last action: ', '')}
+          provenance={`Source: sync runtime · ${syncAge}`}
           tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
         />
       </div>
