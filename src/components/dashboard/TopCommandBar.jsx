@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, BarChart3, ChevronRight, RefreshCw, Shield, Sparkles, TriangleAlert } from 'lucide-react';
-import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
+import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -102,19 +102,23 @@ const iconMap = {
 function StatCell({ label, value, meta, provenance, tone = 'primary' }) {
   const Icon = iconMap[label] || Activity;
   return (
-    <div className="dashboard-subpanel">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
-          <Icon className="h-4 w-4 text-slate-300" />
+    <CommandCard className="h-full">
+      <CommandCardContent className="flex h-full flex-col pt-4">
+        <div className="flex items-start justify-between">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
+            <Icon className="h-4 w-4 text-slate-300" />
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
         </div>
-        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
-      </div>
-      <p className="dashboard-metric mt-5" style={{ color: toneMap[tone] || '#FFFFFF' }}>
-        {value}
-      </p>
-      <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xs text-slate-400">{meta || provenance}</p>
-    </div>
+        <div className="mt-3">
+          <p className="text-2xl font-bold text-slate-100" style={{ color: toneMap[tone] || '#FFFFFF' }}>
+            {value}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
+          <p className="text-xs text-slate-400">{meta || provenance}</p>
+        </div>
+      </CommandCardContent>
+    </CommandCard>
   );
 }
 
@@ -166,66 +170,63 @@ export default function TopCommandBar({
   });
 
   return (
-    <CommandCard>
-      <CommandCardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CommandCardTitle className="truncate">{storeName}</CommandCardTitle>
-            <CommandCardDescription>
-              {syncing ? 'Refreshing store data' : 'Your store health at a glance'}
-            </CommandCardDescription>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${syncing ? 'dashboard-live-dot' : 'bg-emerald-400/80'}`} />
-            <ActionButton
-              icon={RefreshCw}
-              label={syncing ? 'Syncing' : 'Sync Now'}
-              onClick={onSync}
-              disabled={!onSync || syncing}
-              spinning={syncing}
-            />
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-slate-100">{storeName}</h1>
+          <p className="text-slate-400">
+            {syncing ? 'Refreshing store data' : 'Your store health at a glance'}
+          </p>
         </div>
-      </CommandCardHeader>
-      <CommandCardContent>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <StatCell
-            label="Profit Integrity"
-            value={`${Math.round(Number(profitScore || 0))}`}
-            meta={`${integrityMeta} · /100`}
-            provenance={integrityProvenance}
-            tone="primary"
-          />
-          <StatCell
-            label="Net Profit (30d)"
-            value={formatCurrency(metrics?.totalProfit)}
-            meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin · ${trend.label}`}
-            provenance={`Order summary · ${syncAge}`}
-            tone={Number(metrics?.totalProfit || 0) >= 0 ? 'success' : 'warning'}
-          />
-          <StatCell
-            label="Risk Level"
-            value={riskLevel}
-            meta={riskMeta}
-            provenance={`Flagged orders · ${syncAge}`}
-            tone={riskLevel === 'High' ? 'warning' : riskLevel === 'Medium' ? 'accent' : 'success'}
-          />
-          <StatCell
-            label="Alerts Count"
-            value={String(alertsCount)}
-            meta={alertMeta}
-            provenance="Pending alerts"
-            tone={alertsCount ? 'warning' : 'success'}
-          />
-          <StatCell
-            label="AI Status"
-            value={aiStatus}
-            meta={aiMessage.last.replace('Last action: ', '')}
-            provenance={`Store analysis · ${syncAge}`}
-            tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`inline-flex h-2.5 w-2.5 rounded-full ${syncing ? 'dashboard-live-dot' : 'bg-emerald-400/80'}`} />
+          <ActionButton
+            icon={RefreshCw}
+            label={syncing ? 'Syncing' : 'Sync Now'}
+            onClick={onSync}
+            disabled={!onSync || syncing}
+            spinning={syncing}
           />
         </div>
-      </CommandCardContent>
-    </CommandCard>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        <StatCell
+          label="Profit Integrity"
+          value={`${Math.round(Number(profitScore || 0))}`}
+          meta={`${integrityMeta} · /100`}
+          provenance={integrityProvenance}
+          tone="primary"
+        />
+        <StatCell
+          label="Net Profit (30d)"
+          value={formatCurrency(metrics?.totalProfit)}
+          meta={`${Math.round(Number(metrics?.avgMargin || 0))}% margin · ${trend.label}`}
+          provenance={`Order summary · ${syncAge}`}
+          tone={Number(metrics?.totalProfit || 0) >= 0 ? 'success' : 'warning'}
+        />
+        <StatCell
+          label="Risk Level"
+          value={riskLevel}
+          meta={riskMeta}
+          provenance={`Flagged orders · ${syncAge}`}
+          tone={riskLevel === 'High' ? 'warning' : riskLevel === 'Medium' ? 'accent' : 'success'}
+        />
+        <StatCell
+          label="Alerts Count"
+          value={String(alertsCount)}
+          meta={alertMeta}
+          provenance="Pending alerts"
+          tone={alertsCount ? 'warning' : 'success'}
+        />
+        <StatCell
+          label="AI Status"
+          value={aiStatus}
+          meta={aiMessage.last.replace('Last action: ', '')}
+          provenance={`Store analysis · ${syncAge}`}
+          tone={aiStatus === 'Active' ? 'secondary' : 'accent'}
+        />
+      </div>
+    </div>
   );
 }
