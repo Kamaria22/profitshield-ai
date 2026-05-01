@@ -149,7 +149,7 @@ Be specific with order numbers when flagging issues.`;
   };
 
   return (
-    <CommandCard>
+    <CommandCard className="border-cyan-400/20 bg-[linear-gradient(180deg,rgba(0,229,255,0.08),rgba(255,255,255,0.03))]">
       <CommandCardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -162,7 +162,7 @@ Be specific with order numbers when flagging issues.`;
                 <Sparkles className="w-4 h-4 text-[#00E5FF]" />
               </CommandCardTitle>
               <CommandCardDescription>
-                Pattern detection, anomaly identification, and actionable insights
+                AI-driven anomaly detection, fraud review, and profit action guidance
               </CommandCardDescription>
             </div>
           </div>
@@ -188,11 +188,11 @@ Be specific with order numbers when flagging issues.`;
 
       <CommandCardContent>
         {!analysis && !analyzeMutation.isPending && (
-          <div className="text-center py-8">
-            <Brain className="mx-auto mb-3 h-12 w-12 text-slate-500" />
-            <p className="text-slate-300">Click "Analyze Orders" to get AI-powered insights</p>
-            <p className="mt-1 text-sm text-slate-400">
-              Analyzes {Math.min(orders?.length || 0, 100)} orders for patterns and anomalies
+          <div className="py-10 text-center">
+            <Brain className="mx-auto mb-3 h-12 w-12 text-cyan-300" />
+            <p className="text-base font-medium text-slate-100">Run AI order analysis</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Review up to {Math.min(orders?.length || 0, 100)} recent orders for profit leaks, fraud patterns, and next actions.
             </p>
           </div>
         )}
@@ -210,10 +210,13 @@ Be specific with order numbers when flagging issues.`;
                 }`}>
                   {analysis.health_score}
                 </div>
-                <p className="mt-1 text-center text-xs text-slate-500">Health</p>
+                <p className="mt-1 text-center text-xs text-slate-500">Score</p>
               </div>
               <div className="flex-1">
                 <p className="text-slate-300">{analysis.summary}</p>
+                <p className="mt-2 text-xs text-cyan-300">
+                  Action prompt: review flagged anomalies first, then apply the top recommendation.
+                </p>
               </div>
               </div>
             </div>

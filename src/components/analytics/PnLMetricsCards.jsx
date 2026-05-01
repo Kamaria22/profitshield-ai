@@ -69,25 +69,25 @@ export default function PnLMetricsCards({ metrics }) {
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
-          <CommandCard key={idx}>
+          <CommandCard key={idx} className="h-full">
             <CommandCardContent className="pt-4">
               <div className="flex items-start justify-between">
                 <div className={`p-2 rounded-lg ${colorClasses[card.color]}`}>
                   <Icon className="w-4 h-4" />
                 </div>
-                {card.trend && (
-                  <div className={`flex items-center text-xs ${card.trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
+                {card.trend ? (
+                  <div className={`flex items-center text-xs ${card.trend === 'up' ? 'text-emerald-300' : 'text-red-300'}`}>
                     {card.trend === 'up' ? (
                       <ArrowUpRight className="w-3 h-3" />
                     ) : (
                       <ArrowDownRight className="w-3 h-3" />
                     )}
                   </div>
-                )}
+                ) : <div className="h-3 w-3" />}
               </div>
               <div className="mt-3">
                 <p className="text-2xl font-bold text-slate-100">{card.value}</p>

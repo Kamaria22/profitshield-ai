@@ -1,12 +1,12 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { TrendingUp, BarChart3, Activity } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 const formatCurrency = (value) => {
   if (Math.abs(value) >= 1000) {
@@ -19,14 +19,14 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload || !payload.length) return null;
 
   return (
-    <div className="bg-white p-3 rounded-lg shadow-lg border">
-      <p className="font-medium text-slate-900 mb-2">
+    <div className="rounded-lg border border-white/10 bg-slate-950/95 p-3 shadow-lg">
+      <p className="mb-2 font-medium text-slate-100">
         {format(parseISO(label), 'MMM d, yyyy')}
       </p>
       {payload.map((entry, idx) => (
         <div key={idx} className="flex items-center justify-between gap-4 text-sm">
           <span style={{ color: entry.color }}>{entry.name}:</span>
-          <span className="font-medium">{formatCurrency(entry.value)}</span>
+          <span className="font-medium text-slate-100">{formatCurrency(entry.value)}</span>
         </div>
       ))}
     </div>
@@ -53,25 +53,25 @@ export default function PnLTrendsChart({ data, granularity }) {
   ];
 
   return (
-    <Card>
-      <CardHeader>
+    <CommandCard className="h-full">
+      <CommandCardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <CommandCardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-cyan-300" />
               Profit Trends
-            </CardTitle>
-            <CardDescription>
+            </CommandCardTitle>
+            <CommandCardDescription>
               {granularity.charAt(0).toUpperCase() + granularity.slice(1)} performance over time
-            </CardDescription>
+            </CommandCardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex border rounded-lg overflow-hidden">
+            <div className="flex overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
               <Button 
                 variant={chartType === 'area' ? 'secondary' : 'ghost'} 
                 size="sm"
                 onClick={() => setChartType('area')}
-                className="rounded-none"
+                className="rounded-none border-0 text-slate-200"
               >
                 <Activity className="w-4 h-4" />
               </Button>
@@ -79,7 +79,7 @@ export default function PnLTrendsChart({ data, granularity }) {
                 variant={chartType === 'bar' ? 'secondary' : 'ghost'} 
                 size="sm"
                 onClick={() => setChartType('bar')}
-                className="rounded-none"
+                className="rounded-none border-0 text-slate-200"
               >
                 <BarChart3 className="w-4 h-4" />
               </Button>
@@ -98,14 +98,14 @@ export default function PnLTrendsChart({ data, granularity }) {
                 backgroundColor: showMetrics.includes(metric.key) ? metric.color : undefined,
                 borderColor: metric.color
               }}
-              className="text-xs"
+              className="text-xs text-slate-100"
             >
               {metric.label}
             </Button>
           ))}
         </div>
-      </CardHeader>
-      <CardContent>
+      </CommandCardHeader>
+      <CommandCardContent>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'area' ? (
@@ -118,18 +118,22 @@ export default function PnLTrendsChart({ data, granularity }) {
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
                 <XAxis 
                   dataKey="date" 
                   tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  tick={{ fontSize: 12, fill: '#94a3b8' }}
+                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
                 />
                 <YAxis 
                   tickFormatter={formatCurrency}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  tick={{ fontSize: 12, fill: '#94a3b8' }}
+                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ color: '#cbd5e1' }} />
                 {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
                   <Area
                     key={metric.key}
@@ -144,18 +148,22 @@ export default function PnLTrendsChart({ data, granularity }) {
               </AreaChart>
             ) : (
               <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
                 <XAxis 
                   dataKey="date" 
                   tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  tick={{ fontSize: 12, fill: '#94a3b8' }}
+                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
                 />
                 <YAxis 
                   tickFormatter={formatCurrency}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  tick={{ fontSize: 12, fill: '#94a3b8' }}
+                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ color: '#cbd5e1' }} />
                 {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
                   <Bar
                     key={metric.key}
@@ -169,7 +177,7 @@ export default function PnLTrendsChart({ data, granularity }) {
             )}
           </ResponsiveContainer>
         </div>
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

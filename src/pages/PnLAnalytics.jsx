@@ -277,12 +277,12 @@ export default function PnLAnalytics() {
   const isLoading = tenantLoading || ordersLoading;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">P&L Analytics</h1>
-          <p className="text-slate-400">Comprehensive profit and loss analysis</p>
+          <p className="text-slate-400">Profit performance, AI analysis, and segment-level drilldown</p>
         </div>
         <div className="flex items-center gap-3">
           {/* Date Preset Selector */}
@@ -381,28 +381,28 @@ export default function PnLAnalytics() {
         </CommandCard>
       ) : (
         <>
-          {/* Key Metrics Cards */}
+          {/* Row 1 */}
           <PnLMetricsCards metrics={metrics} />
 
-          {/* AI Order Analysis */}
+          {/* Row 2 */}
           <AIOrderAnalysis orders={orders} metrics={metrics} />
 
-          {/* Trends Chart */}
-          <PnLTrendsChart data={trendData} granularity={granularity} />
+          {/* Row 3 */}
+          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+            <PnLTrendsChart data={trendData} granularity={granularity} />
+            <PnLBreakdownChart metrics={metrics} />
+          </div>
 
-          {/* Cost Breakdown */}
-          <PnLBreakdownChart metrics={metrics} />
-
-          {/* Segmentation Section */}
+          {/* Row 4 */}
           <CommandCard>
             <CommandCardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CommandCardTitle>P&L by Segment</CommandCardTitle>
-                  <CommandCardDescription>Drill down into specific segments</CommandCardDescription>
+                  <CommandCardDescription>Full segment performance table with drill-down access</CommandCardDescription>
                 </div>
                 <Select value={segmentBy} onValueChange={setSegmentBy}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-40 border-white/10 bg-white/[0.03] text-slate-100">
                     <Filter className="w-4 h-4 mr-2" />
                     <SelectValue />
                   </SelectTrigger>

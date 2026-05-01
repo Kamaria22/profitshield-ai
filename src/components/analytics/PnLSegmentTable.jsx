@@ -48,18 +48,18 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
           placeholder={`Search ${segmentLabels[segmentBy].toLowerCase()}s...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
+          className="border-white/10 bg-white/[0.03] pl-9 text-slate-100 placeholder:text-slate-500"
         />
       </div>
 
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50">
+            <TableRow className="border-white/10 bg-white/[0.03] hover:bg-white/[0.03]">
               <TableHead className="w-[250px]">{segmentLabels[segmentBy]}</TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-slate-100"
+                className="cursor-pointer hover:bg-white/[0.05]"
                 onClick={() => handleSort('revenue')}
               >
                 <div className="flex items-center gap-1">
@@ -68,7 +68,7 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-slate-100"
+                className="cursor-pointer hover:bg-white/[0.05]"
                 onClick={() => handleSort('cogs')}
               >
                 <div className="flex items-center gap-1">
@@ -77,7 +77,7 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-slate-100"
+                className="cursor-pointer hover:bg-white/[0.05]"
                 onClick={() => handleSort('profit')}
               >
                 <div className="flex items-center gap-1">
@@ -86,7 +86,7 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-slate-100"
+                className="cursor-pointer hover:bg-white/[0.05]"
                 onClick={() => handleSort('margin')}
               >
                 <div className="flex items-center gap-1">
@@ -95,7 +95,7 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-slate-100"
+                className="cursor-pointer hover:bg-white/[0.05]"
                 onClick={() => handleSort('orders')}
               >
                 <div className="flex items-center gap-1">
@@ -109,16 +109,16 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
           <TableBody>
             {filteredData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={7} className="py-8 text-center text-slate-500">
                   No data found
                 </TableCell>
               </TableRow>
             ) : (
               filteredData.slice(0, 20).map((item, idx) => (
-                <TableRow key={idx} className="hover:bg-slate-50">
+                <TableRow key={idx} className="border-white/10 hover:bg-white/[0.03]">
                   <TableCell>
                     <div>
-                      <p className="font-medium text-slate-900 truncate max-w-[220px]">
+                      <p className="max-w-[220px] truncate font-medium text-slate-100">
                         {item.name}
                       </p>
                       {item.customerName && (
@@ -140,9 +140,9 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                       {item.profit >= 0 ? (
                         <TrendingUp className="w-3 h-3 text-emerald-500" />
                       ) : (
-                        <TrendingDown className="w-3 h-3 text-red-500" />
+                        <TrendingDown className="w-3 h-3 text-red-400" />
                       )}
-                      <span className={item.profit >= 0 ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
+                      <span className={item.profit >= 0 ? 'font-medium text-emerald-300' : 'font-medium text-red-300'}>
                         {formatCurrency(item.profit)}
                       </span>
                     </div>
@@ -151,9 +151,9 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                     <Badge 
                       variant="outline"
                       className={
-                        item.margin >= 30 ? 'border-emerald-200 text-emerald-700 bg-emerald-50' :
-                        item.margin >= 15 ? 'border-amber-200 text-amber-700 bg-amber-50' :
-                        'border-red-200 text-red-700 bg-red-50'
+                        item.margin >= 30 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' :
+                        item.margin >= 15 ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' :
+                        'border-red-400/20 bg-red-400/10 text-red-300'
                       }
                     >
                       {item.margin.toFixed(1)}%
@@ -166,6 +166,7 @@ export default function PnLSegmentTable({ data, segmentBy, onDrilldown }) {
                     <Button 
                       variant="ghost" 
                       size="icon"
+                      className="text-slate-400 hover:bg-white/[0.05] hover:text-slate-100"
                       onClick={() => onDrilldown(item)}
                     >
                       <ChevronRight className="w-4 h-4" />

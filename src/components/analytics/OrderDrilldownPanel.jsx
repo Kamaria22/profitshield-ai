@@ -1,11 +1,11 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, ShoppingCart, DollarSign, TrendingUp, TrendingDown, Package, User, Tag } from 'lucide-react';
 import { format } from 'date-fns';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 const formatCurrency = (value) => `$${(value || 0).toFixed(2)}`;
 
@@ -28,92 +28,92 @@ export default function OrderDrilldownPanel({ orders, segment, segmentBy, onClos
   const Icon = segmentIcons[segmentBy] || Package;
 
   return (
-    <Card className="mt-6 border-2 border-emerald-200 bg-emerald-50/30">
-      <CardHeader>
+    <CommandCard className="mt-6 border-white/10">
+      <CommandCardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <Icon className="w-5 h-5 text-emerald-600" />
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
+              <Icon className="w-5 h-5 text-cyan-300" />
             </div>
             <div>
-              <CardTitle className="text-lg">{segment.name}</CardTitle>
-              <CardDescription>
+              <CommandCardTitle className="text-lg">{segment.name}</CommandCardTitle>
+              <CommandCardDescription>
                 {orders.length} orders • {segmentBy.charAt(0).toUpperCase() + segmentBy.slice(1)} drill-down
-              </CardDescription>
+              </CommandCardDescription>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="text-slate-400 hover:bg-white/[0.05] hover:text-slate-100" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      </CommandCardHeader>
+      <CommandCardContent className="space-y-6">
         {/* Segment Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg p-4 border">
-            <div className="flex items-center gap-2 text-blue-600 mb-1">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+            <div className="mb-1 flex items-center gap-2 text-cyan-300">
               <DollarSign className="w-4 h-4" />
               <span className="text-xs font-medium">Revenue</span>
             </div>
-            <p className="text-xl font-bold">{formatCurrency(totalRevenue)}</p>
+            <p className="text-xl font-bold text-slate-100">{formatCurrency(totalRevenue)}</p>
           </div>
-          <div className="bg-white rounded-lg p-4 border">
-            <div className="flex items-center gap-2 text-amber-600 mb-1">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+            <div className="mb-1 flex items-center gap-2 text-amber-300">
               <Package className="w-4 h-4" />
               <span className="text-xs font-medium">COGS</span>
             </div>
-            <p className="text-xl font-bold">{formatCurrency(totalCogs)}</p>
+            <p className="text-xl font-bold text-slate-100">{formatCurrency(totalCogs)}</p>
           </div>
-          <div className="bg-white rounded-lg p-4 border">
-            <div className={`flex items-center gap-2 mb-1 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+            <div className={`mb-1 flex items-center gap-2 ${totalProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
               {totalProfit >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               <span className="text-xs font-medium">Net Profit</span>
             </div>
-            <p className={`text-xl font-bold ${totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`text-xl font-bold ${totalProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
               {formatCurrency(totalProfit)}
             </p>
           </div>
-          <div className="bg-white rounded-lg p-4 border">
-            <div className="flex items-center gap-2 text-purple-600 mb-1">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+            <div className="mb-1 flex items-center gap-2 text-violet-300">
               <ShoppingCart className="w-4 h-4" />
               <span className="text-xs font-medium">Avg Order</span>
             </div>
-            <p className="text-xl font-bold">{formatCurrency(avgOrderValue)}</p>
+            <p className="text-xl font-bold text-slate-100">{formatCurrency(avgOrderValue)}</p>
           </div>
         </div>
 
         {/* Cost Breakdown */}
-        <div className="bg-white rounded-lg p-4 border">
-          <h4 className="font-medium text-slate-900 mb-3">Cost Breakdown</h4>
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <h4 className="mb-3 font-medium text-slate-100">Cost Breakdown</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <p className="text-slate-500">Shipping Cost</p>
-              <p className="font-medium">{formatCurrency(totalShippingCost)}</p>
+              <p className="font-medium text-slate-100">{formatCurrency(totalShippingCost)}</p>
             </div>
             <div>
               <p className="text-slate-500">Shipping Charged</p>
-              <p className="font-medium">{formatCurrency(totalShippingCharged)}</p>
+              <p className="font-medium text-slate-100">{formatCurrency(totalShippingCharged)}</p>
             </div>
             <div>
               <p className="text-slate-500">Payment Fees</p>
-              <p className="font-medium">{formatCurrency(totalPaymentFees)}</p>
+              <p className="font-medium text-slate-100">{formatCurrency(totalPaymentFees)}</p>
             </div>
             <div>
               <p className="text-slate-500">Refunds</p>
-              <p className="font-medium text-red-600">{formatCurrency(totalRefunds)}</p>
+              <p className="font-medium text-red-300">{formatCurrency(totalRefunds)}</p>
             </div>
           </div>
         </div>
 
         {/* Orders List */}
-        <div className="bg-white rounded-lg border">
-          <div className="p-4 border-b">
-            <h4 className="font-medium text-slate-900">Orders ({orders.length})</h4>
+        <div className="rounded-lg border border-white/10 bg-white/[0.02]">
+          <div className="border-b border-white/10 p-4">
+            <h4 className="font-medium text-slate-100">Orders ({orders.length})</h4>
           </div>
           <ScrollArea className="h-[300px]">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead>Order</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Customer</TableHead>
@@ -128,8 +128,8 @@ export default function OrderDrilldownPanel({ orders, segment, segmentBy, onClos
                   const profit = (order.total_revenue || 0) - (order.total_cogs || 0);
                   const margin = order.total_revenue > 0 ? (profit / order.total_revenue) * 100 : 0;
                   return (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">
+                    <TableRow key={idx} className="border-white/10 hover:bg-white/[0.03]">
+                      <TableCell className="font-medium text-slate-100">
                         #{order.order_number || order.platform_order_id}
                       </TableCell>
                       <TableCell className="text-slate-500 text-sm">
@@ -138,14 +138,14 @@ export default function OrderDrilldownPanel({ orders, segment, segmentBy, onClos
                       <TableCell className="text-sm">
                         {order.customer_name || order.customer_email || 'Guest'}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-slate-100">
                         {formatCurrency(order.total_revenue)}
                       </TableCell>
                       <TableCell className="text-slate-600">
                         {formatCurrency(order.total_cogs)}
                       </TableCell>
                       <TableCell>
-                        <span className={order.net_profit >= 0 ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
+                        <span className={order.net_profit >= 0 ? 'font-medium text-emerald-300' : 'font-medium text-red-300'}>
                           {formatCurrency(order.net_profit)}
                         </span>
                       </TableCell>
@@ -153,9 +153,9 @@ export default function OrderDrilldownPanel({ orders, segment, segmentBy, onClos
                         <Badge
                           variant="outline"
                           className={
-                            margin >= 30 ? 'border-emerald-200 text-emerald-700' :
-                            margin >= 15 ? 'border-amber-200 text-amber-700' :
-                            'border-red-200 text-red-700'
+                            margin >= 30 ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' :
+                            margin >= 15 ? 'border-amber-400/20 bg-amber-400/10 text-amber-300' :
+                            'border-red-400/20 bg-red-400/10 text-red-300'
                           }
                         >
                           {margin.toFixed(1)}%
@@ -168,7 +168,7 @@ export default function OrderDrilldownPanel({ orders, segment, segmentBy, onClos
             </Table>
           </ScrollArea>
         </div>
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }
