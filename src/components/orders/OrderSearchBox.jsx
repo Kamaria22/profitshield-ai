@@ -102,7 +102,7 @@ export default function OrderSearchBox({ value, onChange, orders = [] }) {
           onFocus={() => { setFocused(true); setShowSuggestions(draft.length > 0); }}
           onBlur={() => setFocused(false)}
           onKeyDown={handleKeyDown}
-          className="pl-9 pr-8 bg-white/5 border-white/10 text-slate-200 placeholder:text-slate-500"
+          className="h-10 border-white/10 bg-white/[0.03] pl-9 pr-8 text-slate-200 placeholder:text-slate-500"
         />
         {draft && (
           <button
@@ -141,7 +141,7 @@ export default function OrderSearchBox({ value, onChange, orders = [] }) {
       {/* Find button */}
       <Button
         onClick={() => commitSearch()}
-        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 shrink-0"
+        className="shrink-0 bg-cyan-500 px-5 text-slate-950 hover:bg-cyan-400"
       >
         <Search className="w-4 h-4 mr-2" />
         Find

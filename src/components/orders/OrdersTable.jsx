@@ -27,15 +27,15 @@ import AIOrderInsightsBadge from './AIOrderInsightsBadge';
 import { CommandCard, CommandCardContent } from '@/components/ui/command-card';
 
 const riskBadgeConfig = {
-  low: { variant: 'outline', className: 'border-emerald-200 text-emerald-700 bg-emerald-50' },
-  medium: { variant: 'outline', className: 'border-yellow-200 text-yellow-700 bg-yellow-50' },
-  high: { variant: 'outline', className: 'border-red-200 text-red-700 bg-red-50' },
+  low: { variant: 'outline', className: 'border-emerald-400/20 text-emerald-300 bg-emerald-400/10' },
+  medium: { variant: 'outline', className: 'border-yellow-400/20 text-yellow-300 bg-yellow-400/10' },
+  high: { variant: 'outline', className: 'border-red-400/20 text-red-300 bg-red-400/10' },
 };
 
 const getRiskScoreColor = (score) => {
-  if (score >= 70) return 'text-red-600 bg-red-50';
-  if (score >= 40) return 'text-yellow-600 bg-yellow-50';
-  return 'text-emerald-600 bg-emerald-50';
+  if (score >= 70) return 'text-red-300 bg-red-400/10';
+  if (score >= 40) return 'text-yellow-300 bg-yellow-400/10';
+  return 'text-emerald-300 bg-emerald-400/10';
 };
 
 const confidenceIcon = {
@@ -45,12 +45,18 @@ const confidenceIcon = {
 };
 
 const statusBadgeConfig = {
-  pending: 'bg-slate-100 text-slate-700',
-  paid: 'bg-blue-100 text-blue-700',
-  fulfilled: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-slate-100 text-slate-500',
-  refunded: 'bg-red-100 text-red-700',
-  partially_refunded: 'bg-orange-100 text-orange-700',
+  pending: 'bg-slate-500/10 text-slate-300',
+  paid: 'bg-blue-500/10 text-blue-300',
+  fulfilled: 'bg-emerald-500/10 text-emerald-300',
+  cancelled: 'bg-slate-500/10 text-slate-400',
+  refunded: 'bg-red-500/10 text-red-300',
+  partially_refunded: 'bg-orange-500/10 text-orange-300',
+};
+
+const getProfitTone = (value) => {
+  if (value < 0) return { text: 'text-red-300', dot: 'bg-red-400' };
+  if (value === 0 || value < 10) return { text: 'text-yellow-300', dot: 'bg-yellow-400' };
+  return { text: 'text-emerald-300', dot: 'bg-emerald-400' };
 };
 
 export default function OrdersTable({ orders, loading, onOrderClick }) {
@@ -59,7 +65,7 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
       <CommandCard>
         <CommandCardContent className="animate-pulse pt-4">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex gap-4 border-b border-white/8 py-4 last:border-0">
+            <div key={i} className="flex gap-4 border-b border-white/8 py-3 last:border-0">
               <div className="h-4 w-24 rounded bg-white/10" />
               <div className="h-4 w-32 rounded bg-white/10" />
               <div className="h-4 w-20 rounded bg-white/10" />
@@ -101,7 +107,7 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
           {orders.map((order) => {
             const ConfidenceIcon = confidenceIcon[order.confidence]?.icon || HelpCircle;
             const confidenceColor = confidenceIcon[order.confidence]?.color || 'text-slate-400';
-            const isProfitable = (order.net_profit || 0) >= 0;
+            const profitTone = getProfitTone(Number(order.net_profit || 0));
             
             return (
               <TableRow 
@@ -109,32 +115,33 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                 className="cursor-pointer border-white/8 transition-colors hover:bg-white/[0.03]"
                 onClick={() => onOrderClick?.(order)}
               >
-                <TableCell className="font-medium">
+                <TableCell className="py-3 font-medium">
                   <div className="flex items-center gap-2">
                     #{order.order_number}
                     {order.risk_level === 'high' && (
-                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-slate-400">
+                <TableCell className="py-3 text-slate-400">
                   {order.order_date ? format(new Date(order.order_date), 'MMM d, yyyy') : '-'}
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-3">
                   <div>
                     <p className="font-medium text-slate-100">{order.customer_name || 'Guest'}</p>
                     <p className="text-sm text-slate-400">{order.customer_email}</p>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-medium">
+                <TableCell className="py-3 text-right font-medium tabular-nums text-slate-100">
                   ${order.total_revenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                 </TableCell>
-                <TableCell className={`text-right font-semibold ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
+                <TableCell className={`py-3 text-right font-semibold tabular-nums ${profitTone.text}`}>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center justify-end gap-1">
-                          {isProfitable ? '+' : ''}${order.net_profit?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                          <span className={`h-2 w-2 rounded-full ${profitTone.dot}`} />
+                          ${order.net_profit?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                           <ConfidenceIcon className={`w-3.5 h-3.5 ${confidenceColor}`} />
                         </div>
                       </TooltipTrigger>
@@ -144,10 +151,10 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                     </Tooltip>
                   </TooltipProvider>
                 </TableCell>
-                <TableCell className={`text-right font-medium ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
+                <TableCell className={`py-3 text-right font-medium tabular-nums ${profitTone.text}`}>
                   {order.margin_pct?.toFixed(1) || '0.0'}%
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-3">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -193,16 +200,16 @@ export default function OrdersTable({ orders, loading, onOrderClick }) {
                     </Tooltip>
                   </TooltipProvider>
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-3">
                   <Badge className={statusBadgeConfig[order.status] || statusBadgeConfig.pending}>
                     {order.status?.replace('_', ' ')}
                   </Badge>
                 </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
+                <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                   <AIOrderInsightsBadge order={order} />
                 </TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                <TableCell className="py-3">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:bg-white/[0.05] hover:text-slate-100">
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </TableCell>

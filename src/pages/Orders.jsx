@@ -15,7 +15,11 @@ import {
   Sparkles,
   ShieldAlert,
   Store,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign,
+  Shield,
+  ShoppingCart,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -361,7 +365,7 @@ export default function Orders() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Debug Banner */}
       <DebugBanner 
         shopDomain={resolverCheck.storeKey} 
@@ -389,59 +393,63 @@ export default function Orders() {
         </CommandCard>
       )}
 
-      {/* Header */}
-      <CommandCard className="px-4 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-[1.85rem] font-semibold text-white">Orders</h1>
-            <p className="mt-1 text-slate-400">
-            View and analyze order profitability
+      {/* KPI Strip */}
+      <CommandCard className="overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] px-4 py-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div>
+              <h1 className="text-xl font-semibold text-white">Orders</h1>
+            </div>
             {tenantSettings?.demo_mode === false && (
-              <Badge variant="outline" className="ml-2 border-white/10 text-xs text-slate-300">Real orders only</Badge>
+              <Badge variant="outline" className="border-white/10 text-xs text-slate-300">Real orders only</Badge>
             )}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2.5 sm:items-end">
             <OrderSyncStatus
               tenantId={resolverCheck.tenantId}
               integrationId={resolverCheck.integrationId}
               onSynced={() => queryClient.invalidateQueries({ queryKey: ordersQueryKey })}
             />
-            <div className="grid grid-cols-2 gap-2.5 sm:w-[272px]">
-              <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
-                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Risk exposure</p>
-                <p className={`mt-1 text-sm font-semibold ${stats.highRisk > 0 ? 'text-red-300' : 'text-emerald-200'}`}>{stats.highRisk > 0 ? `${stats.highRisk} high risk` : 'Controlled'}</p>
-              </div>
-              <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
-                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Profit posture</p>
-                <p className={`mt-1 text-sm font-semibold ${stats.totalProfit >= 0 ? 'text-emerald-200' : 'text-red-300'}`}>{stats.totalProfit >= 0 ? 'Positive' : 'Negative'}</p>
-              </div>
+          </div>
+
+          <div className="grid flex-1 gap-3 sm:grid-cols-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto_auto]">
+            <CompactMetric
+              icon={ShoppingCart}
+              label="Orders"
+              value={`${stats.totalOrders}`}
+              tone="text-slate-100"
+            />
+            <CompactMetric
+              icon={DollarSign}
+              label="Revenue"
+              value={`$${stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              tone="text-slate-100"
+            />
+            <CompactMetric
+              icon={TrendingUp}
+              label="Net Profit"
+              value={`$${stats.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              tone={stats.totalProfit > 0 ? 'text-emerald-300' : stats.totalProfit === 0 ? 'text-yellow-300' : 'text-red-300'}
+            />
+            <CompactMetric
+              icon={Shield}
+              label="High-Risk"
+              value={`${stats.highRisk}`}
+              tone={stats.highRisk > 0 ? 'text-red-300' : 'text-emerald-300'}
+            />
+            <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Risk Exposure</p>
+              <p className={`mt-1 text-sm font-semibold ${stats.highRisk > 0 ? 'text-red-300' : 'text-emerald-200'}`}>
+                {stats.highRisk > 0 ? `${stats.highRisk} flagged` : 'Controlled'}
+              </p>
+            </div>
+            <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Profit Posture</p>
+              <p className={`mt-1 text-sm font-semibold ${stats.totalProfit > 0 ? 'text-emerald-200' : stats.totalProfit === 0 ? 'text-yellow-300' : 'text-red-300'}`}>
+                {stats.totalProfit > 0 ? 'Positive' : stats.totalProfit === 0 ? 'At risk' : 'Negative'}
+              </p>
             </div>
           </div>
         </div>
       </CommandCard>
-
-      {/* Stats Bar */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="glass-card rounded-lg p-4">
-          <p className="text-sm text-slate-400">Orders</p>
-          <p className="text-2xl font-bold text-slate-100">{stats.totalOrders}</p>
-        </div>
-        <div className="glass-card rounded-lg p-4">
-          <p className="text-sm text-slate-400">Revenue</p>
-          <p className="text-2xl font-bold text-slate-100">${stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-        </div>
-        <div className="glass-card rounded-lg p-4">
-          <p className="text-sm text-slate-400">Net Profit</p>
-          <p className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            ${stats.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </p>
-        </div>
-        <div className="glass-card rounded-lg p-4">
-          <p className="text-sm text-slate-400">High Risk</p>
-          <p className={`text-2xl font-bold ${stats.highRisk > 0 ? 'text-red-400' : 'text-slate-100'}`}>{stats.highRisk}</p>
-        </div>
-      </div>
 
       {/* Risk Analysis Banner */}
       {stats.unscored > 0 && (
@@ -469,192 +477,198 @@ export default function Orders() {
         </CommandCard>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <OrderSearchBox
-          value={searchTerm}
-          onChange={setSearchTerm}
-          orders={orders}
-        />
+      {/* Control Bar */}
+      <CommandCard className="sticky top-[70px] z-20 border-white/10 bg-slate-950/90 shadow-[0_10px_30px_rgba(2,6,23,0.28)] backdrop-blur">
+        <CommandCardContent className="px-3 py-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <OrderSearchBox
+              value={searchTerm}
+              onChange={setSearchTerm}
+              orders={orders}
+            />
 
-        <Select 
-          value={filters.dateRange} 
-          onValueChange={(v) => setFilters({ ...filters, dateRange: v })}
-        >
-          <SelectTrigger className="w-40 bg-white/5 border-white/10 text-slate-200">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-            <SelectItem value="365">Last year</SelectItem>
-          </SelectContent>
-        </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={filters.dateRange}
+                onValueChange={(v) => setFilters({ ...filters, dateRange: v })}
+              >
+                <SelectTrigger className="h-10 w-40 border-white/10 bg-white/[0.03] text-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="365">Last year</SelectItem>
+                </SelectContent>
+              </Select>
 
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <SlidersHorizontal className="w-4 h-4" />
-              Filters
-              {activeFiltersCount > 0 && (
-                <Badge className="ml-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                  {activeFiltersCount}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Filter Orders</SheetTitle>
-            </SheetHeader>
-            <div className="space-y-6 mt-6">
-              <div>
-                <Label className="text-sm font-medium">Status</Label>
-                <Select 
-                  value={filters.status} 
-                  onValueChange={(v) => setFilters({ ...filters, status: v })}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="fulfilled">Fulfilled</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                    <SelectItem value="refunded">Refunded</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="h-10 gap-2 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]">
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Filters
+                    {activeFiltersCount > 0 && (
+                      <Badge className="ml-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
+                        {activeFiltersCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>Filter Orders</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-6 mt-6">
+                    <div>
+                      <Label className="text-sm font-medium">Status</Label>
+                      <Select 
+                        value={filters.status} 
+                        onValueChange={(v) => setFilters({ ...filters, status: v })}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="fulfilled">Fulfilled</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div>
-                <Label className="text-sm font-medium">Risk Level</Label>
-                <Select 
-                  value={filters.riskLevel} 
-                  onValueChange={(v) => setFilters({ ...filters, riskLevel: v })}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="high">High Risk</SelectItem>
-                    <SelectItem value="medium">Medium Risk</SelectItem>
-                    <SelectItem value="low">Low Risk</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                    <div>
+                      <Label className="text-sm font-medium">Risk Level</Label>
+                      <Select 
+                        value={filters.riskLevel} 
+                        onValueChange={(v) => setFilters({ ...filters, riskLevel: v })}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Levels</SelectItem>
+                          <SelectItem value="high">High Risk</SelectItem>
+                          <SelectItem value="medium">Medium Risk</SelectItem>
+                          <SelectItem value="low">Low Risk</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div>
-                <Label className="text-sm font-medium">Risk Score Range</Label>
-                <div className="flex items-center gap-2 mt-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="Min"
-                    value={filters.riskScoreMin}
-                    onChange={(e) => setFilters({ ...filters, riskScoreMin: e.target.value })}
-                    className="w-20"
-                  />
-                  <span className="text-slate-400">-</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="Max"
-                    value={filters.riskScoreMax}
-                    onChange={(e) => setFilters({ ...filters, riskScoreMax: e.target.value })}
-                    className="w-20"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">0-39 Low, 40-69 Medium, 70+ High</p>
-              </div>
+                    <div>
+                      <Label className="text-sm font-medium">Risk Score Range</Label>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="Min"
+                          value={filters.riskScoreMin}
+                          onChange={(e) => setFilters({ ...filters, riskScoreMin: e.target.value })}
+                          className="w-20"
+                        />
+                        <span className="text-slate-400">-</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="Max"
+                          value={filters.riskScoreMax}
+                          onChange={(e) => setFilters({ ...filters, riskScoreMax: e.target.value })}
+                          className="w-20"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">0-39 Low, 40-69 Medium, 70+ High</p>
+                    </div>
 
-              <div>
-                <Label className="text-sm font-medium">Profitability</Label>
-                <Select 
-                  value={filters.profitability} 
-                  onValueChange={(v) => setFilters({ ...filters, profitability: v })}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Orders</SelectItem>
-                    <SelectItem value="profitable">Profitable Only</SelectItem>
-                    <SelectItem value="unprofitable">Unprofitable Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                    <div>
+                      <Label className="text-sm font-medium">Profitability</Label>
+                      <Select 
+                        value={filters.profitability} 
+                        onValueChange={(v) => setFilters({ ...filters, profitability: v })}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Orders</SelectItem>
+                          <SelectItem value="profitable">Profitable Only</SelectItem>
+                          <SelectItem value="unprofitable">Unprofitable Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div>
-                <Label className="text-sm font-medium">Data Confidence</Label>
-                <Select 
-                  value={filters.confidence} 
-                  onValueChange={(v) => setFilters({ ...filters, confidence: v })}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="high">High Confidence</SelectItem>
-                    <SelectItem value="medium">Medium Confidence</SelectItem>
-                    <SelectItem value="low">Low Confidence</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                    <div>
+                      <Label className="text-sm font-medium">Data Confidence</Label>
+                      <Select 
+                        value={filters.confidence} 
+                        onValueChange={(v) => setFilters({ ...filters, confidence: v })}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Levels</SelectItem>
+                          <SelectItem value="high">High Confidence</SelectItem>
+                          <SelectItem value="medium">Medium Confidence</SelectItem>
+                          <SelectItem value="low">Low Confidence</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              {activeFiltersCount > 0 && (
-                <Button variant="outline" className="w-full" onClick={clearFilters}>
-                  <X className="w-4 h-4 mr-2" />
-                  Clear All Filters
-                </Button>
-              )}
+                    {activeFiltersCount > 0 && (
+                      <Button variant="outline" className="w-full" onClick={clearFilters}>
+                        <X className="w-4 h-4 mr-2" />
+                        Clear All Filters
+                      </Button>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              <Button
+                variant="outline"
+                className="h-10 gap-2 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+                onClick={() => {
+                  const headers = ['Order #','Date','Customer','Email','Revenue','Net Profit','Margin %','Risk Level','Risk Score','Status'];
+                  const rows = filteredOrders.map(o => [
+                    o.order_number || '',
+                    o.order_date ? new Date(o.order_date).toLocaleDateString() : '',
+                    o.customer_name || '',
+                    o.customer_email || '',
+                    o.total_revenue?.toFixed(2) || '0.00',
+                    o.net_profit?.toFixed(2) || '0.00',
+                    o.margin_pct?.toFixed(1) || '0.0',
+                    o.risk_level || '',
+                    o.fraud_score ?? '',
+                    o.status || ''
+                  ]);
+                  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
             </div>
-          </SheetContent>
-        </Sheet>
-
-        <Button 
-          variant="outline" 
-          className="gap-2"
-          onClick={() => {
-            const headers = ['Order #','Date','Customer','Email','Revenue','Net Profit','Margin %','Risk Level','Risk Score','Status'];
-            const rows = filteredOrders.map(o => [
-              o.order_number || '',
-              o.order_date ? new Date(o.order_date).toLocaleDateString() : '',
-              o.customer_name || '',
-              o.customer_email || '',
-              o.total_revenue?.toFixed(2) || '0.00',
-              o.net_profit?.toFixed(2) || '0.00',
-              o.margin_pct?.toFixed(1) || '0.0',
-              o.risk_level || '',
-              o.fraud_score ?? '',
-              o.status || ''
-            ]);
-            const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
-        </Button>
-      </div>
+          </div>
+        </CommandCardContent>
+      </CommandCard>
 
       {/* Active Filters Tags */}
       {(activeFiltersCount > 0 || searchTerm) && (
         <div className="flex flex-wrap gap-2">
           {searchTerm && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant="secondary" className="gap-1 bg-white/[0.06] text-slate-200">
               Search: {searchTerm}
               <X 
                 className="w-3 h-3 cursor-pointer" 
@@ -663,7 +677,7 @@ export default function Orders() {
             </Badge>
           )}
           {filters.status !== 'all' && (
-            <Badge variant="secondary" className="gap-1 capitalize">
+            <Badge variant="secondary" className="gap-1 capitalize bg-white/[0.06] text-slate-200">
               Status: {filters.status}
               <X 
                 className="w-3 h-3 cursor-pointer" 
@@ -672,7 +686,7 @@ export default function Orders() {
             </Badge>
           )}
           {filters.riskLevel !== 'all' && (
-            <Badge variant="secondary" className="gap-1 capitalize">
+            <Badge variant="secondary" className="gap-1 capitalize bg-white/[0.06] text-slate-200">
               Risk: {filters.riskLevel}
               <X 
                 className="w-3 h-3 cursor-pointer" 
@@ -681,7 +695,7 @@ export default function Orders() {
             </Badge>
           )}
           {(filters.riskScoreMin !== '' || filters.riskScoreMax !== '') && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant="secondary" className="gap-1 bg-white/[0.06] text-slate-200">
               Score: {filters.riskScoreMin || '0'}-{filters.riskScoreMax || '100'}
               <X 
                 className="w-3 h-3 cursor-pointer" 
@@ -690,7 +704,7 @@ export default function Orders() {
             </Badge>
           )}
           {filters.profitability !== 'all' && (
-            <Badge variant="secondary" className="gap-1 capitalize">
+            <Badge variant="secondary" className="gap-1 capitalize bg-white/[0.06] text-slate-200">
               {filters.profitability}
               <X 
                 className="w-3 h-3 cursor-pointer" 
@@ -728,6 +742,22 @@ export default function Orders() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+function CompactMetric({ icon: Icon, label, value, tone = 'text-slate-100' }) {
+  return (
+    <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-3 py-2">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+          <Icon className="h-3.5 w-3.5 text-cyan-300" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{label}</p>
+          <p className={`mt-0.5 text-sm font-semibold ${tone}`}>{value}</p>
+        </div>
+      </div>
     </div>
   );
 }
