@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { ArrowRight, ShoppingBag } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -15,13 +16,13 @@ export default function RecentActivityPanel({ orders = [] }) {
   const visibleOrders = Array.isArray(orders) ? orders.slice(0, 5) : [];
 
   return (
-    <section className="dashboard-panel">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="dashboard-label">Recent Activity</p>
-          <p className="mt-2 dashboard-title">Latest orders</p>
-          <p className="mt-1 text-sm text-slate-400">What you can explore next from recent order movement.</p>
-        </div>
+    <CommandCard>
+      <CommandCardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CommandCardTitle>Recent Activity</CommandCardTitle>
+            <CommandCardDescription>Latest orders from your store.</CommandCardDescription>
+          </div>
         <button
           type="button"
           onClick={() => navigate(createPageUrl('Orders', location.search))}
@@ -30,9 +31,10 @@ export default function RecentActivityPanel({ orders = [] }) {
           <span>View Orders</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
-      </div>
+        </div>
+      </CommandCardHeader>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <CommandCardContent className="space-y-2">
         {visibleOrders.length ? visibleOrders.map((order) => (
           <div
             key={order?.id || order?.platform_order_id || order?.order_number}
@@ -55,7 +57,7 @@ export default function RecentActivityPanel({ orders = [] }) {
             No recent orders yet.
           </div>
         )}
-      </div>
-    </section>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

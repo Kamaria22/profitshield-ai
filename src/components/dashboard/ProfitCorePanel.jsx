@@ -1,4 +1,5 @@
 import React from 'react';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -53,59 +54,72 @@ function ForecastMetric({ label, value }) {
   );
 }
 
-export default function ProfitCorePanel({ metrics, orders = [] }) {
+export function ProfitOverviewCard({ metrics, orders = [] }) {
   const totalProfit = Number(metrics?.totalProfit || 0);
   const totalRevenue = Number(metrics?.totalRevenue || 0);
   const margin = Number(metrics?.avgMargin || 0);
-  const dailyRunRate = estimateDailyRunRate(orders, totalProfit);
-  const monthlyRunRate = dailyRunRate * 30;
   const trendPoints = buildTrendPoints(orders);
   const trendMeta = getTrendMeta(orders);
   const revenueMeta = totalRevenue > 0 ? `${formatCurrency(totalRevenue)} revenue` : 'No revenue captured yet';
 
   return (
-    <div className="dashboard-panel p-4 md:p-5">
-      <div className="mb-4">
-        <p className="dashboard-label">Performance</p>
-        <p className="mt-2 dashboard-title">Profit and forecast</p>
-        <p className="mt-1 text-sm text-slate-400">What’s happening with profit right now and where it may head next.</p>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(240px,0.9fr)]">
-        <section className="dashboard-subpanel">
-          <p className="dashboard-label">Profit Overview</p>
-          <p className="dashboard-metric mt-3">{formatCurrency(totalProfit)}</p>
-          <p className="mt-2 text-sm text-slate-400">{revenueMeta}</p>
-          <div className="mt-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="dashboard-label">Margin</p>
-              <p className="mt-2 text-lg font-semibold text-[#00E5FF]">{margin.toFixed(1)}%</p>
-            </div>
-            <div className="min-w-[140px] flex-1">
-              <svg viewBox="0 0 100 32" className="h-10 w-full">
-                <polyline
-                  fill="none"
-                  stroke="#00E5FF"
-                  strokeWidth="2"
-                  points={trendPoints}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <p className="text-right text-xs text-slate-400">{trendMeta}</p>
-            </div>
+    <CommandCard className="h-full">
+      <CommandCardHeader>
+        <CommandCardTitle>Profit Overview</CommandCardTitle>
+        <CommandCardDescription>What’s happening with profit right now.</CommandCardDescription>
+      </CommandCardHeader>
+      <CommandCardContent>
+        <p className="dashboard-metric">{formatCurrency(totalProfit)}</p>
+        <p className="mt-2 text-sm text-slate-400">{revenueMeta}</p>
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="dashboard-label">Margin</p>
+            <p className="mt-2 text-lg font-semibold text-[#00E5FF]">{margin.toFixed(1)}%</p>
           </div>
-        </section>
+          <div className="min-w-[140px] flex-1">
+            <svg viewBox="0 0 100 32" className="h-10 w-full">
+              <polyline
+                fill="none"
+                stroke="#00E5FF"
+                strokeWidth="2"
+                points={trendPoints}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <p className="text-right text-xs text-slate-400">{trendMeta}</p>
+          </div>
+        </div>
+      </CommandCardContent>
+    </CommandCard>
+  );
+}
 
-        <section className="dashboard-subpanel">
-          <p className="dashboard-label">Forecast</p>
-          <p className="mt-2 text-sm text-slate-400">Projected from current profit run rate</p>
-          <div className="mt-3 grid gap-3">
-            <ForecastMetric label="30 days" value={monthlyRunRate} />
-            <ForecastMetric label="60 days" value={monthlyRunRate * 2} />
-            <ForecastMetric label="90 days" value={monthlyRunRate * 3} />
-          </div>
-        </section>
-      </div>
+export function ForecastCard({ metrics, orders = [] }) {
+  const totalProfit = Number(metrics?.totalProfit || 0);
+  const dailyRunRate = estimateDailyRunRate(orders, totalProfit);
+  const monthlyRunRate = dailyRunRate * 30;
+
+  return (
+    <CommandCard className="h-full">
+      <CommandCardHeader>
+        <CommandCardTitle>Forecast</CommandCardTitle>
+        <CommandCardDescription>Projected from current profit run rate.</CommandCardDescription>
+      </CommandCardHeader>
+      <CommandCardContent className="space-y-3">
+        <ForecastMetric label="30 days" value={monthlyRunRate} />
+        <ForecastMetric label="60 days" value={monthlyRunRate * 2} />
+        <ForecastMetric label="90 days" value={monthlyRunRate * 3} />
+      </CommandCardContent>
+    </CommandCard>
+  );
+}
+
+export default function ProfitCorePanel(props) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <ProfitOverviewCard {...props} />
+      <ForecastCard {...props} />
     </div>
   );
 }

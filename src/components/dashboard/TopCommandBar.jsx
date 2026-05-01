@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, BarChart3, RefreshCw, Shield, Sparkles, TriangleAlert } from 'lucide-react';
+import { Activity, BarChart3, ChevronRight, RefreshCw, Shield, Sparkles, TriangleAlert } from 'lucide-react';
 import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 function formatCurrency(value) {
@@ -64,17 +64,6 @@ function deriveProfitTrend(orders = []) {
   return { direction: 'flat', label: 'Flat vs prior period', delta };
 }
 
-function deriveTodaysPriority({ metrics, alertsCount, integrationStatus, profitScore }) {
-  const highRiskOrders = Number(metrics?.highRiskOrders || 0);
-  const margin = Number(metrics?.avgMargin || 0);
-  if (highRiskOrders > 0) return 'Review flagged orders now';
-  if (alertsCount > 0) return 'Resolve active alerts';
-  if (integrationStatus && integrationStatus !== 'connected') return 'Restore store connection';
-  if (margin < 20) return 'Investigate margin pressure';
-  if (profitScore >= 70) return 'Protect current momentum';
-  return 'Complete the next sync cycle';
-}
-
 function deriveAiStatusMessage({ syncing, aiStatus, lastActionAt, integrationStatus, alertsCount, highRiskOrders }) {
   if (syncing) return { last: 'Refreshing store data now', next: 'Next: update profit, risk, and alerts' };
   const last = aiStatus === 'Active'
@@ -115,24 +104,16 @@ function StatCell({ label, value, meta, provenance, tone = 'primary' }) {
   return (
     <div className="dashboard-subpanel">
       <div className="flex items-center justify-between gap-3">
-        <p className="dashboard-label">{label}</p>
         <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
           <Icon className="h-4 w-4 text-slate-300" />
         </div>
+        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
       </div>
-      <p className="dashboard-metric mt-3" style={{ color: toneMap[tone] || '#FFFFFF' }}>
+      <p className="dashboard-metric mt-5" style={{ color: toneMap[tone] || '#FFFFFF' }}>
         {value}
       </p>
-      {meta ? (
-        <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-slate-300">
-          {meta}
-        </div>
-      ) : null}
-      {provenance ? (
-        <p className="mt-2 text-[11px] text-slate-500">
-          {provenance}
-        </p>
-      ) : null}
+      <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-xs text-slate-400">{meta || provenance}</p>
     </div>
   );
 }
@@ -175,7 +156,6 @@ export default function TopCommandBar({
   const integrityProvenance = profitScoreSource === 'derived_runtime'
     ? `Derived from live store data · ${syncAge}`
     : 'Tenant score';
-  const priority = deriveTodaysPriority({ metrics, alertsCount, integrationStatus, profitScore });
   const aiMessage = deriveAiStatusMessage({
     syncing,
     aiStatus,
@@ -190,8 +170,7 @@ export default function TopCommandBar({
       <CommandCardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="dashboard-label">Merchant Overview</p>
-            <CommandCardTitle className="mt-2 truncate">{storeName}</CommandCardTitle>
+            <CommandCardTitle className="truncate">{storeName}</CommandCardTitle>
             <CommandCardDescription>
               {syncing ? 'Refreshing store data' : 'Your store health at a glance'}
             </CommandCardDescription>
@@ -208,16 +187,8 @@ export default function TopCommandBar({
           </div>
         </div>
       </CommandCardHeader>
-      <CommandCardContent className="space-y-4">
-        <div className="dashboard-priority-bar">
-          <p className="dashboard-label">Today's Priority</p>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-white">{priority}</p>
-            <p className="text-xs text-slate-400">{syncing ? 'Refreshing now' : aiMessage.next.replace('Next: ', '')}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <CommandCardContent>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
           <StatCell
             label="Profit Integrity"
             value={`${Math.round(Number(profitScore || 0))}`}
