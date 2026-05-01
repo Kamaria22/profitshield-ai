@@ -1,22 +1,30 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { Users, AlertTriangle, Sparkles, RefreshCw, DollarSign, UserCheck, UserX, Crown, Loader2, Target } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import {
+  AlertTriangle,
+  Crown,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Target,
+  UserCheck,
+  UserX,
+  Users
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { base44 } from '@/api/base44Client';
+import { Button } from '@/components/ui/button';
+import {
+  CommandCard,
+  CommandCardContent,
+  CommandCardHeader,
+  CommandCardTitle
+} from '@/components/ui/command-card';
 
-const PRIORITY_COLORS = {
-  high: 'bg-red-100 text-red-700 border-red-200',
-  medium: 'bg-amber-100 text-amber-700 border-amber-200',
-  low: 'bg-emerald-100 text-emerald-700 border-emerald-200'
-};
-
-const RISK_COLORS = {
-  high: 'text-red-600 bg-red-50 border-red-200',
-  medium: 'text-amber-600 bg-amber-50 border-amber-200',
-  low: 'text-emerald-600 bg-emerald-50 border-emerald-200'
+const RISK_TONES = {
+  high: 'border-red-400/25 bg-red-400/10 text-red-200',
+  medium: 'border-amber-400/25 bg-amber-400/10 text-amber-200',
+  low: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
 };
 
 function getSegmentIcon(name) {
@@ -32,7 +40,7 @@ function getSegmentIcon(name) {
 
 function getErrorMessage(error) {
   const msg = error?.message || 'Unknown error';
-  if (/rate limit/i.test(msg)) return 'AI analysis is being rate-limited right now. Wait a moment and retry.';
+  if (/rate limit/i.test(msg)) return 'AI analysis is rate-limited right now. Retry shortly.';
   return msg;
 }
 
@@ -59,6 +67,7 @@ async function invokeSegmentation(tenantId, extra = {}) {
 
 function CustomerSegmentationPanel({ tenantId }) {
   const queryClient = useQueryClient();
+  const [showAllSegments, setShowAllSegments] = React.useState(false);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['customerSegmentation', tenantId],
@@ -71,142 +80,204 @@ function CustomerSegmentationPanel({ tenantId }) {
 
   const handleRefresh = () => {
     queryClient.removeQueries({ queryKey: ['customerSegmentation', tenantId] });
-    toast.promise(invokeSegmentation(tenantId, { force_refresh: true }).then((data) => {
-      queryClient.setQueryData(['customerSegmentation', tenantId], data);
-      return data;
-    }), {
-      loading: 'Re-analyzing customers...',
-      success: 'Segmentation updated!',
-      error: 'Analysis failed'
-    });
+    toast.promise(
+      invokeSegmentation(tenantId, { force_refresh: true }).then((freshData) => {
+        queryClient.setQueryData(['customerSegmentation', tenantId], freshData);
+        return freshData;
+      }),
+      {
+        loading: 'Refreshing segmentation...',
+        success: 'Segmentation updated',
+        error: 'Analysis failed'
+      }
+    );
   };
 
   if (!tenantId) return null;
 
   const segments = data?.segments || [];
   const hasData = segments.length > 0;
+  const visibleSegments = showAllSegments ? segments : segments.slice(0, 4);
+  const visibleInsights = (data?.insights || []).slice(0, 3);
+
+  if ((isLoading || isFetching) && !hasData) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+        <span>Analyzing customer base...</span>
+      </div>
+    );
+  }
+
+  if (isError && !hasData) {
+    return (
+      <CommandCard className="border-red-400/20">
+        <CommandCardContent className="py-8 text-center">
+          <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-red-300" />
+          <p className="text-sm font-medium text-white">Customer segmentation is unavailable.</p>
+          <p className="mt-2 text-xs text-slate-400">{getErrorMessage(error)}</p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-4 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+            onClick={() => refetch()}
+          >
+            Retry
+          </Button>
+        </CommandCardContent>
+      </CommandCard>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <div className="py-10 text-center">
+        <Users className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+        <p className="text-sm text-slate-300">No customer segments are available yet.</p>
+        <p className="mt-1 text-xs text-slate-500">Sync more order data to build segment intelligence.</p>
+      </div>
+    );
+  }
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="w-5 h-5" />
-            AI Customer Segments
-          </CardTitle>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isFetching}
-            className="bg-white/20 hover:bg-white/30 text-white border-0"
-          >
-            <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-white">Customer segment health</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {data.total_customers} customers analyzed
+            {data.churn_risk_summary ? ` · ${data.churn_risk_summary}` : ''}
+          </p>
         </div>
-      </CardHeader>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          className="border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
-      <CardContent className="p-4">
-        {(isLoading || isFetching) && !hasData ? (
-          <div className="flex items-center justify-center py-8 gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-violet-500" />
-            <span className="text-slate-500 text-sm">Analyzing customer base...</span>
-          </div>
-        ) : isError && !hasData ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-            <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-red-500" />
-            <p className="text-sm font-medium text-red-700">Customer segmentation failed to load.</p>
-            <p className="mt-1 text-xs text-red-600">{getErrorMessage(error)}</p>
-            <Button
-              size="sm"
-              className="mt-3 bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => refetch()}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : hasData ? (
-          <div className="space-y-4">
-            {/* Summary bar */}
-            <div className="flex items-center gap-4 p-3 bg-violet-50 rounded-lg border border-violet-100">
-                <div className="text-center min-w-[60px]">
-                  <div className="text-2xl font-bold text-violet-700">{data.health_score ?? '—'}</div>
-                  <div className="text-xs text-violet-500">Health Score</div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500 mb-0.5">{data.total_customers} customers analyzed</p>
-                  <p className="text-sm text-slate-600">{data.churn_risk_summary}</p>
-                  {data.computed_at && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      {data.cached ? 'Instant cache' : 'Fresh analysis'} · {new Date(data.computed_at).toLocaleTimeString()}
-                    </p>
-                  )}
-                </div>
-              </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <CommandCard>
+          <CommandCardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Health Score
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-white">{data.health_score ?? '—'}</p>
+          </CommandCardContent>
+        </CommandCard>
+        <CommandCard>
+          <CommandCardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Active Segments
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-white">{segments.length}</p>
+          </CommandCardContent>
+        </CommandCard>
+        <CommandCard>
+          <CommandCardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Analysis State
+            </p>
+            <p className="mt-2 text-sm font-medium text-slate-200">
+              {data.cached ? 'Cached snapshot' : 'Fresh analysis'}
+            </p>
+          </CommandCardContent>
+        </CommandCard>
+      </div>
 
-            {/* Segments grid */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {segments.map((seg, i) => {
-                const Icon = getSegmentIcon(seg.name);
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className={`p-3 rounded-lg border ${PRIORITY_COLORS[seg.priority] || PRIORITY_COLORS.medium}`}
-                  >
-                    <div className="flex items-start gap-2 mb-1.5">
-                      <Icon className="w-4 h-4 mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{seg.name}</p>
-                        <p className="text-xs opacity-75">{seg.size} customers · {seg.percentage}</p>
+      <div className="grid gap-3 lg:grid-cols-[1.25fr_0.75fr]">
+        <CommandCard>
+          <CommandCardHeader className="pb-2">
+            <CommandCardTitle>Segments</CommandCardTitle>
+          </CommandCardHeader>
+          <CommandCardContent className="space-y-3">
+            {visibleSegments.map((segment, index) => {
+              const Icon = getSegmentIcon(segment.name);
+              return (
+                <div
+                  key={`${segment.name}-${index}`}
+                  className="rounded-[12px] border border-white/10 bg-white/[0.02] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+                        <Icon className="h-4 w-4 text-slate-200" />
                       </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${RISK_COLORS[seg.risk_level] || RISK_COLORS.medium}`}>
-                        {seg.risk_level}
-                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-white">{segment.name}</p>
+                        <p className="mt-1 text-xs text-slate-400">{segment.description}</p>
+                      </div>
                     </div>
-                    <p className="text-xs mb-2 opacity-80">{seg.description}</p>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1 font-medium">
-                        <DollarSign className="w-3 h-3" />
-                        {seg.value_potential}
-                      </span>
-                      <span className="opacity-60">Avg LTV: ${seg.avg_lifetime_value?.toFixed(0)}</span>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                        RISK_TONES[segment.risk_level] || RISK_TONES.medium
+                      }`}
+                    >
+                      {segment.risk_level || 'medium'}
+                    </span>
+                  </div>
 
-            {/* Insights */}
-            {data.insights?.length > 0 && (
-              <div className="border-t pt-3">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  Key Insights
-                </h4>
-                <div className="space-y-2">
-                  {data.insights.map((ins, i) => (
-                    <div key={i} className="p-2 bg-amber-50 rounded-lg text-xs border border-amber-100">
-                      <p className="font-medium text-amber-800">{ins.insight}</p>
-                      <p className="text-amber-600 mt-0.5">→ {ins.action}</p>
-                    </div>
-                  ))}
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <MetricPill label="Customers" value={`${segment.size}`} />
+                    <MetricPill label="Value" value={`${segment.value_potential}`} />
+                    <MetricPill
+                      label="LTV"
+                      value={`$${Number(segment.avg_lifetime_value || 0).toFixed(0)}`}
+                    />
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+
+            {segments.length > 4 && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto px-0 text-sm text-cyan-300 hover:bg-transparent hover:text-cyan-200"
+                onClick={() => setShowAllSegments((value) => !value)}
+              >
+                {showAllSegments ? 'Show fewer segments' : `View ${segments.length - 4} more segments`}
+              </Button>
             )}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Users className="w-12 h-12 text-violet-300 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">No order data found to segment.</p>
-            <p className="text-xs text-slate-400 mt-1">Sync your Shopify store to start analyzing customers.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CommandCardContent>
+        </CommandCard>
+
+        <CommandCard>
+          <CommandCardHeader className="pb-2">
+            <CommandCardTitle>Key Insights</CommandCardTitle>
+          </CommandCardHeader>
+          <CommandCardContent className="space-y-3">
+            {visibleInsights.length > 0 ? (
+              visibleInsights.map((insight, index) => (
+                <div
+                  key={`${insight.insight}-${index}`}
+                  className="rounded-[12px] border border-white/10 bg-white/[0.02] px-3 py-3"
+                >
+                  <p className="text-sm text-slate-200">{insight.insight}</p>
+                  <p className="mt-1 text-xs text-cyan-300">{insight.action}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400">No immediate insights were returned.</p>
+            )}
+          </CommandCardContent>
+        </CommandCard>
+      </div>
+    </div>
+  );
+}
+
+function MetricPill({ label, value }) {
+  return (
+    <div className="rounded-[10px] border border-white/10 bg-white/[0.03] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-slate-100">{value}</p>
+    </div>
   );
 }
 

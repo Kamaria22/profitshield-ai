@@ -1,38 +1,34 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { 
-  Megaphone, 
-  Mail, 
-  Gift, 
-  TrendingUp, 
-  Play, 
-  RefreshCw,
-  Target,
-  DollarSign,
+import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+  CheckCircle2,
+  Gift,
   Loader2,
+  Mail,
+  Megaphone,
+  Play,
+  RefreshCw,
   Rocket,
-  CheckCircle2
+  Target,
+  TrendingUp
 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { base44 } from '@/api/base44Client';
+import { Button } from '@/components/ui/button';
+import {
+  CommandCard,
+  CommandCardContent,
+  CommandCardHeader,
+  CommandCardTitle
+} from '@/components/ui/command-card';
 
-const campaignTypeIcons = {
+const CAMPAIGN_ICONS = {
   email: Mail,
   discount: Gift,
   winback: TrendingUp,
   upsell: Rocket,
   loyalty: Target,
   bundle: Gift
-};
-
-const urgencyColors = {
-  immediate: 'bg-red-100 text-red-700',
-  this_week: 'bg-amber-100 text-amber-700',
-  this_month: 'bg-blue-100 text-blue-700'
 };
 
 function parseError(data) {
@@ -42,7 +38,7 @@ function parseError(data) {
 
 export default function MarketingCampaignsPanel({ tenantId }) {
   const [launchedCampaigns, setLaunchedCampaigns] = useState(new Set());
-  const queryClient = useQueryClient();
+  const [showAllCampaigns, setShowAllCampaigns] = useState(false);
 
   const { data, isLoading, refetch, isFetching, isError, error } = useQuery({
     queryKey: ['marketingCampaigns', tenantId],
@@ -70,172 +66,179 @@ export default function MarketingCampaignsPanel({ tenantId }) {
       if (response.data?.error) throw new Error(response.data.error);
       return response.data;
     },
-    onSuccess: (data, campaignId) => {
-      setLaunchedCampaigns(prev => new Set([...prev, campaignId]));
-      toast.success(data.message);
+    onSuccess: (result, campaignId) => {
+      setLaunchedCampaigns((previous) => new Set([...previous, campaignId]));
+      toast.success(result.message);
     },
-    onError: (error) => {
-      toast.error(error.message);
+    onError: (launchError) => {
+      toast.error(launchError.message);
     }
   });
 
   const handleRefresh = () => {
     toast.promise(refetch(), {
       loading: 'Generating campaigns...',
-      success: 'Campaigns ready!',
+      success: 'Campaigns updated',
       error: 'Generation failed'
     });
   };
 
   if (!tenantId) return null;
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+        <span>Generating campaigns...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <CommandCard className="border-red-400/20">
+        <CommandCardContent className="py-8 text-center">
+          <Megaphone className="mx-auto mb-3 h-9 w-9 text-red-300" />
+          <p className="text-sm font-medium text-white">Marketing campaigns are unavailable.</p>
+          <p className="mt-2 text-xs text-slate-400">
+            {/rate limit/i.test(error?.message || '')
+              ? 'The AI campaign service is rate-limited right now. Retry shortly.'
+              : error?.message || 'Unknown error'}
+          </p>
+        </CommandCardContent>
+      </CommandCard>
+    );
+  }
+
+  if (!data?.campaigns?.length) {
+    return (
+      <div className="py-10 text-center">
+        <Megaphone className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+        <p className="text-sm text-slate-300">No campaigns are ready yet.</p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-4 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+          onClick={handleRefresh}
+        >
+          Generate campaigns
+        </Button>
+      </div>
+    );
+  }
+
+  const campaigns = showAllCampaigns ? data.campaigns : data.campaigns.slice(0, 4);
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3 bg-gradient-to-r from-pink-500 to-rose-600 text-white">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Megaphone className="w-5 h-5" />
-            AI Marketing Campaigns
-          </CardTitle>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isFetching}
-            className="bg-white/20 hover:bg-white/30 text-white border-0"
-          >
-            <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
-            Generate
-          </Button>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-white">Launch-ready campaign ideas</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {data.overall_strategy || 'AI-generated campaigns based on current customer and profit signals.'}
+          </p>
         </div>
-      </CardHeader>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          className="border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
-      <CardContent className="p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-pink-500" />
-            <span className="ml-2 text-slate-500">Creating campaigns...</span>
-          </div>
-        ) : isError ? (
-          <div className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-center">
-            <Megaphone className="mx-auto mb-2 h-8 w-8 text-pink-500" />
-            <p className="text-sm font-medium text-pink-800">Marketing campaigns are temporarily unavailable.</p>
-            <p className="mt-1 text-xs text-pink-700">
-              {/rate limit/i.test(error?.message || '')
-                ? 'The AI campaign service is rate-limited right now. Retry shortly.'
-                : (error?.message || 'Unknown error')}
-            </p>
-          </div>
-        ) : data?.campaigns ? (
-          <div className="space-y-4">
-            {/* Strategy Overview */}
-            {data.overall_strategy && (
-              <div className="p-3 bg-pink-50 rounded-lg">
-                <p className="text-sm text-pink-800">{data.overall_strategy}</p>
-              </div>
-            )}
+      {data.quick_win && (
+        <CommandCard>
+          <CommandCardHeader className="pb-2">
+            <CommandCardTitle>Quick Win</CommandCardTitle>
+          </CommandCardHeader>
+          <CommandCardContent>
+            <p className="text-sm text-slate-300">{data.quick_win}</p>
+          </CommandCardContent>
+        </CommandCard>
+      )}
 
-            {/* Quick Win */}
-            {data.quick_win && (
-              <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Rocket className="w-4 h-4 text-amber-600" />
-                  <span className="font-medium text-amber-800 text-sm">Quick Win</span>
-                </div>
-                <p className="text-xs text-amber-700">{data.quick_win}</p>
-              </div>
-            )}
+      <div className="grid gap-3">
+        {campaigns.map((campaign, index) => {
+          const Icon = CAMPAIGN_ICONS[campaign.type] || Megaphone;
+          const isLaunched = launchedCampaigns.has(campaign.id);
 
-            {/* Campaigns */}
-            <div className="space-y-3">
-              {data.campaigns?.map((campaign, i) => {
-                const Icon = campaignTypeIcons[campaign.type] || Megaphone;
-                const isLaunched = launchedCampaigns.has(campaign.id);
-                
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="p-3 border rounded-lg hover:border-pink-200 transition-colors"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-pink-100 rounded-lg">
-                        <Icon className="w-4 h-4 text-pink-600" />
+          return (
+            <CommandCard key={`${campaign.id || campaign.name}-${index}`}>
+              <CommandCardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+                    <Icon className="h-4 w-4 text-cyan-300" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">{campaign.name}</p>
+                        <p className="mt-1 text-xs text-slate-400">{campaign.target_segment}</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm text-slate-800">{campaign.name}</p>
-                          <Badge className={urgencyColors[campaign.urgency]} variant="outline">
-                            {campaign.urgency?.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-600 mb-2">{campaign.goal}</p>
-                        
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            <Target className="w-3 h-3 mr-1" />
-                            {campaign.target_segment}
-                          </Badge>
-                          {campaign.discount_value && (
-                            <Badge variant="outline" className="text-xs">
-                              <Gift className="w-3 h-3 mr-1" />
-                              {campaign.discount_value}% off
-                            </Badge>
-                          )}
-                        </div>
-
-                        {campaign.email_subject && (
-                          <div className="p-2 bg-slate-50 rounded text-xs mb-2">
-                            <p className="font-medium text-slate-700">📧 {campaign.email_subject}</p>
-                            <p className="text-slate-500 mt-1">{campaign.email_preview}</p>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              {campaign.expected_revenue}
-                            </span>
-                            <span>ROI: {campaign.expected_roi}</span>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={isLaunched || launchMutation.isPending}
-                            onClick={() => launchMutation.mutate(campaign.id)}
-                            className={isLaunched ? 'bg-emerald-500' : 'bg-pink-600 hover:bg-pink-700'}
-                          >
-                            {isLaunched ? (
-                              <>
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Launched
-                              </>
-                            ) : launchMutation.isPending ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <>
-                                <Play className="w-3 h-3 mr-1" />
-                                Launch
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
+                      <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                        {campaign.urgency?.replace('_', ' ') || 'planned'}
+                      </span>
                     </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Megaphone className="w-12 h-12 text-pink-300 mx-auto mb-3" />
-            <p className="text-slate-600">Click "Generate" to create AI campaigns</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <CampaignMeta label="Offer" value={campaign.discount_value ? `${campaign.discount_value}% off` : campaign.goal} />
+                      <CampaignMeta label="Projected ROI" value={campaign.expected_roi || '—'} />
+                      <CampaignMeta label="Revenue" value={campaign.expected_revenue || '—'} />
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        size="sm"
+                        disabled={isLaunched || launchMutation.isPending}
+                        onClick={() => launchMutation.mutate(campaign.id)}
+                        className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                      >
+                        {isLaunched ? (
+                          <>
+                            <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                            Launched
+                          </>
+                        ) : launchMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Play className="mr-2 h-3.5 w-3.5" />
+                            Launch
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CommandCardContent>
+            </CommandCard>
+          );
+        })}
+      </div>
+
+      {data.campaigns.length > 4 && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto px-0 text-sm text-cyan-300 hover:bg-transparent hover:text-cyan-200"
+          onClick={() => setShowAllCampaigns((value) => !value)}
+        >
+          {showAllCampaigns ? 'Show fewer campaigns' : `View ${data.campaigns.length - 4} more campaigns`}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function CampaignMeta({ label, value }) {
+  return (
+    <div className="rounded-[10px] border border-white/10 bg-white/[0.03] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-slate-100">{value}</p>
+    </div>
   );
 }
