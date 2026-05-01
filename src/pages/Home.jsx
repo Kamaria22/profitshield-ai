@@ -582,7 +582,7 @@ export default function Home() {
       )}
 
       <div className="min-h-full flex flex-col">
-        <div className="mt-4 flex-1 space-y-4">
+        <div className="mt-4 flex-1 space-y-6">
           <TopCommandBar
             tenant={displayTenant}
             profitScore={profitScore}

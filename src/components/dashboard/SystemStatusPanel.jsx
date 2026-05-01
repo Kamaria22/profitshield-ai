@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { ChevronDown, ChevronUp, Link2, RefreshCw, Shield } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 function formatTimestamp(value) {
   if (!value) return 'Awaiting first sync';
@@ -66,26 +67,30 @@ export default function SystemStatusPanel({
     'text-slate-100';
 
   return (
-    <section className="dashboard-panel">
+    <CommandCard>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="w-full text-left"
       >
-        <div>
-          <p className="dashboard-label">System Status</p>
-          <p className="mt-2 text-sm text-slate-400">Connection and sync details for your store.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-300">
-            {open ? 'Expanded' : 'Collapsed'}
+        <CommandCardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CommandCardTitle>System Status</CommandCardTitle>
+              <CommandCardDescription>Connection and sync details for your store.</CommandCardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-slate-300">
+                {open ? 'Expanded' : 'Collapsed'}
+              </div>
+              {open ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            </div>
           </div>
-          {open ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-        </div>
+        </CommandCardHeader>
       </button>
 
       {open ? (
-        <div className="mt-3 space-y-3">
+        <CommandCardContent className="space-y-3 pt-0">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <StatusCell label="Store connection" value={integrationStatus || 'Standby'} tone={connectionTone} />
             <StatusCell label="Last refresh" value={formatTimestamp(lastSyncAt)} tone="text-[#00E5FF]" />
@@ -128,8 +133,8 @@ export default function SystemStatusPanel({
               <span className="text-sm text-slate-200">Health</span>
             </button>
           </div>
-        </div>
+        </CommandCardContent>
       ) : null}
-    </section>
+    </CommandCard>
   );
 }

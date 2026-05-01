@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/components/platformContext';
 import { AlertTriangle, ArrowRight, BrainCircuit, ShieldAlert, Sparkles } from 'lucide-react';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -102,19 +103,20 @@ export default function ActionCenterPanel({
   );
 
   return (
-    <section className="dashboard-panel dashboard-action-panel">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="dashboard-label">Action Center</p>
-          <p className="mt-2 dashboard-title">What needs attention now</p>
-          <p className="mt-1 text-sm text-slate-400">Focus on the few actions that move profit and reduce risk.</p>
+    <CommandCard className="dashboard-action-panel">
+      <CommandCardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CommandCardTitle>Action Center</CommandCardTitle>
+            <CommandCardDescription>Focus on the few actions that move profit and reduce risk.</CommandCardDescription>
+          </div>
+          <div className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-cyan-200">
+            {priorities.length} active
+          </div>
         </div>
-        <div className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-cyan-200">
-          {priorities.length} active
-        </div>
-      </div>
+      </CommandCardHeader>
 
-      <div className="mt-3 space-y-3">
+      <CommandCardContent className="space-y-3">
         {priorities.map((item) => {
           const Icon = item.icon;
           return (
@@ -138,7 +140,7 @@ export default function ActionCenterPanel({
             </button>
           );
         })}
-      </div>
-    </section>
+      </CommandCardContent>
+    </CommandCard>
   );
 }

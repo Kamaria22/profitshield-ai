@@ -34,13 +34,13 @@ export default function RecentActivityPanel({ orders = [] }) {
         </div>
       </CommandCardHeader>
 
-      <CommandCardContent className="space-y-2">
+      <CommandCardContent className="space-y-0">
         {visibleOrders.length ? visibleOrders.map((order) => (
           <div
             key={order?.id || order?.platform_order_id || order?.order_number}
-            className="dashboard-subpanel flex items-start gap-3"
+            className="flex min-h-[72px] items-start gap-3 border-t border-white/8 py-3 first:border-t-0 first:pt-0 last:pb-0"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-white/10 bg-white/[0.04]">
               <ShoppingBag className="h-4 w-4 text-[#00E5FF]" />
             </div>
             <div className="min-w-0">
@@ -53,7 +53,7 @@ export default function RecentActivityPanel({ orders = [] }) {
             </div>
           </div>
         )) : (
-          <div className="dashboard-subpanel text-sm text-slate-400">
+          <div className="text-sm text-slate-400">
             No recent orders yet.
           </div>
         )}
