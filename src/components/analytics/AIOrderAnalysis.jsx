@@ -1,371 +1,155 @@
 // @ts-nocheck
-import React, { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import React from 'react';
+import { AlertTriangle, ArrowRight, Brain, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Brain, Sparkles, AlertTriangle, TrendingUp, 
-  ShieldAlert, Users, Loader2,
-  CheckCircle, XCircle, Lightbulb, Target, ArrowRight
-} from 'lucide-react';
-import { CommandCard, CommandCardContent, CommandCardHeader, CommandCardTitle, CommandCardDescription } from '@/components/ui/command-card';
+import { CommandCard, CommandCardContent, CommandCardDescription, CommandCardHeader, CommandCardTitle } from '@/components/ui/command-card';
 
-export default function AIOrderAnalysis({ orders, metrics, onHighlightOrders }) {
-  const [analysis, setAnalysis] = useState(null);
+export default function AIOrderAnalysis({ orders, metrics, onOpenDetails }) {
+  const flaggedOrders = React.useMemo(
+    () =>
+      (orders || []).filter(
+        (order) =>
+          Number(order?.fraud_score || 0) >= 70 ||
+          order?.risk_level === 'high' ||
+          Number(order?.net_profit || 0) < 0
+      ),
+    [orders]
+  );
 
-  const analyzeMutation = useMutation({
-    mutationFn: async () => {
-      // Prepare order summary for AI analysis
-      const orderSummary = orders.slice(0, 100).map(o => ({
-        id: o.id,
-        order_number: o.order_number,
-        revenue: o.total_revenue,
-        cogs: o.total_cogs,
-        profit: o.net_profit,
-        margin: o.total_revenue > 0 ? ((o.net_profit || 0) / o.total_revenue * 100).toFixed(1) : 0,
-        customer: o.customer_email,
-        is_first_order: o.is_first_order,
-        discount_total: o.discount_total,
-        shipping_charged: o.shipping_charged,
-        shipping_cost: o.shipping_cost,
-        risk_score: o.fraud_score,
-        risk_level: o.risk_level,
-        status: o.status,
-        tags: o.tags,
-        order_date: o.order_date
-      }));
+  const atRiskRefunds = React.useMemo(
+    () => (orders || []).filter((order) => Number(order?.refund_amount || 0) > 0),
+    [orders]
+  );
 
-      const prompt = `Analyze this e-commerce order data and provide insights in JSON format.
-
-ORDER DATA (${orders.length} total orders, showing sample):
-${JSON.stringify(orderSummary.slice(0, 50), null, 2)}
-
-AGGREGATE METRICS:
-- Total Revenue: $${metrics?.totalRevenue?.toFixed(2) || 0}
-- Gross Profit: $${metrics?.grossProfit?.toFixed(2) || 0}
-- Net Profit: $${metrics?.netProfit?.toFixed(2) || 0}
-- Average Order Value: $${metrics?.aov?.toFixed(2) || 0}
-- Total Orders: ${orders.length}
-- Profitable Orders: ${orders.filter(o => (o.net_profit || 0) > 0).length}
-- Unprofitable Orders: ${orders.filter(o => (o.net_profit || 0) <= 0).length}
-
-Provide analysis with:
-1. Key patterns identified (positive and negative)
-2. Anomalies or suspicious orders that need attention
-3. Fraud risk indicators found
-4. Actionable recommendations to improve profitability
-5. Customer behavior insights
-
-Be specific with order numbers when flagging issues.`;
-
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            summary: { type: "string", description: "Brief executive summary" },
-            health_score: { type: "number", description: "Overall health score 0-100" },
-            patterns: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  type: { type: "string", enum: ["positive", "negative", "neutral"] },
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  impact: { type: "string" }
-                }
-              }
-            },
-            anomalies: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  order_number: { type: "string" },
-                  issue: { type: "string" },
-                  severity: { type: "string", enum: ["low", "medium", "high", "critical"] },
-                  recommendation: { type: "string" }
-                }
-              }
-            },
-            fraud_indicators: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  indicator: { type: "string" },
-                  affected_orders: { type: "array", items: { type: "string" } },
-                  risk_level: { type: "string" },
-                  explanation: { type: "string" }
-                }
-              }
-            },
-            recommendations: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  priority: { type: "string", enum: ["high", "medium", "low"] },
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  estimated_impact: { type: "string" }
-                }
-              }
-            },
-            customer_insights: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  insight: { type: "string" },
-                  segment: { type: "string" },
-                  action: { type: "string" }
-                }
-              }
-            }
-          }
-        }
-      });
-
-      return result;
-    },
-    onSuccess: (data) => setAnalysis(data)
-  });
-
-  const severityColors = {
-    low: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    medium: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
-    high: 'bg-orange-500/10 text-orange-300 border-orange-500/20',
-    critical: 'bg-red-500/10 text-red-300 border-red-500/20'
-  };
-
-  const priorityColors = {
-    high: 'bg-red-500/10 text-red-300',
-    medium: 'bg-amber-500/10 text-amber-300',
-    low: 'bg-blue-500/10 text-blue-300'
-  };
+  const summary = buildSummary(metrics, flaggedOrders.length, atRiskRefunds.length, orders.length);
+  const hasIssue = summary.issue !== 'All systems operating normally.';
 
   return (
     <CommandCard className="border-cyan-400/20 bg-[linear-gradient(180deg,rgba(0,229,255,0.08),rgba(255,255,255,0.03))]">
-      <CommandCardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2">
-              <Brain className="w-5 h-5 text-[#00E5FF]" />
+      <CommandCardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-2">
+              <Brain className="h-5 w-5 text-cyan-300" />
             </div>
             <div>
-              <CommandCardTitle className="flex items-center gap-2">
-                AI Order Analysis
-                <Sparkles className="w-4 h-4 text-[#00E5FF]" />
-              </CommandCardTitle>
+              <CommandCardTitle>AI Profit Summary</CommandCardTitle>
               <CommandCardDescription>
-                AI-driven anomaly detection, fraud review, and profit action guidance
+                Fast interpretation of profit health, order risk, and the next action.
               </CommandCardDescription>
             </div>
           </div>
-          <Button 
-            onClick={() => analyzeMutation.mutate()}
-            disabled={analyzeMutation.isPending || !orders?.length}
-            className="border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-          >
-            {analyzeMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Brain className="w-4 h-4 mr-2" />
-                {analysis ? 'Re-analyze' : 'Analyze Orders'}
-              </>
-            )}
-          </Button>
+          <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+            {orders.length} orders
+          </div>
         </div>
       </CommandCardHeader>
 
-      <CommandCardContent>
-        {!analysis && !analyzeMutation.isPending && (
-          <div className="py-10 text-center">
-            <Brain className="mx-auto mb-3 h-12 w-12 text-cyan-300" />
-            <p className="text-base font-medium text-slate-100">Run AI order analysis</p>
-            <p className="mt-2 text-sm text-slate-400">
-              Review up to {Math.min(orders?.length || 0, 100)} recent orders for profit leaks, fraud patterns, and next actions.
-            </p>
+      <CommandCardContent className="space-y-4">
+        <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-4">
+          <p className="text-base font-medium text-slate-100">{summary.headline}</p>
+          <p className="mt-2 text-sm text-slate-300">{summary.explanation}</p>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="grid gap-3 md:grid-cols-2">
+            <SummaryCell
+              icon={hasIssue ? AlertTriangle : CheckCircle2}
+              title="Primary Issue"
+              value={summary.issue}
+              tone={hasIssue ? 'warning' : 'healthy'}
+            />
+            <SummaryCell
+              icon={hasIssue ? ShieldAlert : ArrowRight}
+              title="Recommended Action"
+              value={summary.action}
+              tone="neutral"
+            />
           </div>
-        )}
 
-        {analysis && (
-          <div className="space-y-4">
-            {/* Summary & Health Score */}
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex items-start gap-4">
-              <div className="flex-shrink-0">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${
-                  analysis.health_score >= 70 ? 'bg-emerald-500/10 text-emerald-300' :
-                  analysis.health_score >= 40 ? 'bg-amber-500/10 text-amber-300' :
-                  'bg-red-500/10 text-red-300'
-                }`}>
-                  {analysis.health_score}
-                </div>
-                <p className="mt-1 text-center text-xs text-slate-500">Score</p>
-              </div>
-              <div className="flex-1">
-                <p className="text-slate-300">{analysis.summary}</p>
-                <p className="mt-2 text-xs text-cyan-300">
-                  Action prompt: review flagged anomalies first, then apply the top recommendation.
-                </p>
-              </div>
-              </div>
-            </div>
-
-            {/* Patterns */}
-            {analysis.patterns?.length > 0 && (
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-slate-100">
-                  <Target className="w-4 h-4 text-[#00E5FF]" />
-                  Patterns Identified
-                </h4>
-                <div className="space-y-2">
-                  {analysis.patterns.map((pattern, idx) => (
-                    <div key={idx} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      {pattern.type === 'positive' ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5" />
-                      ) : pattern.type === 'negative' ? (
-                        <XCircle className="w-5 h-5 text-red-500 mt-0.5" />
-                      ) : (
-                        <TrendingUp className="w-5 h-5 text-blue-500 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-100">{pattern.title}</p>
-                        <p className="text-sm text-slate-300">{pattern.description}</p>
-                        {pattern.impact && (
-                          <p className="mt-1 text-xs text-slate-500">Impact: {pattern.impact}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Anomalies */}
-            {analysis.anomalies?.length > 0 && (
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-slate-100">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  Anomalies Detected ({analysis.anomalies.length})
-                </h4>
-                <ScrollArea className="h-48">
-                  <div className="space-y-2">
-                    {analysis.anomalies.map((anomaly, idx) => (
-                      <div key={idx} className={`p-3 rounded-lg border ${severityColors[anomaly.severity]}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium">Order #{anomaly.order_number}</span>
-                          <Badge variant="outline" className={severityColors[anomaly.severity]}>
-                            {anomaly.severity}
-                          </Badge>
-                        </div>
-                        <p className="text-sm">{anomaly.issue}</p>
-                        <p className="text-xs mt-1 opacity-80">
-                          <strong>Action:</strong> {anomaly.recommendation}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-
-            {/* Fraud Indicators */}
-            {analysis.fraud_indicators?.length > 0 && (
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-slate-100">
-                  <ShieldAlert className="w-4 h-4 text-red-300" />
-                  Fraud Risk Indicators
-                </h4>
-                <div className="space-y-2">
-                  {analysis.fraud_indicators.map((indicator, idx) => (
-                    <div key={idx} className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-red-200">{indicator.indicator}</span>
-                        <Badge className="bg-red-500/80">{indicator.risk_level} risk</Badge>
-                      </div>
-                      <p className="text-sm text-red-200">{indicator.explanation}</p>
-                      {indicator.affected_orders?.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-red-300">Affected:</span>
-                          {indicator.affected_orders.slice(0, 5).map((order, i) => (
-                            <Badge key={i} variant="outline" className="border-red-500/20 text-xs text-red-200">
-                              #{order}
-                            </Badge>
-                          ))}
-                          {indicator.affected_orders.length > 5 && (
-                            <span className="text-xs text-red-300">+{indicator.affected_orders.length - 5} more</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recommendations */}
-            {analysis.recommendations?.length > 0 && (
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-slate-100">
-                  <Lightbulb className="w-4 h-4 text-amber-300" />
-                  Recommendations
-                </h4>
-                <div className="space-y-2">
-                  {analysis.recommendations.map((rec, idx) => (
-                    <div key={idx} className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      <Badge className={priorityColors[rec.priority]}>{rec.priority}</Badge>
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-100">{rec.title}</p>
-                        <p className="text-sm text-slate-300">{rec.description}</p>
-                        {rec.estimated_impact && (
-                          <p className="mt-1 flex items-center gap-1 text-xs text-emerald-300">
-                            <TrendingUp className="w-3 h-3" />
-                            {rec.estimated_impact}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Customer Insights */}
-            {analysis.customer_insights?.length > 0 && (
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-slate-100">
-                  <Users className="w-4 h-4 text-blue-300" />
-                  Customer Insights
-                </h4>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {analysis.customer_insights.map((insight, idx) => (
-                    <div key={idx} className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-                      <p className="text-sm font-medium text-blue-100">{insight.insight}</p>
-                      <p className="mt-1 text-xs text-blue-200">
-                        <strong>Segment:</strong> {insight.segment}
-                      </p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-blue-300">
-                        <ArrowRight className="w-3 h-3" />
-                        {insight.action}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          <Button
+            type="button"
+            onClick={onOpenDetails}
+            className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+          >
+            {summary.cta}
+          </Button>
+        </div>
       </CommandCardContent>
     </CommandCard>
   );
+}
+
+function SummaryCell({ icon: Icon, title, value, tone }) {
+  const toneClass =
+    tone === 'warning'
+      ? 'border-amber-400/20 bg-amber-400/10 text-amber-200'
+      : tone === 'healthy'
+        ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+        : 'border-white/10 bg-white/[0.03] text-slate-200';
+
+  return (
+    <div className={`rounded-[12px] border p-3 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-75">{title}</p>
+          <p className="mt-1 text-sm">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildSummary(metrics, flaggedCount, refundCount, orderCount) {
+  const safeMargin = Number(metrics?.netMargin || 0);
+  const safeProfit = Number(metrics?.netProfit || 0);
+
+  if (orderCount <= 1) {
+    return {
+      headline: 'Early data only. The financial picture is still forming.',
+      explanation: 'There is not enough order volume yet for a full trend read. Use the detailed breakdown only if you need to inspect the first orders.',
+      issue: 'Low data volume limits confidence.',
+      action: 'Wait for more order history before making major profit changes.',
+      cta: 'View Detailed Breakdown'
+    };
+  }
+
+  if (flaggedCount > 0) {
+    return {
+      headline: `Margin is ${safeMargin >= 15 ? 'holding' : 'under pressure'}, but ${flaggedCount} order${flaggedCount === 1 ? '' : 's'} require review.`,
+      explanation: 'Profit performance is being offset by flagged or unprofitable orders that can change net results quickly if ignored.',
+      issue: `${flaggedCount} flagged order${flaggedCount === 1 ? '' : 's'} need attention.`,
+      action: 'Open the detailed breakdown and inspect the highest-risk orders first.',
+      cta: 'Review Orders'
+    };
+  }
+
+  if (safeProfit < 0 || safeMargin < 10) {
+    return {
+      headline: 'Profit is weak even though no urgent order risk is active.',
+      explanation: 'The issue is more likely cost structure, pricing, or shipping efficiency than fraud or isolated order events.',
+      issue: 'Net margin is below target.',
+      action: 'Open the detailed breakdown and review costs before adjusting pricing or offers.',
+      cta: 'Inspect Breakdown'
+    };
+  }
+
+  if (refundCount > 0) {
+    return {
+      headline: 'Overall profit is healthy, but refunds are starting to erode margin.',
+      explanation: 'Refund activity is not critical yet, but it is the main source of drag in the current period.',
+      issue: `${refundCount} refunded order${refundCount === 1 ? '' : 's'} are reducing profit.`,
+      action: 'Check the detailed breakdown and validate the refund trend before it compounds.',
+      cta: 'Check Refund Impact'
+    };
+  }
+
+  return {
+    headline: 'All systems operating normally.',
+    explanation: 'Revenue, margin, and order quality are aligned. There are no urgent profit risks in the current period.',
+    issue: 'All systems operating normally.',
+    action: 'Use the detailed breakdown only if you want to explore segments or investigate trend shifts.',
+    cta: 'View Detailed Breakdown'
+  };
 }

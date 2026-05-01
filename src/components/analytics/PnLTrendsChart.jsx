@@ -33,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function PnLTrendsChart({ data, granularity }) {
+export default function PnLTrendsChart({ data, granularity, embedded = false, compact = false }) {
   const [chartType, setChartType] = useState('area');
   const [showMetrics, setShowMetrics] = useState(['revenue', 'netProfit']);
 
@@ -52,132 +52,141 @@ export default function PnLTrendsChart({ data, granularity }) {
     { key: 'cogs', label: 'COGS', color: '#f59e0b' },
   ];
 
+  const header = (
+    <div className="flex items-center justify-between">
+      <div>
+        <CommandCardTitle className="flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-cyan-300" />
+          Profit Trends
+        </CommandCardTitle>
+        <CommandCardDescription>
+          {granularity.charAt(0).toUpperCase() + granularity.slice(1)} performance over time
+        </CommandCardDescription>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+          <Button
+            variant={chartType === 'area' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setChartType('area')}
+            className="rounded-none border-0 text-slate-200"
+          >
+            <Activity className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={chartType === 'bar' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setChartType('bar')}
+            className="rounded-none border-0 text-slate-200"
+          >
+            <BarChart3 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const body = (
+    <>
+      <div className={`flex flex-wrap gap-2 ${embedded ? 'mb-4' : 'mt-4'}`}>
+        {metrics.map(metric => (
+          <Button
+            key={metric.key}
+            variant={showMetrics.includes(metric.key) ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => toggleMetric(metric.key)}
+            style={{
+              backgroundColor: showMetrics.includes(metric.key) ? metric.color : undefined,
+              borderColor: metric.color
+            }}
+            className="text-xs text-slate-100"
+          >
+            {metric.label}
+          </Button>
+        ))}
+      </div>
+      <div className={compact ? 'h-56' : 'h-80'}>
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === 'area' ? (
+            <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <defs>
+                {metrics.map(metric => (
+                  <linearGradient key={metric.key} id={`gradient-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={metric.color} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={metric.color} stopOpacity={0}/>
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+              />
+              <YAxis 
+                tickFormatter={formatCurrency}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+              {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
+                <Area
+                  key={metric.key}
+                  type="monotone"
+                  dataKey={metric.key}
+                  name={metric.label}
+                  stroke={metric.color}
+                  fill={`url(#gradient-${metric.key})`}
+                  strokeWidth={2}
+                />
+              ))}
+            </AreaChart>
+          ) : (
+            <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+              />
+              <YAxis 
+                tickFormatter={formatCurrency}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+                tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+              {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
+                <Bar
+                  key={metric.key}
+                  dataKey={metric.key}
+                  name={metric.label}
+                  fill={metric.color}
+                  radius={[4, 4, 0, 0]}
+                />
+              ))}
+            </ComposedChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </>
+  );
+
+  if (embedded) {
+    return body;
+  }
+
   return (
     <CommandCard className="h-full">
-      <CommandCardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CommandCardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-cyan-300" />
-              Profit Trends
-            </CommandCardTitle>
-            <CommandCardDescription>
-              {granularity.charAt(0).toUpperCase() + granularity.slice(1)} performance over time
-            </CommandCardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
-              <Button 
-                variant={chartType === 'area' ? 'secondary' : 'ghost'} 
-                size="sm"
-                onClick={() => setChartType('area')}
-                className="rounded-none border-0 text-slate-200"
-              >
-                <Activity className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant={chartType === 'bar' ? 'secondary' : 'ghost'} 
-                size="sm"
-                onClick={() => setChartType('bar')}
-                className="rounded-none border-0 text-slate-200"
-              >
-                <BarChart3 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-        {/* Metric toggles */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {metrics.map(metric => (
-            <Button
-              key={metric.key}
-              variant={showMetrics.includes(metric.key) ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => toggleMetric(metric.key)}
-              style={{
-                backgroundColor: showMetrics.includes(metric.key) ? metric.color : undefined,
-                borderColor: metric.color
-              }}
-              className="text-xs text-slate-100"
-            >
-              {metric.label}
-            </Button>
-          ))}
-        </div>
-      </CommandCardHeader>
-      <CommandCardContent>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            {chartType === 'area' ? (
-              <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  {metrics.map(metric => (
-                    <linearGradient key={metric.key} id={`gradient-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={metric.color} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={metric.color} stopOpacity={0}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
-                  tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                />
-                <YAxis 
-                  tickFormatter={formatCurrency}
-                  tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#cbd5e1' }} />
-                {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
-                  <Area
-                    key={metric.key}
-                    type="monotone"
-                    dataKey={metric.key}
-                    name={metric.label}
-                    stroke={metric.color}
-                    fill={`url(#gradient-${metric.key})`}
-                    strokeWidth={2}
-                  />
-                ))}
-              </AreaChart>
-            ) : (
-              <ComposedChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(val) => format(parseISO(val), granularity === 'monthly' ? 'MMM' : 'MMM d')}
-                  tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                />
-                <YAxis 
-                  tickFormatter={formatCurrency}
-                  tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  axisLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                  tickLine={{ stroke: 'rgba(148,163,184,0.18)' }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#cbd5e1' }} />
-                {metrics.filter(m => showMetrics.includes(m.key)).map(metric => (
-                  <Bar
-                    key={metric.key}
-                    dataKey={metric.key}
-                    name={metric.label}
-                    fill={metric.color}
-                    radius={[4, 4, 0, 0]}
-                  />
-                ))}
-              </ComposedChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      </CommandCardContent>
+      <CommandCardHeader>{header}</CommandCardHeader>
+      <CommandCardContent>{body}</CommandCardContent>
     </CommandCard>
   );
 }

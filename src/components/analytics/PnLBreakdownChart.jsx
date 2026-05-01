@@ -11,9 +11,7 @@ const formatCurrency = (value) => {
   return `$${value.toFixed(2)}`;
 };
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-
-export default function PnLBreakdownChart({ metrics }) {
+export default function PnLBreakdownChart({ metrics, mode = 'both', embedded = false, compact = false }) {
   // Cost breakdown data
   const costBreakdown = [
     { name: 'COGS', value: metrics.totalCogs, color: '#f59e0b' },
@@ -49,10 +47,9 @@ export default function PnLBreakdownChart({ metrics }) {
     );
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Cost Breakdown Pie */}
-      <CommandCard>
+  const breakdownPanel = (
+    <>
+      {!embedded && (
         <CommandCardHeader>
           <CommandCardTitle className="flex items-center gap-2">
             <PieIcon className="w-5 h-5 text-cyan-300" />
@@ -60,8 +57,9 @@ export default function PnLBreakdownChart({ metrics }) {
           </CommandCardTitle>
           <CommandCardDescription>Where your money goes</CommandCardDescription>
         </CommandCardHeader>
-        <CommandCardContent>
-          <div className="h-64">
+      )}
+      <CommandCardContent>
+          <div className={compact ? 'h-56' : 'h-64'}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -79,7 +77,7 @@ export default function PnLBreakdownChart({ metrics }) {
                 </Pie>
                 <Tooltip content={<CustomPieTooltip />} />
                 <Legend 
-                  formatter={(value, entry) => (
+                  formatter={(value) => (
                     <span className="text-sm text-slate-300">{value}</span>
                   )}
                   wrapperStyle={{ color: '#cbd5e1' }}
@@ -104,11 +102,13 @@ export default function PnLBreakdownChart({ metrics }) {
               </div>
             ))}
           </div>
-        </CommandCardContent>
-      </CommandCard>
+      </CommandCardContent>
+    </>
+  );
 
-      {/* Profit Waterfall */}
-      <CommandCard>
+  const waterfallPanel = (
+    <>
+      {!embedded && (
         <CommandCardHeader>
           <CommandCardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-cyan-300" />
@@ -116,8 +116,9 @@ export default function PnLBreakdownChart({ metrics }) {
           </CommandCardTitle>
           <CommandCardDescription>From revenue to net profit</CommandCardDescription>
         </CommandCardHeader>
-        <CommandCardContent>
-          <div className="h-64">
+      )}
+      <CommandCardContent>
+          <div className={compact ? 'h-56' : 'h-64'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={waterfallData} layout="vertical" margin={{ left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.16)" horizontal={false} />
@@ -172,8 +173,26 @@ export default function PnLBreakdownChart({ metrics }) {
               </div>
             </div>
           </div>
-        </CommandCardContent>
-      </CommandCard>
+      </CommandCardContent>
+    </>
+  );
+
+  if (embedded) {
+    return mode === 'waterfall' ? waterfallPanel : breakdownPanel;
+  }
+
+  if (mode === 'breakdown') {
+    return <CommandCard>{breakdownPanel}</CommandCard>;
+  }
+
+  if (mode === 'waterfall') {
+    return <CommandCard>{waterfallPanel}</CommandCard>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <CommandCard>{breakdownPanel}</CommandCard>
+      <CommandCard>{waterfallPanel}</CommandCard>
     </div>
   );
 }

@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Calendar as CalendarIcon, Download, Filter, BarChart3, Loader2
+  Calendar as CalendarIcon, ChevronDown, ChevronUp, Download, Filter, BarChart3, Loader2
 } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
@@ -54,6 +55,7 @@ export default function PnLAnalytics() {
   const [segmentBy, setSegmentBy] = useState('product');
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [drilldownOrders, setDrilldownOrders] = useState(null);
+  const [showDetails, setShowDetails] = useState(false);
   const invalidateTimerRef = React.useRef(null);
 
   // Fetch orders for the date range
@@ -277,7 +279,7 @@ export default function PnLAnalytics() {
   const isLoading = tenantLoading || ordersLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -385,41 +387,112 @@ export default function PnLAnalytics() {
           <PnLMetricsCards metrics={metrics} />
 
           {/* Row 2 */}
-          <AIOrderAnalysis orders={orders} metrics={metrics} />
+          <AIOrderAnalysis
+            orders={orders}
+            metrics={metrics}
+            onOpenDetails={() => setShowDetails(true)}
+          />
 
           {/* Row 3 */}
-          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-            <PnLTrendsChart data={trendData} granularity={granularity} />
-            <PnLBreakdownChart metrics={metrics} />
-          </div>
-
-          {/* Row 4 */}
           <CommandCard>
-            <CommandCardHeader>
-              <div className="flex items-center justify-between">
+            <CommandCardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <CommandCardTitle>P&L by Segment</CommandCardTitle>
-                  <CommandCardDescription>Full segment performance table with drill-down access</CommandCardDescription>
+                  <CommandCardTitle>Performance Module</CommandCardTitle>
+                  <CommandCardDescription>
+                    One focused view at a time for trends, cost structure, and profit flow.
+                  </CommandCardDescription>
                 </div>
-                <Select value={segmentBy} onValueChange={setSegmentBy}>
-                  <SelectTrigger className="w-40 border-white/10 bg-white/[0.03] text-slate-100">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="product">By Product</SelectItem>
-                    <SelectItem value="customer">By Customer</SelectItem>
-                    <SelectItem value="tags">By Order Tags</SelectItem>
-                  </SelectContent>
-                </Select>
+                {orders.length <= 1 && (
+                  <Badge variant="outline" className="border-white/10 text-slate-400">
+                    Low data mode
+                  </Badge>
+                )}
               </div>
             </CommandCardHeader>
             <CommandCardContent>
-              <PnLSegmentTable 
-                data={segmentData} 
-                segmentBy={segmentBy}
-                onDrilldown={handleSegmentDrilldown}
-              />
+              {orders.length <= 1 ? (
+                <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
+                  More order volume is needed before trend visuals become useful. Use the detailed breakdown only if you need to inspect the current order set.
+                </div>
+              ) : (
+                <Tabs defaultValue="trends" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-3 border border-white/10 bg-white/[0.03]">
+                    <TabsTrigger value="trends">Trends</TabsTrigger>
+                    <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+                    <TabsTrigger value="waterfall">Waterfall</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="trends">
+                    <PnLTrendsChart data={trendData} granularity={granularity} embedded compact />
+                  </TabsContent>
+                  <TabsContent value="breakdown">
+                    <PnLBreakdownChart metrics={metrics} mode="breakdown" embedded compact />
+                  </TabsContent>
+                  <TabsContent value="waterfall">
+                    <PnLBreakdownChart metrics={metrics} mode="waterfall" embedded compact />
+                  </TabsContent>
+                </Tabs>
+              )}
+            </CommandCardContent>
+          </CommandCard>
+
+          {/* Row 4 */}
+          <CommandCard>
+            <CommandCardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CommandCardTitle>Detailed Breakdown</CommandCardTitle>
+                  <CommandCardDescription>
+                    Segment table and drill-down analysis are hidden until you need them.
+                  </CommandCardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.05]"
+                  onClick={() => setShowDetails((value) => !value)}
+                >
+                  {showDetails ? (
+                    <>
+                      <ChevronUp className="mr-2 h-4 w-4" />
+                      Hide Detailed Breakdown
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                      View Detailed Breakdown
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CommandCardHeader>
+            <CommandCardContent>
+              {showDetails ? (
+                <div className="space-y-4">
+                  <div className="flex justify-end">
+                    <Select value={segmentBy} onValueChange={setSegmentBy}>
+                      <SelectTrigger className="w-40 border-white/10 bg-white/[0.03] text-slate-100">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="product">By Product</SelectItem>
+                        <SelectItem value="customer">By Customer</SelectItem>
+                        <SelectItem value="tags">By Order Tags</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <PnLSegmentTable
+                    data={segmentData}
+                    segmentBy={segmentBy}
+                    onDrilldown={handleSegmentDrilldown}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
+                  Hidden by default to keep the main profit summary above the fold.
+                </div>
+              )}
             </CommandCardContent>
           </CommandCard>
 

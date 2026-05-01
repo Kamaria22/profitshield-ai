@@ -27,14 +27,6 @@ export default function PnLMetricsCards({ metrics }) {
       subtitle: `${metrics.orderCount} orders`
     },
     {
-      title: 'Gross Profit',
-      value: formatCurrency(metrics.grossProfit),
-      icon: TrendingUp,
-      color: 'emerald',
-      subtitle: `${formatPercent(metrics.grossMargin)} margin`,
-      trend: metrics.grossMargin >= 30 ? 'up' : 'down'
-    },
-    {
       title: 'Net Profit',
       value: formatCurrency(metrics.netProfit),
       icon: metrics.netProfit >= 0 ? TrendingUp : TrendingDown,
@@ -43,14 +35,22 @@ export default function PnLMetricsCards({ metrics }) {
       trend: metrics.netProfit >= 0 ? 'up' : 'down'
     },
     {
-      title: 'Average Order Value',
-      value: formatCurrency(metrics.aov),
-      icon: ShoppingCart,
-      color: 'purple',
-      subtitle: `${metrics.orderCount} orders`
+      title: 'Margin',
+      value: formatPercent(metrics.netMargin),
+      icon: TrendingUp,
+      color: metrics.netMargin >= 15 ? 'emerald' : 'amber',
+      subtitle: `${formatCurrency(metrics.grossProfit)} gross profit`,
+      trend: metrics.netMargin >= 15 ? 'up' : 'down'
     },
     {
-      title: 'Customer LTV',
+      title: 'Orders',
+      value: `${metrics.orderCount}`,
+      icon: ShoppingCart,
+      color: 'purple',
+      subtitle: `${formatCurrency(metrics.aov)} AOV`
+    },
+    {
+      title: 'LTV',
       value: formatCurrency(metrics.ltv),
       icon: Users,
       color: 'amber',
@@ -69,12 +69,12 @@ export default function PnLMetricsCards({ metrics }) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
           <CommandCard key={idx} className="h-full">
-            <CommandCardContent className="pt-4">
+            <CommandCardContent className="px-4 py-3">
               <div className="flex items-start justify-between">
                 <div className={`p-2 rounded-lg ${colorClasses[card.color]}`}>
                   <Icon className="w-4 h-4" />
@@ -89,9 +89,9 @@ export default function PnLMetricsCards({ metrics }) {
                   </div>
                 ) : <div className="h-3 w-3" />}
               </div>
-              <div className="mt-3">
-                <p className="text-2xl font-bold text-slate-100">{card.value}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{card.title}</p>
+              <div className="mt-2">
+                <p className="text-xl font-bold text-slate-100">{card.value}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{card.title}</p>
                 <p className="text-xs text-slate-400">{card.subtitle}</p>
               </div>
             </CommandCardContent>
