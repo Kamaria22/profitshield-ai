@@ -1,152 +1,115 @@
 import React, { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp } from 'lucide-react';
-import { format, subDays, startOfDay, parseISO } from 'date-fns';
+import { format, parseISO, startOfDay, subDays } from 'date-fns';
+import { AlertTriangle, TrendingUp } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+import {
+  CommandCard,
+  CommandCardContent,
+  CommandCardDescription,
+  CommandCardHeader,
+  CommandCardTitle,
+} from '@/components/ui/command-card';
 
 export default function AlertTrendsChart({ alerts = [] }) {
   const chartData = useMemo(() => {
-    // Generate last 14 days
     const days = [];
-    for (let i = 13; i >= 0; i--) {
+    for (let i = 13; i >= 0; i -= 1) {
       const date = startOfDay(subDays(new Date(), i));
       days.push({
         date: format(date, 'yyyy-MM-dd'),
         label: format(date, 'MMM d'),
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        total: 0
+        total: 0,
       });
     }
 
-    // Count alerts per day by severity
-    alerts.forEach(alert => {
+    alerts.forEach((alert) => {
       if (!alert.created_date) return;
       try {
         const alertDate = format(startOfDay(parseISO(alert.created_date)), 'yyyy-MM-dd');
-        const dayData = days.find(d => d.date === alertDate);
-        if (dayData) {
-          const severity = alert.severity || 'medium';
-          if (dayData[severity] !== undefined) {
-            dayData[severity]++;
-          }
-          dayData.total++;
-        }
+        const bucket = days.find((day) => day.date === alertDate);
+        if (bucket) bucket.total += 1;
       } catch {
-        // Skip invalid date
+        // Ignore malformed dates.
       }
     });
 
     return days;
   }, [alerts]);
 
-  const totalAlerts = chartData.reduce((sum, d) => sum + d.total, 0);
-  const avgPerDay = (totalAlerts / 14).toFixed(1);
+  const totalAlerts = chartData.reduce((sum, day) => sum + day.total, 0);
+  const maxDailyAlerts = chartData.reduce((max, day) => Math.max(max, day.total), 0);
+  const hasMeaningfulTrend = totalAlerts > 1 && maxDailyAlerts > 0;
+
+  if (!hasMeaningfulTrend) {
+    return (
+      <CommandCard className="border-white/8 bg-white/[0.03]">
+        <CommandCardContent className="flex items-center gap-3 px-4 py-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300">
+            <AlertTriangle className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-slate-100">Alert Activity</div>
+            <div className="text-sm text-slate-400">No alert activity in selected period</div>
+          </div>
+        </CommandCardContent>
+      </CommandCard>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
-            Alert Trends (14 Days)
-          </CardTitle>
-          <div className="text-sm text-slate-500">
-            Avg: <span className="font-medium text-slate-700">{avgPerDay}/day</span>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64">
+    <CommandCard className="border-white/8 bg-white/[0.03]">
+      <CommandCardHeader className="pb-2">
+        <CommandCardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-cyan-300" />
+          Alert Activity
+        </CommandCardTitle>
+        <CommandCardDescription>Compact 14-day trend for recent alert volume.</CommandCardDescription>
+      </CommandCardHeader>
+      <CommandCardContent>
+        <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
               <defs>
-                <linearGradient id="criticalGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#DC2626" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="highGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="mediumGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="lowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6B7280" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#6B7280" stopOpacity={0}/>
+                <linearGradient id="alertTrendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.01} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis 
-                dataKey="label" 
-                tick={{ fontSize: 11, fill: '#64748B' }}
-                axisLine={{ stroke: '#E2E8F0' }}
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
                 tickLine={false}
               />
-              <YAxis 
-                tick={{ fontSize: 11, fill: '#64748B' }}
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
               />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '12px',
+                  color: '#e2e8f0',
                 }}
-                labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+                labelStyle={{ color: '#f8fafc', fontWeight: 600 }}
               />
-              <Legend 
-                iconType="circle" 
-                iconSize={8}
-                wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="critical" 
-                name="Critical"
-                stackId="1"
-                stroke="#DC2626" 
-                fill="url(#criticalGrad)" 
-                strokeWidth={2}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="high" 
-                name="High"
-                stackId="1"
-                stroke="#F59E0B" 
-                fill="url(#highGrad)" 
-                strokeWidth={2}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="medium" 
-                name="Medium"
-                stackId="1"
-                stroke="#3B82F6" 
-                fill="url(#mediumGrad)" 
-                strokeWidth={2}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="low" 
-                name="Low"
-                stackId="1"
-                stroke="#6B7280" 
-                fill="url(#lowGrad)" 
+              <Area
+                type="monotone"
+                dataKey="total"
+                name="Alerts"
+                stroke="#22d3ee"
+                fill="url(#alertTrendFill)"
                 strokeWidth={2}
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-      </CardContent>
-    </Card>
+      </CommandCardContent>
+    </CommandCard>
   );
 }
