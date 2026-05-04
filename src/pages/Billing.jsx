@@ -37,52 +37,39 @@ import {
   CommandCardTitle,
 } from '@/components/ui/command-card';
 
+const PLAN_ORDER = ['STARTER', 'GROWTH', 'PRO', 'ENTERPRISE'];
 const PLAN_LIMITS = {
   STARTER: 500,
   GROWTH: 2500,
   PRO: 10000,
+  ENTERPRISE: 100000,
 };
 
 const PLAN_RECOVERY_RATE = {
   STARTER: 0.35,
   GROWTH: 0.62,
   PRO: 0.85,
+  ENTERPRISE: 0.92,
 };
 
-const PLANS = [
-  {
-    code: 'STARTER',
-    name: 'Starter',
-    monthly_price: 49,
-    yearly_price: 490,
-    yearly_monthly_equiv: 41,
-    icon: Zap,
-    tone: 'cyan',
-  },
-  {
-    code: 'GROWTH',
-    name: 'Growth',
-    monthly_price: 99,
-    yearly_price: 990,
-    yearly_monthly_equiv: 83,
-    icon: Rocket,
-    tone: 'violet',
-  },
-  {
-    code: 'PRO',
-    name: 'Pro',
-    monthly_price: 199,
-    yearly_price: 1990,
-    yearly_monthly_equiv: 166,
-    icon: Crown,
-    tone: 'amber',
-  },
-];
+const PLAN_ICON = {
+  STARTER: Zap,
+  GROWTH: Rocket,
+  PRO: Crown,
+  ENTERPRISE: Shield,
+};
 
-function formatCurrency(value, maxFractionDigits = 0) {
+const PLAN_TONE = {
+  STARTER: 'cyan',
+  GROWTH: 'violet',
+  PRO: 'amber',
+  ENTERPRISE: 'slate',
+};
+
+function formatCurrency(value, currency = 'usd', maxFractionDigits = 0) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: String(currency || 'usd').toUpperCase(),
     maximumFractionDigits: maxFractionDigits,
   }).format(Number.isFinite(value) ? value : 0);
 }
@@ -98,20 +85,62 @@ function getPlanFitCode(orderVolume) {
   return 'STARTER';
 }
 
+function intervalLabel(price) {
+  const interval = price?.recurring?.interval;
+  if (interval === 'month') return 'month';
+  if (interval === 'year') return 'year';
+  return interval || 'period';
+}
+
+function normalizeCatalogPlans(plans = []) {
+  const mapped = plans.map((plan) => ({
+    code: plan.code,
+    name: plan.name,
+    description: plan.description || '',
+    productId: plan.product_id || null,
+    metadata: plan.metadata || {},
+    prices: plan.prices || {},
+  }));
+
+  return mapped.sort((a, b) => {
+    const aIndex = PLAN_ORDER.indexOf(a.code);
+    const bIndex = PLAN_ORDER.indexOf(b.code);
+    const aRank = aIndex === -1 ? PLAN_ORDER.length : aIndex;
+    const bRank = bIndex === -1 ? PLAN_ORDER.length : bIndex;
+    return aRank - bRank;
+  });
+}
+
 function getPlanToneClasses(tone, highlighted = false) {
   if (tone === 'amber') {
-    return highlighted
-      ? 'border-amber-300/35 bg-amber-500/[0.06]'
-      : 'border-white/10 bg-white/[0.04]';
+    return highlighted ? 'border-amber-300/35 bg-amber-500/[0.06]' : 'border-white/10 bg-white/[0.04]';
   }
   if (tone === 'violet') {
-    return highlighted
-      ? 'border-violet-300/35 bg-violet-500/[0.06]'
-      : 'border-white/10 bg-white/[0.04]';
+    return highlighted ? 'border-violet-300/35 bg-violet-500/[0.06]' : 'border-white/10 bg-white/[0.04]';
   }
-  return highlighted
-    ? 'border-cyan-300/35 bg-cyan-500/[0.06]'
-    : 'border-white/10 bg-white/[0.04]';
+  if (tone === 'slate') {
+    return highlighted ? 'border-slate-300/30 bg-slate-500/[0.06]' : 'border-white/10 bg-white/[0.04]';
+  }
+  return highlighted ? 'border-cyan-300/35 bg-cyan-500/[0.06]' : 'border-white/10 bg-white/[0.04]';
+}
+
+function buildYearlySavings(plan) {
+  const monthly = plan?.prices?.monthly;
+  const yearly = plan?.prices?.yearly;
+  if (!monthly?.unit_amount || !yearly?.unit_amount) return null;
+
+  const annualFromMonthly = monthly.unit_amount * 12;
+  if (annualFromMonthly <= yearly.unit_amount) return null;
+
+  const percent = Math.round(((annualFromMonthly - yearly.unit_amount) / annualFromMonthly) * 100);
+  return {
+    percent,
+    annualSavingsCents: annualFromMonthly - yearly.unit_amount,
+  };
+}
+
+function selectPrice(plan, billingCycle) {
+  return plan?.prices?.[billingCycle] || null;
 }
 
 export default function Billing() {
@@ -129,6 +158,15 @@ export default function Billing() {
 
   const ordersQueryKey = buildQueryKey('billing-orders', resolverCheck);
   const leaksQueryKey = buildQueryKey('billing-profit-leaks', resolverCheck);
+
+  const { data: pricingCatalogResponse, isLoading: pricingLoading, isError: pricingError, refetch: refetchPricing } = useQuery({
+    queryKey: ['stripe-pricing-catalog'],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('stripeCheckout', { action: 'pricing_catalog' });
+      return res.data?.data?.plans || [];
+    },
+    staleTime: 60000,
+  });
 
   const { data: stripeHealth, isError: stripeHealthError } = useQuery({
     queryKey: ['stripe-health'],
@@ -189,16 +227,11 @@ export default function Billing() {
     enabled: !!user,
   });
 
-  const isPlanAvailable = (planCode) => {
-    if (!stripeHealth) return true;
-    const key = `${planCode}_${billingCycle}`;
-    return !(stripeHealth.missing_price_ids || []).includes(key);
-  };
-
   const checkoutMutation = useMutation({
-    mutationFn: async (planCode) => {
+    mutationFn: async ({ priceId, planCode }) => {
       const response = await base44.functions.invoke('stripeCheckout', {
         action: 'create_checkout',
+        price_id: priceId,
         plan_code: planCode,
         billing_cycle: billingCycle,
         tenant_id: tenantId,
@@ -266,6 +299,23 @@ export default function Billing() {
     };
   }, [tenantId, location.search, refetchSubscription, refetchTrialStatus]);
 
+  const catalogPlans = useMemo(() => normalizeCatalogPlans(pricingCatalogResponse || []), [pricingCatalogResponse]);
+
+  const availableBillingCycles = useMemo(() => {
+    const hasMonthly = catalogPlans.some((plan) => plan.prices?.monthly);
+    const hasYearly = catalogPlans.some((plan) => plan.prices?.yearly);
+    return { hasMonthly, hasYearly };
+  }, [catalogPlans]);
+
+  useEffect(() => {
+    if (billingCycle === 'yearly' && !availableBillingCycles.hasYearly && availableBillingCycles.hasMonthly) {
+      setBillingCycle('monthly');
+    }
+    if (billingCycle === 'monthly' && !availableBillingCycles.hasMonthly && availableBillingCycles.hasYearly) {
+      setBillingCycle('yearly');
+    }
+  }, [availableBillingCycles, billingCycle]);
+
   const roiModel = useMemo(() => {
     const last30Days = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recentOrders = orders.filter((order) => {
@@ -291,10 +341,7 @@ export default function Billing() {
       ? Math.max(revenue30d * 0.035, orderCount * 5)
       : Math.max(orderCount * 8, 180);
 
-    const hiddenLoss = Math.max(
-      leakImpact + negativeMarginLoss + refunds30d + fees30d + discounts30d,
-      0
-    );
+    const hiddenLoss = Math.max(leakImpact + negativeMarginLoss + refunds30d + fees30d + discounts30d, 0);
     const modeledLoss = hiddenLoss > 0 ? hiddenLoss : estimateFromVolume;
     const orderVolume = orderCount || Math.max(1, Math.round((revenue30d || 0) / 85));
     const averageMarginLift = revenue30d > 0 ? Math.min((modeledLoss / revenue30d) * 100, 24) : 7.5;
@@ -316,34 +363,44 @@ export default function Billing() {
   }, [orders, profitLeaks]);
 
   const planCards = useMemo(() => {
-    return PLANS.map((plan) => {
-      const monthlyPrice = billingCycle === 'monthly' ? plan.monthly_price : plan.yearly_monthly_equiv;
-      const billedPrice = billingCycle === 'monthly' ? plan.monthly_price : plan.yearly_price;
-      const saveEstimate = Math.round(roiModel.hiddenLoss * PLAN_RECOVERY_RATE[plan.code]);
-      const netGain = Math.max(0, saveEstimate - monthlyPrice);
-      const yearlySavings = plan.monthly_price * 12 - plan.yearly_price;
-      const isRecommended = roiModel.recommendedPlanCode === plan.code;
-      const exceedsPlan = roiModel.orderVolume > PLAN_LIMITS[plan.code];
+    return catalogPlans
+      .map((plan) => {
+        const selectedPrice = selectPrice(plan, billingCycle);
+        if (!selectedPrice) return null;
 
-      return {
-        ...plan,
-        monthlyPrice,
-        billedPrice,
-        saveEstimate,
-        netGain,
-        yearlySavings,
-        isRecommended,
-        exceedsPlan,
-        usageLabel: `Your store: ~${formatCount(roiModel.orderVolume)} orders/month`,
-        supportLabel: `This plan supports up to ${formatCount(PLAN_LIMITS[plan.code])}`,
-        outcomes: [
-          `Prevent ~${formatCurrency(Math.round(Math.max(roiModel.negativeMarginLoss * PLAN_RECOVERY_RATE[plan.code], 45)) )}/month in fraud and risky orders`,
-          `Recover ~${formatCurrency(Math.round(Math.max((roiModel.leakImpact + roiModel.discounts30d) * PLAN_RECOVERY_RATE[plan.code], 35)) )} from pricing and shipping errors`,
-          'Protect margins in real time with live sync and alerting',
-        ],
-      };
-    });
-  }, [billingCycle, roiModel]);
+        const billingMultiplier = selectedPrice.recurring?.interval === 'year' ? 12 : 1;
+        const periodLoss = roiModel.hiddenLoss * billingMultiplier;
+        const saveEstimate = Math.round(periodLoss * (PLAN_RECOVERY_RATE[plan.code] || 0.5));
+        const rawCost = (selectedPrice.unit_amount || 0) / 100;
+        const netGain = Math.max(0, saveEstimate - rawCost);
+        const yearlySavings = buildYearlySavings(plan);
+        const isRecommended = roiModel.recommendedPlanCode === plan.code;
+        const exceedsPlan = roiModel.orderVolume > (PLAN_LIMITS[plan.code] || PLAN_LIMITS.ENTERPRISE);
+
+        return {
+          ...plan,
+          selectedPrice,
+          selectedCurrency: selectedPrice.currency || 'usd',
+          displayPrice: formatCurrency((selectedPrice.unit_amount || 0) / 100, selectedPrice.currency || 'usd'),
+          periodLabel: intervalLabel(selectedPrice),
+          saveEstimate,
+          netGain,
+          yearlySavings,
+          isRecommended,
+          exceedsPlan,
+          usageLabel: `Your store: ~${formatCount(roiModel.orderVolume)} orders/month`,
+          supportLabel: plan.code === 'ENTERPRISE'
+            ? 'Built for 10K+ orders/month'
+            : `This plan supports up to ${formatCount(PLAN_LIMITS[plan.code] || 0)}`,
+          outcomes: [
+            `Prevent ~${formatCurrency(Math.round(Math.max(roiModel.negativeMarginLoss * (PLAN_RECOVERY_RATE[plan.code] || 0.5), 45)), selectedPrice.currency || 'usd')}/${selectedPrice.recurring?.interval === 'year' ? 'year' : 'month'} in fraud losses`,
+            `Recover ~${formatCurrency(Math.round(Math.max((roiModel.leakImpact + roiModel.discounts30d) * (PLAN_RECOVERY_RATE[plan.code] || 0.5), 35)), selectedPrice.currency || 'usd')} from pricing and shipping errors`,
+            'Protect margins in real time with live sync and alerting',
+          ],
+        };
+      })
+      .filter(Boolean);
+  }, [billingCycle, catalogPlans, roiModel]);
 
   const trustMetrics = useMemo(() => {
     const benchmarkRecovered = Math.max(roiModel.hiddenLoss * 18, 420000);
@@ -362,6 +419,8 @@ export default function Billing() {
     );
   }
 
+  const canRenderPricing = !pricingLoading && !pricingError && planCards.length > 0;
+
   return (
     <div className="space-y-6">
       <CommandCard className="border-cyan-300/20 bg-gradient-to-r from-cyan-500/[0.08] via-white/[0.03] to-violet-500/[0.08]">
@@ -372,10 +431,9 @@ export default function Billing() {
               You’re currently losing {formatCurrency(Math.round(roiModel.hiddenLoss))}/month in hidden profit leaks
             </h1>
             <p className="mt-2 text-sm text-slate-300">
-              {planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.name || 'Growth'} can recover ~
-              {formatCurrency(
-                planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.saveEstimate || roiModel.hiddenLoss * 0.62
-              )}/month based on your current order volume, refunds, fees, discounts, and profit leaks.
+              {(planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.name || 'Your recommended plan')} can recover ~
+              {formatCurrency(planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.saveEstimate || roiModel.hiddenLoss * 0.62)}/
+              {billingCycle === 'yearly' ? 'year' : 'month'} based on your current order volume, refunds, fees, discounts, and profit leaks.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge className="border-white/10 bg-white/[0.06] text-slate-100">
@@ -398,7 +456,7 @@ export default function Billing() {
             <div className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3">
               <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Plan fit</div>
               <div className="mt-1 text-lg font-semibold text-white">
-                {roiModel.recommendedPlanCode === 'ENTERPRISE' ? 'Enterprise' : planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.name}
+                {planCards.find((plan) => plan.code === roiModel.recommendedPlanCode)?.name || roiModel.recommendedPlanCode}
               </div>
               <div className="mt-1 text-xs text-slate-400">Best fit based on your store activity</div>
             </div>
@@ -413,7 +471,7 @@ export default function Billing() {
             <div className="flex-1">
               <div className="font-medium text-amber-100">Billing status could not fully refresh</div>
               <div className="mt-1 text-sm text-slate-300">
-                Plan changes may still work, but subscription or trial status may be stale.
+                Subscription status may be stale. Pricing will still load directly from Stripe when available.
               </div>
             </div>
             <Button
@@ -422,6 +480,7 @@ export default function Billing() {
               onClick={() => {
                 refetchSubscription();
                 refetchTrialStatus();
+                refetchPricing();
               }}
             >
               Retry
@@ -456,11 +515,7 @@ export default function Billing() {
               <div className="mt-1 text-xl font-semibold text-white">{subscription.plan_code}</div>
               <div className="mt-1 text-sm text-slate-400">Status: {subscription.status}</div>
             </div>
-            <Button
-              onClick={() => portalMutation.mutate()}
-              disabled={portalMutation.isPending}
-              className="gap-2"
-            >
+            <Button onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending} className="gap-2">
               {portalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
               Manage Subscription
             </Button>
@@ -471,135 +526,175 @@ export default function Billing() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-white">Recommended solution</h2>
-          <p className="mt-1 text-sm text-slate-400">Choose the plan that best matches your current order volume and recoverable profit.</p>
+          <p className="mt-1 text-sm text-slate-400">Pricing is loaded directly from Stripe. Value messaging is based on your live store data.</p>
         </div>
         <div className="flex items-center rounded-xl border border-white/10 bg-white/[0.04] p-1">
           <button
             type="button"
             onClick={() => setBillingCycle('monthly')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}
+            disabled={!availableBillingCycles.hasMonthly}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}
           >
             Monthly
           </button>
           <button
             type="button"
             onClick={() => setBillingCycle('yearly')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}
+            disabled={!availableBillingCycles.hasYearly}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}
           >
             Yearly
-            <span className="ml-2 text-xs">{`Save ${formatCurrency(PLANS[1].monthly_price * 12 - PLANS[1].yearly_price)}/year (17%)`}</span>
+            {planCards.find((plan) => plan.yearlySavings)?.yearlySavings && (
+              <span className="ml-2 text-xs">
+                Save {planCards.find((plan) => plan.yearlySavings)?.yearlySavings?.percent}%
+              </span>
+            )}
           </button>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        {planCards.map((plan) => {
-          const Icon = plan.icon;
-          const isCurrentPlan = subscription?.plan_code === plan.code;
-          const ctaLabel =
-            plan.code === 'STARTER'
-              ? 'Start Protecting Profit'
-              : plan.code === 'GROWTH'
-                ? `Unlock ${formatCurrency(plan.saveEstimate)}/month Recovery`
-                : 'Maximize Profit Protection';
-
-          return (
-            <CommandCard
-              key={plan.code}
-              className={`${getPlanToneClasses(plan.tone, plan.isRecommended)} p-0`}
-            >
-              <CommandCardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
-                      <Icon className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <CommandCardTitle>{plan.name}</CommandCardTitle>
-                      <CommandCardDescription>{plan.supportLabel}</CommandCardDescription>
-                    </div>
-                  </div>
-                  {plan.isRecommended && (
-                    <Badge className="border-cyan-300/20 bg-cyan-500/15 text-cyan-100">
-                      Recommended for You
-                    </Badge>
-                  )}
-                </div>
-              </CommandCardHeader>
-              <CommandCardContent className="space-y-4">
-                <div>
-                  <div className="flex items-end gap-2">
-                    <span className="text-3xl font-semibold text-white">{formatCurrency(plan.monthlyPrice)}</span>
-                    <span className="pb-1 text-sm text-slate-400">/month</span>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    {billingCycle === 'yearly'
-                      ? `${formatCurrency(plan.billedPrice)} billed yearly · Save ${formatCurrency(plan.yearlySavings)}/year`
-                      : 'Month-to-month billing'}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
-                  <div className="grid gap-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">You save</span>
-                      <span className="font-medium text-emerald-300">~{formatCurrency(plan.saveEstimate)}/month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Cost</span>
-                      <span className="text-slate-100">{formatCurrency(plan.monthlyPrice)}/month</span>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-white/10 pt-2">
-                      <span className="text-slate-400">Net gain</span>
-                      <span className="font-semibold text-cyan-200">+{formatCurrency(plan.netGain)}/month</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {plan.outcomes.map((outcome) => (
-                    <div key={outcome} className="flex items-start gap-2 text-sm text-slate-300">
-                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-300" />
-                      <span>{outcome}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm">
-                  <div className="font-medium text-slate-100">{plan.usageLabel}</div>
-                  <div className="mt-1 text-slate-400">{plan.supportLabel}</div>
-                  {plan.exceedsPlan && (
-                    <div className="mt-2 text-amber-300">
-                      You may miss profit insights at your current volume.
-                    </div>
-                  )}
-                  <div className="mt-2 text-cyan-200">Recommended based on your current store data</div>
-                </div>
-
-                {!isPlanAvailable(plan.code) ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-300">
-                    Plan temporarily unavailable
-                  </div>
-                ) : (
-                  <Button
-                    className="w-full"
-                    onClick={() => checkoutMutation.mutate(plan.code)}
-                    disabled={checkoutMutation.isPending || isCurrentPlan}
-                  >
-                    {isCurrentPlan ? 'Current Plan' : ctaLabel}
-                  </Button>
-                )}
-                <div className="text-center text-xs text-slate-400">Best fit based on your current store activity</div>
+      {pricingLoading && (
+        <div className="grid gap-4 xl:grid-cols-3">
+          {[...Array(3)].map((_, index) => (
+            <CommandCard key={index}>
+              <CommandCardContent className="space-y-4 px-4 py-4">
+                <div className="h-5 w-24 animate-pulse rounded bg-white/10" />
+                <div className="h-10 w-32 animate-pulse rounded bg-white/10" />
+                <div className="h-24 animate-pulse rounded bg-white/10" />
+                <div className="h-10 animate-pulse rounded bg-white/10" />
               </CommandCardContent>
             </CommandCard>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {!pricingLoading && (pricingError || !canRenderPricing) && (
+        <CommandCard className="border-amber-500/25 bg-amber-500/[0.05]">
+          <CommandCardContent className="flex items-center justify-between gap-4 px-4 py-4">
+            <div>
+              <div className="font-medium text-amber-100">Unable to load pricing. Please refresh.</div>
+              <div className="mt-1 text-sm text-slate-300">No placeholder prices are shown when Stripe pricing is unavailable.</div>
+            </div>
+            <Button variant="outline" className="border-white/10 bg-white/[0.04]" onClick={() => refetchPricing()}>
+              Refresh
+            </Button>
+          </CommandCardContent>
+        </CommandCard>
+      )}
+
+      {canRenderPricing && (
+        <div className="grid gap-4 xl:grid-cols-3">
+          {planCards.map((plan) => {
+            const Icon = PLAN_ICON[plan.code] || Shield;
+            const isCurrentPlan = subscription?.plan_code === plan.code;
+            const ctaLabel =
+              plan.code === 'STARTER'
+                ? 'Start Protecting Profit'
+                : plan.code === 'GROWTH'
+                  ? `Unlock ${formatCurrency(plan.saveEstimate, plan.selectedCurrency)}/${plan.periodLabel} Recovery`
+                  : plan.code === 'PRO'
+                    ? 'Maximize Profit Protection'
+                    : 'Talk to Profit Specialist';
+
+            return (
+              <CommandCard key={plan.code} className={`${getPlanToneClasses(PLAN_TONE[plan.code], plan.isRecommended)} p-0`}>
+                <CommandCardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <CommandCardTitle>{plan.name}</CommandCardTitle>
+                        <CommandCardDescription>{plan.description || plan.supportLabel}</CommandCardDescription>
+                      </div>
+                    </div>
+                    {plan.isRecommended && (
+                      <Badge className="border-cyan-300/20 bg-cyan-500/15 text-cyan-100">Recommended for You</Badge>
+                    )}
+                  </div>
+                </CommandCardHeader>
+                <CommandCardContent className="space-y-4">
+                  <div>
+                    <div className="flex items-end gap-2">
+                      <span className="text-3xl font-semibold text-white">{plan.displayPrice}</span>
+                      <span className="pb-1 text-sm text-slate-400">/ {plan.periodLabel}</span>
+                    </div>
+                    {plan.yearlySavings && billingCycle === 'yearly' && (
+                      <div className="mt-1 text-xs text-emerald-300">
+                        Save {plan.yearlySavings.percent}% vs monthly billing
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">You save</span>
+                        <span className="font-medium text-emerald-300">
+                          ~{formatCurrency(plan.saveEstimate, plan.selectedCurrency)}/{plan.periodLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Cost</span>
+                        <span className="text-slate-100">{plan.displayPrice} / {plan.periodLabel}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-white/10 pt-2">
+                        <span className="text-slate-400">Net gain</span>
+                        <span className="font-semibold text-cyan-200">
+                          +{formatCurrency(plan.netGain, plan.selectedCurrency)}/{plan.periodLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {plan.outcomes.map((outcome) => (
+                      <div key={outcome} className="flex items-start gap-2 text-sm text-slate-300">
+                        <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-300" />
+                        <span>{outcome}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm">
+                    <div className="font-medium text-slate-100">{plan.usageLabel}</div>
+                    <div className="mt-1 text-slate-400">{plan.supportLabel}</div>
+                    {plan.exceedsPlan && plan.code !== 'ENTERPRISE' && (
+                      <div className="mt-2 text-amber-300">You may miss profit insights at your current volume.</div>
+                    )}
+                    <div className="mt-2 text-cyan-200">Best fit based on your current store activity</div>
+                  </div>
+
+                  {plan.code === 'ENTERPRISE' ? (
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => { window.location.href = 'mailto:sales@profitshield.ai?subject=Profit%20Specialist'; }}
+                    >
+                      {ctaLabel}
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={() => checkoutMutation.mutate({ priceId: plan.selectedPrice.id, planCode: plan.code })}
+                      disabled={checkoutMutation.isPending || isCurrentPlan}
+                    >
+                      {isCurrentPlan ? 'Current Plan' : ctaLabel}
+                    </Button>
+                  )}
+                  <div className="text-center text-xs text-slate-400">Recommended based on your current store data</div>
+                </CommandCardContent>
+              </CommandCard>
+            );
+          })}
+        </div>
+      )}
 
       <CommandCard>
         <CommandCardHeader className="pb-3">
           <CommandCardTitle>ROI comparison</CommandCardTitle>
-          <CommandCardDescription>Make the upgrade decision based on recoverable profit, not generic features.</CommandCardDescription>
+          <CommandCardDescription>Pricing comes from Stripe. Recovery estimates come from your live merchant data.</CommandCardDescription>
         </CommandCardHeader>
         <CommandCardContent className="grid gap-3 lg:grid-cols-3">
           {planCards.map((plan) => (
@@ -610,16 +705,16 @@ export default function Billing() {
               </div>
               <div className="mt-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Recovered monthly</span>
-                  <span className="text-slate-100">{formatCurrency(plan.saveEstimate)}</span>
+                  <span className="text-slate-400">Recovered {plan.periodLabel}</span>
+                  <span className="text-slate-100">{formatCurrency(plan.saveEstimate, plan.selectedCurrency)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Subscription cost</span>
-                  <span className="text-slate-100">{formatCurrency(plan.monthlyPrice)}</span>
+                  <span className="text-slate-100">{plan.displayPrice}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Store fit</span>
-                  <span className="text-slate-100">{plan.exceedsPlan ? 'Undersized' : 'Aligned'}</span>
+                  <span className="text-slate-100">{plan.exceedsPlan && plan.code !== 'ENTERPRISE' ? 'Undersized' : 'Aligned'}</span>
                 </div>
               </div>
             </div>
@@ -633,7 +728,7 @@ export default function Billing() {
             <div className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Enterprise</div>
             <div className="mt-1 text-xl font-semibold text-white">For stores processing 10K+ orders/month</div>
             <div className="mt-2 text-sm text-slate-400">
-              Custom profit protection, automation, and dedicated AI support for large-scale operations.
+              Custom profit protection, automation, and dedicated AI support.
             </div>
           </div>
           <Button className="gap-2" onClick={() => { window.location.href = 'mailto:sales@profitshield.ai?subject=Profit%20Specialist'; }}>
