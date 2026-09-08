@@ -1,0 +1,44 @@
+{
+  "name": "AI Support Watchdog (Every 30 min)",
+  "description": "Every 30 minutes: scans open support tickets, clusters repeated issues, triggers guardian repairs, auto-resolves AI-fixable tickets, and sends admin email alert when human intervention is needed.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 30,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-03-05T04:54:38.517000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "ai_support_watchdog_every_30_min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "supportWatchdog",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "supportWatchdog"
+  }
+}

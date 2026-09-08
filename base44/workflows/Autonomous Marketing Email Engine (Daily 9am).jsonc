@@ -1,0 +1,46 @@
+{
+  "name": "Autonomous Marketing Email Engine (Daily 9am)",
+  "description": "Daily at 9am: sends personalized onboarding, integration reminders, trial-ending alerts, and profit opportunity emails to merchants. Non-spam compliant, event-triggered only.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 14 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "autonomous_marketing_email_engine_daily_9am",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "autonomousMarketingEmail",
+            "args": {
+              "action": "run_scheduled"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "autonomousMarketingEmail"
+  }
+}
